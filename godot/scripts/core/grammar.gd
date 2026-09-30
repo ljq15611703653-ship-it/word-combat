@@ -82,6 +82,10 @@ static func target_text(t: Dictionary) -> String:
 		"adjacent": return "相邻的" + s + "随从"
 	return "?"
 
+# 单个随从的选择（复制/接续的后续目标只允许这些）
+static func is_single_pick(t: Dictionary) -> bool:
+	return not (t.pick in ["all", "each", "adjacent"])
+
 static func needs_choice(t: Dictionary) -> bool:
 	return t.pick == "choose" or t.pick == "other"
 
@@ -244,6 +248,7 @@ static func words_of(node: Dictionary) -> Array:
 			w.append("施加")
 			w.append(node.status)
 			w.append_array(target_words(node.target))
+			w.append_array(_rep("双倍", int(node.get("dbl", 0))))
 			if node.has("link"):
 				w.append_array(target_words(node.link))
 			if int(node.dur) > 0:
@@ -273,13 +278,16 @@ static func words_of(node: Dictionary) -> Array:
 		"redirect":
 			w.append("转移")
 			w.append_array(target_words(node.target))
+			w.append_array(_rep("双倍", int(node.get("dbl", 0))))
 		"convert":
 			w.append("转为")
 			w.append_array(["恢复", "生命"])
+			w.append_array(_rep("双倍", int(node.get("dbl", 0))))
 		"time":
 			w.append({"delay": "延后", "advance": "提前", "interrupt": "打断"}[node.op])
 			w.append(SIDE_WORD[node.side])
 			w.append("技能")
+			w.append_array(_rep("双倍", int(node.get("dbl", 0))))
 			if int(node.get("delay", 0)) > 0:
 				w.append("之后")
 		"swap":
@@ -543,11 +551,15 @@ static func _check(node: Dictionary, out: Array, ctx: String) -> void:
 			_check(node.then, out, ctx)
 			if not (node.first.kind in ["dmg", "heal"]):
 				out.append("接续的前一效果必须是伤害或治疗")
+			if node.then.has("target") and not is_single_pick(node.then.target):
+				out.append("接续的后一效果只能作用于单个随从（否则前一效果每个结果都会各自触发一遍，数值会被成倍放大）")
 		"copy":
 			_check(node.first, out, ctx)
 			_check_target(node.target, out, in_watch)
 			if not (node.first.kind in ["dmg", "heal"]):
 				out.append("复制只能复制伤害或治疗")
+			if not is_single_pick(node.target):
+				out.append("复制的目标只能是单个随从（每个结果各复制一份，给多个目标会成平方放大）")
 		"if":
 			_check_value(node.cond.left, out, ctx)
 			_check_value(node.cond.right, out, ctx)
@@ -623,9 +635,10 @@ static func node_text(node: Dictionary) -> String:
 		"status":
 			var s2: String = "给%s施加【%s】" % [target_text(node.target), node.status]
 			if node.status == "护盾":
-				s2 += "，可吸收 %d 点伤害" % int(node.value.n)
+				s2 += "，可吸收 %s%d 点伤害" % [_mods_text(node), int(node.value.n)]
 			elif node.status == "沉默":
-				s2 += "，力度%d（压制操作费 ≤ %d 的技能）" % [int(node.value.n), silence_limit(int(node.value.n))]
+				var pw := effective_num(node)
+				s2 += "，力度%s%d（压制操作费 ≤ %d 的技能）" % [_mods_text(node), int(node.value.n), silence_limit(pw)]
 			if node.has("link"):
 				s2 += "，与%s牵连" % target_text(node.link)
 			s2 += "（持续%d秒）" % int(node.dur) if int(node.dur) > 0 else "（直到本轮结束）"
@@ -642,15 +655,15 @@ static func node_text(node: Dictionary) -> String:
 				life = "（%d秒内）" % int(node.dur)
 			return "%s，%s：%s%s" % [when, f, node_text(node.child), life]
 		"redirect":
-			return "把这次伤害转移给%s（每个被保护者至多转移 %d 点）" % [target_text(node.target), int(node.value.n)]
+			return "把这次伤害转移给%s（每个被保护者至多转移 %s%d 点）" % [target_text(node.target), _mods_text(node), int(node.value.n)]
 		"convert":
-			return "把这次伤害转为等量治疗（每个被保护者至多转换 %d 点）" % int(node.value.n)
+			return "把这次伤害转为等量治疗（每个被保护者至多转换 %s%d 点）" % [_mods_text(node), int(node.value.n)]
 		"time":
 			var who: String = SIDE_TEXT[node.side] + "已宣告的技能"
 			match node.op:
 				"delay": return "把%s延后 %d 秒" % [who, int(node.value.n)]
 				"advance": return "把%s提前 %d 秒" % [who, int(node.value.n)]
-				_: return "打断%s尚未发生的部分（力度%d：只对操作费 ≤ %d 的技能有效）" % [who, int(node.value.n), silence_limit(int(node.value.n))]
+				_: return "打断%s尚未发生的部分（力度%s%d：只对操作费 ≤ %d 的技能有效）" % [who, _mods_text(node), int(node.value.n), silence_limit(effective_num(node))]
 		"swap":
 			return "自身与%s交换位置" % target_text(node.target)
 		"split":
@@ -671,6 +684,15 @@ static func node_text(node: Dictionary) -> String:
 		"choose":
 			return "择一：【%s】或【%s】" % [node_text(node.a), node_text(node.b)]
 	return "?"
+
+# 填入的数值套上 双倍/一半 之后的有效值
+static func effective_num(node: Dictionary) -> int:
+	var v := int(node.value.n)
+	for i in int(node.get("dbl", 0)):
+		v *= 2
+	for i in int(node.get("half", 0)):
+		v = (v + 1) / 2
+	return v
 
 # 打断/沉默的力度换算：力度P能压制操作费不超过 1.25×P 的技能
 static func silence_limit(p: int) -> int:

@@ -47,7 +47,7 @@ static func catalog() -> Array:
 			"params": [
 				{"key": "n", "label": "伤害", "kind": "int", "min": 1, "max": 60, "default": 12},
 				{"key": "tgt", "label": "首个目标", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
-				{"key": "tgt2", "label": "复制给", "kind": "enum", "options": [["lowest", "最低生命"], ["highest", "最高生命"], ["random", "随机一个"], ["all", "全部"], ["last", "最后"]], "default": "lowest"},
+				{"key": "tgt2", "label": "复制给", "kind": "enum", "options": [["lowest", "最低生命"], ["highest", "最高生命"], ["random", "随机一个"], ["first", "最前"], ["last", "最后"]], "default": "lowest"},
 			]},
 		{"id": "drain", "family": "攻", "title": "汲取", "glyph": "吸", "blurb": "造成伤害，再按实际伤害治疗自身。",
 			"params": [
@@ -72,6 +72,7 @@ static func catalog() -> Array:
 			"params": [
 				{"key": "tgt", "label": "目标", "kind": "enum", "options": ALLY_PICKS, "default": "self"},
 				{"key": "n", "label": "吸收", "kind": "int", "min": 1, "max": 60, "default": 15},
+				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 			]},
 		{"id": "status", "family": "控", "title": "施加状态", "glyph": "咒", "blurb": "给目标施加狂振、易伤、沉默、牵连或升华。",
 			"params": [
@@ -79,6 +80,7 @@ static func catalog() -> Array:
 				{"key": "tgt", "label": "目标", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
 				{"key": "allyside", "label": "施加给己方", "kind": "bool", "default": false},
 				{"key": "n", "label": "沉默力度（压制操作费 ≤ 1.25×力度）", "kind": "int", "min": 1, "max": 60, "default": 25},
+				{"key": "dbl", "label": "双倍次数（仅沉默）", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
 			]},
 		{"id": "redirect", "family": "反", "title": "改道", "glyph": "转", "blurb": "当被保护者即将受伤，把这次伤害转移给别人。",
@@ -86,12 +88,14 @@ static func catalog() -> Array:
 				{"key": "obs", "label": "保护", "kind": "enum", "options": OBSERVE, "default": "all"},
 				{"key": "to", "label": "转给", "kind": "enum", "options": [["source", "来源"], ["lowest", "敌方最低生命"], ["highest", "敌方最高生命"], ["random", "敌方随机"], ["self", "自身(替人挡)"]], "default": "source"},
 				{"key": "n", "label": "每人转移上限", "kind": "int", "min": 1, "max": 60, "default": 20},
+				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "freq", "label": "次数", "kind": "enum", "options": [["once", "第一次"], ["every", "每次"]], "default": "every"},
 			]},
 		{"id": "convert", "family": "反", "title": "转伤为疗", "glyph": "化", "blurb": "把即将受到的伤害改写成等量治疗。",
 			"params": [
 				{"key": "obs", "label": "保护", "kind": "enum", "options": OBSERVE, "default": "all"},
 				{"key": "n", "label": "每人转换上限", "kind": "int", "min": 1, "max": 60, "default": 20},
+				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "freq", "label": "次数", "kind": "enum", "options": [["once", "第一次"], ["every", "每次"]], "default": "every"},
 			]},
 		{"id": "reflect", "family": "反", "title": "回敬", "glyph": "反", "blurb": "受到伤害后，按该次伤害回敬来源。",
@@ -121,6 +125,7 @@ static func catalog() -> Array:
 			"params": [
 				{"key": "op", "label": "方式", "kind": "enum", "options": [["interrupt", "打断对方"], ["delay", "延后对方"], ["advance", "提前自己"]], "default": "interrupt"},
 				{"key": "power", "label": "打断力度（压制操作费 ≤ 1.25×力度）", "kind": "int", "min": 1, "max": 60, "default": 30},
+				{"key": "dbl", "label": "双倍次数（仅打断力度）", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "sec", "label": "秒数（延后/提前用）", "kind": "int", "min": 1, "max": 19, "default": 4},
 			]},
 		{"id": "remove", "family": "控", "title": "驱散", "glyph": "散", "blurb": "移除一个已建立的限时效果，或目标身上的状态。",
@@ -170,7 +175,10 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 		"mit":
 			nodes = [G.mit(tspec(p.tgt, "ally"), p.mode, int(p.n), int(p.dur))]
 		"shield":
-			nodes = [G.status("护盾", tspec(p.tgt, "ally"), 0, int(p.n))]
+			var shield := G.status("护盾", tspec(p.tgt, "ally"), 0, int(p.n))
+			if int(p.dbl) > 0:
+				shield["dbl"] = int(p.dbl)
+			nodes = [shield]
 		"status":
 			var side: String = "ally" if p.allyside else "enemy"
 			var link := {}
@@ -178,7 +186,10 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			if p.st == "牵连":
 				link = G.T("other", "ally")
 				tnode = G.T("choose", "ally")
-			nodes = [G.status(p.st, tnode, int(p.dur), int(p.n) if p.st == "沉默" else 0, link)]
+			var stn := G.status(p.st, tnode, int(p.dur), int(p.n) if p.st == "沉默" else 0, link)
+			if p.st == "沉默" and int(p.dbl) > 0:
+				stn["dbl"] = int(p.dbl)
+			nodes = [stn]
 			title = "施加" + p.st
 		"redirect":
 			var to: Dictionary
@@ -186,9 +197,15 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 				"source": to = G.T("source", "ref")
 				"self": to = G.T("self", "self")
 				_: to = G.T(p.to, "enemy")
-			nodes = [G.watch("pending_dmg", _observe(p.obs), G.redirect(to, int(p.n)), {"freq": p.freq})]
+			var rd := G.redirect(to, int(p.n))
+			if int(p.dbl) > 0:
+				rd["dbl"] = int(p.dbl)
+			nodes = [G.watch("pending_dmg", _observe(p.obs), rd, {"freq": p.freq})]
 		"convert":
-			nodes = [G.watch("pending_dmg", _observe(p.obs), G.convert_heal(int(p.n)), {"freq": p.freq})]
+			var cv := G.convert_heal(int(p.n))
+			if int(p.dbl) > 0:
+				cv["dbl"] = int(p.dbl)
+			nodes = [G.watch("pending_dmg", _observe(p.obs), cv, {"freq": p.freq})]
 		"reflect":
 			var o := {}
 			if int(p.mult) > 0:
@@ -209,7 +226,10 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			nodes = [G.watch("round_end", G.T("self", "self"), G.heal(G.T("all", "ally"), G.N(int(p.n))), {"freq": "once"})]
 		"time":
 			var sd: String = "ally" if p.op == "advance" else "enemy"
-			nodes = [G.time_op(p.op, sd, int(p.power) if p.op == "interrupt" else int(p.sec))]
+			var tn := G.time_op(p.op, sd, int(p.power) if p.op == "interrupt" else int(p.sec))
+			if p.op == "interrupt" and int(p.dbl) > 0:
+				tn["dbl"] = int(p.dbl)
+			nodes = [tn]
 			title = {"interrupt": "打断", "delay": "延后", "advance": "提前"}[p.op]
 		"remove":
 			var side2: String = "ally" if p.allyside else "enemy"

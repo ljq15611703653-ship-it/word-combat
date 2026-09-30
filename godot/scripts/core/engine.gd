@@ -398,7 +398,8 @@ static func _apply_time_ops(st: Dictionary, ops: Array, t: int) -> void:
 		if target_act == -1 or st.acts[target_act].cancelled:
 			_log(st, t, "time_fail", {"side": my, "why": "对方没有宣告技能"})
 			continue
-		shifts.append({"op": n.op, "sec": int(n.value.n), "act": target_act, "by": my})
+		var sec_v: int = _apply_mods(n, int(n.value.n)) if n.op == "interrupt" else int(n.value.n)
+		shifts.append({"op": n.op, "sec": sec_v, "act": target_act, "by": my})
 	for s in shifts:
 		var moved: Array = []
 		var kept: Array = []
@@ -575,7 +576,7 @@ static func _exec(st: Dictionary, node: Dictionary, ctx: Dictionary) -> void:
 				_install(st, {"type": "mit", "unit": uid, "mode": node.mode, "value": pts}, node, ctx, int(node.dur), "round")
 				_log(st, t, "mit", {"tgt": uid, "mode": node.mode, "value": pts, "dur": int(node.dur)})
 		"status":
-			var val := _value(st, node.value, ctx)
+			var val := _apply_mods(node, _value(st, node.value, ctx))
 			for uid in _targets(st, node.target, ctx, "t%d" % node.id):
 				var link := -1
 				if node.has("link"):
@@ -609,7 +610,7 @@ static func _exec(st: Dictionary, node: Dictionary, ctx: Dictionary) -> void:
 		"watch":
 			var cap := 0
 			if node.child.kind in ["redirect", "convert"]:
-				cap = int(node.child.value.n)
+				cap = _apply_mods(node.child, int(node.child.value.n))
 			_install(st, {"type": "watch", "event": node.event, "freq": node.freq, "observe": node.observe, "child": node.child,
 				"times": 0, "spent": false, "cap": cap, "caps": {}}, node, ctx, int(node.dur), node.life)
 			_log(st, t, "watch_install", {"host": ctx.host, "side": ctx.side, "event": node.event, "text": G.node_text(node)})

@@ -267,6 +267,9 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 				r4.add_child(_row("吸收" if node.status == "护盾" else "力度", _spin(int(node.value.n), 1, 80, func(x):
 					node.value["n"] = x
 					chg.call())))
+				r4.add_child(_row("双倍", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
+					node["dbl"] = x
+					chg.call())))
 			v.add_child(r4)
 		"remove":
 			v.add_child(_row("移除", _enum(["限时效果", "状态"], 0 if node.what == "限时效果" else 1, func(i):
@@ -309,10 +312,16 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(_row("每个被保护者至多转移", _spin(int(node.value.n), 1, 80, func(x):
 				node.value["n"] = x
 				chg.call())))
+			v.add_child(_row("双倍", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
+				node["dbl"] = x
+				chg.call())))
 		"convert":
 			v.add_child(K.label("把这次伤害改写成等量治疗（词：转为 恢复 生命）", 14, K.MUTED))
 			v.add_child(_row("每个被保护者至多转换", _spin(int(node.value.n), 1, 80, func(x):
 				node.value["n"] = x
+				chg.call())))
+			v.add_child(_row("双倍", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
+				node["dbl"] = x
 				chg.call())))
 		"time":
 			v.add_child(_row("方式", _enum(["打断", "延后", "提前"], ["interrupt", "delay", "advance"].find(node.op), func(i):
@@ -329,6 +338,10 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(_row("打断力度" if node.op == "interrupt" else "秒数", _spin(int(node.value.n), 1, 80 if node.op == "interrupt" else 19, func(x):
 				node.value["n"] = x
 				chg.call())))
+			if node.op == "interrupt":
+				v.add_child(_row("双倍", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
+					node["dbl"] = x
+					chg.call())))
 			v.add_child(_row("延后(秒)", _spin(int(node.get("delay", 0)), 0, 19, func(x):
 				node["delay"] = x
 				chg.call())))
