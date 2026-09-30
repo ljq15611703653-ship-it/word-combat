@@ -233,6 +233,10 @@ func _run_demo(demo: String) -> void:
 			m.begin_round()
 			m.pick_bag(0, 0)
 			_show_build("adjust")
+		"clicktest":
+			await _click_test()
+		"clicktest2":
+			await _click_test_editor()
 		"select", "respond":
 			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
 			m.commit_deck(0, m.decks[0])
@@ -284,6 +288,176 @@ func _run_demo(demo: String) -> void:
 				s.popup.complex_root.visible = true
 				s.popup.simple_root.visible = false
 				s.popup.complex_root.load_skill(s.popup._current_skill(), s.popup.avail_for_slot(), s.popup._points_other())
+
+# ---- 真实鼠标点击的集成测试：把鼠标事件注入视口，走“点技能牌 → 点目标 → 点宣告”
+func _click(c: Control) -> void:
+	var pos: Vector2 = c.get_global_rect().get_center()
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.position = pos
+	ev.global_position = pos
+	ev.pressed = true
+	get_viewport().push_input(ev)
+	var ev2 := InputEventMouseButton.new()
+	ev2.button_index = MOUSE_BUTTON_LEFT
+	ev2.position = pos
+	ev2.global_position = pos
+	ev2.pressed = false
+	get_viewport().push_input(ev2)
+	await get_tree().create_timer(0.15).timeout
+
+func _find_button(root: Node, text: String) -> Button:
+	for n in root.find_children("*", "Button", true, false):
+		if n is Button and n.text == text and n.visible and not n.disabled:
+			return n
+	return null
+
+func _click_test() -> void:
+	var okf := [true]
+	var log := func(msg: String, good: bool):
+		print("  [点击测试] ", ("通过 " if good else "失败 "), msg)
+		if not good:
+			okf[0] = false
+	m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
+	m.commit_deck(0, m.decks[0])
+	m.begin_round()
+	# —— 抽词界面：点左袋，再点“收下并继续”
+	var d := DraftScreen.new()
+	_set_screen(d)
+	d.setup(m, -1 if m.human[m.picker] else Ai.pick_bag(m.bags, m.pools[m.picker], m.personas[m.picker]))
+	d.picked.connect(func(i): d.show_human_choice(i))
+	await get_tree().create_timer(0.3).timeout
+	if m.human[m.picker]:
+		var bag0: Control = d.panels[0]
+		await _click(bag0)
+		log.call("点击词袋后界面进入“已选择”状态", d.chosen == 0 and d.continue_btn.visible)
+		m.pick_bag(0, 0)
+	else:
+		m.pick_bag(m.picker, d._ai_idx)
+	var words_after := 0
+	for w in m.pools[0]:
+		words_after += int(m.pools[0][w])
+	log.call("收下词袋后词库增加到 %d 个词" % words_after, words_after > 12)
+	# —— 调整阶段略过，进入战斗
+	while m.phase == "adjust":
+		m.skip_adjust(0)
+		m.skip_adjust(1)
+	m.phase = "adjust_done"
+	m.st.sides[0].ap = 60
+	m.st.sides[1].ap = 60
+	m.begin_declare()
+	_show_battle()
+	var b = battle_screen
+	b.speed = 4.0
+	await get_tree().create_timer(0.8).timeout
+	# 若对手先手，等它宣告完
+	var guard := 0
+	while not b.my_turn and guard < 40:
+		guard += 1
+		await get_tree().create_timer(0.2).timeout
+	log.call("轮到你宣告", b.my_turn)
+	# —— 点一张攻击类技能牌
+	var idx := 0
+	var target_card: Control = null
+	for u in m.st.sides[0].units:
+		for sid in u.skill_ids:
+			var sk = E_skill(sid)
+			if sk.kind_tag == "atk" and target_card == null and int(sk.cost) <= 60:
+				target_card = b.hand_row.get_child(idx)
+				break
+			idx += 1
+		if target_card != null:
+			break
+	if target_card == null:
+		log.call("找不到攻击技能牌", false)
+	else:
+		await _click(target_card)
+		log.call("点击技能牌后已选中", b.sel_sid >= 0)
+		var tries := 0
+		while not b.picking.is_empty() and tries < 4:
+			tries += 1
+			var enemy_uid := -1
+			for uid in b.cards:
+				if b.cards[uid].selectable:
+					enemy_uid = uid
+					break
+			if enemy_uid == -1:
+				break
+			await _click(b.cards[enemy_uid])
+		log.call("点击目标卡后选择槽已补全", b.picking.is_empty())
+		var confirm := _find_button(b.action_box, "宣告 ✓")
+		log.call("出现可点击的“宣告 ✓”按钮", confirm != null)
+		if confirm != null:
+			await _click(confirm)
+			await get_tree().create_timer(0.3).timeout
+			log.call("宣告已提交给对局", m.pending[0].has("done") and not m.pending[0].is_empty() or m.phase != "declare")
+	# 等动画结束，出现“下一轮”
+	guard = 0
+	var nb: Button = null
+	while nb == null and guard < 200:
+		guard += 1
+		await get_tree().create_timer(0.2).timeout
+		nb = _find_button(b.action_box, "下一轮  →")
+	log.call("结算动画结束后出现“下一轮”按钮", nb != null)
+	if nb != null:
+		await _click(nb)
+		await get_tree().create_timer(0.4).timeout
+		log.call("点击后进入下一轮抽词", m.st.round == 2 and screen is DraftScreen)
+	print("【点击测试结束】", "全部通过" if okf[0] else "有失败")
+	get_tree().quit(0 if okf[0] else 1)
+
+# ---- 构筑界面与编辑器的真实点击测试
+func _click_test_editor() -> void:
+	var okf := [true]
+	var log := func(msg: String, good: bool):
+		print("  [编辑器点击] ", ("通过 " if good else "失败 "), msg)
+		if not good:
+			okf[0] = false
+	_show_build("initial")
+	var s = screen
+	await get_tree().create_timer(0.4).timeout
+	var edit := _find_button(s, "编辑")
+	log.call("构筑界面有“编辑”按钮", edit != null)
+	await _click(edit)
+	await get_tree().create_timer(0.3).timeout
+	var pop = s.popup
+	log.call("点击后弹出编辑器", pop != null and is_instance_valid(pop))
+	# 逐个点模板，直到“装入技能槽 1”可点
+	var installed := false
+	for tid in ["atk1", "atkA", "heal", "mit", "shield", "redirect", "time", "swap"]:
+		if not pop.tpl_buttons.has(tid):
+			continue
+		await _click(pop.tpl_buttons[tid])
+		var ib := _find_button(pop, "装入技能槽 1")
+		if ib != null:
+			await _click(ib)
+			installed = true
+			log.call("选模板 %s 并装入" % tid, pop.work.skills.size() == 1)
+			break
+	log.call("至少有一个模板凑得出词", installed)
+	# 复杂版标签
+	var tab_btn := _find_button(pop, "复杂版 · 自由拼词")
+	log.call("有复杂版标签", tab_btn != null)
+	if tab_btn != null:
+		await _click(tab_btn)
+		log.call("切到复杂版后可见", pop.complex_root.visible and not pop.simple_root.visible)
+		var back := _find_button(pop, "简单版 · 选招式填空")
+		await _click(back)
+		log.call("切回简单版", pop.simple_root.visible)
+	var commit := _find_button(pop, "确认修改")
+	log.call("“确认修改”可点", commit != null)
+	if commit != null:
+		await _click(commit)
+		await get_tree().create_timer(0.3).timeout
+		log.call("确认后牌组里有技能", s.wd.units[0].skills.size() == 1)
+	var start_btn := _find_button(s, "开始对战  →")
+	log.call("装好技能后“开始对战”可点", start_btn != null)
+	if start_btn != null:
+		await _click(start_btn)
+		await get_tree().create_timer(0.4).timeout
+		log.call("进入抽词", screen is DraftScreen and m.phase == "draft")
+	print("【编辑器点击测试结束】", "全部通过" if okf[0] else "有失败")
+	get_tree().quit(0 if okf[0] else 1)
 
 func E_skill(sid: int) -> Dictionary:
 	return load("res://scripts/core/engine.gd").skill_of(m.st, sid)

@@ -354,11 +354,42 @@ func _template_card(t: Dictionary) -> Control:
 	tpl_buttons[t.id] = p
 	return p
 
+# 缺词总数（用于“自动凑词”）
+func _missing_total(tid: String, p: Dictionary) -> int:
+	var sk := R.build(tid, p)
+	var miss := G.missing(sk.words, avail_for_slot())
+	var n := 0
+	for w in miss:
+		n += int(miss[w])
+	return n
+
+# 新选一个模板时：若默认参数凑不出词，就在各个“选项型”参数里挑缺词最少的取值
+func _auto_fit(tid: String, p: Dictionary) -> Dictionary:
+	var cur := p.duplicate()
+	var best := _missing_total(tid, cur)
+	if best == 0:
+		return cur
+	for prm in R.template(tid).params:
+		if prm.kind != "enum":
+			continue
+		for o in prm.options:
+			var trial := cur.duplicate()
+			trial[prm.key] = o[0]
+			var m := _missing_total(tid, trial)
+			if m < best:
+				best = m
+				cur = trial
+		if best == 0:
+			break
+	return cur
+
 func _select_template(tid: String, params: Dictionary) -> void:
 	sel_tid = tid
 	sel_params = R.defaults(tid)
 	for k in params:
 		sel_params[k] = params[k]
+	if params.is_empty():
+		sel_params = _auto_fit(tid, sel_params)
 	for id in tpl_buttons:
 		var t: Dictionary = R.template(id)
 		var fam_col: Color = {"攻": Color("8a3a36"), "守": Color("2f7a55"), "控": Color("2f7a7a"), "反": Color("7a4aa0")}.get(t.family, K.EDGE)
