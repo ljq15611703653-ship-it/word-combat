@@ -1,34 +1,39 @@
 extends SceneTree
 const Match = preload("res://scripts/game/match.gd")
-const E = preload("res://scripts/core/engine.gd")
-const R = preload("res://scripts/core/recipes.gd")
-const D = preload("res://scripts/core/deck.gd")
-const Ai = preload("res://scripts/ai/ai.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 func _init() -> void:
 	Lex.load_all()
-	var m := Match.new()
-	m.start(true, 7, false)
-	m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
-	m.commit_deck(0, m.decks[0])
-	m.begin_round()
-	m.pick_bag(0, 0)
-	print("steps ", m.adjust_steps, " idx ", m.adjust_idx, " side ", m.adjust_side())
-	var nd := D.clone(m.decks[0])
-	var sk := R.build("mit", {})
-	var u: Dictionary = nd.units[1]
-	u.skills.append(sk)
-	print("validate ", D.validate(nd, m.pools[0]).ok)
-	var r := m.apply_adjust(0, 1, u)
-	print("apply ", r.ok, " ", r.get("errors", []))
-	print("steps ", m.adjust_steps, " idx ", m.adjust_idx, " side ", m.adjust_side(), " phase ", m.phase)
-	var guard := 0
-	while m.phase == "adjust" and guard < 10:
-		guard += 1
-		var s: int = m.adjust_side()
-		print(" loop side ", s, " human ", m.human[s], " left ", m.adjust_left(s))
-		if m.human[s]:
-			break
-		m.ai_adjust()
-		print("  after ai: steps ", m.adjust_steps, " idx ", m.adjust_idx, " phase ", m.phase)
+	var scores: Array = []
+	var by_round := {}
+	for g in 60:
+		var m := Match.new()
+		m.fast_ai = true
+		m.start(false, 500 + g, false)
+		m.st.rules.win_score = 100000
+		var guard := 0
+		var hit := {}
+		while guard < 600:
+			guard += 1
+			if not m.step_auto():
+				break
+			if m.phase == "resolved":
+				var mx: int = maxi(int(m.st.sides[0].score), int(m.st.sides[1].score))
+				for thr in [60, 80, 100, 120, 150]:
+					if mx >= thr and not hit.has(thr):
+						hit[thr] = int(m.st.round)
+		for thr in [60, 80, 100, 120, 150]:
+			if not by_round.has(thr):
+				by_round[thr] = []
+			by_round[thr].append(hit.get(thr, 99))
+		scores.append(maxi(int(m.st.sides[0].score), int(m.st.sides[1].score)))
+	scores.sort()
+	print("最终最高分 分位: 10%%=%d 25%%=%d 50%%=%d 75%%=%d 90%%=%d" % [scores[6], scores[15], scores[30], scores[45], scores[54]])
+	for thr in [60, 80, 100, 120, 150]:
+		var arr: Array = by_round[thr]
+		arr.sort()
+		var reached := 0
+		for r in arr:
+			if r < 99:
+				reached += 1
+		print("阈值%d：%d/60局在12轮内达到，中位达到轮数 %s" % [thr, reached, str(arr[30])])
 	quit(0)
