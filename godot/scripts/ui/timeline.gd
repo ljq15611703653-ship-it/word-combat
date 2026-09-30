@@ -10,7 +10,7 @@ var windup_hint := -1        # 选中技能时显示最早起手刻度
 var start_hint := -1         # 选中技能时显示拟定起手
 
 func _init() -> void:
-	custom_minimum_size = Vector2(0, 104)
+	custom_minimum_size = Vector2(0, 98)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func clear_all() -> void:
@@ -53,7 +53,7 @@ func _draw() -> void:
 	if start_hint >= 0:
 		var xs := _x(float(start_hint))
 		draw_line(Vector2(xs, mid - 24), Vector2(xs, mid + 8), K.GOLD, 2.0)
-		draw_string(font, Vector2(xs - 30, mid - 28), "拟 %d秒" % start_hint, HORIZONTAL_ALIGNMENT_CENTER, 60, 14, K.GOLD)
+		draw_string(font, Vector2(xs + 6, mid - 14), "拟 %d秒" % start_hint, HORIZONTAL_ALIGNMENT_LEFT, 80, 14, K.GOLD)
 	# 宣告标记
 	var used_slots := {}
 	for mk in marks:

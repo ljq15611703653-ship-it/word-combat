@@ -36,7 +36,7 @@ const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "合计", "diff
 const STATUSES := ["狂振", "牵连", "升华", "护盾", "易伤", "沉默"]
 const STATUS_DESC := {
 	"狂振": "造成与受到的伤害各+25%", "牵连": "与另一名友方平分受到的伤害", "升华": "受到的治疗不回血，转为下次造成伤害的增量",
-	"护盾": "吸收所填数值的伤害", "易伤": "受到的伤害+50%", "沉默": "不能发动新技能",
+	"护盾": "吸收所填数值的伤害", "易伤": "受到的伤害+50%", "沉默": "压制操作费不超过 1.25×力度 的技能",
 }
 
 # ---------------------------------------------------------------- 目标式
@@ -519,7 +519,10 @@ static func _check(node: Dictionary, out: Array, ctx: String) -> void:
 		"redirect", "convert":
 			out.append("转移/转为必须直接放在“当 即将受到伤害”之下")
 		"time":
-			if node.op != "interrupt" and (int(node.value.n) < 1 or int(node.value.n) > 19):
+			if node.op == "interrupt":
+				if int(node.value.n) < 1:
+					out.append("打断要填入力度（至少1）")
+			elif int(node.value.n) < 1 or int(node.value.n) > 19:
 				out.append("时间改动须填1到19秒")
 		"split":
 			var sum := 0
@@ -612,6 +615,8 @@ static func node_text(node: Dictionary) -> String:
 			var s2: String = "给%s施加【%s】" % [target_text(node.target), node.status]
 			if node.status == "护盾":
 				s2 += "，可吸收 %d 点伤害" % int(node.value.n)
+			elif node.status == "沉默":
+				s2 += "，力度%d（压制操作费 ≤ %d 的技能）" % [int(node.value.n), silence_limit(int(node.value.n))]
 			if node.has("link"):
 				s2 += "，与%s牵连" % target_text(node.link)
 			s2 += "（持续%d秒）" % int(node.dur) if int(node.dur) > 0 else "（直到本轮结束）"
@@ -636,7 +641,7 @@ static func node_text(node: Dictionary) -> String:
 			match node.op:
 				"delay": return "把%s延后 %d 秒" % [who, int(node.value.n)]
 				"advance": return "把%s提前 %d 秒" % [who, int(node.value.n)]
-				_: return "打断%s尚未发生的部分" % who
+				_: return "打断%s尚未发生的部分（力度%d：只对操作费 ≤ %d 的技能有效）" % [who, int(node.value.n), silence_limit(int(node.value.n))]
 		"swap":
 			return "自身与%s交换位置" % target_text(node.target)
 		"split":
@@ -657,6 +662,10 @@ static func node_text(node: Dictionary) -> String:
 		"choose":
 			return "择一：【%s】或【%s】" % [node_text(node.a), node_text(node.b)]
 	return "?"
+
+# 打断/沉默的力度换算：力度P能压制操作费不超过 1.25×P 的技能
+static func silence_limit(p: int) -> int:
+	return int(p * 5 / 4)
 
 static func pct_of(points: int) -> int:
 	return int(round(100.0 * points / (points + 20.0)))

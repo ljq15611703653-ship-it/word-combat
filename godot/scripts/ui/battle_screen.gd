@@ -14,7 +14,7 @@ signal next_round()
 signal quit_to_title()
 signal rematch()
 
-const CARD_SIZE := Vector2(164, 222)
+const CARD_SIZE := Vector2(160, 204)
 
 var m
 var cards := {}
@@ -145,7 +145,7 @@ func _build() -> void:
 	hand_sc.add_child(hand_row)
 	bottom.add_child(hand_sc)
 	var ap := K.panel(K.PANEL, K.GOLD_D, 12, 2, 6)
-	ap.custom_minimum_size = Vector2(400, 0)
+	ap.custom_minimum_size = Vector2(470, 0)
 	var asc := ScrollContainer.new()
 	asc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	action_box = K.vbox(6)
@@ -162,9 +162,8 @@ func _build() -> void:
 	toast_label = K.label("", 40, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	toast_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	toast_label.add_theme_constant_override("outline_size", 8)
-	toast_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	toast_label.position = Vector2(400, 330)
-	toast_label.size = Vector2(800, 60)
+	toast_label.position = Vector2(300, 318)
+	toast_label.size = Vector2(1000, 60)
 	toast_label.modulate.a = 0.0
 	toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fx_layer.add_child(toast_label)
@@ -280,8 +279,8 @@ func _rebuild_hand() -> void:
 func _skill_reason(sk: Dictionary, u: Dictionary, ap: int) -> String:
 	if u.down_round != -1:
 		return "持有者修整中"
-	if E.has_status(u, "沉默"):
-		return "持有者被沉默"
+	if E._silenced_for(u, int(sk.cost)):
+		return "被沉默（压制操作费≤%d）" % E._silence_cap(u)
 	var cheapest: int = int(sk.cost)
 	if cheapest > ap:
 		# 择一可能更便宜
@@ -459,24 +458,34 @@ func _render_action_panel() -> void:
 		action_box.add_child(K.label("对手思考中…", 22, K.MUTED))
 		return
 	var second: bool = m.declare_order[0] != 0
-	action_box.add_child(K.label("你的宣告" + ("（应对）" if second else "（先手）"), 22, K.GOLD))
+	var title := K.hbox(8)
+	title.add_child(K.label("你的宣告" + ("（应对）" if second else "（先手）"), 20, K.GOLD))
+	var tsp := Control.new()
+	tsp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_child(tsp)
+	title.add_child(K.label("行动点 %d" % int(m.st.sides[0].ap), 16, K.TEXT))
+	action_box.add_child(title)
 	if sel_sid < 0:
-		action_box.add_child(K.wrap_label("点选下方的一张技能牌。操作费从行动点里扣除；行动点每轮 +%d，最多存 %d。" % [int(m.st.rules.ap_gain), int(m.st.rules.ap_cap)], 15, K.MUTED))
-		action_box.add_child(K.label("行动点：%d" % int(m.st.sides[0].ap), 18, K.TEXT))
-		var passb := K.button("本轮不行动（攒行动点）", "normal", 18)
+		action_box.add_child(K.wrap_label("点选下方的一张技能牌。操作费从行动点里扣；每轮 +%d，最多存 %d。先手锁定，后手看见后应对。" % [int(m.st.rules.ap_gain), int(m.st.rules.ap_cap)], 14, K.MUTED))
+		var passb := K.button("本轮不行动（攒行动点）", "normal", 17)
 		passb.pressed.connect(_pass)
 		action_box.add_child(passb)
 		return
 	var sk := E.skill_of(m.st, sel_sid)
-	action_box.add_child(K.label(sk.name, 20, K.TEXT))
-	action_box.add_child(K.wrap_label(sk.text, 14, K.MUTED))
+	var nm := K.hbox(8)
+	nm.add_child(K.label(sk.name, 19, K.TEXT))
+	nm.add_child(K.chip("起手≥%d秒" % int(sk.windup), Color("2f5f93"), 12))
+	action_box.add_child(nm)
+	var st := K.wrap_label(sk.text, 13, K.MUTED)
+	st.max_lines_visible = 3
+	action_box.add_child(st)
 	# 选择槽
 	for slot in G.choice_slots(sk):
 		var row := K.hbox(6)
-		row.add_child(K.label(slot.label, 14, K.MUTED))
+		row.add_child(K.label(slot.label, 13, K.MUTED))
 		if slot.kind == "target":
 			if sel_choices.has(slot.key):
-				row.add_child(K.chip(_name_of(int(sel_choices[slot.key])), Color("2c5c44"), 15))
+				row.add_child(K.chip(_name_of(int(sel_choices[slot.key])), Color("2c5c44"), 14))
 				var re := K.button("重选", "ghost", 12)
 				re.custom_minimum_size = Vector2(44, 24)
 				re.pressed.connect(func():
@@ -503,7 +512,7 @@ func _render_action_panel() -> void:
 			var cands := E.slot_candidates(m.st, 0, slot, [m.public_declared(1)])
 			var sel := -1
 			for i in cands.size():
-				ob.add_item(_origin_label(str(cands[i])).substr(0, 34))
+				ob.add_item(_origin_label(str(cands[i])).substr(0, 30))
 				ob.set_item_metadata(i, cands[i])
 				if sel_choices.get(slot.key, "") == cands[i]:
 					sel = i
@@ -522,13 +531,14 @@ func _render_action_panel() -> void:
 	var act := _current_act()
 	var ms := E.min_start(m.st, act)
 	var srow := K.hbox(8)
-	srow.add_child(K.label("起效时间", 15, K.MUTED))
+	srow.add_child(K.label("起效", 14, K.MUTED))
 	var sl := HSlider.new()
 	sl.min_value = ms
 	sl.max_value = 19
 	sl.step = 1
 	sl.value = maxi(sel_start, ms)
-	sl.custom_minimum_size = Vector2(170, 26)
+	sl.custom_minimum_size = Vector2(190, 26)
+	sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var vl := K.label("第 %d 秒" % int(sl.value), 16, K.GOLD)
 	sl.value_changed.connect(func(x):
 		sel_start = int(x)
@@ -537,28 +547,28 @@ func _render_action_panel() -> void:
 		timeline.queue_redraw())
 	srow.add_child(sl)
 	srow.add_child(vl)
-	action_box.add_child(srow)
 	var en: Dictionary = m.public_declared(1)
 	if not en.is_empty() and en.get("sid", -1) >= 0:
-		action_box.add_child(K.wrap_label("对手第 %d 秒起效。想抢在前面就要更早（起手 ≥ %d 秒）。" % [int(en.start), ms], 13, K.MUTED))
-		var align := K.button("对齐到对手的第 %d 秒" % int(en.start), "ghost", 13)
-		align.custom_minimum_size = Vector2(0, 26)
+		var align := K.button("对齐对手", "ghost", 12)
+		align.custom_minimum_size = Vector2(0, 24)
+		align.tooltip_text = "对手第 %d 秒起效；想抢在前面就要更早（起手 ≥ %d 秒）" % [int(en.start), ms]
 		align.pressed.connect(func():
 			sel_start = maxi(ms, int(en.start))
 			_render_action_panel()
 			timeline.start_hint = sel_start
 			timeline.queue_redraw())
-		action_box.add_child(align)
+		srow.add_child(align)
+	action_box.add_child(srow)
 	var cost := E.action_cost(m.st, act)
 	var err := E.can_declare(m.st, act)
-	action_box.add_child(K.label("操作费 %d  （行动点 %d → %d）" % [cost, int(m.st.sides[0].ap), int(m.st.sides[0].ap) - cost], 16, K.GOLD))
 	var btns := K.hbox(8)
-	var ok := K.button("宣告  ✓", "primary", 19)
+	btns.add_child(K.label("操作费 %d（%d→%d）" % [cost, int(m.st.sides[0].ap), int(m.st.sides[0].ap) - cost], 14, K.GOLD))
+	var ok := K.button("宣告 ✓", "primary", 19)
 	ok.disabled = err != ""
 	ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ok.pressed.connect(_confirm)
 	btns.add_child(ok)
-	var cancel := K.button("重选", "normal", 17)
+	var cancel := K.button("重选", "normal", 16)
 	cancel.pressed.connect(func():
 		_clear_selection()
 		_rebuild_hand()
@@ -566,7 +576,7 @@ func _render_action_panel() -> void:
 	btns.add_child(cancel)
 	action_box.add_child(btns)
 	if err != "":
-		action_box.add_child(K.wrap_label(err, 14, K.RED))
+		action_box.add_child(K.wrap_label(err, 13, K.RED))
 
 func _pass() -> void:
 	m.submit(0, {})

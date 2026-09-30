@@ -232,19 +232,22 @@ static func adjust_step(deck: Dictionary, pool: Dictionary, persona: String, rng
 				if worst_rank <= my_rank:
 					continue # 现有的都更重要
 				new_deck.units[target].skills.remove_at(replaced)
-			# 预算：放不下就压缩这张卡的生命，再不够就缩小填数
+			# 预算：放不下就从这张卡的生命里挤一点（不低于原来的60%，也不低于8），再不够就缩小填数
 			var free: int = D.BUDGET - D.budget_used(new_deck).total
 			var need := int(sk.budget)
 			if need > free:
-				var can_take: int = maxi(0, int(new_deck.units[target].max_hp) - 6)
-				var take: int = mini(can_take, need - free)
+				var hp_now: int = int(new_deck.units[target].max_hp)
+				var floor_hp: int = maxi(8, int(ceil(hp_now * 0.6)))
+				var take: int = mini(maxi(0, hp_now - floor_hp), need - free)
 				new_deck.units[target].max_hp -= take
 				free += take
 			if need > free and sk.params.has("n"):
 				var p2: Dictionary = sk.params.duplicate()
-				p2["n"] = maxi(1, int(p2.n) - (need - free))
+				p2["n"] = maxi(4, int(p2.n) - (need - free))
 				sk = R.build(sk.template, p2)
 			if int(sk.budget) > free:
+				continue
+			if D.budget_used(new_deck).nums + int(sk.budget) > 50:
 				continue
 			new_deck.units[target].skills.append(sk)
 			D.rename_skills(new_deck)
@@ -331,8 +334,6 @@ static func enumerate_actions(st: Dictionary, side: int, enemy_act: Dictionary, 
 	var out: Array = [{}]
 	var ap: int = st.sides[side].ap
 	for u in E.alive_units(st, side):
-		if E.has_status(u, "沉默"):
-			continue
 		for sid in u.skill_ids:
 			var sk := E.skill_of(st, sid)
 			if int(sk.cost) > ap and int(sk.cost) - 0 > ap:

@@ -113,7 +113,7 @@ func _new_node(kind: String) -> Dictionary:
 		"status": return G.status("易伤", G.T("choose", "enemy"))
 		"remove": return G.remove("限时效果", G.T("choose", "enemy"))
 		"watch": return G.watch("damaged", G.T("self", "self"), G.dmg(G.T("source", "ref"), G.REF("event_damage")), {"freq": "every"})
-		"time": return G.time_op("interrupt", "enemy")
+		"time": return G.time_op("interrupt", "enemy", 30)
 		"swap": return G.swap(G.T("choose", "ally"))
 		"split": return G.split("dmg", 20, [{"target": G.T("choose", "enemy"), "part": 12, "delay": 0}, {"target": G.T("lowest", "enemy"), "part": 8, "delay": 0}])
 		"chain": return G.chain(G.dmg(G.T("choose", "enemy"), G.N(10)), G.heal(G.T("self", "self"), G.REF("prev")))
@@ -263,8 +263,8 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			r4.add_child(_row("持续(秒,0=本轮)", _spin(int(node.dur), 0, 20, func(x):
 				node["dur"] = x
 				chg.call())))
-			if node.status == "护盾":
-				r4.add_child(_row("吸收", _spin(int(node.value.n), 1, 80, func(x):
+			if node.status == "护盾" or node.status == "沉默":
+				r4.add_child(_row("吸收" if node.status == "护盾" else "力度", _spin(int(node.value.n), 1, 80, func(x):
 					node.value["n"] = x
 					chg.call())))
 			v.add_child(r4)
@@ -312,16 +312,17 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(_row("方式", _enum(["打断", "延后", "提前"], ["interrupt", "delay", "advance"].find(node.op), func(i):
 				node["op"] = ["interrupt", "delay", "advance"][i]
 				node["side"] = "ally" if node.op == "advance" else "enemy"
-				if node.op != "interrupt" and int(node.value.n) < 1:
+				if node.op == "interrupt":
+					node.value["n"] = maxi(int(node.value.n), 20)
+				elif int(node.value.n) < 1 or int(node.value.n) > 19:
 					node.value["n"] = 3
 				chg.call())))
 			v.add_child(_row("对象", _enum(["对方技能", "己方技能"], 0 if node.side == "enemy" else 1, func(i):
 				node["side"] = "enemy" if i == 0 else "ally"
 				chg.call())))
-			if node.op != "interrupt":
-				v.add_child(_row("秒数", _spin(int(node.value.n), 1, 19, func(x):
-					node.value["n"] = x
-					chg.call())))
+			v.add_child(_row("打断力度" if node.op == "interrupt" else "秒数", _spin(int(node.value.n), 1, 80 if node.op == "interrupt" else 19, func(x):
+				node.value["n"] = x
+				chg.call())))
 			v.add_child(_row("延后(秒)", _spin(int(node.get("delay", 0)), 0, 19, func(x):
 				node["delay"] = x
 				chg.call())))

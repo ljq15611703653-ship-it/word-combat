@@ -17,6 +17,7 @@ var screen: Control
 var battle_screen
 var auto := false
 var driver_on := false
+var slow := false
 
 func _ready() -> void:
 	Lex.load_all()
@@ -36,6 +37,8 @@ func _ready() -> void:
 			auto = true
 		if a == "--play":
 			driver_on = true
+		if a == "--slow":
+			slow = true
 	if demo == "" and driver_on:
 		_new_game(7)
 	elif demo == "":
@@ -57,6 +60,7 @@ func _drive(s: Control) -> void:
 	await get_tree().create_timer(0.35).timeout
 	if not is_instance_valid(s) or s != screen:
 		return
+	print("  [驱动] 屏幕=", s.get_script().resource_path.get_file(), " 阶段=", m.phase, " 轮=", m.st.round)
 	if s is BuildScreen:
 		if s.mode == "initial":
 			# 用电脑的构筑法给“人类”装牌，再经编辑器弹窗走一遍提交路径
@@ -68,6 +72,32 @@ func _drive(s: Control) -> void:
 			if s.popup != null and is_instance_valid(s.popup):
 				s.popup.committed.emit(s.popup.work)
 			await get_tree().create_timer(0.3).timeout
+		else:
+			# 调整阶段：尝试用编辑器装一个当前词库里凑得出的新技能，走完整的提交路径
+			var R = load("res://scripts/core/recipes.gd")
+			var G = load("res://scripts/core/grammar.gd")
+			var done := false
+			if m.adjust_side() == 0 and m.adjust_left(0) > 0:
+				s._open_editor(1)
+				await get_tree().create_timer(0.3).timeout
+				var pop = s.popup
+				if pop != null and is_instance_valid(pop):
+					for t in R.catalog():
+						var sk: Dictionary = R.build(t.id, {})
+						if G.missing(sk.words, pop.avail_for_slot()).is_empty() and pop._points_other() - pop._slot_budget() + int(sk.budget) <= 100 and G.problems(sk).is_empty():
+							pop.slot = 1
+							pop._install(sk)
+							if pop.btn_commit.disabled:
+								continue
+							pop.committed.emit(pop.work)
+							done = true
+							print("  [驱动] 调整：装入 ", t.id)
+							break
+					if not done:
+						pop.cancelled.emit()
+			if not done:
+				s.finished.emit()
+			return
 		s.finished.emit()
 	elif s is DraftScreen:
 		if m.human[m.picker]:
@@ -75,7 +105,7 @@ func _drive(s: Control) -> void:
 			await get_tree().create_timer(0.3).timeout
 		s.finished.emit()
 	elif s is BattleScreen:
-		s.speed = 4.0
+		s.speed = 1.0 if slow else 4.0
 		s.auto_human = true
 		if m.human[m.declare_side()] if m.declare_side() != -1 else false:
 			s._auto_play()
@@ -203,6 +233,38 @@ func _run_demo(demo: String) -> void:
 			m.begin_round()
 			m.pick_bag(0, 0)
 			_show_build("adjust")
+		"select", "respond":
+			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
+			m.commit_deck(0, m.decks[0])
+			m.begin_round()
+			if demo == "respond":
+				m.begin_round()
+			m.st.sides[0].ap = 50
+			m.st.sides[1].ap = 50
+			m.pick_bag(0, 0)
+			while m.phase == "adjust":
+				m.skip_adjust(0)
+				m.skip_adjust(1)
+			m.phase = "adjust_done"
+			m.begin_declare()
+			m.human = [true, false]
+			_show_battle()
+			if demo == "respond":
+				await get_tree().create_timer(3.0).timeout
+			await get_tree().create_timer(0.6).timeout
+			var b = battle_screen
+			if b.my_turn:
+				for sid in m.st.sides[0].units[0].skill_ids:
+					if E_skill(sid).kind_tag == "atk":
+						b._select_skill(sid)
+						break
+				if b.sel_sid < 0:
+					b._select_skill(m.st.sides[0].units[1].skill_ids[0])
+				var guard := 0
+				while not b.picking.is_empty() and guard < 5:
+					guard += 1
+					var cands: Array = b.cards.keys().filter(func(u): return b.cards[u].selectable)
+					b._on_card_clicked(b.cards[cands[0]])
 		"battle":
 			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
 			m.commit_deck(0, m.decks[0])
@@ -222,6 +284,9 @@ func _run_demo(demo: String) -> void:
 				s.popup.complex_root.visible = true
 				s.popup.simple_root.visible = false
 				s.popup.complex_root.load_skill(s.popup._current_skill(), s.popup.avail_for_slot(), s.popup._points_other())
+
+func E_skill(sid: int) -> Dictionary:
+	return load("res://scripts/core/engine.gd").skill_of(m.st, sid)
 
 func _continue_adjust_demo() -> void:
 	m.pick_bag(0, 0)

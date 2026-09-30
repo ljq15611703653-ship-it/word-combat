@@ -502,7 +502,8 @@ func _refresh_info() -> void:
 	else:
 		for e in v.errors.slice(0, 3):
 			info_box.add_child(K.label("· " + str(e), 15, K.RED))
-	btn_commit.disabled = false
+	btn_commit.disabled = not v.ok
+	btn_commit.tooltip_text = "" if v.ok else "牌组还不合法，无法确认"
 
 func _merged_units() -> Array:
 	var units: Array = []

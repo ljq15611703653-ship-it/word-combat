@@ -92,11 +92,11 @@ func _build_contents() -> void:
 	v.add_child(head)
 	# 画像
 	var portrait := PanelContainer.new()
-	portrait.custom_minimum_size = Vector2(0, 92 if big else 66)
+	portrait.custom_minimum_size = Vector2(0, 92 if big else 56)
 	var ps := K.style(_glyph_color(unit.get("glyph", "剑")), _glyph_color(unit.get("glyph", "剑")).lightened(0.3), 8, 1)
 	portrait.add_theme_stylebox_override("panel", ps)
 	var cc := CenterContainer.new()
-	glyph_label = K.label(unit.get("glyph", "?"), 62 if big else 44, Color(1, 1, 1, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
+	glyph_label = K.label(unit.get("glyph", "?"), 62 if big else 38, Color(1, 1, 1, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
 	cc.add_child(glyph_label)
 	portrait.add_child(cc)
 	v.add_child(portrait)

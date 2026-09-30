@@ -7,7 +7,7 @@ const G = preload("res://scripts/core/grammar.gd")
 
 const TICKS := 20          # 0..19 为时间轴，20 为回合结束阶段
 const STRIDE := 21         # 每轮占的绝对时间刻数
-const DEFAULT_RULES := {"win_score": 120, "max_rounds": 12, "ap_gain": 15, "ap_cap": 60}
+const DEFAULT_RULES := {"win_score": 120, "max_rounds": 12, "ap_gain": 15, "ap_cap": 60, "start_ap": 15}
 
 # ================================================================ 状态创建
 # deck: {units:[{name,max_hp,kw,skills:[skill…]}×5]}
@@ -20,7 +20,7 @@ static func make_state(decks: Array, first: int = 0, rules: Dictionary = {}, see
 	for k in rules:
 		st.rules[k] = rules[k]
 	for s in 2:
-		var side := {"ap": 0, "score": 0, "units": []}
+		var side := {"ap": int(st.rules.start_ap), "score": 0, "units": []}
 		st.sides.append(side)
 		set_deck(st, s, decks[s], true)
 	return st
@@ -174,9 +174,9 @@ static func can_declare(st: Dictionary, act: Dictionary) -> String:
 	var host := _u(st, host_of(st, act.sid))
 	if not _alive(host):
 		return "持有者已倒下"
-	if has_status(host, "沉默"):
-		return "持有者被沉默"
 	var cost := action_cost(st, act)
+	if _silenced_for(host, cost):
+		return "持有者被沉默（压制操作费 ≤ %d 的技能）" % _silence_cap(host)
 	if cost > int(st.sides[act.side].ap):
 		return "行动点不足（需要%d）" % cost
 	if int(act.start) < min_start(st, act):
@@ -318,7 +318,21 @@ static func _run_tick(st: Dictionary, t: int) -> void:
 			live_ops.append(it)
 	if not live_ops.is_empty():
 		_apply_time_ops(st, live_ops, t)
-	# 3. 起手：倒下/沉默检查，发动技能事件
+	# 3. 同刻施加的状态先于起手检查（沉默因此能挡住同一秒起手的技能）；双方对称
+	var status_now: Array = []
+	rest = []
+	for it in st.items:
+		if it.t == t and it.kind == "node" and it.node.kind == "status":
+			status_now.append(it)
+		else:
+			rest.append(it)
+	st.items = rest
+	for it in status_now:
+		if _cancelled(st, it):
+			continue
+		st.cur_t = t
+		_exec(st, it.node, it.ctx)
+	# 4. 起手：倒下/沉默检查，发动技能事件
 	var starts: Array = []
 	rest = []
 	for it in st.items:
@@ -363,7 +377,7 @@ static func _start_action(st: Dictionary, ai: int, t: int) -> void:
 		rec.cancelled = true
 		_log(st, t, "fizzle", {"why": "持有者已倒下", "host": rec.host})
 		return
-	if has_status(host, "沉默"):
+	if _silenced_for(host, int(rec.paid)):
 		rec.cancelled = true
 		_log(st, t, "fizzle", {"why": "被沉默", "host": rec.host})
 		return
@@ -398,8 +412,14 @@ static func _apply_time_ops(st: Dictionary, ops: Array, t: int) -> void:
 		var rec: Dictionary = st.acts[s.act]
 		match s.op:
 			"interrupt":
-				rec.cancelled = true
-				_log(st, t, "interrupt", {"side": s.by, "target_side": rec.side, "lost": moved.size()})
+				if int(rec.paid) <= G.silence_limit(int(s.sec)):
+					rec.cancelled = true
+					_log(st, t, "interrupt", {"side": s.by, "target_side": rec.side, "lost": moved.size()})
+				else:
+					# 力度不足：对方的技能原样进行
+					for it in moved:
+						st.items.append(it)
+					_log(st, t, "time_fail", {"side": s.by, "why": "打断力度不足（对方操作费 %d > %d）" % [int(rec.paid), G.silence_limit(int(s.sec))]})
 			"delay":
 				for it in moved:
 					it.t += s.sec
@@ -414,6 +434,16 @@ static func _apply_time_ops(st: Dictionary, ops: Array, t: int) -> void:
 					it.t = maxi(it.t - s.sec, minimum)
 					st.items.append(it)
 				_log(st, t, "advance", {"side": s.by, "target_side": rec.side, "sec": s.sec})
+
+static func _silence_cap(u: Dictionary) -> int:
+	var cap := 0
+	for s in u.statuses:
+		if s.name == "沉默":
+			cap = maxi(cap, G.silence_limit(int(s.value)))
+	return cap
+
+static func _silenced_for(u: Dictionary, cost: int) -> bool:
+	return has_status(u, "沉默") and cost <= _silence_cap(u)
 
 static func _windup_of(st: Dictionary, rec: Dictionary) -> int:
 	return mini(int(rec.paid / 10), 19)

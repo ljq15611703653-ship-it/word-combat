@@ -78,6 +78,7 @@ static func catalog() -> Array:
 				{"key": "st", "label": "状态", "kind": "enum", "options": [["狂振", "狂振"], ["易伤", "易伤"], ["沉默", "沉默"], ["牵连", "牵连"], ["升华", "升华"]], "default": "易伤"},
 				{"key": "tgt", "label": "目标", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
 				{"key": "allyside", "label": "施加给己方", "kind": "bool", "default": false},
+				{"key": "n", "label": "沉默力度（压制操作费 ≤ 1.25×力度）", "kind": "int", "min": 1, "max": 60, "default": 25},
 				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
 			]},
 		{"id": "redirect", "family": "反", "title": "改道", "glyph": "转", "blurb": "当被保护者即将受伤，把这次伤害转移给别人。",
@@ -117,7 +118,8 @@ static func catalog() -> Array:
 		{"id": "time", "family": "控", "title": "时间术", "glyph": "时", "blurb": "打断、延后对方已宣告的技能，或提前自己的。",
 			"params": [
 				{"key": "op", "label": "方式", "kind": "enum", "options": [["interrupt", "打断对方"], ["delay", "延后对方"], ["advance", "提前自己"]], "default": "interrupt"},
-				{"key": "sec", "label": "秒数", "kind": "int", "min": 1, "max": 19, "default": 4},
+				{"key": "power", "label": "打断力度（压制操作费 ≤ 1.25×力度）", "kind": "int", "min": 1, "max": 60, "default": 30},
+				{"key": "sec", "label": "秒数（延后/提前用）", "kind": "int", "min": 1, "max": 19, "default": 4},
 			]},
 		{"id": "remove", "family": "控", "title": "驱散", "glyph": "散", "blurb": "移除一个已建立的限时效果，或目标身上的状态。",
 			"params": [
@@ -174,7 +176,7 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			if p.st == "牵连":
 				link = G.T("other", "ally")
 				tnode = G.T("choose", "ally")
-			nodes = [G.status(p.st, tnode, int(p.dur), 0, link)]
+			nodes = [G.status(p.st, tnode, int(p.dur), int(p.n) if p.st == "沉默" else 0, link)]
 			title = "施加" + p.st
 		"redirect":
 			var to: Dictionary
@@ -205,7 +207,7 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			nodes = [G.watch("round_end", G.T("self", "self"), G.heal(G.T("all", "ally"), G.N(int(p.n))), {"freq": "once"})]
 		"time":
 			var sd: String = "ally" if p.op == "advance" else "enemy"
-			nodes = [G.time_op(p.op, sd, int(p.sec) if p.op != "interrupt" else 0)]
+			nodes = [G.time_op(p.op, sd, int(p.power) if p.op == "interrupt" else int(p.sec))]
 			title = {"interrupt": "打断", "delay": "延后", "advance": "提前"}[p.op]
 		"remove":
 			var side2: String = "ally" if p.allyside else "enemy"
