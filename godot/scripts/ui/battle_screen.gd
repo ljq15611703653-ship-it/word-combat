@@ -207,7 +207,7 @@ func _rebuild_rows() -> void:
 
 func _update_hud() -> void:
 	round_label.text = "第 %d / %d 轮   先手：%s" % [m.st.round, int(m.st.rules.max_rounds), "你" if m.human[E.first_side(m.st)] else "对手"]
-	score_label.text = "你 %d   ∶   %d 对手      （先到 %d 分，或全灭对手）" % [disp_score[0], disp_score[1], int(m.st.rules.win_score)]
+	score_label.text = "你 %d   ∶   %d 对手      （先到 %d 分获胜）" % [disp_score[0], disp_score[1], int(m.st.rules.win_score)]
 	var a0: int = m.st.sides[0].ap
 	var a1: int = m.st.sides[1].ap
 	ap_label.text = "行动点 你 %d/%d · 对手 %d/%d" % [a0, int(m.st.rules.ap_cap), a1, int(m.st.rules.ap_cap)]
@@ -910,11 +910,7 @@ func _show_game_over() -> void:
 	v.add_child(tl)
 	v.add_child(K.label("你 %d 分  ∶  %d 分 对手    共 %d 轮" % [int(m.st.sides[0].score), int(m.st.sides[1].score), int(m.st.round)], 24, K.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
 	var reason := ""
-	if E.alive_units(m.st, 1).is_empty() and w == 0:
-		reason = "对手全队同时倒下。"
-	elif E.alive_units(m.st, 0).is_empty() and w == 1:
-		reason = "你的全队同时倒下。"
-	elif m.st.round >= int(m.st.rules.max_rounds):
+	if m.st.round >= int(m.st.rules.max_rounds) and maxi(int(m.st.sides[0].score), int(m.st.sides[1].score)) < int(m.st.rules.win_score):
 		reason = "轮数用尽，按分数判定。"
 	else:
 		reason = "先到 %d 分。" % int(m.st.rules.win_score)

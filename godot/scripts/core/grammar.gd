@@ -173,11 +173,11 @@ static func watch(event: String, observe: Dictionary, child: Dictionary, o: Dict
 		n[k] = o[k]
 	return n
 
-static func redirect(target: Dictionary) -> Dictionary:
-	return {"kind": "redirect", "target": target}
+static func redirect(target: Dictionary, cap: int = 20) -> Dictionary:
+	return {"kind": "redirect", "target": target, "value": N(cap)}
 
-static func convert_heal() -> Dictionary:
-	return {"kind": "convert"}
+static func convert_heal(cap: int = 20) -> Dictionary:
+	return {"kind": "convert", "value": N(cap)}
 
 static func time_op(op: String, side: String, seconds: int = 0) -> Dictionary:
 	return {"kind": "time", "op": op, "side": side, "value": N(seconds)}
@@ -349,7 +349,10 @@ static func nums_of(node: Dictionary, choices: Dictionary = {}) -> Dictionary:
 			var d := int(node.dur) if node.life == "dur" else 0
 			b += c.budget + d
 			ap += c.ap + d
-		"redirect", "convert", "remove", "swap":
+		"redirect", "convert":
+			b += int(node.value.n)
+			ap += int(node.value.n)
+		"remove", "swap":
 			pass
 		"time":
 			b += int(node.value.n)
@@ -510,6 +513,8 @@ static func _check(node: Dictionary, out: Array, ctx: String) -> void:
 			if ck == "redirect" or ck == "convert":
 				if node.event != "pending_dmg":
 					out.append("转移/转为只能用于“即将受到伤害”")
+				if int(node.child.get("value", {"n": 0}).n) < 1:
+					out.append("转移/转为要填入每个被保护者的上限（至少1）")
 				if ck == "redirect":
 					_check_target(node.child.target, out, true)
 			else:
@@ -633,9 +638,9 @@ static func node_text(node: Dictionary) -> String:
 				life = "（%d秒内）" % int(node.dur)
 			return "%s，%s：%s%s" % [when, f, node_text(node.child), life]
 		"redirect":
-			return "把这次效果转移给" + target_text(node.target)
+			return "把这次伤害转移给%s（每个被保护者至多转移 %d 点）" % [target_text(node.target), int(node.value.n)]
 		"convert":
-			return "把这次伤害转为等量治疗"
+			return "把这次伤害转为等量治疗（每个被保护者至多转换 %d 点）" % int(node.value.n)
 		"time":
 			var who: String = SIDE_TEXT[node.side] + "已宣告的技能"
 			match node.op:

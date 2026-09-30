@@ -422,11 +422,8 @@ static func _apply_time_ops(st: Dictionary, ops: Array, t: int) -> void:
 					_log(st, t, "time_fail", {"side": s.by, "why": "打断力度不足（对方操作费 %d > %d）" % [int(rec.paid), G.silence_limit(int(s.sec))]})
 			"delay":
 				for it in moved:
-					it.t += s.sec
-					if it.t > TICKS - 1:
-						_log(st, t, "fizzle", {"why": "被延后出时间轴", "host": rec.host})
-					else:
-						st.items.append(it)
+					it.t = mini(it.t + int(s.sec), TICKS - 1)
+					st.items.append(it)
 				_log(st, t, "delay", {"side": s.by, "target_side": rec.side, "sec": s.sec})
 			"advance":
 				for it in moved:
@@ -610,8 +607,11 @@ static func _exec(st: Dictionary, node: Dictionary, ctx: Dictionary) -> void:
 				if removed == 0:
 					_log(st, t, "remove_fail", {"why": "该效果尚未建立或不存在"})
 		"watch":
+			var cap := 0
+			if node.child.kind in ["redirect", "convert"]:
+				cap = int(node.child.value.n)
 			_install(st, {"type": "watch", "event": node.event, "freq": node.freq, "observe": node.observe, "child": node.child,
-				"times": 0, "spent": false}, node, ctx, int(node.dur), node.life)
+				"times": 0, "spent": false, "cap": cap, "caps": {}}, node, ctx, int(node.dur), node.life)
 			_log(st, t, "watch_install", {"host": ctx.host, "side": ctx.side, "event": node.event, "text": G.node_text(node)})
 		"time":
 			# 顶层的时间改动由 _run_tick 统一处理；嵌在触发器/分支里的到这里按“立即生效”处理
@@ -852,23 +852,34 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 		if rw.is_empty():
 			break
 		used[rw.eid] = true
+		var used_cap: int = int(rw.caps.get(e.tgt, 0))
+		var room: int = int(rw.cap) - used_cap
+		if room <= 0:
+			continue
 		if rw.freq == "once":
 			rw.spent = true
 		rw.times += 1
+		var moved: int = mini(room, int(e.amount))
+		rw.caps[e.tgt] = used_cap + moved
 		if rw.child.kind == "redirect":
 			var ctx := {"side": rw.side, "host": rw.host, "choices": rw.choices, "source": e.src, "recipient": e.tgt}
 			var to := _targets(st, rw.child.target, ctx, "t%d" % rw.child.id)
 			if to.is_empty():
+				rw.caps[e.tgt] = used_cap
 				_log(st, t, "redirect_fail", {"tgt": e.tgt})
 			else:
-				_log(st, t, "redirect", {"from": e.tgt, "to": to[0], "amount": e.amount, "host": rw.host})
-				e["tgt"] = to[0]
-				tgt = _u(st, to[0])
+				_log(st, t, "redirect", {"from": e.tgt, "to": to[0], "amount": moved, "host": rw.host})
+				_apply(st, {"kind": "dmg", "src": e.src, "tgt": to[0], "amount": moved, "root": e.root})
+				e["amount"] = int(e.amount) - moved
+				if int(e.amount) <= 0:
+					return
+				tgt = _u(st, e.tgt)
 		else:
-			_log(st, t, "convert", {"tgt": e.tgt, "amount": e.amount, "host": rw.host})
-			e["kind"] = "heal"
-			_apply_heal(st, e, tgt, t)
-			return
+			_log(st, t, "convert", {"tgt": e.tgt, "amount": moved, "host": rw.host})
+			_apply_heal(st, {"kind": "heal", "src": e.src, "tgt": e.tgt, "amount": moved, "root": e.root}, tgt, t)
+			e["amount"] = int(e.amount) - moved
+			if int(e.amount) <= 0:
+				return
 	_fire(st, "pending_dmg", {"subject": e.tgt, "src": e.src, "recipient": e.tgt, "amount": int(e.amount), "raw": int(e.amount), "root": e.root}, false)
 	tgt = _u(st, e.tgt)
 	if not _alive(tgt):
@@ -1044,15 +1055,7 @@ static func _settle(st: Dictionary, t: int) -> void:
 		_fire(st, "down", info, true)
 		_fire(st, "ally_down", info, true)
 		_fire(st, "enemy_down", info, true)
-	# 全灭判定
-	var w0 := _wiped(st, 0)
-	var w1 := _wiped(st, 1)
-	if w0 and w1:
-		st.winner = 0 if st.sides[0].score > st.sides[1].score else (1 if st.sides[1].score > st.sides[0].score else -2)
-	elif w0:
-		st.winner = 1
-	elif w1:
-		st.winner = 0
+	# 全灭只给对方满额分数与一整轮的行动真空，不直接结束比赛；胜负按分数在回合结束时判定
 
 static func _wiped(st: Dictionary, s: int) -> bool:
 	for u in st.sides[s].units:

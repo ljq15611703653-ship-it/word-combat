@@ -144,7 +144,7 @@ func _init() -> void:
 	st = play(deck([bigaoe]), deck([S("延后3", [G.time_op("delay","enemy",3)])]), {}, {}, 3, 1)
 	check(hps(st,1)[0] == 0, "延后3秒：伤害落在第6秒，仍造成")
 	st = play(deck([bigaoe]), deck([S("延后17", [G.time_op("delay","enemy",17)])]), {}, {}, 3, 1)
-	check(hps(st,1) == [20,20,20,20,20], "延后推出20秒则落空")
+	check(hps(st,1)[0] == 0, "延后17秒：最晚落在第19秒，仍然造成伤害")
 	st = play(deck([bigaoe]), deck([S("打断", [G.time_op("interrupt","enemy",40)])]), {}, {}, 5, 4)
 	check(hps(st,1) == [20,20,20,20,20], "更早打断：对方尚未发生，落空")
 	st = play(deck([bigaoe]), deck([S("打断", [G.time_op("interrupt","enemy",40)])]), {}, {}, 5, 5)
@@ -164,7 +164,7 @@ func _init() -> void:
 	st = E.make_state([deck([S("全20",[G.dmg(G.T("all","enemy"), G.N(20))])]), deck([], [10,10,10,10,10])], 0)
 	E.begin_round(st); st.sides[0].ap = 99
 	E.run_round(st, [{"side":0,"sid": st.sides[0].units[0].skill_ids[0],"choices":{},"start":3}, {}])
-	check(st.winner == 0, "对方全灭，胜")
+	check(st.winner == -1 and st.sides[0].score == 50, "对方全灭：送出满额分数，但不直接结束比赛")
 	st = E.make_state([deck([S("打",[G.dmg(G.T("choose","enemy"), G.N(30))])]), deck([], [10,10,10,10,10])], 0)
 	E.begin_round(st); st.sides[0].ap = 99
 	E.run_round(st, [{"side":0,"sid": st.sides[0].units[0].skill_ids[0],"choices":{"t1":12},"start":3}, {}])

@@ -85,11 +85,13 @@ static func catalog() -> Array:
 			"params": [
 				{"key": "obs", "label": "保护", "kind": "enum", "options": OBSERVE, "default": "all"},
 				{"key": "to", "label": "转给", "kind": "enum", "options": [["source", "来源"], ["lowest", "敌方最低生命"], ["highest", "敌方最高生命"], ["random", "敌方随机"], ["self", "自身(替人挡)"]], "default": "source"},
+				{"key": "n", "label": "每人转移上限", "kind": "int", "min": 1, "max": 60, "default": 20},
 				{"key": "freq", "label": "次数", "kind": "enum", "options": [["once", "第一次"], ["every", "每次"]], "default": "every"},
 			]},
 		{"id": "convert", "family": "反", "title": "转伤为疗", "glyph": "化", "blurb": "把即将受到的伤害改写成等量治疗。",
 			"params": [
 				{"key": "obs", "label": "保护", "kind": "enum", "options": OBSERVE, "default": "all"},
+				{"key": "n", "label": "每人转换上限", "kind": "int", "min": 1, "max": 60, "default": 20},
 				{"key": "freq", "label": "次数", "kind": "enum", "options": [["once", "第一次"], ["every", "每次"]], "default": "every"},
 			]},
 		{"id": "reflect", "family": "反", "title": "回敬", "glyph": "反", "blurb": "受到伤害后，按该次伤害回敬来源。",
@@ -184,9 +186,9 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 				"source": to = G.T("source", "ref")
 				"self": to = G.T("self", "self")
 				_: to = G.T(p.to, "enemy")
-			nodes = [G.watch("pending_dmg", _observe(p.obs), G.redirect(to), {"freq": p.freq})]
+			nodes = [G.watch("pending_dmg", _observe(p.obs), G.redirect(to, int(p.n)), {"freq": p.freq})]
 		"convert":
-			nodes = [G.watch("pending_dmg", _observe(p.obs), G.convert_heal(), {"freq": p.freq})]
+			nodes = [G.watch("pending_dmg", _observe(p.obs), G.convert_heal(int(p.n)), {"freq": p.freq})]
 		"reflect":
 			var o := {}
 			if int(p.mult) > 0:

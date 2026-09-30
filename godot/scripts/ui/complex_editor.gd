@@ -306,8 +306,14 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(_child_slot(node, "child", node.event, chg, node.event == "pending_dmg"))
 		"redirect":
 			v.add_child(_row("转给", _target(node.target, true, chg)))
+			v.add_child(_row("每个被保护者至多转移", _spin(int(node.value.n), 1, 80, func(x):
+				node.value["n"] = x
+				chg.call())))
 		"convert":
 			v.add_child(K.label("把这次伤害改写成等量治疗（词：转为 恢复 生命）", 14, K.MUTED))
+			v.add_child(_row("每个被保护者至多转换", _spin(int(node.value.n), 1, 80, func(x):
+				node.value["n"] = x
+				chg.call())))
 		"time":
 			v.add_child(_row("方式", _enum(["打断", "延后", "提前"], ["interrupt", "delay", "advance"].find(node.op), func(i):
 				node["op"] = ["interrupt", "delay", "advance"][i]
