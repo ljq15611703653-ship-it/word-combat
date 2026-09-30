@@ -598,15 +598,19 @@ static func count_words(words: Array) -> Dictionary:
 	return c
 
 # ---------------------------------------------------------------- 人话
-static func verb_text(kind: String, alt: int, target: String, value: String) -> String:
+static func verb_text(kind: String, alt: int, target: String, value: String, is_num: bool = true) -> String:
 	if kind == "dmg":
-		return "对%s造成 %s 点伤害" % [target, value] if alt == 0 else "使%s当前生命减少 %s" % [target, value]
-	return "使%s恢复 %s 点生命" % [target, value] if alt == 0 else "使%s当前生命增加 %s" % [target, value]
+		if alt == 0:
+			return ("对%s造成 %s 点伤害" % [target, value]) if is_num else ("对%s造成【%s】的伤害" % [target, value])
+		return "使%s当前生命减少 %s" % [target, value]
+	if alt == 0:
+		return ("使%s恢复 %s 点生命" % [target, value]) if is_num else ("使%s恢复【%s】的生命" % [target, value])
+	return "使%s当前生命增加 %s" % [target, value]
 
 static func node_text(node: Dictionary) -> String:
 	match node.kind:
 		"dmg", "heal":
-			var t := verb_text(node.kind, int(node.get("alt", 0)), target_text(node.target), _mods_text(node) + value_text(node.value))
+			var t := verb_text(node.kind, int(node.get("alt", 0)), target_text(node.target), _mods_text(node) + value_text(node.value), node.value.k == "num")
 			if int(node.get("rep", 0)) > 0:
 				t += "，再重复 %d 次（每次间隔%d秒，每次重新付数字）" % [int(node.rep), int(node.get("rep_gap", 0)) if int(node.get("rep_gap", 0)) > 0 else 2]
 			if int(node.get("delay", 0)) > 0:

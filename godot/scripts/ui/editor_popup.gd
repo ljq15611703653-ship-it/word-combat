@@ -40,6 +40,11 @@ var param_box: VBoxContainer
 var preview_box: VBoxContainer
 var tpl_buttons := {}
 
+func _unhandled_key_input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and visible:
+		get_viewport().set_input_as_handled()
+		cancelled.emit()
+
 func open(deck: Dictionary, idx: int, pool_words: Dictionary, m: String) -> void:
 	base_deck = deck
 	unit_idx = idx

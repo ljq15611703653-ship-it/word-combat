@@ -28,6 +28,7 @@ var last_declared: Array = [{}, {}]
 var log_lines: Array = []
 var winner := -1               # -1 进行中，0/1，-2 平局
 var fast_ai := false
+var ai_epsilon := 0.0
 var rounds_played := 0
 
 func start(human0: bool = true, seed_val: int = -1, human1: bool = false) -> void:
@@ -191,7 +192,7 @@ func ai_declare() -> void:
 	if s != declare_order[0] and not pending[declare_order[0]].is_empty():
 		enemy = pending[declare_order[0]].duplicate()
 		enemy.erase("done")
-	var act := Ai.choose_action(st, s, enemy, rng, fast_ai)
+	var act := Ai.choose_action(st, s, enemy, rng, fast_ai, ai_epsilon)
 	pending[s] = act.duplicate(true)
 	pending[s]["done"] = true
 	max_think_ms = maxi(max_think_ms, Time.get_ticks_msec() - t0)

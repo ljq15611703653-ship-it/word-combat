@@ -403,10 +403,13 @@ static func _sim(st: Dictionary, acts: Array) -> Dictionary:
 	E.run_round(c, acts)
 	return c
 
-static func choose_action(st: Dictionary, side: int, enemy_act: Dictionary, rng: RandomNumberGenerator, fast: bool = false) -> Dictionary:
+static func choose_action(st: Dictionary, side: int, enemy_act: Dictionary, rng: RandomNumberGenerator, fast: bool = false, epsilon: float = 0.0) -> Dictionary:
 	var mine := enumerate_actions(st, side, enemy_act)
 	if mine.size() == 1:
 		return {}
+	# 失误：以 epsilon 的概率随手出一招（含不行动），用于“简单/普通”难度
+	if epsilon > 0.0 and rng.randf() < epsilon:
+		return mine[rng.randi() % mine.size()]
 	var second := not enemy_act.is_empty() or (E.first_side(st) != side)
 	var best: Dictionary = {}
 	var best_v := -INF

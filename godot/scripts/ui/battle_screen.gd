@@ -105,8 +105,12 @@ func _build() -> void:
 	top.add_child(speed_btn)
 	var snd := K.button("音效：开", "ghost", 16)
 	snd.custom_minimum_size = Vector2(0, 34)
+	snd.text = "音效：关" if Sfx.muted else "音效：开"
 	snd.pressed.connect(func():
 		Sfx.muted = not Sfx.muted
+		var st = load("res://scripts/ui/settings.gd")
+		st.muted = Sfx.muted
+		st.save_all()
 		snd.text = "音效：关" if Sfx.muted else "音效：开")
 	top.add_child(snd)
 	var quit := K.button("退出", "ghost", 16)

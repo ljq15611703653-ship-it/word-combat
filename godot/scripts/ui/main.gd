@@ -8,6 +8,7 @@ const Ai = preload("res://scripts/ai/ai.gd")
 const D = preload("res://scripts/core/deck.gd")
 const Match = preload("res://scripts/game/match.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
+const Settings = preload("res://scripts/ui/settings.gd")
 const TitleScreen = preload("res://scripts/ui/title_screen.gd")
 const BuildScreen = preload("res://scripts/ui/build_screen.gd")
 const DraftScreen = preload("res://scripts/ui/draft_screen.gd")
@@ -29,6 +30,8 @@ func _ready() -> void:
 	th.default_font = f
 	th.default_font_size = 18
 	theme = th
+	Settings.load_all()
+	Sfx.muted = Settings.muted
 	var sfx := Sfx.new()
 	add_child(sfx)
 	var args := OS.get_cmdline_user_args()
@@ -48,6 +51,11 @@ func _ready() -> void:
 		_show_title()
 	else:
 		_run_demo(demo)
+
+func _unhandled_input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_F11:
+		var mode := DisplayServer.window_get_mode()
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if mode == DisplayServer.WINDOW_MODE_FULLSCREEN else DisplayServer.WINDOW_MODE_FULLSCREEN)
 
 func _set_screen(c: Control) -> void:
 	if screen != null:
@@ -125,6 +133,8 @@ func _show_title() -> void:
 func _new_game(seed_val: int = -1) -> void:
 	m = Match.new()
 	m.start(not auto, seed_val, false)
+	m.ai_epsilon = [0.45, 0.12, 0.0][Settings.level]
+	m.fast_ai = Settings.level < 2
 	if auto:
 		m.human = [false, false]
 		m.decks[0] = Ai.build_deck(m.pools[0], m.personas[0], m.rng)
@@ -236,6 +246,60 @@ func _run_demo(demo: String) -> void:
 			m.begin_round()
 			m.pick_bag(0, 0)
 			_show_build("adjust")
+		"gameover", "deckview", "statuses":
+			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
+			m.commit_deck(0, m.decks[0])
+			m.begin_round()
+			m.pick_bag(0, 0)
+			while m.phase == "adjust":
+				m.skip_adjust(0)
+				m.skip_adjust(1)
+			m.phase = "adjust_done"
+			m.begin_declare()
+			m.human = [true, false]
+			_show_battle()
+			await get_tree().create_timer(0.5).timeout
+			var bb = battle_screen
+			if demo == "gameover":
+				m.winner = 0
+				m.st.sides[0].score = 103
+				m.st.sides[1].score = 64
+				bb._show_game_over()
+			elif demo == "deckview":
+				bb._peek_enemy()
+			else:
+				var E = load("res://scripts/core/engine.gd")
+				for u in m.st.sides[1].units:
+					u.statuses.append({"name": "易伤", "value": 0, "link": -1, "until": 999, "src": 0})
+				m.st.sides[1].units[1].statuses.append({"name": "护盾", "value": 12, "link": -1, "until": 999, "src": 0})
+				m.st.sides[1].units[2].statuses.append({"name": "沉默", "value": 20, "link": -1, "until": 999, "src": 0})
+				m.st.sides[1].units[0].hp = 5
+				m.st.sides[1].units[3].down_round = 1
+				m.st.sides[1].units[3].hp = 0
+				bb._rebuild_rows()
+		"complex2":
+			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
+			m.commit_deck(0, m.decks[0])
+			var s2 := BuildScreen.new()
+			_set_screen(s2)
+			s2.setup(m, "initial")
+			s2._open_editor(2)
+			await get_tree().create_timer(0.3).timeout
+			var G = load("res://scripts/core/grammar.gd")
+			var pp = s2.popup
+			pp.tab = "complex"
+			pp.complex_root.visible = true
+			pp.simple_root.visible = false
+			pp.complex_root.avail = {}
+			for w in Lex.implemented():
+				pp.complex_root.avail[w] = 4
+			pp.complex_root.nodes = [
+				G.watch("pending_dmg", G.T("all", "ally"), G.redirect(G.T("source", "ref"), 25), {"freq": "every"}),
+				G.watch("damaged", G.T("self", "self"), G.chain(G.dmg(G.T("source", "ref"), G.REF("event_damage"), {"dbl": 1}), G.heal(G.T("self", "self"), G.REF("prev"))), {"freq": "every", "life": "next"}),
+			]
+			pp.complex_root.skill_name = "嵌套示例"
+			pp.complex_root.name_edit.text = "嵌套示例"
+			pp.complex_root._rerender()
 		"clicktest":
 			await _click_test()
 		"clicktest2":

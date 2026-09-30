@@ -5,6 +5,11 @@ const K = preload("res://scripts/ui/kit.gd")
 
 signal closed()
 
+func _unhandled_key_input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and visible:
+		get_viewport().set_input_as_handled()
+		closed.emit()
+
 func open(title: String, units: Array, extra: String = "") -> void:
 	K.clear_children(self)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

@@ -3,6 +3,8 @@ extends Control
 
 const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
+const Settings = preload("res://scripts/ui/settings.gd")
+const Sfx = preload("res://scripts/ui/sfx.gd")
 
 signal start_game()
 signal watch_demo()
@@ -50,6 +52,38 @@ func _ready() -> void:
 	b1.custom_minimum_size = Vector2(0, 68)
 	b1.pressed.connect(func(): start_game.emit())
 	v.add_child(b1)
+	Settings.load_all()
+	var lv_row := K.hbox(8)
+	lv_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var desc := K.label("", 15, K.MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	var lv_btns: Array = []
+	var refresh_lv := func():
+		for i in lv_btns.size():
+			var b: Button = lv_btns[i]
+			var active: bool = i == Settings.level
+			b.add_theme_stylebox_override("normal", K.style(K.GOLD if active else K.PANEL2, Color("fff0c0") if active else K.EDGE, 10, 1, 4))
+			b.add_theme_color_override("font_color", Color("20180a") if active else K.TEXT)
+			b.add_theme_color_override("font_hover_color", Color("20180a") if active else K.TEXT)
+		desc.text = "难度：" + Settings.LEVEL_DESC[Settings.level]
+	for i in 3:
+		var b := K.button(Settings.LEVEL_NAMES[i], "normal", 18)
+		b.custom_minimum_size = Vector2(110, 38)
+		lv_btns.append(b)
+		lv_row.add_child(b)
+		b.pressed.connect(func():
+			Settings.level = i
+			Settings.save_all()
+			refresh_lv.call())
+	var snd := K.button("音效：开" if not Settings.muted else "音效：关", "ghost", 16)
+	snd.pressed.connect(func():
+		Settings.muted = not Settings.muted
+		Sfx.muted = Settings.muted
+		Settings.save_all()
+		snd.text = "音效：关" if Settings.muted else "音效：开")
+	lv_row.add_child(snd)
+	v.add_child(lv_row)
+	v.add_child(desc)
+	refresh_lv.call()
 	var b2 := K.button("玩法说明", "normal", 24)
 	b2.custom_minimum_size = Vector2(0, 54)
 	b2.pressed.connect(_show_rules)
