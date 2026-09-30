@@ -600,7 +600,7 @@ static func node_text(node: Dictionary) -> String:
 		"dmg", "heal":
 			var t := verb_text(node.kind, int(node.get("alt", 0)), target_text(node.target), _mods_text(node) + value_text(node.value))
 			if int(node.get("rep", 0)) > 0:
-				t += "，再重复 %d 次（每次间隔%d秒，每次重新付数字）" % [int(node.rep), maxi(1, int(node.get("rep_gap", 2)))]
+				t += "，再重复 %d 次（每次间隔%d秒，每次重新付数字）" % [int(node.rep), int(node.get("rep_gap", 0)) if int(node.get("rep_gap", 0)) > 0 else 2]
 			if int(node.get("delay", 0)) > 0:
 				t = "%d 秒后，" % int(node.delay) + t
 			return t

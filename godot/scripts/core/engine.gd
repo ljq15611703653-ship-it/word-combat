@@ -655,7 +655,7 @@ static func _exec_effect(st: Dictionary, node: Dictionary, ctx: Dictionary) -> v
 	# 重复
 	var reps := int(node.get("rep", 0))
 	if reps > 0 and not ctx.get("is_rep", false):
-		var gap := maxi(1, int(node.get("rep_gap", 2)))
+		var gap: int = int(node.get("rep_gap", 0)) if int(node.get("rep_gap", 0)) > 0 else 2
 		for k in range(1, reps + 1):
 			var c2 := ctx.duplicate()
 			c2["is_rep"] = true
