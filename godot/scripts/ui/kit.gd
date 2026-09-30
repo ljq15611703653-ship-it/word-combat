@@ -2,6 +2,7 @@ extends RefCounted
 # 界面基础件：配色、样式、词卡、小标签。全部用代码构造，不依赖外部资源。
 
 const Lex = preload("res://scripts/core/lexicon.gd")
+const Sfx = preload("res://scripts/ui/sfx.gd")
 
 const BG := Color("10121a")
 const PANEL := Color("1b2030")
@@ -77,6 +78,7 @@ static func button(text: String, kind: String = "normal", size: int = 18) -> But
 	b.add_theme_color_override("font_pressed_color", fg)
 	b.add_theme_color_override("font_disabled_color", Color(0.5, 0.5, 0.55))
 	b.custom_minimum_size = Vector2(0, 40)
+	b.pressed.connect(func(): Sfx.play("click"))
 	return b
 
 static func chip(text: String, color: Color, size: int = 13, fg: Color = Color.WHITE) -> PanelContainer:
@@ -133,16 +135,17 @@ static func word_card(word: String, count: int = 1, used: int = -1, size: Vector
 	head.add_child(label(info.get("cat", "?"), 11, Color(1, 1, 1, 0.92), HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(head)
 	# 词
-	var fs := 26
 	var n := word.length()
-	if n >= 6:
-		fs = 14
-	elif n >= 5:
-		fs = 16
-	elif n >= 4:
-		fs = 19
-	elif n == 3:
-		fs = 23
+	var avail_w: float = size.x - 22.0
+	var fs := 28
+	while fs > 12 and float(n * fs) > avail_w:
+		fs -= 1
+	if fs < 17 and n >= 4:
+		# 放不下一行就分两行
+		var per: int = int(ceil(n / 2.0))
+		fs = 26
+		while fs > 12 and float(per * fs) > avail_w:
+			fs -= 1
 	var center := CenterContainer.new()
 	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var wl := label(word, fs, TEXT, HORIZONTAL_ALIGNMENT_CENTER)

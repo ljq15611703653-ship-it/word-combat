@@ -7,6 +7,7 @@ const Lex = preload("res://scripts/core/lexicon.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
 const D = preload("res://scripts/core/deck.gd")
 const Match = preload("res://scripts/game/match.gd")
+const Sfx = preload("res://scripts/ui/sfx.gd")
 const TitleScreen = preload("res://scripts/ui/title_screen.gd")
 const BuildScreen = preload("res://scripts/ui/build_screen.gd")
 const DraftScreen = preload("res://scripts/ui/draft_screen.gd")
@@ -28,6 +29,8 @@ func _ready() -> void:
 	th.default_font = f
 	th.default_font_size = 18
 	theme = th
+	var sfx := Sfx.new()
+	add_child(sfx)
 	var args := OS.get_cmdline_user_args()
 	var demo := ""
 	for a in args:

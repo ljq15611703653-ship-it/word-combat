@@ -3,6 +3,7 @@ extends Control
 
 const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
+const Sfx = preload("res://scripts/ui/sfx.gd")
 
 signal picked(idx)
 signal finished()
@@ -142,6 +143,7 @@ func _hover(i: int, on: bool) -> void:
 func _on_panel_input(ev: InputEvent, i: int) -> void:
 	if can_pick and ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 		can_pick = false
+		Sfx.play("pick")
 		picked.emit(i)
 
 func _begin() -> void:

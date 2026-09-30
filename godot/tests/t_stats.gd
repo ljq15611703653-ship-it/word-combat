@@ -18,9 +18,10 @@ func _init() -> void:
 	var acted := 0
 	var passed := 0
 	var words_total := 0
+	var think_max := 0
 	for g in n:
 		var m := Match.new()
-		m.fast_ai = true
+		m.fast_ai = (OS.get_cmdline_user_args().size() < 2)
 		m.start(false, 1000 + g, false)
 		var guard := 0
 		while guard < 500:
@@ -37,6 +38,7 @@ func _init() -> void:
 						acted += 1
 				if m.phase == "over":
 					break
+		think_max = maxi(think_max, m.max_think_ms)
 		var w: int = m.winner
 		if w == 0:
 			wins.side0 += 1
@@ -66,6 +68,7 @@ func _init() -> void:
 		for s in 2:
 			for p in m.pools[s]:
 				words_total += int(m.pools[s][p])
+	print("电脑单次思考最长 %d ms" % think_max)
 	print("局数 %d  用时 %.1fs  平均轮数 %.1f" % [n, (Time.get_ticks_msec() - t0) / 1000.0, float(rounds_sum) / n])
 	print("胜者：0号位 %d · 1号位 %d · 平局 %d" % [wins.side0, wins.side1, wins.draw])
 	print("结束方式：", ended_by)

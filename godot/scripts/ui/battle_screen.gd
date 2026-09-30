@@ -9,6 +9,7 @@ const Lex = preload("res://scripts/core/lexicon.gd")
 const MinionCard = preload("res://scripts/ui/minion_card.gd")
 const Timeline = preload("res://scripts/ui/timeline.gd")
 const DeckView = preload("res://scripts/ui/deck_view.gd")
+const Sfx = preload("res://scripts/ui/sfx.gd")
 
 signal next_round()
 signal quit_to_title()
@@ -102,6 +103,12 @@ func _build() -> void:
 	speed_btn.custom_minimum_size = Vector2(0, 34)
 	speed_btn.pressed.connect(_toggle_speed)
 	top.add_child(speed_btn)
+	var snd := K.button("音效：开", "ghost", 16)
+	snd.custom_minimum_size = Vector2(0, 34)
+	snd.pressed.connect(func():
+		Sfx.muted = not Sfx.muted
+		snd.text = "音效：关" if Sfx.muted else "音效：开")
+	top.add_child(snd)
 	var quit := K.button("退出", "ghost", 16)
 	quit.custom_minimum_size = Vector2(0, 34)
 	quit.pressed.connect(func(): quit_to_title.emit())
@@ -586,6 +593,7 @@ func _pass() -> void:
 	_next_declare()
 
 func _confirm() -> void:
+	Sfx.play("declare")
 	var act := _current_act()
 	var err: String = m.submit(0, act)
 	if err != "":
@@ -665,6 +673,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if c != null:
 				c.flash(K.BLUE if e.side == 0 else K.RED)
 			toast("%s：%s" % ["你" if e.side == 0 else "对手", sk.name], K.BLUE if e.side == 0 else K.RED)
+			Sfx.play("cast")
 			return 0.45
 		"dmg":
 			var c2 = _card(int(e.tgt))
@@ -674,6 +683,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 					c2.shake()
 					c2.flash(K.RED)
 				_line_fx(int(e.src), int(e.tgt), K.RED)
+				Sfx.play("hit")
 				timeline.add_dot(float(t), K.RED, E._u(m.st, int(e.tgt)).side)
 				_log("　%s 对 %s 造成 [color=#e0605a]%d[/color]%s" % [_uname(int(e.src)), _uname(int(e.tgt)), int(e.amount), "" if int(e.raw) == int(e.amount) else "（原 %d）" % int(e.raw)])
 				return 0.3
@@ -686,6 +696,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if c3 != null:
 				c3.float_text("+%d" % int(e.actual) if int(e.actual) > 0 else "满", K.GREEN)
 				c3.flash(K.GREEN)
+				Sfx.play("heal")
 			timeline.add_dot(float(t), K.GREEN, E._u(m.st, int(e.tgt)).side)
 			_log("　%s 恢复 [color=#62c483]%d[/color]" % [_uname(int(e.tgt)), int(e.actual)])
 			return 0.25
@@ -700,12 +711,14 @@ func _play_event(e: Dictionary, t: int) -> float:
 			var c5 = _card(int(e.tgt))
 			if c5 != null:
 				c5.float_text("格挡!", K.GOLD, 28)
+				Sfx.play("block")
 			_log("　%s 的首挡生效" % _uname(int(e.tgt)))
 			return 0.25
 		"shield":
 			var c6 = _card(int(e.tgt))
 			if c6 != null:
 				c6.float_text("盾 -%d" % int(e.absorbed), K.BLUE, 24)
+				Sfx.play("block")
 			return 0.2
 		"mit":
 			var c7 = _card(int(e.tgt))
@@ -726,6 +739,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if c9 != null:
 				c9.flash(K.PURPLE)
 				c9.float_text("触发!", K.PURPLE, 26)
+				Sfx.play("magic")
 			_log("　[color=#a279d6]%s 的监听触发[/color]" % _uname(int(e.host)))
 			return 0.35
 		"redirect":
@@ -733,6 +747,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if cf != null:
 				cf.float_text("转移!", K.PURPLE, 28)
 			_line_fx(int(e.from), int(e.to), K.PURPLE)
+			Sfx.play("magic")
 			toast("伤害被转移给 %s" % _uname(int(e.to)), K.PURPLE)
 			_log("　[color=#a279d6]%d 点伤害从 %s 转移给 %s[/color]" % [int(e.amount), _uname(int(e.from)), _uname(int(e.to))])
 			return 0.6
@@ -744,6 +759,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			return 0.45
 		"interrupt":
 			toast("打断！对方的招式落空", K.GOLD)
+			Sfx.play("interrupt")
 			_log("[color=#e0b85c]第%d秒 %s打断了%s的技能[/color]" % [t, "你" if e.side == 0 else "对手", "对手" if e.side == 0 else "你"])
 			return 0.6
 		"delay":
@@ -774,6 +790,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 				cd.refresh(cd.unit, cd.skills)
 				cd.float_text("倒下", K.RED, 34)
 				cd.shake()
+				Sfx.play("down")
 			disp_score[int(e.score_side)] += int(e.score)
 			_update_hud()
 			toast("%s 倒下！ %s +%d分" % [_uname(int(e.tgt)), "你" if int(e.score_side) == 0 else "对手", int(e.score)], K.RED if int(e.score_side) == 1 else K.GREEN)
@@ -904,6 +921,7 @@ func _show_game_over() -> void:
 	var v := K.vbox(14)
 	p.add_child(v)
 	var w: int = m.winner
+	Sfx.play("win" if w == 0 else "lose")
 	var title := "胜利！" if w == 0 else ("落败" if w == 1 else "平局")
 	var col := K.GREEN if w == 0 else (K.RED if w == 1 else K.GOLD)
 	var tl := K.label(title, 64, col, HORIZONTAL_ALIGNMENT_CENTER)

@@ -125,7 +125,10 @@ func apply_adjust(side: int, unit_idx: int, new_unit: Dictionary) -> Dictionary:
 		return v
 	decks[side] = nd
 	E.set_deck(st, side, nd, false)
-	say("%s 调整了【%s】。" % ["你" if human[side] else "对手", new_unit.name])
+	var names: Array = []
+	for sk in new_unit.skills:
+		names.append(sk.name)
+	say("%s 调整了【%s】：现有技能 %s，关键词 %s，生命 %d。" % ["你" if human[side] else "对手", new_unit.name, "、".join(names) if not names.is_empty() else "无", new_unit.kw if new_unit.kw != "" else "无", int(new_unit.max_hp)])
 	_advance_adjust()
 	return v
 
@@ -180,7 +183,9 @@ func submit(side: int, act: Dictionary) -> String:
 	pending[side]["done"] = true
 	return ""
 
+var max_think_ms := 0
 func ai_declare() -> void:
+	var t0 := Time.get_ticks_msec()
 	var s := declare_side()
 	var enemy: Dictionary = {}
 	if s != declare_order[0] and not pending[declare_order[0]].is_empty():
@@ -189,6 +194,7 @@ func ai_declare() -> void:
 	var act := Ai.choose_action(st, s, enemy, rng, fast_ai)
 	pending[s] = act.duplicate(true)
 	pending[s]["done"] = true
+	max_think_ms = maxi(max_think_ms, Time.get_ticks_msec() - t0)
 
 func public_declared(side: int) -> Dictionary:
 	# 后手可见的先手宣告

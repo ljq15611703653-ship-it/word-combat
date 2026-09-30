@@ -7,6 +7,7 @@ const G = preload("res://scripts/core/grammar.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const EditorPopup = preload("res://scripts/ui/editor_popup.gd")
 const DeckView = preload("res://scripts/ui/deck_view.gd")
+const Ai = preload("res://scripts/ai/ai.gd")
 
 signal finished()                      # 构筑完成 / 结束调整
 signal adjusted(unit_idx, unit)        # 调整模式下确认了一张卡的修改
@@ -57,6 +58,13 @@ func _build() -> void:
 		var peek := K.button("查看对手牌组", "normal", 17)
 		peek.pressed.connect(_peek_enemy)
 		top.add_child(peek)
+	else:
+		var rec := K.button("推荐构筑（可再改）", "normal", 17)
+		rec.tooltip_text = "让电脑用你现有的词配一套牌；不满意可以逐张再改"
+		rec.pressed.connect(func():
+			wd = Ai.build_deck(m.pools[0], Ai.pick_persona(m.rng), m.rng)
+			refresh())
+		top.add_child(rec)
 	finish_btn = K.button("开始对战  →" if mode == "initial" else "结束调整  →", "primary", 21)
 	finish_btn.custom_minimum_size = Vector2(230, 48)
 	finish_btn.pressed.connect(_on_finish)
@@ -74,6 +82,15 @@ func _build() -> void:
 	msg_label = K.label("", 15, K.RED)
 	bb.add_child(msg_label)
 	v.add_child(bb)
+	if mode == "adjust":
+		var recent: Array = m.log_lines.slice(maxi(0, m.log_lines.size() - 3))
+		var box := K.panel(Color("1f2738"), K.EDGE, 8, 1)
+		var lv := K.vbox(2)
+		box.add_child(lv)
+		lv.add_child(K.label("近期公开动态", 13, K.MUTED))
+		for ln in recent:
+			lv.add_child(K.label(str(ln), 14, K.TEXT))
+		v.add_child(box)
 	# 五张卡
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -81,6 +98,7 @@ func _build() -> void:
 	card_row = K.hbox(14)
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.add_child(card_row)
 	v.add_child(scroll)
 	# 词库
@@ -136,7 +154,7 @@ func refresh() -> void:
 	var sub: Label = find_child("sub", true, false)
 	if sub != null:
 		if mode == "initial":
-			sub.text = "点击卡牌编辑技能（简单版：选招式填空；复杂版：自由拼词）。至少装一个技能。"
+			sub.text = "①点「编辑」  ②选招式、调数值（绿=有词，红=缺词）  ③装入技能槽并确认。点数 = 生命 + 技能数字，共 100；至少装一个技能。"
 		else:
 			sub.text = "你还有 %d 次调整，对手 %d 次。每次只能改一张卡。" % [m.adjust_left(0), m.adjust_left(1)]
 	var v := D.validate(deck, m.pools[0])
@@ -157,16 +175,24 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 	var v := K.vbox(6)
 	p.add_child(v)
 	var head := K.hbox(8)
-	head.add_child(K.label(u.glyph, 40, Color("c9b27a")))
 	var col := K.vbox(0)
-	col.add_child(K.label(u.name, 22, K.TEXT))
+	col.add_child(K.label(u.name, 24, K.TEXT))
 	col.add_child(K.label("第 %d 位" % (i + 1), 13, K.MUTED))
 	head.add_child(col)
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
-	head.add_child(K.chip("生命 %d" % int(u.max_hp), Color("2c5c44"), 18))
+	head.add_child(K.chip("生命 %d" % int(u.max_hp), Color("2c5c44"), 20))
 	v.add_child(head)
+	var hue: float = {"剑": 0.0, "盾": 0.58, "咒": 0.76, "弓": 0.33, "魂": 0.92}.get(u.glyph, 0.1)
+	var pcol := Color.from_hsv(hue, 0.45, 0.55)
+	var portrait := PanelContainer.new()
+	portrait.custom_minimum_size = Vector2(0, 120)
+	portrait.add_theme_stylebox_override("panel", K.style(pcol, pcol.lightened(0.3), 10, 1))
+	var cc := CenterContainer.new()
+	cc.add_child(K.label(u.glyph, 84, Color(1, 1, 1, 0.88), HORIZONTAL_ALIGNMENT_CENTER))
+	portrait.add_child(cc)
+	v.add_child(portrait)
 	if u.kw != "":
 		v.add_child(K.chip("◈ " + u.kw, Color("6b5a22"), 15))
 	else:
