@@ -181,7 +181,13 @@ func _init() -> void:
 	var stn := play(deck([skn]), deck([S("全10", [G.dmg(G.T("all","enemy"), G.N(10))])]), {"t1": 10, "t2": 12}, {}, 8, 3)
 	var evn := []
 	for e in stn.events: if e.type == "dmg" and e.tgt == 10: evn.append(e.t)
-	check(evn.size() > 0 and evn[0] == 0, "立即的节点在第0秒落下 %s" % str(evn))
+	check(evn.size() > 0 and evn[0] <= 1, "便宜节点立即落在第0–1秒（立即这个词自己价格4，计入节点起手）%s" % str(evn))
+	var bign := G.dmg(G.T("all","enemy"), G.N(30)); bign["now"] = true
+	var skb := S("立即大招", [bign])
+	stn = play(deck([skb]), deck([]), {}, {}, 9)
+	var tb := -1
+	for e in stn.events: if e.type == "dmg" and tb == -1: tb = e.t
+	check(tb == G.node_windup(bign) and tb >= 3, "立即不能让大招绕过自己的起手：落在第%d秒" % tb)
 	# 之前：比起点早N秒
 	var erl := G.dmg(G.T("choose","enemy"), G.N(5)); erl["early"] = 3
 	var ske := S("之前", [erl])

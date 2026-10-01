@@ -290,9 +290,9 @@ static func _log(st: Dictionary, t: int, type: String, data: Dictionary) -> void
 static func _node_tick(n: Dictionary, start: int) -> int:
 	var t := start
 	if n.get("now", false):
-		t = 0
+		t = mini(G.node_windup(n), start)
 	elif int(n.get("early", 0)) > 0:
-		t = maxi(0, start - int(n.early))
+		t = maxi(mini(G.node_windup(n), start), start - int(n.early))
 	if n.kind == "time":
 		t += int(n.get("delay", 0))
 	return t

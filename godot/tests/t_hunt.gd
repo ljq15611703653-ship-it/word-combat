@@ -32,7 +32,16 @@ func rand_attack() -> Dictionary:
 				d["rep"] = rng.randi_range(1, 2)
 			if rng.randf() < 0.15:
 				d["delay"] = rng.randi_range(1, 5)
+			if rng.randf() < 0.3:
+				d["now"] = true
+			elif rng.randf() < 0.2:
+				d["early"] = rng.randi_range(1, 6)
+			if rng.randf() < 0.25:
+				d["sync"] = true
 			nodes.append(d)
+		elif r < 0.5:
+			var low := G.T("lowest", "enemy")
+			nodes.append(G.until_node(G.cmp_cond(G.REF("cur_hp", low), "lt", G.N(rng.randi_range(2, 8))), G.dmg(low, G.N(rng.randi_range(4, 12)))))
 		elif r < 0.55:
 			var total := rng.randi_range(8, 40)
 			var a := rng.randi_range(2, total - 2)
