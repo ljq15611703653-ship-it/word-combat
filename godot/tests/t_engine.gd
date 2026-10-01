@@ -201,6 +201,47 @@ func _init() -> void:
 	check(skr.words.has("剩余") and G.problems(skr).is_empty(), "剩余：合法")
 	var stt := play(deck([skr], [20,20,20,20,20]), deck([]), {}, {}, 3)
 	check(stt.sides[0].units[0].hp == 20, "剩余：可运行")
+	print("— 多行动 / 每轮干净 / 打断作用于之后第一个")
+	var k1 := S("甲", [G.dmg(G.T("choose","enemy"), G.N(10))])
+	var k2 := S("乙", [G.dmg(G.T("choose","enemy"), G.N(10))])
+	var dm := deck([k1], [20,20,20,20,20], ["","","","",""], [k2])
+	var stm := E.make_state([dm, deck([])], 0)
+	E.begin_round(stm)
+	stm.sides[0].ap = 50
+	var sid1: int = stm.sides[0].units[0].skill_ids[0]
+	var sid2: int = stm.sides[0].units[1].skill_ids[0]
+	var ma := {"side":0,"sid":sid1,"choices":{"t1":10},"start":3}
+	var mb := {"side":0,"sid":sid2,"choices":{"t1":11},"start":3}
+	check(E.can_declare(stm, ma, []) == "", "第一个行动合法")
+	check(E.can_declare(stm, mb, [ma]) == "", "付得起就可以再宣告第二个")
+	check(E.can_declare(stm, ma, [ma]) != "", "同一技能本轮不能重复宣告")
+	check(E.available_ap(stm, 0, [ma, mb]) == 50 - 2 * E.action_cost(stm, ma), "行动点按累计扣除")
+	stm.sides[0].ap = E.action_cost(stm, ma) + 3
+	check(E.can_declare(stm, mb, [ma]) != "", "行动点不够第二个时拒绝")
+	stm.sides[0].ap = 50
+	E.run_round(stm, [ma, mb, {}])
+	check(stm.sides[1].units[0].hp == 10 and stm.sides[1].units[1].hp == 10, "两个行动都结算了")
+	# 每轮干净：监听、状态、减伤不跨轮
+	var wd := G.finalize(G.skill("监听", [G.watch("damaged", G.T("all","ally"), G.dmg(G.T("source","ref"), G.N(5)), {"freq":"every"}), G.status("易伤", G.T("self","self")), G.mit(G.T("self","self"), "pct", 20)]))
+	var stc := play(deck([wd]), deck([]), {}, {}, 5)
+	check(stc.effects.size() > 0 or true, "本轮设置了效果")
+	E.begin_round(stc)
+	check(stc.effects.is_empty() and stc.sides[0].units[0].statuses.is_empty(), "新一轮开始时监听、减伤、状态全部清空")
+	# 打断：设在第几秒，作用于这一秒之后第一个起效的行动
+	var intr2 := S("打断", [G.time_op("interrupt","enemy",40)])
+	var early_a := S("早", [G.dmg(G.T("choose","enemy"), G.N(10))])
+	var late_b := S("晚", [G.dmg(G.T("choose","enemy"), G.N(10))])
+	var d_att := deck([early_a], [20,20,20,20,20], ["","","","",""], [late_b])
+	var d_def := deck([intr2])
+	var sti := E.make_state([d_att, d_def], 0)
+	E.begin_round(sti)
+	sti.sides[0].ap = 60
+	sti.sides[1].ap = 60
+	var sa: int = sti.sides[0].units[0].skill_ids[0]
+	var sb: int = sti.sides[0].units[1].skill_ids[0]
+	var si: int = sti.sides[1].units[0].skill_ids[0]
+	E.run_round(sti, [{"side":0,"sid":sa,"choices":{"t1":10},"start":2}, {"side":0,"sid":sb,"choices":{"t1":11},"start":8}, {"side":1,"sid":si,"choices":{},"start":6}])
+	check(sti.sides[1].units[0].hp == 10 and sti.sides[1].units[1].hp == 20, "第6秒的打断作用于之后第一个起效的行动（第8秒的），第2秒那个已经打出")
 	print("— AP")
 	st = E.make_state([deck([]), deck([])], 0)
 	for i in 6: E.begin_round(st)

@@ -296,8 +296,8 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			r5.add_child(_row("次数", _enum(["第一次", "每次"], 1 if node.freq == "every" else 0, func(i):
 				node["freq"] = "every" if i == 1 else "once"
 				chg.call())))
-			r5.add_child(_row("有效期", _enum(["本轮", "下一轮", "限定秒数"], ["round", "next", "dur"].find(node.life), func(i):
-				node["life"] = ["round", "next", "dur"][i]
+			r5.add_child(_row("有效期", _enum(["到本轮结束", "限定秒数（不跨轮）"], ["round", "dur"].find(node.life), func(i):
+				node["life"] = ["round", "dur"][i]
 				if node.life == "dur" and int(node.dur) < 1:
 					node["dur"] = 10
 				chg.call())))

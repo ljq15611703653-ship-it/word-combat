@@ -286,22 +286,26 @@ static func pick_bag(bags: Array, pool: Dictionary, persona: String) -> int:
 	return 0 if scores[0] >= scores[1] else 1
 
 # ------------------------------------------------------------ 战斗决策
-static func _starts(ms: int, enemy_act: Dictionary) -> Array:
+static func _starts(ms: int, enemy_list: Array) -> Array:
 	var out := [ms]
 	var cand := [ms + 3, 10]
-	if not enemy_act.is_empty():
-		cand.append(int(enemy_act.start))
-		cand.append(int(enemy_act.start) - 1)
-		cand.append(int(enemy_act.start) + 1)
+	for ea in enemy_list:
+		if ea.is_empty():
+			continue
+		cand.append(int(ea.start))
+		cand.append(int(ea.start) - 1)
+		cand.append(int(ea.start) + 1)
 	for c in cand:
 		if c >= ms and c <= 19 and not (c in out):
 			out.append(c)
 	return out
 
-static func _slot_options(st: Dictionary, side: int, slot: Dictionary, enemy_act: Dictionary) -> Array:
-	var cands := E.slot_candidates(st, side, slot, [enemy_act] if not enemy_act.is_empty() else [])
+static func _slot_options(st: Dictionary, side: int, slot: Dictionary, all_declared: Array) -> Array:
+	var cands := E.slot_candidates(st, side, slot, all_declared)
 	if slot.kind == "branch":
 		return cands
+	if slot.kind == "action":
+		return cands.slice(0, 3)
 	if slot.kind == "remove":
 		var keep: Array = []
 		for c in cands:
@@ -330,21 +334,29 @@ static func _slot_options(st: Dictionary, side: int, slot: Dictionary, enemy_act
 				out.append(u.uid)
 	return out
 
-static func enumerate_actions(st: Dictionary, side: int, enemy_act: Dictionary, max_per_skill: int = 8) -> Array:
+# enemy：对方已宣告的行动（单个字典或数组）；mine_declared：本方此前已宣告的行动
+static func enumerate_actions(st: Dictionary, side: int, enemy, max_per_skill: int = 8, mine_declared: Array = []) -> Array:
+	var enemy_list: Array = []
+	if enemy is Dictionary:
+		if not enemy.is_empty():
+			enemy_list = [enemy]
+	else:
+		enemy_list = enemy
+	var all_declared: Array = enemy_list + mine_declared
 	var out: Array = [{}]
-	var ap: int = st.sides[side].ap
+	var avail: int = E.available_ap(st, side, mine_declared)
 	for u in E.alive_units(st, side):
 		for sid in u.skill_ids:
 			var sk := E.skill_of(st, sid)
-			if int(sk.cost) > ap and int(sk.cost) - 0 > ap:
-				# 择一可能更便宜，保守起见仍然尝试
-				if not _has_choose(sk):
-					continue
+			if int(sk.cost) > avail and not _has_choose(sk):
+				continue
 			var slots := G.choice_slots(sk)
 			var combos: Array = [{}]
 			for slot in slots:
-				var opts := _slot_options(st, side, slot, enemy_act)
+				var opts := _slot_options(st, side, slot, all_declared)
 				if opts.is_empty():
+					if slot.kind == "action":
+						continue # 没有对方行动可指：缺省作用于第一个，也允许
 					combos = []
 					break
 				var nxt: Array = []
@@ -360,9 +372,9 @@ static func enumerate_actions(st: Dictionary, side: int, enemy_act: Dictionary, 
 			for ch in combos:
 				var act := {"side": side, "sid": sid, "choices": ch, "start": 0}
 				var ms := E.min_start(st, act)
-				for s in _starts(ms, enemy_act):
+				for s in _starts(ms, enemy_list):
 					act.start = s
-					if E.can_declare(st, act) == "":
+					if E.can_declare(st, act, mine_declared) == "":
 						out.append(act.duplicate(true))
 						count += 1
 				if count >= max_per_skill * 3:
@@ -403,81 +415,74 @@ static func _sim(st: Dictionary, acts: Array) -> Dictionary:
 	E.run_round(c, acts)
 	return c
 
-static func choose_action(st: Dictionary, side: int, enemy_act: Dictionary, rng: RandomNumberGenerator, fast: bool = false, epsilon: float = 0.0) -> Dictionary:
-	var mine := enumerate_actions(st, side, enemy_act)
+# 在“已宣告若干行动”的基础上，决定本方下一个行动；返回空字典表示不再宣告。
+static func choose_action(st: Dictionary, side: int, enemy_list: Array, mine_declared: Array, rng: RandomNumberGenerator, fast: bool = false, epsilon: float = 0.0) -> Dictionary:
+	var mine := enumerate_actions(st, side, enemy_list, 8, mine_declared)
 	if mine.size() == 1:
 		return {}
-	# 失误：以 epsilon 的概率随手出一招（含不行动），用于“简单/普通”难度
+	# 失误：以 epsilon 的概率随手出一招（含不再宣告），用于“简单/普通”难度
 	if epsilon > 0.0 and rng.randf() < epsilon:
 		return mine[rng.randi() % mine.size()]
-	var second := not enemy_act.is_empty() or (E.first_side(st) != side)
+	var second: bool = not enemy_list.is_empty() or E.first_side(st) != side
 	var best: Dictionary = {}
-	var best_v := -INF
 	if second:
-		# 对方已宣告（或不行动）：逐个模拟
-		var their: Dictionary = enemy_act
+		# 先手已把行动宣告完：逐个看“再加一个行动”是否比现在就停下更好
+		var base_acts: Array = enemy_list + mine_declared
+		var best_v := evaluate(_sim(st, base_acts), side) + 0.5
 		for a in mine:
-			var acts: Array = [{}, {}]
-			acts[side] = a
-			acts[1 - side] = their
-			var v := evaluate(_sim(st, acts), side) + rng.randf() * 1.5
+			if a.is_empty():
+				continue
+			var v := evaluate(_sim(st, base_acts + [a]), side) + rng.randf() * 1.5
 			if v > best_v:
 				best_v = v
 				best = a
 		return best
-	# 先手：先对“对方不应对”预筛，再对对方的若干应对取折中
-	var pre: Array = []
-	for a in mine:
-		var acts0: Array = [{}, {}]
-		acts0[side] = a
-		pre.append({"a": a, "v": evaluate(_sim(st, acts0), side)})
-	pre.sort_custom(func(x, y): return x.v > y.v)
-	var keep: Array = []
-	var limit := 4 if fast else 8
-	for i in mini(limit, pre.size()):
-		keep.append(pre[i].a)
-	var has_pass := false
-	for a in keep:
-		if a.is_empty():
-			has_pass = true
-	if not has_pass:
-		keep.append({})
-	var replies := enumerate_actions(st, 1 - side, {})
-	# 对方的应对：按“对方视角对我方不行动”预筛
+	# 先手：对“对方的若干应对”取折中；只有明显优于“现在就停下”才追加
+	var replies := enumerate_actions(st, 1 - side, mine_declared, 8)
 	var rep_scored: Array = []
 	for r in replies:
-		var acts1: Array = [{}, {}]
-		acts1[1 - side] = r
-		rep_scored.append({"a": r, "v": evaluate(_sim(st, acts1), 1 - side)})
+		rep_scored.append({"a": r, "v": evaluate(_sim(st, mine_declared + [r]), 1 - side)})
 	rep_scored.sort_custom(func(x, y): return x.v > y.v)
 	var reps: Array = []
 	for i in mini(3 if fast else 6, rep_scored.size()):
 		reps.append(rep_scored[i].a)
 	reps.append({})
-	for a in keep:
-		var worst := INF
-		var sum := 0.0
-		for r in reps:
-			# 对方的应对必须满足“看见我方宣告”的起手时间，这里按其合法范围重新取起手
-			var acts2: Array = [{}, {}]
-			acts2[side] = a
-			acts2[1 - side] = _retime(st, r, a)
-			var v := evaluate(_sim(st, acts2), side)
-			worst = minf(worst, v)
-			sum += v
-		var score := 0.65 * worst + 0.35 * (sum / float(reps.size())) + rng.randf() * 1.5
-		if score > best_v:
-			best_v = score
-			best = a
+	var pass_score := _blend(st, side, mine_declared, reps, rng)
+	var pre: Array = []
+	for a in mine:
+		if a.is_empty():
+			continue
+		pre.append({"a": a, "v": evaluate(_sim(st, mine_declared + [a]), side)})
+	pre.sort_custom(func(x, y): return x.v > y.v)
+	var best_v2 := pass_score + 0.5
+	for i in mini(4 if fast else 8, pre.size()):
+		var cand: Dictionary = pre[i].a
+		var sc := _blend(st, side, mine_declared + [cand], reps, rng)
+		if sc > best_v2:
+			best_v2 = sc
+			best = cand
 	return best
 
+static func _blend(st: Dictionary, side: int, mine_acts: Array, reps: Array, rng: RandomNumberGenerator) -> float:
+	var worst := INF
+	var sum := 0.0
+	for r in reps:
+		var acts: Array = mine_acts.duplicate()
+		if not r.is_empty():
+			acts.append(_retime(st, r, mine_acts))
+		var v := evaluate(_sim(st, acts), side)
+		worst = minf(worst, v)
+		sum += v
+	return 0.65 * worst + 0.35 * (sum / float(reps.size())) + rng.randf() * 1.5
+
 # 对方看见我的宣告后会在合法范围内调整起手：若我方在第t秒落地，对方倾向于同刻或更早
-static func _retime(st: Dictionary, r: Dictionary, mine: Dictionary) -> Dictionary:
-	if r.is_empty() or mine.is_empty():
+static func _retime(st: Dictionary, r: Dictionary, mine_acts: Array) -> Dictionary:
+	if r.is_empty() or mine_acts.is_empty():
 		return r
 	var out: Dictionary = r.duplicate(true)
 	var ms := E.min_start(st, out)
-	out.start = maxi(ms, mini(int(mine.start), 19))
+	var last: Dictionary = mine_acts[mine_acts.size() - 1]
+	out.start = maxi(ms, mini(int(last.start), 19))
 	return out
 
 # 二手方式：宣告后把起手对齐到对方之前（若能）

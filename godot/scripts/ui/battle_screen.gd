@@ -221,15 +221,17 @@ func _update_hud() -> void:
 	score_label.text = "你 %d   ∶   %d 对手      （先到 %d 分获胜）" % [disp_score[0], disp_score[1], int(m.st.rules.win_score)]
 	var a0: int = m.st.sides[0].ap
 	var a1: int = m.st.sides[1].ap
+	if m.phase == "declare":
+		a0 = E.available_ap(m.st, 0, m.declared[0])
+		a1 = E.available_ap(m.st, 1, m.declared[1])
 	ap_label.text = "行动点 你 %d/%d · 对手 %d/%d" % [a0, int(m.st.rules.ap_cap), a1, int(m.st.rules.ap_cap)]
 
 func _update_marks() -> void:
 	timeline.marks = []
-	for s in 2:
-		var a: Dictionary = m.pending[s]
-		if a.has("done") and a.get("sid", -1) >= 0:
+	for side in 2:
+		for a in m.declared[side]:
 			var sk := E.skill_of(m.st, a.sid)
-			timeline.marks.append({"t": int(a.start), "label": sk.name, "side": s})
+			timeline.marks.append({"t": int(a.start), "label": sk.name, "side": side})
 	timeline.queue_redraw()
 
 func _describe_act(act: Dictionary) -> String:
@@ -279,7 +281,7 @@ func _find_in(n: Dictionary, id: int) -> Dictionary:
 # ---------------------------------------------------------------- 手牌
 func _rebuild_hand() -> void:
 	K.clear_children(hand_row)
-	var ap: int = m.st.sides[0].ap
+	var ap: int = E.available_ap(m.st, 0, m.declared[0]) if m.phase == "declare" else int(m.st.sides[0].ap)
 	for u in m.st.sides[0].units:
 		for sid in u.skill_ids:
 			var sk := E.skill_of(m.st, sid)
@@ -288,6 +290,9 @@ func _rebuild_hand() -> void:
 		hand_row.add_child(K.label("你还没有任何技能。", 20, K.MUTED))
 
 func _skill_reason(sk: Dictionary, u: Dictionary, ap: int) -> String:
+	for d in m.declared[0]:
+		if int(d.sid) == int(sk.sid):
+			return "本轮已宣告"
 	if u.down_round != -1:
 		return "持有者修整中"
 	if E._silenced_for(u, int(sk.cost)):
@@ -367,30 +372,26 @@ func _ai_turn(s: int) -> void:
 	await get_tree().process_frame
 	m.ai_declare()
 	_update_marks()
-	var act: Dictionary = m.public_declared(s)
 	_update_hud()
 	await get_tree().create_timer(0.3).timeout
 	_next_declare()
 
 func _show_enemy_declared() -> void:
 	banner_clear()
-	var first: int = m.declare_order[0]
-	var foe := 1 - 0
-	if m.pending[foe].has("done"):
-		var a: Dictionary = m.public_declared(foe)
+	var foe_acts: Array = m.public_declared(1)
+	if not foe_acts.is_empty():
 		var box := K.panel(Color("3a1f24"), K.RED, 8, 2)
-		var h := K.hbox(10)
-		h.add_child(K.chip("对手已宣告", K.RED.darkened(0.2), 16))
-		var t := K.wrap_label(_describe_act(a).replace("\n", "   "), 16, K.TEXT)
-		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		h.add_child(t)
-		box.add_child(h)
+		var col := K.vbox(2)
+		box.add_child(col)
+		var chip := K.chip("对手已宣告 %d 个行动（你看得到全部）" % foe_acts.size(), K.RED.darkened(0.2), 15)
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		col.add_child(chip)
+		for a in foe_acts:
+			col.add_child(K.wrap_label(_describe_act(a).replace("\n", "   "), 14, K.TEXT))
 		banner.add_child(box)
-	elif first != 0:
-		pass
-	else:
+	elif m.declare_order[0] == 0:
 		var box2 := K.panel(Color("1f2a3a"), K.BLUE, 8, 1)
-		box2.add_child(K.label("你是先手：先锁定行动，对手看见后再应对。", 16, K.TEXT))
+		box2.add_child(K.label("你是先手：把行动一次宣告完，再点“完成宣告”；对手会看到你的全部行动。", 16, K.TEXT))
 		banner.add_child(box2)
 
 func _clear_selection() -> void:
@@ -420,12 +421,12 @@ func _select_skill(sid: int) -> void:
 	sel_sid = sid
 	sel_choices = {}
 	picking = {}
-	var enemy: Dictionary = m.public_declared(1)
+	var enemy_acts: Array = m.public_declared(1)
 	var act := {"side": 0, "sid": sid, "choices": {}, "start": 0}
 	var ms := E.min_start(m.st, act)
 	sel_start = ms
-	if not enemy.is_empty() and enemy.get("sid", -1) >= 0:
-		sel_start = maxi(ms, int(enemy.start))
+	if not enemy_acts.is_empty():
+		sel_start = maxi(ms, int(enemy_acts[0].start))
 	timeline.windup_hint = ms
 	timeline.start_hint = sel_start
 	timeline.queue_redraw()
@@ -474,11 +475,11 @@ func _render_action_panel() -> void:
 	var tsp := Control.new()
 	tsp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title.add_child(tsp)
-	title.add_child(K.label("行动点 %d" % int(m.st.sides[0].ap), 16, K.TEXT))
+	title.add_child(K.label("行动点 %d" % E.available_ap(m.st, 0, m.declared[0]), 16, K.TEXT))
 	action_box.add_child(title)
 	if sel_sid < 0:
-		action_box.add_child(K.wrap_label("点选下方的一张技能牌。操作费从行动点里扣；每轮 +%d，最多存 %d。先手锁定，后手看见后应对。" % [int(m.st.rules.ap_gain), int(m.st.rules.ap_cap)], 14, K.MUTED))
-		var passb := K.button("本轮不行动（攒行动点）", "normal", 17)
+		action_box.add_child(K.wrap_label("点选下方的技能牌，付得起就可以宣告多个（每个技能一轮一次）。先手宣告完，后手看见全部后再宣告。已宣告 %d 个。" % m.declared[0].size(), 14, K.MUTED))
+		var passb := K.button("完成宣告  →" if not m.declared[0].is_empty() else "本轮不行动（攒行动点）", "primary" if not m.declared[0].is_empty() else "normal", 17)
 		passb.pressed.connect(_pass)
 		action_box.add_child(passb)
 		return
@@ -520,7 +521,7 @@ func _render_action_panel() -> void:
 		elif slot.kind == "remove":
 			var ob := OptionButton.new()
 			ob.add_theme_font_size_override("font_size", 13)
-			var cands := E.slot_candidates(m.st, 0, slot, [m.public_declared(1)])
+			var cands := E.slot_candidates(m.st, 0, slot, m.public_declared(1) + m.declared[0])
 			var sel := -1
 			for i in cands.size():
 				ob.add_item(_origin_label(str(cands[i])).substr(0, 30))
@@ -558,8 +559,9 @@ func _render_action_panel() -> void:
 		timeline.queue_redraw())
 	srow.add_child(sl)
 	srow.add_child(vl)
-	var en: Dictionary = m.public_declared(1)
-	if not en.is_empty() and en.get("sid", -1) >= 0:
+	var en_list: Array = m.public_declared(1)
+	if not en_list.is_empty():
+		var en: Dictionary = en_list[0]
 		var align := K.button("对齐对手", "ghost", 12)
 		align.custom_minimum_size = Vector2(0, 24)
 		align.tooltip_text = "对手第 %d 秒起效；想抢在前面就要更早（起手 ≥ %d 秒）" % [int(en.start), ms]
@@ -571,9 +573,10 @@ func _render_action_panel() -> void:
 		srow.add_child(align)
 	action_box.add_child(srow)
 	var cost := E.action_cost(m.st, act)
-	var err := E.can_declare(m.st, act)
+	var err := E.can_declare(m.st, act, m.declared[0])
+	var avail_ap: int = E.available_ap(m.st, 0, m.declared[0])
 	var btns := K.hbox(8)
-	btns.add_child(K.label("操作费 %d（%d→%d）" % [cost, int(m.st.sides[0].ap), int(m.st.sides[0].ap) - cost], 14, K.GOLD))
+	btns.add_child(K.label("操作费 %d（%d→%d）" % [cost, avail_ap, avail_ap - cost], 14, K.GOLD))
 	var ok := K.button("宣告 ✓", "primary", 19)
 	ok.disabled = err != ""
 	ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -594,6 +597,7 @@ func _pass() -> void:
 	my_turn = false
 	_clear_selection()
 	_update_marks()
+	_update_hud()
 	_next_declare()
 
 func _confirm() -> void:
@@ -602,10 +606,17 @@ func _confirm() -> void:
 	var err: String = m.submit(0, act)
 	if err != "":
 		return
-	my_turn = false
 	_clear_selection()
 	_update_marks()
-	_next_declare()
+	_update_hud()
+	_rebuild_hand()
+	# 还有没有付得起的行动？没有就自动结束宣告
+	var Ai = load("res://scripts/ai/ai.gd")
+	if Ai.enumerate_actions(m.st, 0, m.public_declared(1), 1, m.declared[0]).size() <= 1:
+		_pass()
+		return
+	_show_enemy_declared()
+	_render_action_panel()
 
 # ---------------------------------------------------------------- 结算与动画
 func _resolve() -> void:
@@ -867,7 +878,10 @@ func _auto_play() -> void:
 	var Ai = load("res://scripts/ai/ai.gd")
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var acts: Array = Ai.enumerate_actions(m.st, 0, m.public_declared(1))
+	if not m.declared[0].is_empty():
+		_pass()
+		return
+	var acts: Array = Ai.enumerate_actions(m.st, 0, m.public_declared(1), 8, m.declared[0])
 	var act: Dictionary = acts[rng.randi() % acts.size()]
 	if act.is_empty():
 		_pass()

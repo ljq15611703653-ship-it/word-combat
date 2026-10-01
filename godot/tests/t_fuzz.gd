@@ -119,7 +119,7 @@ func rand_node(depth: int, ctx: String, allow_prev: bool = false, simple_only: b
 				child = G.redirect(rand_target(true), rng.randi_range(1, 30)) if rng.randf() < 0.6 else G.convert_heal(rng.randi_range(1, 30))
 			else:
 				child = rand_node(depth + 1, ev, false, rng.randf() < 0.5)
-			var w := G.watch(ev, rand_target(false), child, {"freq": pick(["once", "every"]), "life": pick(["round", "next", "dur"]), "dur": rng.randi_range(1, 12)})
+			var w := G.watch(ev, rand_target(false), child, {"freq": pick(["once", "every"]), "life": pick(["round", "dur"]), "dur": rng.randi_range(1, 12)})
 			return w
 	return G.dmg(G.T("choose", "enemy"), G.N(5))
 

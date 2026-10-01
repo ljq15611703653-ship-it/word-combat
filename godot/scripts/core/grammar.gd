@@ -12,13 +12,13 @@ const EVENT_WORD := {
 	"pending_dmg": "即将受到伤害", "damaged": "受到伤害", "dealt": "造成伤害", "healed": "恢复生命",
 	"lost": "失去生命", "targeted": "被选为目标", "cast": "发动技能", "hit": "技能命中",
 	"status_applied": "状态施加", "status_end": "状态结束", "down": "倒下", "ally_down": "队友倒下",
-	"enemy_down": "敌人倒下", "revive": "复出", "round_end": "回合结束",
+	"enemy_down": "敌人倒下", "round_end": "回合结束",
 }
 const EVENT_TEXT := {
 	"pending_dmg": "即将受到伤害", "damaged": "受到伤害", "dealt": "造成伤害", "healed": "恢复生命",
 	"lost": "失去生命", "targeted": "被选为目标", "cast": "发动技能", "hit": "被技能命中",
 	"status_applied": "被施加状态", "status_end": "状态结束", "down": "倒下", "ally_down": "有队友倒下",
-	"enemy_down": "有敌人倒下", "revive": "复出", "round_end": "本轮结束",
+	"enemy_down": "有敌人倒下", "round_end": "本轮结束",
 }
 const NO_OBSERVE := ["ally_down", "enemy_down", "round_end"]
 const REF_WORD := {
@@ -314,9 +314,7 @@ static func _words_core(node: Dictionary) -> Array:
 				w.append("每次")
 			if not (node.event in NO_OBSERVE):
 				w.append_array(target_words(node.observe))
-			if node.life == "next":
-				w.append("下轮")
-			elif node.life == "dur":
+			if node.life == "dur":
 				w.append("持续")
 			w.append_array(words_of(node.child))
 			if int(node.get("delay", 0)) > 0:
@@ -716,9 +714,7 @@ static func _node_text_core(node: Dictionary) -> String:
 			var when: String = "当" + ("" if node.event in NO_OBSERVE else target_text(node.observe)) + EVENT_TEXT[node.event]
 			var f := "每次" if node.freq == "every" else "第一次"
 			var life := "（到本轮结束）"
-			if node.life == "next":
-				life = "（到下一轮结束）"
-			elif node.life == "dur":
+			if node.life == "dur":
 				life = "（%d秒内）" % int(node.dur)
 			return "%s，%s：%s%s" % [when, f, node_text(node.child), life]
 		"redirect":
@@ -726,7 +722,7 @@ static func _node_text_core(node: Dictionary) -> String:
 		"convert":
 			return "把这次伤害转为等量治疗（每个被保护者至多转换 %s%d 点）" % [_mods_text(node), int(node.value.n)]
 		"time":
-			var who: String = SIDE_TEXT[node.side] + "已宣告的技能"
+			var who: String = SIDE_TEXT[node.side] + "此后第一个起效的技能"
 			match node.op:
 				"delay": return "把%s延后 %d 秒" % [who, int(node.value.n)]
 				"advance": return "把%s提前 %d 秒" % [who, int(node.value.n)]

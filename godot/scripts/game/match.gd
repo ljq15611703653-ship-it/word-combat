@@ -21,14 +21,16 @@ var picker := 0
 var bag_choice := -1
 var adjust_steps: Array = []   # 依次轮到的一方
 var adjust_idx := 0
-var pending: Array = [{}, {}]
+var declared: Array = [[], []]      # 每方本轮已宣告的行动（按宣告顺序）
+var declare_done: Array = [false, false]
 var declare_order: Array = []
 var last_events: Array = []
-var last_declared: Array = [{}, {}]
+var last_declared: Array = [[], []]
 var log_lines: Array = []
 var winner := -1               # -1 进行中，0/1，-2 平局
 var fast_ai := false
 var ai_epsilon := 0.0
+var max_think_ms := 0
 var rounds_played := 0
 
 func start(human0: bool = true, seed_val: int = -1, human1: bool = false) -> void:
@@ -165,53 +167,54 @@ func ai_adjust() -> void:
 
 func begin_declare() -> void:
 	phase = "declare"
-	pending = [{}, {}]
+	declared = [[], []]
+	declare_done = [false, false]
 	declare_order = [E.first_side(st), 1 - E.first_side(st)]
-	say("进入宣告：先手锁定行动，后手看见后应对。")
+	say("进入宣告：先手把行动一次宣告完，后手看见全部后再宣告。")
 
 func declare_side() -> int:
 	for s in declare_order:
-		if not pending[s].has("done"):
+		if not declare_done[s]:
 			return s
 	return -1
 
+# 宣告一个行动；act 为空表示本方不再宣告。返回错误文字（空串=成功）
 func submit(side: int, act: Dictionary) -> String:
-	if not act.is_empty():
-		var err := E.can_declare(st, act)
-		if err != "":
-			return err
-	pending[side] = act.duplicate(true)
-	pending[side]["done"] = true
+	if act.is_empty():
+		declare_done[side] = true
+		return ""
+	var err := E.can_declare(st, act, declared[side])
+	if err != "":
+		return err
+	declared[side].append(act.duplicate(true))
 	return ""
 
-var max_think_ms := 0
 func ai_declare() -> void:
 	var t0 := Time.get_ticks_msec()
 	var s := declare_side()
-	var enemy: Dictionary = {}
-	if s != declare_order[0] and not pending[declare_order[0]].is_empty():
-		enemy = pending[declare_order[0]].duplicate()
-		enemy.erase("done")
-	var act := Ai.choose_action(st, s, enemy, rng, fast_ai, ai_epsilon)
-	pending[s] = act.duplicate(true)
-	pending[s]["done"] = true
+	var enemy_list: Array = []
+	if s != declare_order[0]:
+		enemy_list = declared[1 - s].duplicate(true)
+	var guard := 0
+	while guard < E.MAX_ACTIONS:
+		guard += 1
+		var act := Ai.choose_action(st, s, enemy_list, declared[s], rng, fast_ai, ai_epsilon)
+		if act.is_empty():
+			break
+		if submit(s, act) != "":
+			break
+	declare_done[s] = true
 	max_think_ms = maxi(max_think_ms, Time.get_ticks_msec() - t0)
 
-func public_declared(side: int) -> Dictionary:
-	# 后手可见的先手宣告
-	if pending[side].has("done"):
-		var a: Dictionary = pending[side].duplicate()
-		a.erase("done")
-		return a
-	return {}
+# 对方可见的本方已宣告行动
+func public_declared(side: int) -> Array:
+	return declared[side].duplicate(true)
 
 func resolve() -> Dictionary:
-	var acts: Array = [{}, {}]
-	for s in 2:
-		var a: Dictionary = pending[s].duplicate()
-		a.erase("done")
-		acts[s] = a
-	last_declared = acts
+	var acts: Array = []
+	for s in declare_order:
+		acts.append_array(declared[s])
+	last_declared = [declared[0].duplicate(true), declared[1].duplicate(true)]
 	var res := E.run_round(st, acts)
 	last_events = res.events
 	if res.winner != -1:

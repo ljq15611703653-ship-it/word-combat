@@ -295,7 +295,7 @@ func _run_demo(demo: String) -> void:
 				pp.complex_root.avail[w] = 4
 			pp.complex_root.nodes = [
 				G.watch("pending_dmg", G.T("all", "ally"), G.redirect(G.T("source", "ref"), 25), {"freq": "every"}),
-				G.watch("damaged", G.T("self", "self"), G.chain(G.dmg(G.T("source", "ref"), G.REF("event_damage"), {"dbl": 1}), G.heal(G.T("self", "self"), G.REF("prev"))), {"freq": "every", "life": "next"}),
+				G.watch("damaged", G.T("self", "self"), G.chain(G.dmg(G.T("source", "ref"), G.REF("event_damage"), {"dbl": 1}), G.heal(G.T("self", "self"), G.REF("prev"))), {"freq": "every"}),
 			]
 			pp.complex_root.skill_name = "嵌套示例"
 			pp.complex_root.name_edit.text = "嵌套示例"
@@ -457,7 +457,11 @@ func _click_test() -> void:
 		if confirm != null:
 			await _click(confirm)
 			await get_tree().create_timer(0.3).timeout
-			log.call("宣告已提交给对局", m.pending[0].has("done") and not m.pending[0].is_empty() or m.phase != "declare")
+			log.call("宣告已提交给对局", not m.declared[0].is_empty() or m.phase != "declare")
+			var done_btn := _find_button(b.action_box, "完成宣告  →")
+			if done_btn != null:
+				await _click(done_btn)
+				await get_tree().create_timer(0.3).timeout
 	# 等动画结束，出现“下一轮”
 	guard = 0
 	var nb: Button = null

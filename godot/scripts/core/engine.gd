@@ -135,23 +135,20 @@ static func begin_round(st: Dictionary) -> Array:
 	st.used = {}
 	st.round_taken = {}
 	var revived: Array = []
+	# 每一轮都是干净的：监听、减伤、状态、护盾、已存的升华增量都不跨轮
+	st.effects = []
 	for s in 2:
 		var side: Dictionary = st.sides[s]
 		side.ap = mini(int(side.ap) + int(st.rules.ap_gain), int(st.rules.ap_cap))
 		for u in side.units:
+			u.statuses = []
+			u.bonus = 0
 			if u.down_round != -1 and st.round >= u.down_round + 2:
 				u.down_round = -1
 				u.hp = u.max_hp
 				u.statuses = []
 				u.bonus = 0
 				revived.append(u.uid)
-	# 清理已过期的持续效果
-	var keep: Array = []
-	var round_base: int = (st.round - 1) * STRIDE
-	for e in st.effects:
-		if e.until > round_base:
-			keep.append(e)
-	st.effects = keep
 	return revived
 
 static func first_side(st: Dictionary) -> int:
@@ -167,9 +164,29 @@ static func min_start(st: Dictionary, act: Dictionary) -> int:
 	return mini(int(action_cost(st, act) / 10), 19)
 
 # ================================================================ 宣告合法性
-static func can_declare(st: Dictionary, act: Dictionary) -> String:
+const MAX_ACTIONS := 8
+
+# 本方在已宣告若干行动之后还剩多少行动点
+static func available_ap(st: Dictionary, side: int, declared: Array) -> int:
+	var ap: int = int(st.sides[side].ap)
+	for d in declared:
+		if not d.is_empty() and d.get("side", side) == side:
+			ap -= action_cost(st, d)
+	return ap
+
+# declared：本方此前已宣告的行动（用于扣除行动点、禁止同一技能重复宣告）
+static func can_declare(st: Dictionary, act: Dictionary, declared: Array = []) -> String:
 	if act.is_empty() or act.get("sid", -1) < 0:
 		return ""
+	var mine_n := 0
+	for d in declared:
+		if d.is_empty() or d.get("side", act.side) != act.side:
+			continue
+		mine_n += 1
+		if d.sid == act.sid:
+			return "这个技能本轮已经宣告过了（想再来一次要用“重复”）"
+	if mine_n >= MAX_ACTIONS:
+		return "一轮最多宣告%d个行动" % MAX_ACTIONS
 	var sk: Dictionary = skill_of(st, act.sid)
 	if sk.is_empty():
 		return "技能不存在"
@@ -179,8 +196,8 @@ static func can_declare(st: Dictionary, act: Dictionary) -> String:
 	var cost := action_cost(st, act)
 	if _silenced_for(host, cost):
 		return "持有者被沉默（压制操作费 ≤ %d 的技能）" % _silence_cap(host)
-	if cost > int(st.sides[act.side].ap):
-		return "行动点不足（需要%d）" % cost
+	if cost > available_ap(st, act.side, declared):
+		return "行动点不足（需要%d，还剩%d）" % [cost, available_ap(st, act.side, declared)]
 	if int(act.start) < min_start(st, act):
 		return "起手需要至少%d秒" % min_start(st, act)
 	for slot in G.choice_slots(sk):
@@ -232,20 +249,22 @@ static func run_round(st: Dictionary, acts: Array) -> Dictionary:
 	st.guard = 0
 	st.winner = -1
 	# 支付与排程
+	var paid_by: Array = [[], []]
 	for i in acts.size():
 		var a: Dictionary = acts[i]
-		var rec := {"side": i, "active": false}
-		if not a.is_empty() and a.get("sid", -1) >= 0 and can_declare(st, a) == "":
+		if a.is_empty() or a.get("sid", -1) < 0:
+			continue
+		if can_declare(st, a, paid_by[a.side]) == "":
 			var cost := action_cost(st, a)
-			st.sides[a.side].ap -= cost
-			rec = {"side": a.side, "active": true, "sid": a.sid, "choices": a.get("choices", {}), "start": int(a.start), "host": host_of(st, a.sid),
+			var rec := {"side": a.side, "active": true, "sid": a.sid, "choices": a.get("choices", {}), "start": int(a.start), "host": host_of(st, a.sid),
 				"paid": cost, "cancelled": false, "idx": st.acts.size()}
 			st.acts.append(rec)
-			var sk := skill_of(st, a.sid)
+			paid_by[a.side].append(a)
 			_log(st, int(a.start), "declare", {"side": a.side, "sid": a.sid, "start": int(a.start), "cost": cost})
-		else:
-			if not a.is_empty():
-				pass
+	# 行动点在全部校验完之后统一扣除（校验时已按累计算过）
+	for sd in 2:
+		for d in paid_by[sd]:
+			st.sides[sd].ap -= action_cost(st, d)
 	for ai in st.acts.size():
 		var rec2: Dictionary = st.acts[ai]
 		var sk2 := skill_of(st, rec2.sid)
@@ -401,9 +420,17 @@ static func _apply_time_ops(st: Dictionary, ops: Array, t: int) -> void:
 		var my: int = it.ctx.side
 		var target_side: int = 1 - my if n.side == "enemy" else my
 		var target_act := -1
-		for a in st.acts:
-			if a.side == target_side:
-				target_act = a.idx
+		# 作用于“这一秒之后（含这一秒）第一个起效的行动”：按起效时间最早者，同秒取先宣告的；不含自己所在的行动
+		var best_t := 999
+		for si in st.items:
+			if si.kind != "start" or si.t < t:
+				continue
+			var cand: Dictionary = st.acts[si.act]
+			if cand.side != target_side or cand.cancelled or si.act == int(it.ctx.get("act", -1)):
+				continue
+			if si.t < best_t or (si.t == best_t and si.act < target_act):
+				best_t = si.t
+				target_act = si.act
 		if target_act == -1 or st.acts[target_act].cancelled:
 			_log(st, t, "time_fail", {"side": my, "why": "对方没有宣告技能"})
 			continue
@@ -763,10 +790,8 @@ static func _install(st: Dictionary, eff: Dictionary, node: Dictionary, ctx: Dic
 	eff["from"] = st.abs_now
 	var round_end: int = st.round * STRIDE
 	var until := round_end
-	if life == "next":
-		until = round_end + STRIDE
-	elif life == "dur" or (eff.type != "watch" and dur > 0):
-		until = st.abs_now + maxi(dur, 1)
+	if life == "dur" or (eff.type != "watch" and dur > 0):
+		until = mini(st.abs_now + maxi(dur, 1), round_end)
 	eff["until"] = until
 	st.effects.append(eff)
 
@@ -1038,7 +1063,7 @@ static func _apply_status(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 		return
 	var until: int = st.round * STRIDE
 	if int(e.get("dur", 0)) > 0:
-		until = st.abs_now + int(e.dur)
+		until = mini(st.abs_now + int(e.dur), until)
 	for s in tgt.statuses.duplicate():
 		if s.name == name:
 			tgt.statuses.erase(s)

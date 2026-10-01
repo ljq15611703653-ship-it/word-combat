@@ -228,7 +228,7 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 				o["half"] = 1
 			nodes = [G.watch("damaged", _observe(p.obs), G.dmg(G.T("source", "ref"), G.REF("event_damage"), o), {"freq": p.freq})]
 		"burst":
-			nodes = [G.watch("down", G.T("self", "self"), G.dmg(G.T("all", "enemy"), G.N(int(p.n))), {"freq": "once", "life": "next"})]
+			nodes = [G.watch("down", G.T("self", "self"), G.dmg(G.T("all", "enemy"), G.N(int(p.n))), {"freq": "once"})]
 		"engine":
 			nodes = [
 				G.watch("healed", G.T("all", "ally"), G.dmg(G.T(p.to, "enemy"), G.REF("event_heal")), {"freq": "every"}),
