@@ -4,6 +4,7 @@ extends RefCounted
 const PATH := "user://settings.cfg"
 static var level := 1      # 0 简单  1 普通  2 困难
 static var muted := false
+static var coach := true        # 辅助轮（教练提示与自动组合）
 static var _loaded := false
 
 const LEVEL_NAMES := ["简单", "普通", "困难"]
@@ -21,9 +22,11 @@ static func load_all() -> void:
 	if cf.load(PATH) == OK:
 		level = clampi(int(cf.get_value("game", "level", 1)), 0, 2)
 		muted = bool(cf.get_value("audio", "muted", false))
+		coach = bool(cf.get_value("game", "coach", true))
 
 static func save_all() -> void:
 	var cf := ConfigFile.new()
 	cf.set_value("game", "level", level)
 	cf.set_value("audio", "muted", muted)
+	cf.set_value("game", "coach", coach)
 	cf.save(PATH)

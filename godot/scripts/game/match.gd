@@ -126,8 +126,11 @@ func apply_adjust(side: int, unit_idx: int, new_unit: Dictionary) -> Dictionary:
 	var v := D.validate(nd, pools[side])
 	if not v.ok:
 		return v
+	var only_names := D.changed_units(decks[side], nd).is_empty()
 	decks[side] = nd
 	E.set_deck(st, side, nd, false)
+	if only_names:
+		return v # 只改了名字：不算一次调整
 	var names: Array = []
 	for sk in new_unit.skills:
 		names.append(sk.name)

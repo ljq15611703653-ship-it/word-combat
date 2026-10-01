@@ -7,6 +7,7 @@ const E = preload("res://scripts/core/engine.gd")
 const R = preload("res://scripts/core/recipes.gd")
 const D = preload("res://scripts/core/deck.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
+const Coach = preload("res://scripts/core/coach.gd")
 
 # 性格：技能优先序。每项 [模板, [参数变体，从强到弱], 默认填数]
 const PERSONAS := {
@@ -65,6 +66,15 @@ const PREFER_WORDS := {
 	"控场": ["打断", "延后", "沉默", "易伤", "移除"], "连锁": ["恢复生命", "每次", "倒下", "发动技能", "回合结束"],
 	"均衡": ["转移", "双倍", "打断", "全部"],
 }
+
+const PERSONA_LABEL := {
+	"狂攻": "狂攻流：放大的大招先手压制，赌对手拆不掉",
+	"守反": "守反流：设伏改道、回敬，让对手的大招反噬自己",
+	"控场": "控场流：打断、沉默、拖节奏，让对手出不了招",
+	"连锁": "连锁流：治疗引爆、遗志、收税，把对方的行动变成代价",
+	"均衡": "均衡流：攻守兼备，稳扎稳打",
+}
+const PERSONA_ORDER := ["均衡", "狂攻", "守反", "控场", "连锁"]
 
 static func pick_persona(rng: RandomNumberGenerator) -> String:
 	var keys: Array = PERSONAS.keys()
@@ -125,8 +135,36 @@ static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGener
 	_fit_and_place(deck, chosen, num_cap)
 	_place_keywords(deck, pool, used, persona)
 	_spread_hp(deck, chosen)
+	_fill_empty_units(deck, pool)
 	D.rename_skills(deck)
 	return deck
+
+# 让没有技能的卡也能“跑”起来：用剩下的词给它配一个便宜的自保/攻击技能
+static func _fill_empty_units(deck: Dictionary, pool: Dictionary) -> void:
+	var fallbacks := [
+		["heal", {"tgt": "self", "n": 6}], ["mit", {"tgt": "self", "n": 10}], ["shield", {"tgt": "self", "n": 8}],
+		["atk1", {"n": 6}], ["tax", {"n": 6}],
+	]
+	for i in 5:
+		if not deck.units[i].skills.is_empty():
+			continue
+		for fb in fallbacks:
+			var avail := Coach.free_words(pool, deck)
+			var f := Coach.fit(["", fb[0], fb[1], "", 0.0, ""], avail)
+			if int(f.n) != 0:
+				continue
+			var sk: Dictionary = f.skill
+			var free: int = D.BUDGET - int(D.budget_used(deck).total)
+			var need := int(sk.budget)
+			if need > free:
+				var can: int = maxi(0, int(deck.units[i].max_hp) - 6)
+				var take: int = mini(can, need - free)
+				deck.units[i].max_hp -= take
+				free += take
+			if need > free:
+				continue
+			deck.units[i].skills.append(sk)
+			break
 
 static func _fit_and_place(deck: Dictionary, chosen: Array, num_cap: int) -> void:
 	var total := 0

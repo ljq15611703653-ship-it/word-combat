@@ -17,6 +17,8 @@ var tree_box: VBoxContainer
 var sum_box: VBoxContainer
 var name_edit: LineEdit
 var skill_name := "自拟招式"
+var name_custom := false
+const Namer = preload("res://scripts/core/namer.gd")
 
 const TARGET_OPTS := [
 	["自身", "self", "self"],
@@ -64,8 +66,24 @@ func _build() -> void:
 	bar.add_child(K.label("技能名", 16, K.MUTED))
 	name_edit = LineEdit.new()
 	name_edit.custom_minimum_size = Vector2(200, 34)
-	name_edit.text_changed.connect(func(t): skill_name = t)
+	name_edit.max_length = 10
+	name_edit.text_changed.connect(func(t):
+		skill_name = t
+		name_custom = t.strip_edges() != "")
 	bar.add_child(name_edit)
+	var dice := K.button("🎲", "normal", 16)
+	dice.custom_minimum_size = Vector2(44, 34)
+	dice.tooltip_text = "按这个技能的效果随机取一个名字"
+	dice.pressed.connect(func():
+		if nodes.is_empty():
+			return
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		skill_name = Namer.skill_name(_sk(), rng)
+		name_custom = true
+		name_edit.text = skill_name
+		_rerender())
+	bar.add_child(dice)
 	var add := MenuButton.new()
 	add.text = "＋ 添加节点"
 	add.flat = false
@@ -101,6 +119,7 @@ func load_skill(sk: Dictionary, avail_words: Dictionary, pts_other: int) -> void
 	points_other = pts_other
 	nodes = sk.nodes.duplicate(true) if sk.has("nodes") else []
 	skill_name = sk.get("name", "自拟招式") if sk.has("nodes") else "自拟招式"
+	name_custom = bool(sk.get("custom_name", false))
 	slot_old_budget = int(sk.get("budget", 0))
 	name_edit.text = skill_name
 	_rerender()
@@ -139,7 +158,10 @@ func _rerender() -> void:
 	_render_summary()
 
 func _sk() -> Dictionary:
-	var sk := G.skill(skill_name, nodes.duplicate(true))
+	var sk := G.skill(skill_name if skill_name.strip_edges() != "" else "自拟招式", nodes.duplicate(true))
+	if name_custom:
+		sk["custom_name"] = true
+		sk["base_name"] = sk.name
 	return G.finalize(sk)
 
 func _render_summary() -> void:

@@ -4,6 +4,8 @@ extends Control
 const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
+const Settings = preload("res://scripts/ui/settings.gd")
+const Coach = preload("res://scripts/core/coach.gd")
 
 signal picked(idx)
 signal finished()
@@ -15,6 +17,9 @@ var continue_btn: Button
 var chosen := -1
 var can_pick := false
 var _ai_idx := -1
+var coach_box: VBoxContainer
+var coach_info: Dictionary = {}
+var rec_chips: Array = [null, null]
 
 func setup(match_obj, ai_idx: int = -1) -> void:
 	m = match_obj
@@ -29,12 +34,16 @@ func setup(match_obj, ai_idx: int = -1) -> void:
 	for side in ["left", "right", "top", "bottom"]:
 		root.add_theme_constant_override("margin_" + side, 28)
 	add_child(root)
-	var v := K.vbox(14)
+	var v := K.vbox(8)
 	root.add_child(v)
-	var title := K.label("第 %d 轮 · 词袋" % m.st.round, 36, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	var title := K.label("第 %d 轮 · 词袋" % m.st.round, 30, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(title)
 	info_label = K.label("", 20, K.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
 	v.add_child(info_label)
+	Settings.load_all()
+	coach_info = Coach.analyze_draft(m.pools[0], m.decks[0], m.bags)
+	coach_box = K.vbox(4)
+	v.add_child(coach_box)
 	var row := K.hbox(28)
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -60,18 +69,72 @@ func setup(match_obj, ai_idx: int = -1) -> void:
 	for w in keys:
 		flow.add_child(K.word_tag(w, true, int(m.pools[0][w])))
 	sc.add_child(flow)
-	sc.custom_minimum_size = Vector2(0, 92)
+	sc.custom_minimum_size = Vector2(0, 62)
 	pv.add_child(sc)
 	v.add_child(pool_box)
 	var bottom := K.hbox(10)
 	bottom.alignment = BoxContainer.ALIGNMENT_CENTER
 	continue_btn = K.button("收下并继续  →", "primary", 22)
 	continue_btn.custom_minimum_size = Vector2(260, 52)
-	continue_btn.visible = false
+	continue_btn.modulate.a = 0.0
+	continue_btn.disabled = true
 	continue_btn.pressed.connect(func(): finished.emit())
 	bottom.add_child(continue_btn)
 	v.add_child(bottom)
 	_begin()
+	_refresh_coach()
+
+func _bag_line(i: int) -> String:
+	var b: Dictionary = coach_info.per_bag[i]
+	var parts: Array = []
+	if not b.done.is_empty():
+		var names: Array = []
+		for d in b.done.slice(0, 3):
+			names.append("%s" % d.name)
+		parts.append("新凑齐：" + "、".join(names))
+	if not b.near.is_empty():
+		var nn: Array = []
+		for c in b.near.slice(0, 2):
+			nn.append("%s（差 %d 个）" % [c.name, c.n])
+		parts.append("接近：" + "、".join(nn))
+	return "；".join(parts) if not parts.is_empty() else "对你现有的路线帮助不大"
+
+func _refresh_coach() -> void:
+	K.clear_children(coach_box)
+	var head := K.hbox(10)
+	head.alignment = BoxContainer.ALIGNMENT_CENTER
+	var tg := K.button("辅助轮：开" if Settings.coach else "辅助轮：关", "ghost", 15)
+	tg.custom_minimum_size = Vector2(0, 30)
+	tg.pressed.connect(func():
+		Settings.coach = not Settings.coach
+		Settings.save_all()
+		_refresh_coach())
+	head.add_child(tg)
+	coach_box.add_child(head)
+	for i in 2:
+		if rec_chips[i] != null:
+			rec_chips[i].visible = Settings.coach and m.human[m.picker] and continue_btn.disabled and int(coach_info.pick) == i
+	if not Settings.coach:
+		return
+	var box := K.panel(Color("1f2a26"), K.GREEN.darkened(0.2), 10, 1)
+	var col := K.vbox(3)
+	box.add_child(col)
+	var pick: int = coach_info.pick
+	var mine := pick
+	if m.human[m.picker]:
+		col.add_child(K.wrap_label("教练推荐：%s袋 —— %s" % ["左" if pick == 0 else "右", coach_info.reason], 17, K.GREEN))
+	else:
+		mine = 1 - _ai_idx
+		col.add_child(K.wrap_label("对手先选了%s袋，你拿到%s袋：%s" % [("左" if _ai_idx == 0 else "右"), ("左" if mine == 0 else "右"), _bag_line(mine)], 17, K.GREEN))
+	var two := K.hbox(30)
+	two.add_child(K.wrap_label("左袋 → " + _bag_line(0), 14, K.MUTED))
+	two.add_child(K.wrap_label("右袋 → " + _bag_line(1), 14, K.MUTED))
+	for c in two.get_children():
+		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(two)
+	if not coach_info.watch.is_empty():
+		col.add_child(K.wrap_label("接下来要留意：" + "；".join(coach_info.watch), 14, K.GOLD))
+	coach_box.add_child(box)
 
 func _pool_total() -> int:
 	var n := 0
@@ -110,17 +173,21 @@ func _bag_panel(i: int) -> Control:
 	if rare > 0:
 		head.add_child(K.chip("奇术 %d" % rare, Color("8a6a1f"), 14))
 	head.add_child(K.chip("词价 %d" % price, Color("4a3f20"), 14))
+	var rec := K.chip("教练推荐", Color("2c6a44"), 14)
+	rec.visible = false
+	head.add_child(rec)
+	rec_chips[i] = rec
 	v.add_child(head)
 	var grid := GridContainer.new()
-	grid.columns = 6
+	grid.columns = 7
 	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.add_theme_constant_override("v_separation", 8)
 	var keys: Array = cnt.keys()
 	keys.sort_custom(func(a, b): return Lex.words[a].id < Lex.words[b].id)
 	var delay := 0.0
 	for w in keys:
-		var c := K.word_card(w, int(cnt[w]), -1, Vector2(100, 120))
-		c.pivot_offset = Vector2(50, 60)
+		var c := K.word_card(w, int(cnt[w]), -1, Vector2(92, 100))
+		c.pivot_offset = Vector2(46, 50)
 		c.scale = Vector2(0.4, 0.4)
 		c.modulate.a = 0.0
 		grid.add_child(c)
@@ -162,11 +229,13 @@ func _show_choice(idx: int, human_chose: bool) -> void:
 		var good: bool = (i == mine)
 		panels[i].add_theme_stylebox_override("panel", K.style(Color("1f3a2c") if good else Color("2a2228"), K.GREEN if good else Color("5a3a3f"), 16, 4 if good else 2, 10))
 		panels[i].modulate = Color(1, 1, 1, 1) if good else Color(1, 1, 1, 0.55)
+	_refresh_coach()
 	if human_chose:
 		info_label.text = "你收下了%s袋；对手得到另一袋。" % ("左" if idx == 0 else "右")
 	else:
 		info_label.text = "对手先选了%s袋，剩下的%s袋归你。" % [("左" if idx == 0 else "右"), ("右" if idx == 0 else "左")]
-	continue_btn.visible = true
+	continue_btn.modulate.a = 1.0
+	continue_btn.disabled = false
 
 func show_human_choice(idx: int) -> void:
 	_show_choice(idx, true)

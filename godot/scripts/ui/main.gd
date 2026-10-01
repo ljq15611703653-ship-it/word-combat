@@ -304,6 +304,8 @@ func _run_demo(demo: String) -> void:
 			await _click_test()
 		"clicktest2":
 			await _click_test_editor()
+		"clicktest3":
+			await _click_test_coach()
 		"select", "respond":
 			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
 			m.commit_deck(0, m.decks[0])
@@ -475,6 +477,62 @@ func _click_test() -> void:
 		await get_tree().create_timer(0.4).timeout
 		log.call("点击后进入下一轮抽词", m.st.round == 2 and screen is DraftScreen)
 	print("【点击测试结束】", "全部通过" if okf[0] else "有失败")
+	get_tree().quit(0 if okf[0] else 1)
+
+# ---- 辅助轮：自动组合 / 换一批 / 自动调整 的真实点击测试
+func _click_test_coach() -> void:
+	var okf := [true]
+	var log := func(msg: String, good: bool):
+		print("  [辅助轮点击] ", ("通过 " if good else "失败 "), msg)
+		if not good:
+			okf[0] = false
+	Settings.coach = true
+	_show_build("initial")
+	var s = screen
+	await get_tree().create_timer(0.4).timeout
+	var auto := _find_button(s, "自动组合")
+	log.call("有“自动组合”按钮", auto != null)
+	await _click(auto)
+	await get_tree().create_timer(0.3).timeout
+	var skills := 0
+	for u in s.wd.units:
+		skills += u.skills.size()
+	log.call("自动组合后牌组合法且有技能（%d个）" % skills, D.validate(s.wd, m.pools[0]).ok and skills >= 2)
+	var nb := _find_button(s, "换一批")
+	log.call("有“换一批”按钮", nb != null)
+	await _click(nb)
+	await get_tree().create_timer(0.3).timeout
+	log.call("换一批后牌组仍合法", D.validate(s.wd, m.pools[0]).ok)
+	var start_btn := _find_button(s, "开始对战  →")
+	log.call("可以开始对战", start_btn != null)
+	await _click(start_btn)
+	await get_tree().create_timer(0.5).timeout
+	log.call("进入抽词", screen is DraftScreen)
+	var d = screen
+	if m.human[m.picker]:
+		await _click(d.panels[0])
+		await get_tree().create_timer(0.2).timeout
+	var cont := _find_button(d, "收下并继续  →")
+	log.call("可以继续", cont != null)
+	await _click(cont)
+	await get_tree().create_timer(0.6).timeout
+	if screen is BuildScreen:
+		var b = screen
+		var adj := _find_button(b, "自动调整（用掉一次）")
+		log.call("调整界面有“自动调整”按钮", adj != null)
+		if adj != null:
+			var left_before: int = m.adjust_left(0)
+			await _click(adj)
+			await get_tree().create_timer(0.3).timeout
+			var use := _find_button(b, "采用（用掉一次调整）")
+			log.call("出现建议并可采用（也可能暂无可装的新招）", use != null or b.archetype_note != "")
+			if use != null:
+				await _click(use)
+				await get_tree().create_timer(0.5).timeout
+				log.call("采用后消耗了一次调整", m.adjust_left(0) < left_before or screen is BattleScreen)
+	else:
+		log.call("本轮人类没有调整步骤（直接进入战斗）", screen is BattleScreen)
+	print("【辅助轮点击测试结束】", "全部通过" if okf[0] else "有失败")
 	get_tree().quit(0 if okf[0] else 1)
 
 # ---- 构筑界面与编辑器的真实点击测试

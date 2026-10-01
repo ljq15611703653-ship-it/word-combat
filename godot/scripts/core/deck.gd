@@ -82,5 +82,8 @@ static func rename_skills(deck: Dictionary) -> void:
 		for sk in u.skills:
 			var base: String = sk.get("base_name", sk.name)
 			sk["base_name"] = base
+			if sk.get("custom_name", false):
+				sk["name"] = base # 玩家自己起的名字，不加序号
+				continue
 			seen[base] = int(seen.get(base, 0)) + 1
 			sk["name"] = base if seen[base] == 1 else "%s·%d" % [base, seen[base]]

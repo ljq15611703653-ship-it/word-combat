@@ -8,6 +8,8 @@ const Lex = preload("res://scripts/core/lexicon.gd")
 const EditorPopup = preload("res://scripts/ui/editor_popup.gd")
 const DeckView = preload("res://scripts/ui/deck_view.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
+const Coach = preload("res://scripts/core/coach.gd")
+const Settings = preload("res://scripts/ui/settings.gd")
 
 signal finished()                      # 构筑完成 / 结束调整
 signal adjusted(unit_idx, unit)        # 调整模式下确认了一张卡的修改
@@ -23,6 +25,10 @@ var msg_label: Label
 var finish_btn: Button
 var popup: Control
 var overlay_layer: Control
+var coach_box: VBoxContainer
+var persona_i := -1
+var archetype_note := ""
+var suggest_nd: Dictionary = {}
 
 func setup(match_obj, m_mode: String) -> void:
 	m = match_obj
@@ -58,13 +64,14 @@ func _build() -> void:
 		var peek := K.button("查看对手牌组", "normal", 17)
 		peek.pressed.connect(_peek_enemy)
 		top.add_child(peek)
-	else:
-		var rec := K.button("推荐构筑（可再改）", "normal", 17)
-		rec.tooltip_text = "让电脑用你现有的词配一套牌；不满意可以逐张再改"
-		rec.pressed.connect(func():
-			wd = Ai.build_deck(m.pools[0], Ai.pick_persona(m.rng), m.rng)
-			refresh())
-		top.add_child(rec)
+	Settings.load_all()
+	var tgc := K.button("辅助轮：开" if Settings.coach else "辅助轮：关", "ghost", 16)
+	tgc.pressed.connect(func():
+		Settings.coach = not Settings.coach
+		Settings.save_all()
+		tgc.text = "辅助轮：开" if Settings.coach else "辅助轮：关"
+		refresh())
+	top.add_child(tgc)
 	finish_btn = K.button("开始对战  →" if mode == "initial" else "结束调整  →", "primary", 21)
 	finish_btn.custom_minimum_size = Vector2(230, 48)
 	finish_btn.pressed.connect(_on_finish)
@@ -82,6 +89,8 @@ func _build() -> void:
 	msg_label = K.label("", 15, K.RED)
 	bb.add_child(msg_label)
 	v.add_child(bb)
+	coach_box = K.vbox(4)
+	v.add_child(coach_box)
 	if mode == "adjust":
 		var recent: Array = m.log_lines.slice(maxi(0, m.log_lines.size() - 3))
 		var box := K.panel(Color("1f2738"), K.EDGE, 8, 1)
@@ -157,6 +166,7 @@ func refresh() -> void:
 			sub.text = "①点「编辑」  ②选招式、调数值（绿=有词，红=缺词）  ③装入技能槽并确认。点数 = 生命 + 技能数字，共 100；至少装一个技能。"
 		else:
 			sub.text = "你还有 %d 次调整，对手 %d 次。每次只能改一张卡。" % [m.adjust_left(0), m.adjust_left(1)]
+	_refresh_coach(deck)
 	var v := D.validate(deck, m.pools[0])
 	var has_skill := false
 	for u2 in deck.units:
@@ -167,6 +177,115 @@ func refresh() -> void:
 		msg_label.text = "" if v.ok and has_skill else ("至少装一个技能" if v.ok else str(v.errors[0]))
 	else:
 		msg_label.text = ""
+
+# ---------------------------------------------------------------- 辅助轮
+func _refresh_coach(deck: Dictionary) -> void:
+	K.clear_children(coach_box)
+	if not Settings.coach:
+		return
+	var box := K.panel(Color("1f2a26"), K.GREEN.darkened(0.2), 10, 1)
+	var col := K.vbox(3)
+	box.add_child(col)
+	col.add_child(K.label("教练", 14, K.GREEN))
+	for ln in Coach.describe_build(m.pools[0], deck):
+		col.add_child(K.wrap_label("· " + ln, 15, K.TEXT))
+	if archetype_note != "":
+		col.add_child(K.wrap_label("当前配法：" + archetype_note, 15, K.GOLD))
+	var row := K.hbox(10)
+	if mode == "initial":
+		var auto := K.button("自动组合", "primary", 17)
+		auto.tooltip_text = "用你现有的词一键配出五张能跑的牌，之后仍可逐张修改"
+		auto.pressed.connect(func(): _auto_compose(false))
+		row.add_child(auto)
+		var nxt := K.button("换一批", "normal", 17)
+		nxt.tooltip_text = "换一种打法再配一遍（均衡 → 狂攻 → 守反 → 控场 → 连锁）"
+		nxt.pressed.connect(func(): _auto_compose(true))
+		row.add_child(nxt)
+	else:
+		var aa := K.button("自动调整（用掉一次）", "primary", 17)
+		aa.disabled = m.adjust_side() != 0 or m.adjust_left(0) <= 0
+		aa.pressed.connect(func(): _auto_adjust(false))
+		row.add_child(aa)
+	col.add_child(row)
+	coach_box.add_child(box)
+
+func _auto_compose(next: bool) -> void:
+	var tried := 0
+	var old := wd
+	var found := false
+	while tried < Ai.PERSONA_ORDER.size():
+		persona_i = (persona_i + 1) % Ai.PERSONA_ORDER.size() if (next or tried > 0 or persona_i < 0) else persona_i
+		tried += 1
+		var persona: String = Ai.PERSONA_ORDER[persona_i]
+		var nd := Ai.build_deck(m.pools[0], persona, m.rng)
+		if D.changed_units(old, nd).is_empty() and (next or tried > 1):
+			continue # 和现在一样，换下一种
+		wd = nd
+		archetype_note = Ai.PERSONA_LABEL[persona]
+		found = true
+		break
+	if not found:
+		archetype_note = "你的词暂时只够这一种配法；多凑些词再来。"
+	refresh()
+
+func _auto_adjust(next: bool) -> void:
+	if m.adjust_side() != 0 or m.adjust_left(0) <= 0:
+		return
+	var tried := 0
+	while tried < Ai.PERSONA_ORDER.size():
+		persona_i = (persona_i + 1) % Ai.PERSONA_ORDER.size()
+		tried += 1
+		var persona: String = Ai.PERSONA_ORDER[persona_i]
+		var nd := Ai.adjust_step(m.decks[0], m.pools[0], persona, m.rng)
+		if nd.is_empty():
+			continue
+		var changed := D.changed_units(m.decks[0], nd)
+		if changed.size() != 1:
+			continue
+		_show_suggestion(changed[0], nd, persona)
+		return
+	archetype_note = "暂时没有能自动装上的新招；多凑些词，或自己编辑。"
+	refresh()
+
+func _show_suggestion(idx: int, nd: Dictionary, persona: String) -> void:
+	suggest_nd = nd
+	overlay_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.7)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var win := K.panel(Color("171b29"), K.GREEN, 16, 2, 16)
+	win.custom_minimum_size = Vector2(760, 0)
+	win.position = Vector2(420, 220)
+	var v := K.vbox(8)
+	win.add_child(v)
+	v.add_child(K.label("自动调整建议（%s）" % persona, 24, K.GOLD))
+	var u: Dictionary = nd.units[idx]
+	v.add_child(K.label("修改【%s】：生命 %d，关键词 %s" % [u.name, int(u.max_hp), u.kw if u.kw != "" else "无"], 17, K.TEXT))
+	for sk in u.skills:
+		v.add_child(K.wrap_label("· %s（操作费 %d）：%s" % [sk.name, int(sk.cost), sk.text], 15, K.MUTED))
+	var row := K.hbox(10)
+	var ok := K.button("采用（用掉一次调整）", "primary", 18)
+	var other := K.button("换一个建议", "normal", 18)
+	var cancel := K.button("取消", "ghost", 18)
+	row.add_child(ok)
+	row.add_child(other)
+	row.add_child(cancel)
+	v.add_child(row)
+	var holder := Control.new()
+	holder.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	holder.add_child(dim)
+	holder.add_child(win)
+	overlay_layer.add_child(holder)
+	var close := func():
+		holder.queue_free()
+		overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ok.pressed.connect(func():
+		close.call()
+		adjusted.emit(idx, suggest_nd.units[idx]))
+	other.pressed.connect(func():
+		close.call()
+		_auto_adjust(true))
+	cancel.pressed.connect(close)
 
 func _unit_panel(i: int, u: Dictionary) -> Control:
 	var p := K.panel(Color("1d2233"), K.BLUE.darkened(0.3), 14, 2, 8)

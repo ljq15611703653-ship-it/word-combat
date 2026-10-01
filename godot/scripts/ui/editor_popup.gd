@@ -10,6 +10,7 @@ const R = preload("res://scripts/core/recipes.gd")
 const D = preload("res://scripts/core/deck.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Complex = preload("res://scripts/ui/complex_editor.gd")
+const Namer = preload("res://scripts/core/namer.gd")
 
 signal committed(unit)
 signal cancelled()
@@ -38,6 +39,10 @@ var sel_params := {}
 var preview_skill: Dictionary = {}
 var param_box: VBoxContainer
 var preview_box: VBoxContainer
+var sel_name := ""            # 玩家给当前技能起的名字（空=用模板名）
+var skill_name_edit: LineEdit
+var unit_name_edit: LineEdit
+var _rng := RandomNumberGenerator.new()
 var tpl_buttons := {}
 
 func _unhandled_key_input(ev: InputEvent) -> void:
@@ -132,6 +137,23 @@ func _build() -> void:
 	left.add_child(lv)
 	var glyph := K.label(work.glyph, 70, Color("c9b27a"), HORIZONTAL_ALIGNMENT_CENTER)
 	lv.add_child(glyph)
+	var nrow := K.hbox(6)
+	nrow.add_child(K.label("卡名", 18, K.MUTED))
+	unit_name_edit = LineEdit.new()
+	unit_name_edit.max_length = 8
+	unit_name_edit.text = work.name
+	unit_name_edit.custom_minimum_size = Vector2(170, 34)
+	unit_name_edit.text_changed.connect(func(t): work.name = t if t.strip_edges() != "" else work.name)
+	nrow.add_child(unit_name_edit)
+	var dice := K.button("🎲", "normal", 18)
+	dice.custom_minimum_size = Vector2(44, 34)
+	dice.tooltip_text = "按这张卡装的技能随机取一个名字"
+	dice.pressed.connect(func():
+		_rng.randomize()
+		work.name = Namer.minion_name(work, _rng)
+		unit_name_edit.text = work.name)
+	nrow.add_child(dice)
+	lv.add_child(nrow)
 	var hp_row := K.hbox(6)
 	hp_row.add_child(K.label("生命", 18, K.MUTED))
 	for d in [-5, -1]:
@@ -404,6 +426,7 @@ func _select_template(tid: String, params: Dictionary) -> void:
 
 func _load_slot() -> void:
 	var sk := _current_skill()
+	sel_name = str(sk.get("name", "")) if sk.get("custom_name", false) else ''
 	if sk.is_empty():
 		_select_template(sel_tid if sel_tid != "" else "atk1", {})
 	elif sk.has("template"):
@@ -418,6 +441,24 @@ func _rebuild_params() -> void:
 	var t: Dictionary = R.template(sel_tid)
 	param_box.add_child(K.label("%s  ·  %s" % [t.title, t.family], 22, K.GOLD))
 	param_box.add_child(K.wrap_label(t.blurb, 15, K.MUTED))
+	var nm := K.hbox(8)
+	nm.add_child(K.label("技能名", 16, K.TEXT))
+	skill_name_edit = LineEdit.new()
+	skill_name_edit.max_length = 10
+	skill_name_edit.placeholder_text = String(t.title)
+	skill_name_edit.text = sel_name
+	skill_name_edit.custom_minimum_size = Vector2(170, 32)
+	skill_name_edit.text_changed.connect(func(tx): sel_name = tx.strip_edges())
+	nm.add_child(skill_name_edit)
+	var sdice := K.button("🎲", "normal", 16)
+	sdice.custom_minimum_size = Vector2(44, 32)
+	sdice.tooltip_text = "按这个技能的效果随机取一个名字"
+	sdice.pressed.connect(func():
+		_rng.randomize()
+		sel_name = Namer.skill_name(preview_skill, _rng)
+		skill_name_edit.text = sel_name)
+	nm.add_child(sdice)
+	param_box.add_child(nm)
 	for prm in t.params:
 		var row := K.hbox(8)
 		var lab := K.label(prm.label, 16, K.TEXT)
@@ -517,6 +558,10 @@ func _slot_budget() -> int:
 
 func _install(sk: Dictionary) -> void:
 	var copy: Dictionary = sk.duplicate(true)
+	if tab == "simple" and sel_name != "":
+		copy["name"] = sel_name
+		copy["base_name"] = sel_name
+		copy["custom_name"] = true
 	if slot < work.skills.size():
 		work.skills[slot] = copy
 	else:

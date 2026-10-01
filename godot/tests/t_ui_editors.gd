@@ -69,5 +69,23 @@ func _init() -> void:
 	cx.nodes = [nested]
 	cx._rerender()
 	check(G.problems(cx._sk()).is_empty(), "监听器嵌套监听器合法 " + str(G.problems(cx._sk())))
+	# 取名：每个模板都能随机出名字；自定义名字被保留且不加序号
+	var Namer = load("res://scripts/core/namer.gd")
+	var nrng := RandomNumberGenerator.new()
+	nrng.seed = 5
+	for t in R.catalog():
+		var nm: String = Namer.skill_name(R.build(t.id, R.defaults(t.id)), nrng)
+		check(nm != "" and nm.length() <= 6, "模板 %s 随机名 %s" % [t.id, nm])
+	var uname: String = Namer.minion_name({"glyph": "剑", "skills": [R.build("atk1", {})]}, nrng)
+	check(uname != "", "随从随机名 " + uname)
+	popup._select_template("atk1", {})
+	popup.sel_name = "我的绝招"
+	popup.slot = 0
+	popup._install(popup.preview_skill)
+	check(popup.work.skills[0].name == "我的绝招" and popup.work.skills[0].get("custom_name", false), "自定义技能名写入")
+	var dk := D.new_deck()
+	dk.units[0].skills = [popup.work.skills[0].duplicate(true), popup.work.skills[0].duplicate(true)]
+	D.rename_skills(dk)
+	check(dk.units[0].skills[1].name == "我的绝招", "自定义名不加序号")
 	print("编辑器测试完成，失败数 ", fails)
 	quit(fails)

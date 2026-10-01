@@ -81,6 +81,13 @@ func _ready() -> void:
 		Settings.save_all()
 		snd.text = "音效：关" if Settings.muted else "音效：开")
 	lv_row.add_child(snd)
+	var cbtn := K.button("辅助轮：开" if Settings.coach else "辅助轮：关", "ghost", 16)
+	cbtn.tooltip_text = "抽词/构筑时给出路线提示，并提供“自动组合”“换一批”。纯新手建议打开。"
+	cbtn.pressed.connect(func():
+		Settings.coach = not Settings.coach
+		Settings.save_all()
+		cbtn.text = "辅助轮：开" if Settings.coach else "辅助轮：关")
+	lv_row.add_child(cbtn)
 	v.add_child(lv_row)
 	v.add_child(desc)
 	refresh_lv.call()
