@@ -110,7 +110,7 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 			out.fears.append("起效在第 %d 秒，比较晚：对手有更长的时间让它倒下或把它打断。" % landing)
 		for s in host.statuses:
 			if s.name == "沉默":
-				out.fears.append("%s 被沉默了，压住了费用不超过 %d 的技能。" % [_name(st, host.uid), G.silence_limit(int(s.value))])
+				out.fears.append("%s 被沉默了，在持续期间无法发动技能。" % _name(st, host.uid))
 	var seen := {}
 	for uid in dmg.keys() + stat.keys():
 		if seen.has(uid):

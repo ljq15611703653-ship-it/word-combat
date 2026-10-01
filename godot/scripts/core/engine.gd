@@ -195,7 +195,7 @@ static func can_declare(st: Dictionary, act: Dictionary, declared: Array = []) -
 		return "持有者已倒下"
 	var cost := action_cost(st, act)
 	if _silenced_for(host, cost):
-		return "持有者被沉默（压制操作费 ≤ %d 的技能）" % _silence_cap(host)
+		return "持有者被沉默（持续期间无法发动技能）"
 	if cost > available_ap(st, act.side, declared):
 		return "行动点不足（需要%d，还剩%d）" % [cost, available_ap(st, act.side, declared)]
 	if int(act.start) < min_start(st, act):

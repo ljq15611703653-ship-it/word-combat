@@ -399,7 +399,7 @@ func _skill_reason(sk: Dictionary, u: Dictionary, ap: int) -> String:
 	if u.down_round != -1:
 		return "持有者修整中"
 	if E._silenced_for(u, int(sk.cost)):
-		return "被沉默（压制操作费≤%d）" % E._silence_cap(u)
+		return "被沉默（持续期间无法发动技能）"
 	var cheapest: int = int(sk.cost)
 	if cheapest > ap:
 		# 择一可能更便宜

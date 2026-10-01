@@ -86,7 +86,7 @@ static func catalog() -> Array:
 				{"key": "st", "label": "状态", "kind": "enum", "options": [["狂振", "狂振"], ["易伤", "易伤"], ["沉默", "沉默"], ["牵连", "牵连"], ["升华", "升华"]], "default": "易伤"},
 				{"key": "tgt", "label": "目标", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
 				{"key": "allyside", "label": "施加给己方", "kind": "bool", "default": false},
-				{"key": "n", "label": "沉默力度（压制操作费 ≤ 1.25×力度）", "kind": "int", "min": 1, "max": 60, "default": 25},
+				{"key": "n", "label": "沉默占用点数（只决定价格，不限制压制哪些技能）", "kind": "int", "min": 1, "max": 60, "default": 25},
 				{"key": "dbl", "label": "双倍次数（仅沉默）", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
 			]},
@@ -131,7 +131,7 @@ static func catalog() -> Array:
 		{"id": "time", "family": "控", "title": "时间术", "glyph": "时", "blurb": "打断、延后对方已宣告的技能，或提前自己的。",
 			"params": [
 				{"key": "op", "label": "方式", "kind": "enum", "options": [["interrupt", "打断对方"], ["delay", "延后对方"], ["advance", "提前自己"]], "default": "interrupt"},
-				{"key": "power", "label": "打断力度（压制操作费 ≤ 1.25×力度）", "kind": "int", "min": 1, "max": 60, "default": 30},
+				{"key": "power", "label": "打断占用点数（只决定价格，不限制打断哪些技能）", "kind": "int", "min": 1, "max": 60, "default": 30},
 				{"key": "dbl", "label": "双倍次数（仅打断力度）", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "sec", "label": "秒数（延后/提前用）", "kind": "int", "min": 1, "max": 19, "default": 4},
 			]},

@@ -39,7 +39,7 @@ const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "合计", "diff
 const STATUSES := ["狂振", "牵连", "升华", "护盾", "易伤", "沉默"]
 const STATUS_DESC := {
 	"狂振": "造成与受到的伤害各+25%", "牵连": "与另一名友方平分受到的伤害", "升华": "受到的治疗不回血，转为下次造成伤害的增量",
-	"护盾": "吸收所填数值的伤害", "易伤": "受到的伤害+50%", "沉默": "压制操作费不超过 1.25×力度 的技能",
+	"护盾": "吸收所填数值的伤害", "易伤": "受到的伤害+50%", "沉默": "让持有者在持续期间无法发动技能",
 }
 
 # ---------------------------------------------------------------- 目标式
@@ -755,7 +755,7 @@ static func _node_text_core(node: Dictionary) -> String:
 			if node.status == "护盾":
 				s2 += "，可吸收 %s 点伤害%s" % ["某某" if int(node.value.n) < 0 else str(int(node.value.n)), mods_clause(node, "吸收量")]
 			elif node.status == "沉默":
-				s2 += "，使其无法发动费用不超过 %s 的技能%s" % ["某某" if int(node.value.n) < 0 else str(silence_limit(int(node.value.n))), mods_clause(node, "这个上限")]
+				s2 += "，使其无法发动技能"
 			elif STATUS_DESC.has(node.status) and node.status != "牵连":
 				s2 += "（%s）" % STATUS_DESC[node.status]
 			if node.status == "牵连" and node.has("link"):
@@ -780,7 +780,7 @@ static func _node_text_core(node: Dictionary) -> String:
 			match node.op:
 				"delay": return "把%s推迟 %s 秒%s" % [who, tn, tclause]
 				"advance": return "把%s提前 %s 秒%s" % [who, tn, tclause]
-				"interrupt": return "打断%s（只对费用不超过 %s 的技能有效%s）" % [who, "某某" if int(node.value.n) < 0 else str(silence_limit(int(node.value.n))), mods_clause(node, "这个上限")]
+				"interrupt": return "打断%s（取消它尚未起效的技能，不论费用）" % who
 				_: return "对%s做某某" % who
 		"swap":
 			return "自身与%s交换位置" % target_text(node.target)
@@ -813,9 +813,10 @@ static func effective_num(node: Dictionary) -> int:
 		v = (v + 1) / 2
 	return v
 
-# 打断/沉默的力度换算：力度P能压制操作费不超过 1.25×P 的技能
-static func silence_limit(p: int) -> int:
-	return int(p * 5 / 4)
+# 打断/沉默不再有“只对某费用以下的技能起效”的限制：不论对方技能多贵，都能打断、都能沉默。
+# 数字只决定这张牌自己的价格。这里保留函数是为了兼容旧调用：返回一个永远够大的上限。
+static func silence_limit(_p: int) -> int:
+	return 9999
 
 static func pct_of(points: int) -> int:
 	return int(round(100.0 * points / (points + 20.0)))

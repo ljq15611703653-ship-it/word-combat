@@ -111,7 +111,7 @@ func _init() -> void:
 	st = play(deck([silence]), deck([S("全10",[G.dmg(G.T("all","enemy"), G.N(10))])]), {"t1": 10}, {}, 1, 3)
 	check(hps(st,0) == [20,20,20,20,20], "被沉默者的技能落空")
 	st = play(deck([S("沉默弱", [G.status("沉默", G.T("choose","enemy"), 0, 10)])]), deck([S("全10",[G.dmg(G.T("all","enemy"), G.N(10))])]), {"t1": 10}, {}, 1, 3)
-	check(hps(st,0)[0] == 10, "沉默力度不足（压制<=12，对方操作费21）则无效，仍受10 (hp=%d)" % hps(st,0)[0])
+	check(hps(st,0)[0] == 20, "沉默不看费用：数字再小，对方的技能也照样落空 (hp=%d)" % hps(st,0)[0])
 
 	print("— 首挡 / 不屈 / 回击")
 	st = play(deck([S("打30",[G.dmg(G.T("choose","enemy"), G.N(30))])]), deck([], [20,20,20,20,20], ["首挡","","","",""]), {"t1": 10}, {}, 4)
@@ -159,7 +159,7 @@ func _init() -> void:
 	st = play(deck([bigaoe]), deck([S("打断", [G.time_op("interrupt","enemy",40)])]), {}, {}, 5, 5)
 	check(hps(st,1) == [20,20,20,20,20], "同刻打断：控制先于效果，落空")
 	st = play(deck([bigaoe]), deck([S("弱打断", [G.time_op("interrupt","enemy",10)])]), {}, {}, 3, 3)
-	check(hps(st,1)[0] == 0, "打断力度10只压制操作费<=12：全体攻击照常")
+	check(hps(st,1) == [20,20,20,20,20], "打断不看费用：数字再小，贵的全体攻击也被取消")
 	st = play(deck([bigaoe]), deck([S("打断", [G.time_op("interrupt","enemy",40)])]), {}, {}, 3, 4)
 	check(hps(st,1)[0] == 0, "打断太晚：对方已经打出")
 	st = play(deck([bigaoe]), deck([S("提前", [G.time_op("advance","ally",2)]) ]), {}, {}, 3, 5)
