@@ -17,8 +17,8 @@ const EVENT_WORD := {
 const EVENT_TEXT := {
 	"pending_dmg": "即将受到伤害", "damaged": "受到伤害", "dealt": "造成伤害", "healed": "恢复生命",
 	"lost": "失去生命", "targeted": "被选为目标", "cast": "发动技能", "hit": "被技能命中",
-	"status_applied": "被施加状态", "status_end": "状态结束", "down": "倒下", "ally_down": "有队友倒下",
-	"enemy_down": "有敌人倒下", "round_end": "本轮结束",
+	"status_applied": "被施加状态", "status_end": "状态结束", "down": "倒下", "ally_down": "有友方倒下",
+	"enemy_down": "有敌方倒下", "round_end": "本轮结束",
 }
 const NO_OBSERVE := ["ally_down", "enemy_down", "round_end"]
 const REF_WORD := {
@@ -29,9 +29,9 @@ const REF_WORD := {
 }
 const UNTIL_MAX := 4       # “直到”最多重复执行的次数（首次之外），每次重新付数字
 const REF_TEXT := {
-	"event_damage": "该次伤害", "event_heal": "该次治疗", "actual": "实际数值", "raw": "原始数值",
-	"cur_hp": "当前生命", "max_hp": "生命上限", "lost_hp": "已损失的生命", "count": "人数", "times": "本轮已触发次数",
-	"ap": "剩余行动点", "paid": "已支付的行动点", "invested": "本技能已投入的数字", "overflow": "溢出的治疗", "prev": "前一效果的实际数值",
+	"event_damage": "这次伤害", "event_heal": "这次治疗", "actual": "实际数值", "raw": "原始数值",
+	"cur_hp": "当前生命", "max_hp": "生命上限", "lost_hp": "已损失生命", "count": "人数", "times": "本轮已触发的次数",
+	"ap": "剩余行动点", "paid": "已支付的行动点", "invested": "这个技能投入的数字", "overflow": "溢出的治疗", "prev": "上一步的实际数值",
 	"round_taken": "本轮累计受到的伤害", "remaining": "剩余护盾量",
 }
 const OP_WORD := {"max": "较高者", "min": "较低者", "sum": "合计", "diff": "差值"}
@@ -71,21 +71,20 @@ static func target_text(t: Dictionary) -> String:
 	var s: String = SIDE_TEXT.get(t.get("side", ""), "")
 	match t.pick:
 		"self": return "自身"
-		"source": return "来源"
-		"recipient": return "接受者"
-		"choose": return "所选的一个" + s + "随从"
+		"source": return "来源随从"
+		"recipient": return "被作用的随从"
+		"choose": return "你选的一个" + s + "随从"
 		"all": return "全部" + s + "随从"
-		"each": return "逐个" + s + "随从"
+		"each": return "每一个" + s + "随从"
 		"lowest": return "生命最低的" + s + "随从"
 		"highest": return "生命最高的" + s + "随从"
-		"first": return "最前的" + s + "随从"
-		"last": return "最后的" + s + "随从"
+		"first": return "最前面的" + s + "随从"
+		"last": return "最后面的" + s + "随从"
 		"random": return "随机一个" + s + "随从"
 		"other": return "另一个" + s + "随从"
 		"adjacent": return "相邻的" + s + "随从"
 	return "?"
 
-# 单个随从的选择（复制/接续的后续目标只允许这些）
 static func is_single_pick(t: Dictionary) -> bool:
 	return not (t.pick in ["all", "each", "adjacent"])
 
@@ -136,18 +135,35 @@ static func value_text(v: Dictionary) -> String:
 			if v.has("of"):
 				s = target_text(v.of) + "的" + s
 			return s
-		"op": return OP_TEXT[v.op] + "(" + value_text(v.a) + "，" + value_text(v.b) + ")"
+		"op":
+			var a := value_text(v.a)
+			var b := value_text(v.b)
+			match v.op:
+				"max": return "%s 与 %s 中较大的" % [a, b]
+				"min": return "%s 与 %s 中较小的" % [a, b]
+				"sum": return "%s 加 %s" % [a, b]
+				"diff": return "%s 与 %s 的差" % [a, b]
 	return "?"
 
-static func _mods_text(node: Dictionary) -> String:
-	var s := ""
+# 数值套上 双倍/一半 之后的人话：数字直接给最终值；非数字（引用）写“2倍的…”
+static func _num_text(node: Dictionary, v: Dictionary) -> String:
+	if v.k == "num":
+		return str(effective_num(node))
+	var suf := ""
 	var d := int(node.get("dbl", 0))
 	var h := int(node.get("half", 0))
 	if d > 0:
-		s += "×" + str(1 << d) + " "
+		suf += "的 %d 倍" % (1 << d)
 	if h > 0:
-		s += "÷" + str(1 << h) + " "
-	return s
+		suf += ("的一半" if h == 1 else "的 1/%d" % (1 << h))
+	return value_text(v) + suf
+
+static func _after_text(node: Dictionary) -> String:
+	var d := int(node.get("delay", 0))
+	return ("%d 秒后，" % d) if d > 0 else ""
+
+static func _dur_text(dur: int) -> String:
+	return "，持续 %d 秒" % dur if dur > 0 else "，持续到本轮结束"
 
 # ---------------------------------------------------------------- 节点构造
 static func dmg(target: Dictionary, value: Dictionary, o: Dictionary = {}) -> Dictionary:
@@ -235,8 +251,8 @@ static func cond_nums(c: Dictionary) -> int:
 
 static func cond_text(c: Dictionary) -> String:
 	if c.has("has"):
-		return "%s已生效【%s】" % [target_text(c.has.target), c.has.status]
-	return "%s %s %s" % [value_text(c.left), "小于" if c.cmp == "lt" else "不小于", value_text(c.right)]
+		return "%s身上有【%s】" % [target_text(c.has.target), c.has.status]
+	return "%s %s %s" % [value_text(c.left), "低于" if c.cmp == "lt" else "不低于", value_text(c.right)]
 
 static func cond_check(c: Dictionary, out: Array, ctx: String) -> void:
 	if c.has("has"):
@@ -672,84 +688,91 @@ static func count_words(words: Array) -> Dictionary:
 static func verb_text(kind: String, alt: int, target: String, value: String, is_num: bool = true) -> String:
 	if kind == "dmg":
 		if alt == 0:
-			return ("对%s造成 %s 点伤害" % [target, value]) if is_num else ("对%s造成【%s】的伤害" % [target, value])
-		return "使%s当前生命减少 %s" % [target, value]
+			return ("对%s造成 %s 点伤害" % [target, value]) if is_num else ("对%s造成与 %s 相等的伤害" % [target, value])
+		return "使%s的当前生命减少 %s" % [target, value]
 	if alt == 0:
-		return ("使%s恢复 %s 点生命" % [target, value]) if is_num else ("使%s恢复【%s】的生命" % [target, value])
-	return "使%s当前生命增加 %s" % [target, value]
+		return ("使%s恢复 %s 点生命" % [target, value]) if is_num else ("使%s恢复与 %s 相等的生命" % [target, value])
+	return "使%s的当前生命增加 %s" % [target, value]
 
 static func node_text(node: Dictionary) -> String:
 	var t := _node_text_core(node)
 	if node.get("sync", false):
-		t += "（重复/逐个同时落下）"
+		t += "（各次同时落下）"
 	return t
+
+static func _event_phrase(node: Dictionary) -> String:
+	var who: String = ""
+	if not (node.event in NO_OBSERVE):
+		var ob: Dictionary = node.observe
+		if ob.pick in ["all", "each"]:
+			who = "任何一个" + SIDE_TEXT.get(ob.get("side", ""), "") + "随从"
+		else:
+			who = target_text(ob)
+	return who + EVENT_TEXT[node.event]
 
 static func _node_text_core(node: Dictionary) -> String:
 	match node.kind:
 		"dmg", "heal":
-			var t := verb_text(node.kind, int(node.get("alt", 0)), target_text(node.target), _mods_text(node) + value_text(node.value), node.value.k == "num")
+			var t := verb_text(node.kind, int(node.get("alt", 0)), target_text(node.target), _num_text(node, node.value), node.value.k == "num")
 			if int(node.get("rep", 0)) > 0:
-				t += "，再重复 %d 次（每次间隔%d秒，每次重新付数字）" % [int(node.rep), int(node.get("rep_gap", 0)) if int(node.get("rep_gap", 0)) > 0 else 2]
-			if int(node.get("delay", 0)) > 0:
-				t = "%d 秒后，" % int(node.delay) + t
-			return t
+				var gap := int(node.get("rep_gap", 0)) if int(node.get("rep_gap", 0)) > 0 else 2
+				t += "；之后每隔 %d 秒再来一次，共再来 %d 次" % [gap, int(node.rep)]
+			return _after_text(node) + t
 		"mit":
-			var s: String = "使%s受到的伤害%s" % [target_text(node.target), ("每次减少 %d" % (int(node.value.n) / 2)) if node.mode == "fixed" else ("降低 %d%%" % pct_of(int(node.value.n)))]
-			s += "（持续%d秒）" % int(node.dur) if int(node.dur) > 0 else "（直到本轮结束）"
-			return s
+			var s: String = "使%s受到的伤害%s" % [target_text(node.target), ("每次减少 %d 点" % (int(node.value.n) / 2)) if node.mode == "fixed" else ("降低 %d%%" % pct_of(int(node.value.n)))]
+			return s + _dur_text(int(node.dur))
 		"status":
 			var s2: String = "给%s施加【%s】" % [target_text(node.target), node.status]
 			if node.status == "护盾":
-				s2 += "，可吸收 %s%d 点伤害" % [_mods_text(node), int(node.value.n)]
+				s2 += "，可吸收 %d 点伤害" % effective_num(node)
 			elif node.status == "沉默":
-				var pw := effective_num(node)
-				s2 += "，力度%s%d（压制操作费 ≤ %d 的技能）" % [_mods_text(node), int(node.value.n), silence_limit(pw)]
-			if node.has("link"):
-				s2 += "，与%s牵连" % target_text(node.link)
-			s2 += "（持续%d秒）" % int(node.dur) if int(node.dur) > 0 else "（直到本轮结束）"
-			return s2
+				s2 += "，使其无法发动费用不超过 %d 的技能" % silence_limit(effective_num(node))
+			elif STATUS_DESC.has(node.status) and node.status != "牵连":
+				s2 += "（%s）" % STATUS_DESC[node.status]
+			if node.status == "牵连" and node.has("link"):
+				s2 = "给%s施加【牵连】：与%s平分受到的伤害" % [target_text(node.target), target_text(node.link)]
+			return s2 + _dur_text(int(node.dur))
 		"remove":
-			return "移除%s的%s" % [target_text(node.target), node.what]
+			return "移除%s身上的%s" % [target_text(node.target), node.what]
 		"watch":
-			var when: String = "当" + ("" if node.event in NO_OBSERVE else target_text(node.observe)) + EVENT_TEXT[node.event]
-			var f := "每次" if node.freq == "every" else "第一次"
-			var life := "（到本轮结束）"
-			if node.life == "dur":
-				life = "（%d秒内）" % int(node.dur)
-			return "%s，%s：%s%s" % [when, f, node_text(node.child), life]
+			if node.event == "round_end":
+				return "本轮结束时，" + node_text(node.child)
+			var when := "本轮内，" if node.life != "dur" else "接下来 %d 秒内，" % int(node.dur)
+			var f := "每当" if node.freq == "every" else "第一次"
+			return "%s%s%s时，%s" % [when, f, _event_phrase(node), node_text(node.child)]
 		"redirect":
-			return "把这次伤害转移给%s（每个被保护者至多转移 %s%d 点）" % [target_text(node.target), _mods_text(node), int(node.value.n)]
+			return "改由%s承受这次伤害（每个被保护的随从最多转移 %d 点）" % [target_text(node.target), effective_num(node)]
 		"convert":
-			return "把这次伤害转为等量治疗（每个被保护者至多转换 %s%d 点）" % [_mods_text(node), int(node.value.n)]
+			return "把这次伤害变成等量的治疗（每个被保护的随从最多转换 %d 点）" % effective_num(node)
 		"time":
-			var who: String = SIDE_TEXT[node.side] + "此后第一个起效的技能"
+			var who: String = SIDE_TEXT[node.side] + "接下来第一个起效的技能"
 			match node.op:
-				"delay": return "把%s延后 %d 秒" % [who, int(node.value.n)]
-				"advance": return "把%s提前 %d 秒" % [who, int(node.value.n)]
-				_: return "打断%s尚未发生的部分（力度%s%d：只对操作费 ≤ %d 的技能有效）" % [who, _mods_text(node), int(node.value.n), silence_limit(effective_num(node))]
+				"delay": return "把%s推迟 %d 秒" % [who, effective_num(node)]
+				"advance": return "把%s提前 %d 秒" % [who, effective_num(node)]
+				_: return "打断%s（只对费用不超过 %d 的技能有效）" % [who, silence_limit(effective_num(node))]
 		"swap":
 			return "自身与%s交换位置" % target_text(node.target)
 		"split":
 			var parts: Array = []
 			for b in node.branches:
-				parts.append("%s %d" % [target_text(b.target), int(b.part)])
-			return "分流总计 %d 点%s：%s" % [int(node.total), "伤害" if node.verb == "dmg" else "治疗", "；".join(parts)]
+				parts.append("%s 分到 %d" % [target_text(b.target), int(b.part)])
+			return "把总共 %d 点%s分配出去：%s" % [int(node.total), "伤害" if node.verb == "dmg" else "治疗", "；".join(parts)]
 		"chain":
-			return node_text(node.first) + "，接着以其实际数值：" + node_text(node.then)
+			return node_text(node.first) + "；然后" + node_text(node.then)
 		"copy":
-			return node_text(node.first) + "，并把实际数值复制给" + target_text(node.target)
+			return node_text(node.first) + "；同样的数值也对" + target_text(node.target) + "生效"
 		"until":
-			return "重复执行【%s】（每%d秒一次，至多再 %d 次，每次重新付数字），直到 %s" % [node_text(node.child), int(node.get("gap", 0)) if int(node.get("gap", 0)) > 0 else 2, UNTIL_MAX, cond_text(node.cond)]
+			var gap2 := int(node.get("gap", 0)) if int(node.get("gap", 0)) > 0 else 2
+			return "%s；每隔 %d 秒再来一次，直到 %s 为止（最多再来 %d 次）" % [node_text(node.child), gap2, cond_text(node.cond), UNTIL_MAX]
 		"if":
-			var s3 := "若 %s：%s" % [cond_text(node.cond), node_text(node.then)]
+			var s3 := "如果%s，就%s" % [cond_text(node.cond), node_text(node.then)]
 			if node.has("else"):
-				s3 += "；否则：" + node_text(node["else"])
+				s3 += "；否则%s" % node_text(node["else"])
 			return s3
 		"choose":
-			return "择一：【%s】或【%s】" % [node_text(node.a), node_text(node.b)]
+			return "二选一，宣告时决定：%s，或者%s" % [node_text(node.a), node_text(node.b)]
 	return "?"
 
-# 填入的数值套上 双倍/一半 之后的有效值
 static func effective_num(node: Dictionary) -> int:
 	var v := int(node.value.n)
 	for i in int(node.get("dbl", 0)):
@@ -769,7 +792,7 @@ static func describe(sk: Dictionary) -> String:
 	var parts: Array = []
 	for n in sk.nodes:
 		parts.append(node_text(n))
-	return "；并 ".join(parts)
+	return "；另外，".join(parts)
 
 # 技能的粗分类，用于界面图标与AI：atk / def / heal / ctl / buff
 static func kind_tag(sk: Dictionary) -> String:
