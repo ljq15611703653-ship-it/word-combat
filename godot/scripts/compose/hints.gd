@@ -27,6 +27,7 @@ static func sample_number(role: String, rng: RandomNumberGenerator) -> int:
 		"delay": return rng.randi_range(2, 5)
 		"gap": return rng.randi_range(2, 4)
 		"part": return rng.randi_range(5, 15)
+		"alive": return rng.randi_range(1, 3)
 	return rng.randi_range(4, 15)
 
 # ------------------------------------------------------------ 1. 下一张牌

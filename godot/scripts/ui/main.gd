@@ -592,7 +592,7 @@ func _run_demo(demo: String) -> void:
 			m.st.sides[0].ap = 45
 			m.st.sides[1].ap = 45
 			_continue_adjust_demo()
-		"editor", "editor2", "editor3", "cast", "dbl":
+		"editor", "editor2", "editor3", "cast", "dbl", "fuzzy":
 			for w in Lex.implemented():
 				m.pools[0][w] = maxi(int(m.pools[0].get(w, 0)), 3)
 			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
@@ -610,6 +610,11 @@ func _run_demo(demo: String) -> void:
 				for w in ["选择", "一个", "敌方", "随从", "造成"]:
 					cp.add_word(w)
 					await get_tree().create_timer(0.12).timeout
+			elif demo == "fuzzy":
+				cp.toggle_fuzzy()
+				for w in ["减伤", "友方", "随从", "双倍"]:
+					cp.add_word(w)
+					await get_tree().create_timer(0.1).timeout
 			elif demo == "dbl":
 				for w in ["选择", "一个", "敌方", "随从", "造成"]:
 					cp.add_word(w)

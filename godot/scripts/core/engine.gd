@@ -588,6 +588,9 @@ static func _value(st: Dictionary, v: Dictionary, ctx: Dictionary) -> int:
 
 # 条件：比较，或“已生效”（目标身上有某状态）
 static func _cond(st: Dictionary, c: Dictionary, ctx: Dictionary) -> bool:
+	if c.has("alive"):
+		var side_i: int = int(ctx.side) if c.alive.side == "ally" else 1 - int(ctx.side)
+		return alive_units(st, side_i).size() >= int(c.alive.n)
 	if c.has("has"):
 		var ts := _targets(st, c.has.target, ctx)
 		if ts.is_empty():

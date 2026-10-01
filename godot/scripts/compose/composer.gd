@@ -15,6 +15,7 @@ const H = preload("res://scripts/compose/hints.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const FX = preload("res://scripts/compose/stamp_fx.gd")
+const Fuzzy = preload("res://scripts/compose/fuzzy.gd")
 
 signal changed()
 signal hint_ready()
@@ -22,8 +23,8 @@ signal hint_ready()
 const TILE := Vector2(76, 98)
 const RACK_CARD := Vector2(80, 96)
 const CAT_ORDER := ["动作", "对象", "范围", "结构", "触发", "时间", "引用", "状态"]
-const ROLE_TEXT := {"value": "填一个数（点数）", "dur": "持续几秒（1~20）", "delay": "几秒之后（1~19）", "gap": "间隔几秒（1~10）", "part": "这一份分多少点"}
-const ROLE_RANGE := {"value": [1, 60], "dur": [1, 20], "delay": [1, 19], "gap": [1, 10], "part": [1, 60]}
+const ROLE_TEXT := {"alive": "至少几个（1~5）", "value": "填一个数（点数）", "dur": "持续几秒（1~20）", "delay": "几秒之后（1~19）", "gap": "间隔几秒（1~10）", "part": "这一份分多少点"}
+const ROLE_RANGE := {"alive": [1, 5], "value": [1, 60], "dur": [1, 20], "delay": [1, 19], "gap": [1, 10], "part": [1, 60]}
 const PART_HELP := {"低于": "左边比右边小", "不低于": "左边不比右边小", "每次固定": "每次固定减少，而不是按比例"}
 
 var pool: Dictionary = {}
@@ -38,6 +39,19 @@ var rail_box: PanelContainer
 var rail: HFlowContainer
 var hint_label: Label
 var status_label: Label
+var help_label: Label
+var hint_panel: Control
+var sugg_group: Control
+var strip_panel: Control
+var fuzzy_btn: Button
+var fuzzy_mode := false
+var tray: Array = []
+var tray_box: PanelContainer
+var tray_flow: HFlowContainer
+var fuzzy_box: VBoxContainer
+var fuzzy_msg: Label
+var _fuzzy_token := 0
+var _fuzzy_solver
 var sugg_box: VBoxContainer
 var rack_flow: VBoxContainer
 var rack_cards := {}
@@ -73,6 +87,12 @@ func _build() -> void:
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
+	fuzzy_btn = K.button("模糊匹配模式：关", "ghost", 15)
+	fuzzy_btn.custom_minimum_size = Vector2(0, 32)
+	fuzzy_btn.tooltip_text = "把词随便扔进托盘，电脑告诉你它们能拼成什么、怎么摆；拼不成就猜你想拼什么、还差哪张"
+	fuzzy_btn.pressed.connect(toggle_fuzzy)
+	Tut.tag(fuzzy_btn, "c:fuzzy")
+	head.add_child(fuzzy_btn)
 	back_btn = K.button("撤回一张", "normal", 15)
 	back_btn.custom_minimum_size = Vector2(0, 32)
 	back_btn.pressed.connect(undo)
@@ -98,18 +118,46 @@ func _build() -> void:
 	rail_box.add_child(rail)
 	Tut.tag(rail_box, "c:rail")
 	v.add_child(rail_box)
+	# 模糊匹配的托盘：词随便扔，不用按语法顺序
+	tray_box = PanelContainer.new()
+	var ts := K.style(Color("2a2438"), Color("7a58a8"), 12, 2, 6)
+	ts.content_margin_left = 12
+	ts.content_margin_right = 12
+	ts.content_margin_top = 10
+	ts.content_margin_bottom = 10
+	tray_box.add_theme_stylebox_override("panel", ts)
+	tray_box.custom_minimum_size = Vector2(0, 124)
+	tray_box.visible = false
+	var tv := K.vbox(4)
+	tray_box.add_child(tv)
+	tv.add_child(K.label("托盘：把词点进来（点托盘里的词可以拿出去），电脑会分析它们能拼成什么", 14, Color("c9b6ee")))
+	tray_flow = HFlowContainer.new()
+	tray_flow.add_theme_constant_override("h_separation", 6)
+	tray_flow.add_theme_constant_override("v_separation", 6)
+	tv.add_child(tray_flow)
+	Tut.tag(tray_box, "c:tray")
+	v.add_child(tray_box)
+	fuzzy_box = K.vbox(6)
+	fuzzy_box.visible = false
+	fuzzy_msg = K.wrap_label("", 17, Color("f1e3b0"))
+	fuzzy_box.add_child(fuzzy_msg)
+	v.add_child(fuzzy_box)
 	# 人话提示
 	var hp := K.panel(Color("2a2616"), Color("8d7032"), 10, 1)
+	hint_panel = hp
 	var hv := K.vbox(2)
 	hp.add_child(hv)
 	hint_label = K.wrap_label("", 18, Color("f1e3b0"))
 	hv.add_child(hint_label)
 	status_label = K.label("", 14, K.MUTED)
 	hv.add_child(status_label)
+	help_label = K.wrap_label("", 13, Color("9fd0ff"))
+	hv.add_child(help_label)
 	Tut.tag(hp, "c:hint")
 	v.add_child(hp)
 	# 三种流派
 	var sg := K.vbox(4)
+	sugg_group = sg
 	sg.add_child(K.label("接下来可能变成的三句话（也是用词拼出来的）", 15, K.MUTED))
 	sugg_box = K.vbox(4)
 	sg.add_child(sugg_box)
@@ -132,7 +180,7 @@ func _build() -> void:
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(inner)
 	# 最上面：“现在能接”的词，放大，永远一眼看到
-	var strip_panel := K.panel(Color("2a2616"), Color("8d7032"), 10, 2)
+	strip_panel = K.panel(Color("2a2616"), Color("8d7032"), 10, 2)
 	var sv := K.vbox(4)
 	strip_panel.add_child(sv)
 	strip_title = K.label("现在能接 ▶", 15, Color("ffd66b"))
@@ -196,6 +244,9 @@ func undo() -> void:
 	Tut.fire("undo")
 
 func add_word(w: String) -> void:
+	if fuzzy_mode:
+		_tray_add(w)
+		return
 	if not _expects("W", w):
 		_shake_rail()
 		return
@@ -243,6 +294,17 @@ func _after_change(stamp_last: bool, stamp_idx: int = -1) -> void:
 	changed.emit()
 
 func _recompute() -> void:
+	if fuzzy_mode:
+		avail = pool.duplicate()
+		for w in tray:
+			avail[w] = int(avail.get(w, 0)) - 1
+		opts = {"complete": false, "words_have": [], "words_miss": [], "numbers": [], "parts": [], "skills": []}
+		for w in pool:
+			if int(avail.get(w, 0)) > 0:
+				opts.words_have.append(w)
+		analysis = {"complete": false, "skills": [], "expect": []}
+		_update_rack()
+		return
 	avail = H.avail_of(pool, tokens)
 	analysis = S.analyze(tokens)
 	opts = H.options(tokens, avail)
@@ -595,7 +657,20 @@ func _update_rack() -> void:
 	miss_label.text = ("也可能接：" + "、".join(miss) + "（你没有）") if not miss.is_empty() else ""
 
 # ------------------------------------------------------------ 人话提示
+# 这句话里用到了某些词时，顺手讲一下怎么调（比如减伤的比例和数字）
+func _context_help() -> String:
+	var ws: Array = S.words_in(tokens)
+	var lines: Array = []
+	if "减伤" in ws:
+		lines.append("调减伤：强度就是“减伤”后面那个数字（点数字牌可以改）。比例 = 数字 ÷（数字 + 20）：填 20 ≈ 减 50%，40 ≈ 67%，60 ≈ 75%，越投越难再提高。想要“每次固定减少”，在【减伤】后面接连接牌【每次固定】（每次减少数字的一半）；想更强就接【双倍】。")
+	if "若有" in ws:
+		lines.append("若有：数字是“至少有几个存活的随从”（1~5）。想覆盖五个随从，要拼五个【若有】，每个只管一次判断。")
+	if "并" in ws:
+		lines.append("并：把几个效果连成同一个技能（最多 6 个）；想让后一段晚一点，在它前面加【之后】和秒数。")
+	return "\n".join(lines)
+
 func _refresh_hint() -> void:
+	help_label.text = _context_help()
 	last_hint_nodes = []
 	if tokens.is_empty():
 		hint_label.text = "这句话还没开始：某某。\n可以先放一个目标（比如“自身”“选择 一个 敌方 随从”），或者先放“当”设一个埋伏。"
@@ -756,3 +831,171 @@ func partial_skill() -> Dictionary:
 	if not nodes.is_empty() and str(nodes[0].get("kind", "hole")) != "hole":
 		tag = G.kind_tag({"nodes": nodes})
 	return {"name": "", "words": S.words_in(tokens), "nodes": nodes, "kind_tag": tag}
+
+# ------------------------------------------------------------ 模糊匹配模式
+func toggle_fuzzy() -> void:
+	fuzzy_mode = not fuzzy_mode
+	Sfx.play("click")
+	fuzzy_btn.text = "模糊匹配模式：开" if fuzzy_mode else "模糊匹配模式：关"
+	rail_box.visible = not fuzzy_mode
+	hint_panel.visible = not fuzzy_mode
+	sugg_group.visible = not fuzzy_mode
+	strip_panel.visible = not fuzzy_mode
+	tray_box.visible = fuzzy_mode
+	fuzzy_box.visible = fuzzy_mode
+	back_btn.visible = not fuzzy_mode
+	clear_btn.visible = not fuzzy_mode
+	if fuzzy_mode:
+		tray.clear()
+		_rebuild_tray()
+		fuzzy_msg.text = "把你想试的词点进托盘，不用管顺序。"
+		_clear_fuzzy_results()
+	_recompute_after_mode()
+	changed.emit()
+
+# 清掉旧的分析结果，但保留那条提示文字本身
+func _clear_fuzzy_results() -> void:
+	for c in fuzzy_box.get_children():
+		if c != fuzzy_msg:
+			fuzzy_box.remove_child(c)
+			c.queue_free()
+
+func _recompute_after_mode() -> void:
+	if fuzzy_mode:
+		_recompute()
+	else:
+		_after_change(false)
+
+func _tray_add(w: String) -> void:
+	if int(avail.get(w, 0)) <= 0:
+		_shake_rail()
+		return
+	tray.append(w)
+	Sfx.play("stamp")
+	_recompute()
+	_rebuild_tray(true)
+	_schedule_fuzzy()
+
+func _tray_remove(i: int) -> void:
+	if i < 0 or i >= tray.size():
+		return
+	tray.remove_at(i)
+	Sfx.play("click")
+	_recompute()
+	_rebuild_tray()
+	_schedule_fuzzy()
+
+func _rebuild_tray(stamp_last: bool = false) -> void:
+	K.clear_children(tray_flow)
+	var last: Control = null
+	for i in tray.size():
+		var t := K.word_card(str(tray[i]), 1, -1, TILE)
+		t.mouse_filter = Control.MOUSE_FILTER_STOP
+		t.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		t.tooltip_text = "点一下把它拿出托盘"
+		var ii := i
+		t.gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				_tray_remove(ii))
+		tray_flow.add_child(t)
+		last = t
+	if tray.is_empty():
+		tray_flow.add_child(K.label("（空）", 16, Color(1, 1, 1, 0.4)))
+	if stamp_last and last != null:
+		_stamp(last)
+
+func _schedule_fuzzy() -> void:
+	_fuzzy_token += 1
+	var tok := _fuzzy_token
+	if _fuzzy_solver != null:
+		_fuzzy_solver.cancelled = true
+	call_deferred("_run_fuzzy", tok)
+
+func _run_fuzzy(tok: int) -> void:
+	if not is_inside_tree():
+		return
+	await get_tree().create_timer(0.25).timeout
+	if tok != _fuzzy_token or not fuzzy_mode:
+		return
+	_clear_fuzzy_results()
+	fuzzy_msg.text = "分析中…" if not tray.is_empty() else "托盘是空的：先从下面把词点进托盘。"
+	if tray.is_empty():
+		return
+	var solver = Fuzzy.new()
+	solver.host = self
+	_fuzzy_solver = solver
+	var res: Dictionary = await solver.solve(tray.duplicate())
+	if tok != _fuzzy_token or not fuzzy_mode or not is_inside_tree():
+		return
+	_show_fuzzy(res)
+
+func _show_fuzzy(res: Dictionary) -> void:
+	_clear_fuzzy_results()
+	fuzzy_msg.text = str(res.message)
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(0, 250)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	var box := K.vbox(6)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	sc.add_child(box)
+	var any := false
+	var groups: Array = [["exact", "刚好用完", Color("2c6a44")], ["partial", "能拼，但有词用不上", Color("2f5f93")], ["completed", "再补几张就行", Color("8a6a1f")]]
+	for g in groups:
+		for e in res[g[0]]:
+			any = true
+			box.add_child(_fuzzy_row(e, str(g[1]), g[2]))
+	if not res.guess.is_empty():
+		any = true
+		box.add_child(_fuzzy_row(res.guess, "我猜你想拼这句", Color("8a3a3a")))
+	if any:
+		fuzzy_box.add_child(sc)
+
+func _fuzzy_row(e: Dictionary, label: String, col: Color) -> Control:
+	var p := K.panel(Color("1d2236"), col, 9, 2)
+	var vb := K.vbox(4)
+	p.add_child(vb)
+	var top := K.hbox(8)
+	top.add_child(K.chip(label, col, 14))
+	var sp := Control.new()
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(sp)
+	var use := K.button("采用这一句", "primary", 14)
+	use.custom_minimum_size = Vector2(0, 30)
+	var toks: Array = e.tokens
+	use.pressed.connect(func(): adopt(toks))
+	top.add_child(use)
+	vb.add_child(top)
+	# 怎么摆：按顺序一张一张列出；托盘里的词是实心的，要补的词红框，数字是示例值
+	var fl := HFlowContainer.new()
+	fl.add_theme_constant_override("h_separation", 4)
+	fl.add_theme_constant_override("v_separation", 4)
+	var added_left: Array = e.added.duplicate()
+	var idx := 1
+	for t in e.tokens:
+		var chip: Control
+		if t.t == "W" and t.v in added_left:
+			added_left.erase(t.v)
+			chip = K.chip("%d·%s ＋补" % [idx, t.v], Color("8a2a2a"), 14)
+		elif t.t == "W":
+			chip = K.chip("%d·%s" % [idx, t.v], Lex.cat_color(str(t.v)).darkened(0.25), 14)
+		elif t.t == "N":
+			chip = K.chip("%d·数字(自填)" % idx, Color("6b5a22"), 14)
+		else:
+			chip = K.chip("%d·%s" % [idx, t.v], Color("4a5266"), 14)
+		fl.add_child(chip)
+		idx += 1
+	vb.add_child(fl)
+	vb.add_child(K.wrap_label("= " + str(e.text), 14, Color("c8d0e8")))
+	if not e.added.is_empty():
+		vb.add_child(K.wrap_label("还差：" + "、".join(e.added) + "（你托盘里没有这几张）", 14, Color("e8a0a0")))
+	if not e.unused.is_empty():
+		vb.add_child(K.wrap_label("用不上：" + "、".join(e.unused), 14, K.MUTED))
+	return p
+
+# 把某一句送回正式的拼句台（数字是示例值，自己点数字牌改）
+func adopt(toks: Array) -> void:
+	toggle_fuzzy()
+	tokens = toks.duplicate(true)
+	editing_idx = -1
+	_after_change(false)
+	Sfx.play("chime")

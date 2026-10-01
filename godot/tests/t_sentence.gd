@@ -137,7 +137,8 @@ func rnode(depth := 0, ctx := "") -> Dictionary:
 	elif r < 0.82:
 		n = G.until_node(rcond(ctx), rdh("dmg", ctx), pick([0, 3]))
 	elif r < 0.87:
-		n = G.if_node(rcond(ctx), rdh("dmg", ctx), rdh("heal", ctx) if rng.randf() < 0.5 else {})
+		var cnd: Dictionary = G.alive_cond(pick(["ally", "enemy"]), rng.randi_range(1, 5)) if rng.randf() < 0.4 else rcond(ctx)
+		n = G.if_node(cnd, rdh("dmg", ctx), rdh("heal", ctx) if rng.randf() < 0.5 else {})
 	elif r < 0.9:
 		n = G.pick_one(rdh("dmg", ctx), rdh("heal", ctx))
 	else:

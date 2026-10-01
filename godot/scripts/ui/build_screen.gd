@@ -17,6 +17,7 @@ signal finished()                      # 构筑完成 / 结束调整
 signal adjusted(unit_idx, unit)        # 调整模式下确认了一张卡的修改
 
 var m
+var main_root: Control
 var first_card := false     # 开局的第一张牌：自动打开编辑器，拼完并起名才能继续
 var mode := "initial"
 var wd: Dictionary
@@ -48,6 +49,7 @@ func _open_first_card() -> void:
 		return
 	var Pet = load("res://scripts/ui/pet.gd")
 	Pet.chat("先拼一张属于你自己的牌吧！用词拼出一句话，再给你的随从起个名字。", "talk", 8.0)
+	main_root.modulate.a = 0.0      # 从零开始：先只有这一张空白的牌，五张卡的总览等拼完再翻出来
 	_open_editor(0)
 
 func _build() -> void:
@@ -57,6 +59,7 @@ func _build() -> void:
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var root := MarginContainer.new()
+	main_root = root
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left", "right", "top", "bottom"]:
 		root.add_theme_constant_override("margin_" + side, 24)
@@ -372,10 +375,13 @@ func _open_editor(i: int) -> void:
 	overlay_layer.add_child(pop)
 	pop.require_name = first_card and mode == "initial" and i == 0 and _deck_has_no_skill()
 	pop.open(_deck(), i, m.pools[0], mode)
-	pop.cancelled.connect(func(): _close_popup(pop))
+	pop.cancelled.connect(func():
+		_close_popup(pop)
+		_reveal_board())
 	pop.committed.connect(func(unit):
 		Tut.fire("committed")
 		_close_popup(pop)
+		_reveal_board()
 		if mode == "initial":
 			wd.units[i] = unit
 			D.rename_skills(wd)
@@ -383,6 +389,12 @@ func _open_editor(i: int) -> void:
 		else:
 			adjusted.emit(i, unit))
 	popup = pop
+
+# 第一张牌拼完：五张卡的总览从暗处翻出来
+func _reveal_board() -> void:
+	if main_root != null and main_root.modulate.a < 1.0:
+		var tw := create_tween()
+		tw.tween_property(main_root, "modulate:a", 1.0, 0.7)
 
 func _deck_has_no_skill() -> bool:
 	for u in _deck().units:

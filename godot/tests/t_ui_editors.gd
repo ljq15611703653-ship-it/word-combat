@@ -96,5 +96,25 @@ func _init() -> void:
 	check(not committed_unit.is_empty() and committed_unit.skills.size() == 1, "点确定后（%d 帧）技能写进卡" % waited)
 	if not committed_unit.is_empty():
 		check(committed_unit.skills[0].text.find("11 点伤害") >= 0, "写进卡的技能：" + str(committed_unit.skills[0].text))
+	# 9. 模糊匹配模式：随便扔词进托盘，电脑给出能拼的句子，并能“采用”
+	cp.setup(pool, [])
+	cp.toggle_fuzzy()
+	check(cp.fuzzy_mode and cp.tray_box.visible and not cp.rail_box.visible, "切到模糊匹配模式后出现托盘")
+	for w in ["造成", "伤害", "自身"]:
+		cp.add_word(w)
+	check(cp.tray.size() == 3 and cp.tokens.is_empty(), "词进了托盘（不按语法顺序也行）")
+	var waited2 := 0
+	while cp.fuzzy_box.get_child_count() < 2 and waited2 < 600:
+		await process_frame
+		waited2 += 1
+	check(cp.fuzzy_box.get_child_count() >= 2, "电脑给出了分析结果（%d 帧）：%s" % [waited2, cp.fuzzy_msg.text])
+	var f = load("res://scripts/compose/fuzzy.gd").new()
+	var r: Dictionary = await f.solve(["造成", "伤害", "自身"])
+	check(not r.exact.is_empty() and r.exact[0].text.find("对自身造成") >= 0, "托盘里 造成/伤害/自身 刚好能拼：" + str(r.exact[0].text if not r.exact.is_empty() else ""))
+	var r2: Dictionary = await f.solve(["减伤", "友方", "随从"])
+	check(not r2.completed.is_empty() and not r2.completed[0].added.is_empty(), "减伤+友方+随从 差一张目标词：补 " + str(r2.completed[0].added if not r2.completed.is_empty() else []))
+	if not r.exact.is_empty():
+		cp.adopt(r.exact[0].tokens)
+		check(not cp.fuzzy_mode and cp.is_complete(), "“采用这一句”后回到拼句台并成句")
 	print("编辑器测试完成，失败数 ", fails)
 	quit(fails)

@@ -23,7 +23,7 @@ const EVENTS := [["即将受到伤害", "pending_dmg"], ["受到伤害", "damage
 	["失去生命", "lost"], ["被选为目标", "targeted"], ["发动技能", "cast"], ["技能命中", "hit"], ["状态施加", "status_applied"],
 	["状态结束", "status_end"], ["倒下", "down"], ["队友倒下", "ally_down"], ["敌人倒下", "enemy_down"], ["回合结束", "round_end"]]
 const DELAYABLE := ["dmg", "heal", "mit", "status", "remove", "watch", "time", "swap"]
-const MAX_NODES := 5
+const MAX_NODES := 6
 
 var toks: Array = []
 var n := 0
@@ -246,13 +246,22 @@ func _body(i: int, c: Dictionary, allow_prev: bool) -> Array:
 			for gp in gaps:
 				for ch in p_node(gp.i, c, ["dmg", "heal", "mit", "status", "split", "chain", "copy"]):
 					out.append({"i": ch.i, "v": G.until_node(cd.v, ch.v, int(gp.gap))})
+	# 若 条件 效果 [否则 效果]；若有 阵营 随从 个数 效果 [否则 效果]（“若有”自己就是条件，前面不再加“若”）
+	var conds: Array = []
 	if _w(i, "若"):
-		for cd2 in p_cond(i + 1, c):
-			for th2 in p_node(cd2.i, c):
-				out.append({"i": th2.i, "v": G.if_node(cd2.v, th2.v)})
-				if _w(th2.i, "否则"):
-					for el in p_node(th2.i + 1, c):
-						out.append({"i": el.i, "v": G.if_node(cd2.v, th2.v, el.v)})
+		conds.append_array(p_cond(i + 1, c))
+	if _w(i, "若有"):
+		for s0 in _side(i + 1):
+			if _w(s0.i, "随从"):
+				var an := _num(s0.i + 1, "alive")
+				if an >= 1:
+					conds.append({"i": s0.i + 2, "v": G.alive_cond(s0.v, an)})
+	for cd2 in conds:
+		for th2 in p_node(cd2.i, c):
+			out.append({"i": th2.i, "v": G.if_node(cd2.v, th2.v)})
+			if _w(th2.i, "否则"):
+				for el in p_node(th2.i + 1, c):
+					out.append({"i": el.i, "v": G.if_node(cd2.v, th2.v, el.v)})
 	if _w(i, "择一"):
 		for a in p_node(i + 1, c):
 			for b in p_node(a.i, c):
@@ -663,8 +672,11 @@ static func node_tokens(node: Dictionary) -> Array:
 				out.append_array([W("间隔"), Num(int(node.gap))])
 			out.append_array(node_tokens(node.child))
 		"if":
-			out.append(W("若"))
-			out.append_array(cond_tokens(node.cond))
+			if node.cond.has("alive"):
+				out.append_array([W("若有"), W(G.SIDE_WORD[node.cond.alive.side]), W("随从"), Num(int(node.cond.alive.n))])
+			else:
+				out.append(W("若"))
+				out.append_array(cond_tokens(node.cond))
 			out.append_array(node_tokens(node.then))
 			if node.has("else"):
 				out.append(W("否则"))

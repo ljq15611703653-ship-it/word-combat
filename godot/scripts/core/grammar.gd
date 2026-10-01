@@ -243,7 +243,12 @@ static func has_cond(target: Dictionary, status_name: String) -> Dictionary:
 static func cmp_cond(left: Dictionary, cmp: String, right: Dictionary) -> Dictionary:
 	return {"left": left, "cmp": cmp, "right": right}
 
+static func alive_cond(side: String, n: int) -> Dictionary:
+	return {"alive": {"side": side, "n": n}}
+
 static func cond_words(c: Dictionary) -> Array:
+	if c.has("alive"):
+		return ["若有", SIDE_WORD[c.alive.side], "随从"]
 	if c.has("has"):
 		var w: Array = ["已生效", c.has.status]
 		w.append_array(target_words(c.has.target))
@@ -253,11 +258,15 @@ static func cond_words(c: Dictionary) -> Array:
 	return out
 
 static func cond_nums(c: Dictionary) -> int:
+	if c.has("alive"):
+		return int(c.alive.n)
 	if c.has("has"):
 		return 0
 	return value_nums(c.left) + value_nums(c.right)
 
 static func cond_text(c: Dictionary) -> String:
+	if c.has("alive"):
+		return "%s存活的随从至少有 %s 个" % [SIDE_TEXT.get(c.alive.side, "某某"), "某某" if int(c.alive.n) < 0 else str(int(c.alive.n))]
 	if not c.has("has") and not (c.has("left") and c.has("right")):
 		return "某某"
 	if c.has("has"):
@@ -265,6 +274,10 @@ static func cond_text(c: Dictionary) -> String:
 	return "%s %s %s" % [value_text(c.left), "低于" if c.get("cmp", "") == "lt" else ("不低于" if c.get("cmp", "") == "ge" else "某某"), value_text(c.right)]
 
 static func cond_check(c: Dictionary, out: Array, ctx: String) -> void:
+	if c.has("alive"):
+		if int(c.alive.n) < 1 or int(c.alive.n) > 5:
+			out.append("“若有”的个数须在1到5")
+		return
 	if c.has("has"):
 		if not (c.has.status in STATUSES):
 			out.append("未知状态：" + str(c.has.status))
@@ -390,7 +403,8 @@ static func _words_core(node: Dictionary) -> Array:
 			if int(node.get("gap", 0)) > 0:
 				w.append("间隔")
 		"if":
-			w.append("若")
+			if not node.cond.has("alive"):
+				w.append("若")
 			w.append_array(cond_words(node.cond))
 			w.append_array(words_of(node.then))
 			if node.has("else"):

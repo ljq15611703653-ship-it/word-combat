@@ -55,7 +55,7 @@ var _last_ap_sig := ""
 var _committing := false
 
 func _unhandled_key_input(ev: InputEvent) -> void:
-	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and visible and not _committing:
+	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and visible and not _committing and not require_name:
 		get_viewport().set_input_as_handled()
 		cancelled.emit()
 
@@ -277,6 +277,7 @@ func _build() -> void:
 	cancel.pressed.connect(func():
 		if not _committing:
 			cancelled.emit())
+	cancel.visible = not require_name      # 开局第一张牌：不能取消，必须拼出来
 	foot.add_child(cancel)
 	btn_commit = K.button("确定，拼好了", "primary", 20)
 	btn_commit.custom_minimum_size = Vector2(170, 44)
