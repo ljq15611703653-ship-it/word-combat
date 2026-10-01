@@ -78,6 +78,7 @@ func _init() -> void:
 		check(nm != "" and nm.length() <= 6, "模板 %s 随机名 %s" % [t.id, nm])
 	var uname: String = Namer.minion_name({"glyph": "剑", "skills": [R.build("atk1", {})]}, nrng)
 	check(uname != "", "随从随机名 " + uname)
+	popup.tab = "simple"
 	popup._select_template("atk1", {})
 	popup.sel_name = "我的绝招"
 	popup.slot = 0

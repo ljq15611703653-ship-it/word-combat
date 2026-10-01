@@ -23,12 +23,13 @@ var unit_idx := 0
 var work: Dictionary          # 正在编辑的这张卡
 var slot := 0
 var mode := "initial"
-var tab := "simple"
+var tab := "complex"
 
 var hp_label: Label
 var kw_option: OptionButton
 var slot_box: VBoxContainer
 var info_box: VBoxContainer
+var tab_hint: Label
 var tab_holder: Control
 var simple_root: Control
 var complex_root
@@ -193,16 +194,21 @@ func _build() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(right)
 	var tabs := K.hbox(8)
-	var b_simple := K.button("简单版 · 选招式填空", "primary", 18)
-	var b_complex := K.button("复杂版 · 自由拼词", "normal", 18)
+	var b_complex := K.button("自由拼词（自己组合）", "primary", 18)
+	var b_simple := K.button("备选模板（现成的招式）", "normal", 18)
+	Tut.tag(b_simple, "e:tab_simple")
 	b_simple.pressed.connect(func():
 		tab = "simple"
-		_show_tab(b_simple, b_complex))
+		_show_tab(b_simple, b_complex)
+		Tut.fire("tab:simple"))
 	b_complex.pressed.connect(func():
 		tab = "complex"
 		_show_tab(b_simple, b_complex))
-	tabs.add_child(b_simple)
 	tabs.add_child(b_complex)
+	tabs.add_child(b_simple)
+	tab_hint = K.label("", 14, K.MUTED)
+	tabs.add_child(tab_hint)
+	Tut.tag(tabs, "e:tabs")
 	right.add_child(tabs)
 	tab_holder = Control.new()
 	tab_holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -214,7 +220,8 @@ func _build() -> void:
 	complex_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	complex_root.changed.connect(_on_complex_changed)
 	tab_holder.add_child(complex_root)
-	complex_root.visible = false
+	Tut.tag(complex_root, "e:complex")
+	_show_tab(b_simple, b_complex)
 	# 底栏
 	var foot := K.hbox(12)
 	info_box = K.vbox(2)
@@ -242,6 +249,7 @@ func _show_tab(b_simple: Button, b_complex: Button) -> void:
 		b.add_theme_color_override("font_hover_color", Color("20180a") if active else K.TEXT)
 	simple_root.visible = tab == "simple"
 	complex_root.visible = tab == "complex"
+	tab_hint.text = "你可以像搭积木一样自己组合效果；没灵感就看看右边的「备选模板」。" if tab == "complex" else "这些只是现成的备选招式，省事用的；想要更自由的组合，回到「自由拼词」。"
 	if tab == "complex":
 		complex_root.load_skill(_current_skill(), avail_for_slot(), _points_other())
 	else:

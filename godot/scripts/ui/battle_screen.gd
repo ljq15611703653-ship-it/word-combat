@@ -12,6 +12,7 @@ const DeckView = preload("res://scripts/ui/deck_view.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Preview = preload("res://scripts/game/preview.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
 const Table3D = preload("res://scripts/view3d/table3d.gd")
 
@@ -318,13 +319,43 @@ func _find_in(n: Dictionary, id: int) -> Dictionary:
 func _rebuild_hand() -> void:
 	K.clear_children(hand_row)
 	var ap: int = E.available_ap(m.st, 0, m.declared[0]) if m.phase == "declare" else int(m.st.sides[0].ap)
+	var first_card := true
 	for u in m.st.sides[0].units:
+		if u.skill_ids.is_empty():
+			continue
+		# 每个随从一组：上面是“谁”，下面是这个随从自己的技能
+		var owns_sel := false
+		for sid in u.skill_ids:
+			if int(sid) == sel_sid:
+				owns_sel = true
+		var grp := K.panel(Color("171e33"), K.GREEN if owns_sel else K.BLUE.darkened(0.25), 14, 3 if owns_sel else 2, 6)
+		var gv := K.vbox(4)
+		grp.add_child(gv)
+		var head := K.hbox(6)
+		head.add_child(Icon.make(str(u.get("glyph", "")), 30, Color("c9b27a")))
+		head.add_child(K.label(u.name, 18, K.TEXT))
+		head.add_child(K.chip("生命 %d/%d" % [int(u.hp), int(u.max_hp)], Color("2c5c44"), 13))
+		if u.down_round != -1:
+			head.add_child(K.chip("修整中", Color("5a3a3f"), 13))
+		gv.add_child(head)
+		var row := K.hbox(6)
 		for sid in u.skill_ids:
 			var sk := E.skill_of(m.st, sid)
 			var hc := _skill_card(sk, u, ap)
-			hand_row.add_child(hc)
-			Tut.tag(hc, "b:hand")
+			row.add_child(hc)
+			if first_card:
+				Tut.tag(hc, "b:hand")
+				first_card = false
 			Tut.tag(hc, "b:hand:" + str(sk.get("kind_tag", "atk")))
+		gv.add_child(row)
+		var uid: int = int(u.uid)
+		grp.mouse_entered.connect(func():
+			if cards.has(uid) and cards[uid].highlight.a <= 0.0:
+				cards[uid].set_highlight(K.GREEN))
+		grp.mouse_exited.connect(func():
+			if cards.has(uid) and cards[uid].highlight == K.GREEN and E.host_of(m.st, sel_sid) != uid:
+				cards[uid].set_highlight(Color(0, 0, 0, 0)))
+		hand_row.add_child(grp)
 	if hand_row.get_child_count() == 0:
 		hand_row.add_child(K.label("你还没有任何技能。", 20, K.MUTED))
 
@@ -474,6 +505,8 @@ func _select_skill(sid: int) -> void:
 	timeline.queue_redraw()
 	_rebuild_hand()
 	_advance_picking()
+	if cards.has(host):
+		cards[host].set_highlight(K.GREEN)
 	_render_action_panel()
 	Tut.fire("select_skill")
 
