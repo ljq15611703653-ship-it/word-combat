@@ -1,5 +1,5 @@
 extends Control
-# 抽词界面：两袋各20词，先手先选。
+# 抽词界面：两袋各25词，先手先选。
 
 const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")

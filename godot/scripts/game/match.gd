@@ -1,7 +1,7 @@
 extends RefCounted
 # 一局对战的流程控制（与界面无关）。人类默认是0号位；两边都可设为电脑，用于批量模拟。
 #
-# 每轮：开始（行动点/复出）→ 抽词（两袋，先手先选）→ 调整（各两次，交替、公开）→ 宣告（先手锁定→后手应对）→ 时间轴结算。
+# 每轮：开始（行动点）→ 抽词（两袋各25词，先手先选）→ 调整（各三次，交替、公开）→ 宣告（先手宣告完→后手宣告）→ 时间轴结算。
 
 const E = preload("res://scripts/core/engine.gd")
 const G = preload("res://scripts/core/grammar.gd")
@@ -54,7 +54,7 @@ func start(human0: bool = true, seed_val: int = -1, human1: bool = false) -> voi
 	winner = -1
 	log_lines = []
 	rounds_played = 0
-	say("对局开始。双方各得12个起始词，先完成构筑。")
+	say("对局开始。双方各得18个起始词，先完成构筑。")
 
 func say(t: String) -> void:
 	log_lines.append(t)
@@ -100,7 +100,7 @@ func pick_bag(side: int, idx: int) -> void:
 		pools[1 - side][w] = int(pools[1 - side].get(w, 0)) + 1
 	say("%s 选择了%s袋。" % ["你" if human[side] else "对手", "左" if idx == 0 else "右"])
 	var f := E.first_side(st)
-	adjust_steps = [f, 1 - f, f, 1 - f]
+	adjust_steps = [f, 1 - f, f, 1 - f, f, 1 - f]
 	adjust_idx = 0
 	phase = "adjust"
 

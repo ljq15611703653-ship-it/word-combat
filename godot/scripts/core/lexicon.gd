@@ -61,8 +61,8 @@ static func implemented() -> Array:
 			out.append(n)
 	return out
 
-# 词袋：每袋20词，基础55% 进阶40% 奇术5%，同类内按权重；至少10个基础词。
-static func draw_bag(rng: RandomNumberGenerator, size: int = 20) -> Array:
+# 词袋：每袋25词，基础40% 进阶45% 奇术15%，同类内按权重；至少10个基础词（宁可不平衡，也不要平庸）。
+static func draw_bag(rng: RandomNumberGenerator, size: int = 25) -> Array:
 	load_all()
 	var pools := {"基础": [], "进阶": [], "奇术": []}
 	for n in order:
@@ -77,7 +77,7 @@ static func draw_bag(rng: RandomNumberGenerator, size: int = 20) -> Array:
 		bag.clear()
 		for i in size:
 			var r := rng.randf()
-			var key := "基础" if r < 0.55 else ("进阶" if r < 0.95 else "奇术")
+			var key := "基础" if r < 0.40 else ("进阶" if r < 0.85 else "奇术")
 			var pool: Array = pools[key]
 			bag.append(pool[rng.randi() % pool.size()])
 		var basics := 0
@@ -85,7 +85,7 @@ static func draw_bag(rng: RandomNumberGenerator, size: int = 20) -> Array:
 			if words[n].rarity == "基础":
 				basics += 1
 		guard += 1
-		if basics >= size / 2 or guard > 50:
+		if basics >= size * 2 / 5 or guard > 50:
 			break
 	bag.sort_custom(func(a, b): return words[a].id < words[b].id)
 	return bag
@@ -113,6 +113,6 @@ static func opening_words(rng: RandomNumberGenerator) -> Array:
 		if w.impl and w.rarity == "基础":
 			for i in int(w.weight):
 				basics.append(n)
-	while out.size() < 12:
+	while out.size() < 18:
 		out.append(basics[rng.randi() % basics.size()])
 	return out
