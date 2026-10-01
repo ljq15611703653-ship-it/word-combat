@@ -10,6 +10,7 @@ const MinionCard = preload("res://scripts/ui/minion_card.gd")
 const Timeline = preload("res://scripts/ui/timeline.gd")
 const DeckView = preload("res://scripts/ui/deck_view.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
+const Table3D = preload("res://scripts/view3d/table3d.gd")
 
 signal next_round()
 signal quit_to_title()
@@ -45,6 +46,9 @@ var disp_score := [0, 0]
 var skip_anim := false
 var _built := false
 var auto_human := false
+static var use_3d := true
+var table: Node3D
+var table_box: Control
 
 func begin(match_obj) -> void:
 	m = match_obj
@@ -118,9 +122,24 @@ func _build() -> void:
 	quit.pressed.connect(func(): quit_to_title.emit())
 	top.add_child(quit)
 	v.add_child(top)
+	# 3D 牌桌（占据两排随从的位置；2D 排保留为后备）
+	if use_3d:
+		table_box = SubViewportContainer.new()
+		table_box.stretch = true
+		table_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		table_box.custom_minimum_size = Vector2(0, 330)
+		var svp := SubViewport.new()
+		svp.msaa_3d = Viewport.MSAA_4X
+		svp.handle_input_locally = true
+		svp.physics_object_picking = false
+		table_box.add_child(svp)
+		table = Table3D.new()
+		svp.add_child(table)
+		v.add_child(table_box)
 	# 敌方排
 	enemy_row = K.hbox(10)
 	enemy_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	enemy_row.visible = not use_3d
 	v.add_child(enemy_row)
 	# 时间轴 + 横幅
 	var mid := PanelContainer.new()
@@ -135,6 +154,7 @@ func _build() -> void:
 	# 我方排
 	my_row = K.hbox(10)
 	my_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	my_row.visible = not use_3d
 	v.add_child(my_row)
 	# 底部：日志 | 手牌 | 宣告面板
 	var bottom := K.hbox(10)
@@ -207,6 +227,12 @@ func _rebuild_rows() -> void:
 	K.clear_children(enemy_row)
 	K.clear_children(my_row)
 	cards.clear()
+	if use_3d:
+		table.setup_state(m.st, _skills_of)
+		for uid in table.minions:
+			cards[uid] = table.minions[uid]
+			cards[uid].clicked.connect(_on_card_clicked)
+		return
 	for s in 2:
 		var row := enemy_row if s == 1 else my_row
 		for u in m.st.sides[s].units:
@@ -224,6 +250,9 @@ func _update_hud() -> void:
 	if m.phase == "declare":
 		a0 = E.available_ap(m.st, 0, m.declared[0])
 		a1 = E.available_ap(m.st, 1, m.declared[1])
+	if use_3d and table != null:
+		table.set_ap(0, a0)
+		table.set_ap(1, a1)
 	ap_label.text = "行动点 你 %d/%d · 对手 %d/%d" % [a0, int(m.st.rules.ap_cap), a1, int(m.st.rules.ap_cap)]
 
 func _update_marks() -> void:
@@ -851,6 +880,11 @@ func _line_fx(from_uid: int, to_uid: int, col: Color) -> void:
 	var b = _card(to_uid)
 	if a == null or b == null or a == b:
 		return
+	if use_3d:
+		a.lunge(b.global_position)
+		b.recoil()
+		_bolt3d(a, b, col)
+		return
 	var l := Line2D.new()
 	l.width = 6.0
 	l.default_color = col
@@ -861,6 +895,25 @@ func _line_fx(from_uid: int, to_uid: int, col: Color) -> void:
 	var t := create_tween()
 	t.tween_property(l, "modulate:a", 0.0, 0.5 / speed).from(1.0)
 	t.tween_callback(l.queue_free)
+
+# 3D：一颗光弹从出手者飞向目标
+func _bolt3d(a: Node3D, b: Node3D, col: Color) -> void:
+	var orb := MeshInstance3D.new()
+	var sp := SphereMesh.new()
+	sp.radius = 0.03
+	sp.height = 0.06
+	orb.mesh = sp
+	var mt := StandardMaterial3D.new()
+	mt.albedo_color = col
+	mt.emission_enabled = true
+	mt.emission = col
+	mt.emission_energy_multiplier = 3.0
+	orb.material_override = mt
+	table.add_child(orb)
+	orb.global_position = a.global_position + Vector3(0, 0.2, 0)
+	var t := create_tween()
+	t.tween_property(orb, "global_position", b.global_position + Vector3(0, 0.15, 0), 0.28 / speed).set_trans(Tween.TRANS_QUAD)
+	t.tween_callback(orb.queue_free)
 
 func toast(text: String, col: Color) -> void:
 	toast_label.text = text

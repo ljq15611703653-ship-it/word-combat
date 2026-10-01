@@ -19,6 +19,8 @@ var screen: Control
 var battle_screen
 var auto := false
 var driver_on := false
+var _last_adj_left := -1
+var _last_adj_round := -1
 var slow := false
 
 func _ready() -> void:
@@ -43,6 +45,8 @@ func _ready() -> void:
 			auto = true
 		if a == "--play":
 			driver_on = true
+		if a == "--2d":
+			BattleScreen.use_3d = false
 		if a == "--slow":
 			slow = true
 	if demo == "" and driver_on:
@@ -88,6 +92,12 @@ func _drive(s: Control) -> void:
 			var R = load("res://scripts/core/recipes.gd")
 			var G = load("res://scripts/core/grammar.gd")
 			var done := false
+			var left_now: int = m.adjust_left(0)
+			if left_now == _last_adj_left and m.st.round == _last_adj_round:
+				s.finished.emit() # 上一次尝试没有消耗调整次数：不再重复
+				return
+			_last_adj_left = left_now
+			_last_adj_round = int(m.st.round)
 			if m.adjust_side() == 0 and m.adjust_left(0) > 0:
 				s._open_editor(1)
 				await get_tree().create_timer(0.3).timeout
@@ -300,6 +310,8 @@ func _run_demo(demo: String) -> void:
 			pp.complex_root.skill_name = "嵌套示例"
 			pp.complex_root.name_edit.text = "嵌套示例"
 			pp.complex_root._rerender()
+		"minions3d":
+			_demo_minions3d()
 		"clicktest":
 			await _click_test()
 		"clicktest2":
@@ -587,6 +599,57 @@ func _click_test_editor() -> void:
 		log.call("进入抽词", screen is DraftScreen and m.phase == "draft")
 	print("【编辑器点击测试结束】", "全部通过" if okf[0] else "有失败")
 	get_tree().quit(0 if okf[0] else 1)
+
+# ---- 3D 随从外观演示：同一排五个随从，装不同的关键词与技能
+func _demo_minions3d() -> void:
+	var R = load("res://scripts/core/recipes.gd")
+	var MB = load("res://scripts/view3d/minion_builder.gd")
+	var defs := [
+		{"glyph": "剑", "kw": "首挡", "hp": 14, "sk": [["atk1", {"dbl": 1, "rep": 1}]]},
+		{"glyph": "盾", "kw": "不屈", "hp": 20, "sk": [["mit", {}], ["redirect", {}]]},
+		{"glyph": "咒", "kw": "回春", "hp": 10, "sk": [["heal", {}], ["time", {"op": "interrupt"}]]},
+		{"glyph": "弓", "kw": "回击", "hp": 12, "sk": [["atkA", {"dbl": 1}]]},
+		{"glyph": "魂", "kw": "免疫升华", "hp": 8, "sk": [["tax", {}], ["status", {"st": "沉默"}]]},
+	]
+	var world := Node3D.new()
+	add_child(world)
+	var env := WorldEnvironment.new()
+	var e := Environment.new()
+	e.background_mode = Environment.BG_COLOR
+	e.background_color = Color("14161f")
+	e.ambient_light_color = Color("8890b0")
+	e.ambient_light_energy = 0.7
+	env.environment = e
+	world.add_child(env)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-50, 25, 0)
+	sun.light_energy = 1.3
+	world.add_child(sun)
+	var floor_mesh := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(2.0, 0.6)
+	floor_mesh.mesh = pm
+	var fm := StandardMaterial3D.new()
+	fm.albedo_color = Color("1f4a38")
+	floor_mesh.material_override = fm
+	world.add_child(floor_mesh)
+	for i in defs.size():
+		var d: Dictionary = defs[i]
+		var skills: Array = []
+		for pair in d.sk:
+			skills.append(R.build(pair[0], pair[1]))
+		var unit := {"glyph": d.glyph, "kw": d.kw, "max_hp": d.hp}
+		var node: Node3D = MB.build(unit, skills)
+		node.position = Vector3((i - 2) * 0.22, 0.0, 0.0)
+		world.add_child(node)
+		if i == 3:
+			MB.apply_status_fx(node, [{"name": "狂振"}, {"name": "护盾"}])
+	var cam := Camera3D.new()
+	cam.position = Vector3(0, 0.28, 0.62)
+	cam.rotation_degrees = Vector3(-18, 0, 0)
+	cam.fov = 40
+	cam.current = true
+	world.add_child(cam)
 
 func E_skill(sid: int) -> Dictionary:
 	return load("res://scripts/core/engine.gd").skill_of(m.st, sid)
