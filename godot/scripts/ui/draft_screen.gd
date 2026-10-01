@@ -7,6 +7,7 @@ const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
+const Pet = preload("res://scripts/ui/pet.gd")
 const Coach = preload("res://scripts/core/coach.gd")
 
 signal picked(idx)
@@ -22,6 +23,7 @@ var can_pick := false
 var _ai_idx := -1
 var coach_box: VBoxContainer
 var coach_info: Dictionary = {}
+var plan: Dictionary = {}
 var rec_chips: Array = [null, null]
 var bags3d: Array = [null, null]
 var detail_layer: Control
@@ -49,6 +51,9 @@ func setup(match_obj, ai_idx: int = -1) -> void:
 	v.add_child(info_label)
 	Settings.load_all()
 	coach_info = Coach.analyze_draft(m.pools[0], m.decks[0], m.bags)
+	plan = Coach.draft_plan(m.pools[0], m.decks[0], m.bags, m.public_deck(1))
+	coach_info["pick"] = plan.pick
+	coach_info["reason"] = plan.reason
 	coach_box = K.vbox(4)
 	v.add_child(coach_box)
 	var row := K.hbox(28)
@@ -93,7 +98,15 @@ func setup(match_obj, ai_idx: int = -1) -> void:
 	v.add_child(bottom)
 	_begin()
 	_refresh_coach()
+	if Settings.coach and m.human[_picker] and Pet.inst != null and is_instance_valid(Pet.inst) and not Tut.is_on():
+		Pet.chat("我建议选%s袋。%s" % ["左" if int(plan.pick) == 0 else "右", plan.reason], "talk", 12.0)
 	Tut.fire("screen:draft")
+
+func _bag_summary(i: int) -> String:
+	for o in plan.per_bag[i].options:
+		if o.buildable:
+			return "能拼出【%s】。怎么拼：%s" % [o.name, o.how]
+	return "对你现有的路线帮助不大"
 
 func _bag_line(i: int) -> String:
 	var b: Dictionary = coach_info.per_bag[i]
@@ -133,19 +146,32 @@ func _refresh_coach() -> void:
 	var pick: int = coach_info.pick
 	var mine := pick
 	if m.human[_picker]:
-		col.add_child(K.wrap_label("教练推荐：%s袋 —— %s" % ["左" if pick == 0 else "右", coach_info.reason], 17, K.GREEN))
+		col.add_child(K.wrap_label("小词推荐：%s袋 —— %s" % ["左" if pick == 0 else "右", coach_info.reason], 17, K.GREEN))
 	else:
 		mine = 1 - _ai_idx
-		col.add_child(K.wrap_label("对手先选了%s袋，你拿到%s袋：%s" % [("左" if _ai_idx == 0 else "右"), ("左" if mine == 0 else "右"), _bag_line(mine)], 17, K.GREEN))
-	var two := K.hbox(30)
-	two.add_child(K.wrap_label("左袋 → " + _bag_line(0), 14, K.MUTED))
-	two.add_child(K.wrap_label("右袋 → " + _bag_line(1), 14, K.MUTED))
-	for c in two.get_children():
-		c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(two)
-	if not coach_info.watch.is_empty():
-		col.add_child(K.wrap_label("接下来要留意：" + "；".join(coach_info.watch), 14, K.GOLD))
+		col.add_child(K.wrap_label("对手先选了%s袋，你拿到%s袋：%s" % [("左" if _ai_idx == 0 else "右"), ("左" if mine == 0 else "右"), _bag_summary(mine)], 17, K.GREEN))
 	coach_box.add_child(box)
+
+# 这袋词能拼出的三条备选：激进进攻 / 防御或反制 / 打断控场；写明怎么拼、针对对手什么
+func _options_box(i: int) -> Control:
+	var box := K.vbox(4)
+	var opts: Array = plan.per_bag[i].options
+	for o in opts:
+		var p := K.panel(Color("1f2a26") if o.buildable else Color("23262f"), K.GREEN.darkened(0.3) if o.buildable else K.EDGE, 8, 1, 6)
+		var col := K.vbox(1)
+		p.add_child(col)
+		var head := ("【%s】%s" % [o.school, o.name]) + ("  ← 这袋才拼得出" if o.fresh else "")
+		col.add_child(K.label(head, 15, K.GREEN if o.buildable else K.MUTED))
+		if o.buildable:
+			col.add_child(K.wrap_label("怎么拼：" + str(o.how), 13, K.TEXT))
+			if str(o.note) != "":
+				col.add_child(K.wrap_label("针对：" + str(o.note), 13, K.GOLD))
+		else:
+			col.add_child(K.wrap_label("还差：" + str(o.missing), 13, K.MUTED))
+		box.add_child(p)
+	if opts.is_empty():
+		box.add_child(K.label("这袋对你帮助不大", 14, K.MUTED))
+	return box
 
 func _pool_total() -> int:
 	var n := 0
@@ -184,7 +210,7 @@ func _bag_panel(i: int) -> Control:
 	if rare > 0:
 		head.add_child(K.chip("奇术 %d" % rare, Color("8a6a1f"), 14))
 	head.add_child(K.chip("词价 %d" % price, Color("4a3f20"), 14))
-	var rec := K.chip("教练推荐", Color("2c6a44"), 14)
+	var rec := K.chip("小词推荐", Color("2c6a44"), 14)
 	rec.visible = false
 	head.add_child(rec)
 	rec_chips[i] = rec
@@ -215,8 +241,8 @@ func _bag_panel(i: int) -> Control:
 	b3.hovered.connect(func(on): _hover(i, on))
 	bags3d[i] = b3
 	v.add_child(b3)
-	if Settings.coach and coach_info.has("per_bag"):
-		v.add_child(K.wrap_label("这袋能帮你：" + _bag_line(i), 16, K.GREEN))
+	if Settings.coach and plan.has("per_bag"):
+		v.add_child(_options_box(i))
 	var more := K.button("查看详情（全部 %d 个词）" % bag.size(), "ghost", 15)
 	more.custom_minimum_size = Vector2(0, 32)
 	more.pressed.connect(func(): _show_detail(i))

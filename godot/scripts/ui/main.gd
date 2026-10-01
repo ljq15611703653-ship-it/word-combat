@@ -669,6 +669,13 @@ func _run_demo(demo: String) -> void:
 			_tut_test()
 		"fmtest":
 			_tut_test(true)
+		"draft2":
+			m.start(true, 11, false)
+			m.begin_staged()
+			var uq: Dictionary = m.ai_make_card(0, 0)
+			m.commit_card(0, 0, uq)
+			m.after_reveal()
+			_show_draft()
 		"card2":
 			m.start(true, 11, false)
 			m.begin_staged()

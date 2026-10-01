@@ -189,3 +189,93 @@ static func describe_build(pool: Dictionary, deck: Dictionary) -> Array:
 	for c in info.chase.slice(0, 2):
 		lines.append("再凑 %d 个词就能做【%s】（%s）：%s" % [c.n, c.name, c.role, _missing_text(c.missing)])
 	return lines
+
+# ------------------------------------------------------------ 抽词辅助轮 v2：每袋三条备选 + 推荐 + 针对
+const SCHOOL_LABEL := {"攻": "激进进攻", "守": "稳健防御", "反": "反制埋伏", "控": "打断控场"}
+
+# 对手已公开的牌：关键词、技能类型、血少的卡
+static func foe_profile(foe: Dictionary) -> Dictionary:
+	var kws: Array = []
+	var tags := {}
+	var low: Array = []
+	var names: Array = []
+	for u in foe.get("units", []):
+		if str(u.get("kw", "")) != "":
+			kws.append(str(u.kw))
+		if int(u.max_hp) <= 8 and not u.skills.is_empty():
+			low.append(str(u.get("name", "")))
+		for sk in u.get("skills", []):
+			var t := str(sk.get("kind_tag", "atk"))
+			tags[t] = int(tags.get(t, 0)) + 1
+			if "沉默" in sk.words or "打断" in sk.words:
+				tags["ctl"] = int(tags.get("ctl", 0)) + 1
+	return {"kws": kws, "tags": tags, "low": low}
+
+# 这条路线针对对手已亮出的牌有什么用：返回 {bonus, note}
+static func _relevance(a: Dictionary, prof: Dictionary) -> Dictionary:
+	var params: Dictionary = a.params
+	var tid: String = str(a.tid)
+	var tags: Dictionary = prof.tags
+	if "首挡" in prof.kws and int(params.get("rep", 0)) > 0:
+		return {"bonus": 2.2, "note": "对手有带【首挡】的卡：多段攻击的第二下能打进去，首挡只能挡第一下"}
+	if (int(tags.get("heal", 0)) > 0 or int(tags.get("def", 0)) > 0) and str(a.role) == "控":
+		return {"bonus": 1.6, "note": "对手会治疗/上护盾：打断或沉默能让它出不了招"}
+	if int(tags.get("trap", 0)) > 0 and (tid == "remove" or (tid == "time" and str(params.get("op", "")) == "interrupt")):
+		return {"bonus": 1.6, "note": "对手布了埋伏：驱散或打断能提前拆掉它"}
+	if int(tags.get("atk", 0)) >= 2 and str(a.role) in ["守", "反"]:
+		return {"bonus": 1.3, "note": "对手进攻型卡很多：减伤、改道、反噬都能克制它"}
+	if not prof.low.is_empty() and tid in ["atk1", "chase"]:
+		return {"bonus": 1.3, "note": "对手有血很少的卡（%s）：单点或追击能直接斩杀" % str(prof.low[0])}
+	return {"bonus": 0.0, "note": ""}
+
+static func _how_text(sk: Dictionary) -> String:
+	var S = load("res://scripts/compose/sentence.gd")
+	var parts: Array = []
+	for t in S.tokens_of_skill(sk.nodes):
+		parts.append("〔数字〕" if str(t.t) == "N" else str(t.v))
+	return " ".join(parts)
+
+# 每袋三条备选（进攻 / 防御或反制 / 打断控场），再推荐一袋
+static func draft_plan(pool: Dictionary, deck: Dictionary, bags: Array, foe: Dictionary) -> Dictionary:
+	var avail := free_words(pool, deck)
+	var base := route_status(avail)
+	var prof := foe_profile(foe)
+	var per: Array = []
+	for bag in bags:
+		var after := route_status(_bag_free(avail, bag))
+		var opts: Array = []
+		var score := 0.0
+		for slot in [["攻"], ["守", "反"], ["控"]]:
+			var best: Dictionary = {}
+			var best_sc := -999.0
+			for i in after.size():
+				var a: Dictionary = after[i]
+				if not (str(a.role) in slot):
+					continue
+				var rel := _relevance(a, prof)
+				var buildable: bool = int(a.n) == 0
+				var fresh: bool = buildable and int(base[i].n) > 0
+				var sc: float = float(a.w) + float(rel.bonus) - (0.9 if str(a.role) == "反" and float(rel.bonus) <= 0.0 else 0.0) + (1.2 if fresh else 0.0) - (0.0 if buildable else 2.0 + float(a.n) * 0.7)
+				if sc > best_sc:
+					best_sc = sc
+					best = {"school": SCHOOL_LABEL[str(slot[0])] if slot.size() == 1 else ("稳健防御" if str(a.role) == "守" else "反制埋伏"),
+						"name": a.name, "desc": a.desc, "buildable": buildable, "fresh": fresh, "n": int(a.n),
+						"missing": _missing_text(a.missing), "note": rel.note, "score": sc,
+						"text": str(a.skill.text), "how": _how_text(a.skill)}
+			if not best.is_empty():
+				opts.append(best)
+				if best.buildable:
+					score += float(best.score)
+		per.append({"options": opts, "score": score})
+	var pick := 0 if per[0].score >= per[1].score else 1
+	var win: Dictionary = per[pick]
+	var top: Dictionary = {}
+	for o in win.options:
+		if o.buildable and (top.is_empty() or o.score > top.score):
+			top = o
+	var reason := "两袋都不太能拼出成型的招，选词更多、更基础的一袋稳妥"
+	if not top.is_empty():
+		reason = "拿这袋能拼出【%s】（%s）。怎么拼：%s" % [top.name, top.desc, top.how]
+		if top.note != "":
+			reason += "。针对：" + str(top.note)
+	return {"pick": pick, "per_bag": per, "reason": reason, "top": top}
