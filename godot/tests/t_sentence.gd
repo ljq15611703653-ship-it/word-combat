@@ -16,7 +16,7 @@ func norm(x):
 	if x is Dictionary:
 		var o := {}
 		for k in x:
-			if k in ["id", "_h"]:
+			if k in ["id", "_h", "slot"]:
 				continue
 			if k == "observe" and x.get("kind", "") == "watch" and str(x.get("event", "")) in G.NO_OBSERVE:
 				continue   # 队友倒下/回合结束这类事件不看观察对象
@@ -71,16 +71,26 @@ func check_skill(label: String, sk: Dictionary) -> void:
 
 # ---------------------------------------------------------------- 随机树（覆盖全部节点种类）
 func rt(side_pref := "") -> Dictionary:
-	var o: Array = pick([["self", "self"], ["choose", "enemy"], ["choose", "ally"], ["all", "enemy"], ["all", "ally"], ["each", "enemy"], ["lowest", "enemy"], ["highest", "ally"], ["first", "enemy"], ["last", "enemy"], ["random", "enemy"], ["other", "ally"]])
+	var o: Array = pick([["self", "self"], ["choose", "enemy"], ["choose", "ally"], ["choose", "enemy"], ["choose", "ally"], ["lowest", "enemy"], ["highest", "ally"], ["first", "enemy"], ["last", "enemy"], ["random", "enemy"], ["other", "ally"]])
+	if o[0] == "choose" and rng.randf() < 0.4:
+		return G.T("choose", o[1], {"n": rng.randi_range(2, G.MAX_PICK)})
 	return G.T(o[0], o[1])
 
 func rv(depth := 0, ctx := "") -> Dictionary:
 	var r := rng.randf()
 	if r < 0.6 or depth > 1:
 		return G.N(rng.randi_range(1, 30))
-	if r < 0.8:
-		return G.REF(pick(["cur_hp", "max_hp", "lost_hp"]), rt())
-	return G.OP(pick(["max", "min", "sum", "diff"]), rv(depth + 1), rv(depth + 1))
+	if r < 0.72:
+		var rr: Dictionary = rt()
+		if rr.pick == "choose":
+			rr = G.T("choose", rr.side)
+		return G.REF(pick(["cur_hp", "max_hp", "lost_hp"]), rr)
+	if r < 0.78:
+		return G.REF("count", G.T("all", pick(["ally", "enemy"])))
+	var v: Dictionary = G.OP(pick(["max", "min", "sum", "sub", "sum", "sub", "diff"]), rv(depth + 1), rv(depth + 1))
+	if G.value_terms(v) > G.MAX_TERMS:
+		return G.N(rng.randi_range(1, 30))
+	return v
 
 func mods(n: Dictionary, half := true, rep := true) -> Dictionary:
 	if rng.randf() < 0.4:
@@ -97,7 +107,7 @@ func mods(n: Dictionary, half := true, rep := true) -> Dictionary:
 
 func rdh(kind: String, ctx := "", prev := false) -> Dictionary:
 	var v: Dictionary = G.REF("prev") if prev else rv(0, ctx)
-	var tgt: Dictionary = rt() if ctx == "" else pick([G.T("source", "ref"), G.T("all", "enemy"), rt()])
+	var tgt: Dictionary = rt() if ctx == "" else pick([G.T("source", "ref"), G.T("choose", "enemy", {"n": 3}), rt()])
 	var n: Dictionary = G.dmg(tgt, v, {"alt": pick([0, 0, 1])}) if kind == "dmg" else G.heal(tgt, v, {"alt": pick([0, 0, 1])})
 	return mods(n)
 
@@ -116,12 +126,12 @@ func rnode(depth := 0, ctx := "") -> Dictionary:
 		if rng.randf() < 0.3: n["dbl"] = 1
 	elif r < 0.45:
 		var st: String = pick(G.STATUSES)
-		n = G.status(st, rt(), pick([0, 5]), rng.randi_range(5, 30) if st in ["护盾", "沉默"] else 0, rt() if st == "牵连" else {})
+		n = G.status(st, rt(), pick([0, 5]), rng.randi_range(5, 30) if st == "护盾" else 0, rt() if st == "牵连" else {})
 		if rng.randf() < 0.2: n["dbl"] = 1
 	elif r < 0.5:
 		n = G.remove(pick(["限时效果", "状态"]), rt())
 	elif r < 0.56:
-		n = G.time_op(pick(["delay", "advance", "interrupt"]), pick(["ally", "enemy"]), rng.randi_range(2, 19))
+		n = G.time_op(pick(["delay", "advance"]), pick(["ally", "enemy"]), rng.randi_range(2, 19))
 		if rng.randf() < 0.2: n["dbl"] = 1
 	elif r < 0.6:
 		n = G.swap(G.T("choose", "ally"))

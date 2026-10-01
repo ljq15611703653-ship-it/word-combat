@@ -689,6 +689,8 @@ func _run_demo(demo: String) -> void:
 			_tut_test(true)
 		"advtest":
 			await _adv_test()
+		"multitest":
+			await _multi_test()
 		"advmap":
 			_show_adventure_map()
 		"advlevel":
@@ -1094,7 +1096,7 @@ func _demo_minions3d() -> void:
 	var defs := [
 		{"glyph": "剑", "kw": "首挡", "hp": 14, "sk": [["atk1", {"dbl": 1, "rep": 1}]]},
 		{"glyph": "盾", "kw": "不屈", "hp": 20, "sk": [["mit", {}], ["redirect", {}]]},
-		{"glyph": "咒", "kw": "回春", "hp": 10, "sk": [["heal", {}], ["time", {"op": "interrupt"}]]},
+		{"glyph": "咒", "kw": "回春", "hp": 10, "sk": [["heal", {}], ["time", {"op": "delay"}]]},
 		{"glyph": "弓", "kw": "回击", "hp": 12, "sk": [["atkA", {"dbl": 1}]]},
 		{"glyph": "魂", "kw": "免疫升华", "hp": 8, "sk": [["tax", {}], ["status", {"st": "沉默"}]]},
 	]
@@ -1156,7 +1158,15 @@ func _continue_adjust_demo() -> void:
 func _adv_test() -> void:
 	var L = load("res://scripts/adventure/level_eval.gd")
 	var levels: Array = L.load_levels()
-	var ids: Array = [1, 8, 20, 40, 63, 88, 100]
+	var ids: Array = []
+	var playable: Array = []
+	for lv0 in levels:
+		if L.is_playable(lv0):
+			playable.append(int(lv0.id))
+	for pi in range(0, playable.size(), maxi(1, playable.size() / 7)):
+		ids.append(playable[pi])
+	if not (playable[playable.size() - 1] in ids):
+		ids.append(playable[playable.size() - 1])
 	var bad := 0
 	Settings.adv_cleared = []
 	for id in ids:
@@ -1194,4 +1204,52 @@ func _adv_test() -> void:
 		if not ok:
 			bad += 1
 	print("【冒险测试结束】", "全部通过" if bad == 0 else "有失败 %d" % bad)
+	get_tree().quit(0 if bad == 0 else 1)
+
+
+# 选择 N 个目标：战斗界面里连点两个敌人，宣告合法；点同一个人不算
+func _multi_test() -> void:
+	var Sn = load("res://scripts/compose/sentence.gd")
+	var G = load("res://scripts/core/grammar.gd")
+	var E = load("res://scripts/core/engine.gd")
+	var toks: Array = ["选择", "一个", "一个", "敌方", "随从", "造成", 5, "伤害"].map(func(x): return Sn.Num(x) if x is int else Sn.W(str(x)))
+	var an: Dictionary = Sn.analyze(toks)
+	var sk: Dictionary = G.finalize(G.skill("双击", an.skills[0]))
+	m = Match.new()
+	m.start(true, 3, false, 0)
+	m.auto_opening()
+	var dk: Dictionary = D.new_deck()
+	dk.units[0].skills = [sk]
+	m.decks[0] = dk
+	m.decks[1] = D.new_deck()
+	m.st = E.make_state(m.decks, 0, {}, 11)
+	m.begin_round()
+	m.begin_declare()
+	m.st.sides[0].ap = 60
+	_show_battle()
+	await get_tree().create_timer(0.8).timeout
+	var b = battle_screen
+	var sid: int = int(m.st.sides[0].units[0].skill_ids[0])
+	b._select_skill(sid)
+	await get_tree().create_timer(0.2).timeout
+	var bad := 0
+	b._on_card_clicked(b.cards[10])
+	await get_tree().create_timer(0.1).timeout
+	if b.sel_choices.size() != 1:
+		bad += 1
+	b._on_card_clicked(b.cards[10])      # 同一个人再点：不应该被接受
+	await get_tree().create_timer(0.1).timeout
+	if b.sel_choices.size() != 1:
+		print("  [多选测试] 同一个人被重复选中")
+		bad += 1
+	b._on_card_clicked(b.cards[11])
+	await get_tree().create_timer(0.1).timeout
+	if b.sel_choices.size() != 2:
+		print("  [多选测试] 第二个目标没选上 ", b.sel_choices)
+		bad += 1
+	var err: String = E.can_declare(m.st, b._current_act(), [])
+	if err != "":
+		print("  [多选测试] 宣告不合法：", err)
+		bad += 1
+	print("【多选测试结束】", "全部通过" if bad == 0 else "有失败 %d" % bad)
 	get_tree().quit(0 if bad == 0 else 1)

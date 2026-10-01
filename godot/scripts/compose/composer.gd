@@ -26,7 +26,7 @@ const RACK_CARD := Vector2(80, 96)
 const CAT_ORDER := ["动作", "对象", "范围", "结构", "触发", "时间", "引用", "状态"]
 const ROLE_TEXT := {"alive": "至少几个（1~5）", "value": "填一个数（点数）", "dur": "持续几秒（1~20）", "delay": "几秒之后（1~19）", "gap": "间隔几秒（1~10）", "part": "这一份分多少点"}
 const ROLE_RANGE := {"alive": [1, 5], "value": [1, 60], "dur": [1, 20], "delay": [1, 19], "gap": [1, 10], "part": [1, 60]}
-const PART_HELP := {"低于": "左边比右边小", "不低于": "左边不比右边小", "每次固定": "每次固定减少，而不是按比例"}
+const PART_HELP := {"低于": "左边比右边小", "不低于": "左边不比右边小", "每次固定": "每次固定减少，而不是按比例", "（": "左括号：括号里的先算（可以不用）", "）": "右括号：和左括号配对"}
 
 var pool: Dictionary = {}
 var tokens: Array = []
@@ -598,7 +598,7 @@ func _build_rack() -> void:
 	var pfl := HFlowContainer.new()
 	pfl.add_theme_constant_override("h_separation", 6)
 	prow.add_child(pfl)
-	for pname in ["低于", "不低于", "每次固定"]:
+	for pname in ["低于", "不低于", "每次固定", "（", "）"]:
 		var pt := _part_plate(pname, false)
 		pt.mouse_filter = Control.MOUSE_FILTER_STOP
 		pt.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND

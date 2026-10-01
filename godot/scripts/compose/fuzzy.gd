@@ -86,6 +86,8 @@ func _beam(tray: Array, max_add: int, depth_cap: int) -> Array:
 						tok = S.Num(int(NUM_SAMPLE.get(e.role, 5)))
 						sc -= 0.05
 					"P":
+						if e.v in ["（", "）"]:
+							continue
 						tok = S.Part(e.v)
 						sc -= 0.05
 				var toks: Array = p.tokens.duplicate()

@@ -38,6 +38,22 @@ static func tokens_from(spec: Array) -> Array:
 			out.append(S.W(str(x)))
 	return out
 
+# 这一关的标准答案在当前语言里还拼得出来吗（用了已取消的词的关卡标成“待改”）
+static var _playable_cache := {}
+
+static func is_playable(level: Dictionary) -> bool:
+	var id := int(level.get("id", -1))
+	if _playable_cache.has(id):
+		return bool(_playable_cache[id])
+	var ok := false
+	var an := S.analyze(tokens_from(level.sol))
+	if an.complete:
+		var sk: Dictionary = G.finalize(G.skill("x", an.skills[0]))
+		if G.problems(sk).is_empty():
+			ok = bool(evaluate(level, tokens_from(level.sol)).win)      # 标准答案也得真的能通关（规则改了，有的关会失效）
+	_playable_cache[id] = ok
+	return ok
+
 static func tray_of(level: Dictionary) -> Dictionary:
 	var t := {}
 	for k in level.tray:
@@ -245,11 +261,24 @@ static func evaluate(level: Dictionary, tokens: Array) -> Dictionary:
 			combos = []
 			break
 		var nxt: Array = []
+		var multi: bool = slot.kind == "target" and int(slot.get("multi_idx", 0)) > 0
+		var base: String = str(slot.key).split("#")[0]
 		for c in combos:
+			var added := 0
 			for o in opts:
+				if multi:
+					var bad := false
+					for k in c:
+						if str(k).split("#")[0] == base and int(c[k]) >= int(o):
+							bad = true
+					if bad:
+						continue
 				var c2: Dictionary = c.duplicate()
 				c2[slot.key] = o
 				nxt.append(c2)
+				added += 1
+			if multi and added == 0:
+				nxt.append(c)
 		combos = nxt.slice(0, 40)
 	if combos.is_empty():
 		out.reason = "这句话现在找不到可以作用的对象。"

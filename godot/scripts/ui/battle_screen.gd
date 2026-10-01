@@ -553,15 +553,38 @@ func _select_skill(sid: int) -> void:
 	_render_action_panel()
 	Tut.fire("select_skill")
 
+# “选择 一个 一个 …”同一组里已经选过的人
+func _group_chosen(slot: Dictionary) -> Array:
+	var base: String = str(slot.key).split("#")[0]
+	var out: Array = []
+	for k in sel_choices:
+		if str(k).split("#")[0] == base and slot.kind == "target":
+			out.append(int(sel_choices[k]))
+	return out
+
+# 这个槽现在还能选谁（已选过的不能再选）
+func _slot_cands(slot: Dictionary) -> Array:
+	var cands: Array = E.slot_candidates(m.st, 0, slot)
+	if int(slot.get("multi_n", 1)) > 1:
+		var chosen: Array = _group_chosen(slot)
+		cands = cands.filter(func(u): return not (u in chosen))
+	return cands
+
+# 候选不够时，多出来的“一个”不用选
+func _slot_skipped(slot: Dictionary) -> bool:
+	return slot.kind == "target" and int(slot.get("multi_idx", 0)) >= 1 and not sel_choices.has(slot.key) and _slot_cands(slot).is_empty()
+
 func _advance_picking() -> void:
 	_clear_highlights()
 	picking = {}
 	var sk := E.skill_of(m.st, sel_sid)
 	for slot in G.choice_slots(sk):
 		if not sel_choices.has(slot.key):
+			if _slot_skipped(slot):
+				continue
 			if slot.kind == "target":
 				picking = slot
-				var cands := E.slot_candidates(m.st, 0, slot)
+				var cands := _slot_cands(slot)
 				for uid in cands:
 					if cards.has(uid):
 						cards[uid].selectable = true
@@ -617,6 +640,8 @@ func _render_action_panel() -> void:
 	action_box.add_child(st)
 	# 选择槽
 	for slot in G.choice_slots(sk):
+		if _slot_skipped(slot):
+			continue
 		var row := K.hbox(6)
 		row.add_child(K.label(slot.label, 13, K.MUTED))
 		if slot.kind == "target":
@@ -766,7 +791,7 @@ func _fill_preview() -> void:
 	K.clear_children(preview_box)
 	var act := _current_act()
 	for slot in G.choice_slots(E.skill_of(m.st, sel_sid)):
-		if slot.kind == "target" and not sel_choices.has(slot.key):
+		if slot.kind == "target" and not sel_choices.has(slot.key) and not _slot_skipped(slot):
 			preview_box.add_child(K.wrap_label("选好目标后，这里会告诉你：这招打出去预计会怎样、要小心什么。", 13, K.MUTED))
 			return
 	var info: Dictionary = Preview.analyze(m.st, 0, act, m.declared[0], m.public_declared(1))

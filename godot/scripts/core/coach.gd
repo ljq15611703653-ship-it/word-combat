@@ -32,8 +32,6 @@ const ROUTES := [
 	["见招收税", "tax", {}, "反", 1.6, "对手每发动一个技能就让施法者掉血"],
 	["遗志", "burst", {}, "反", 1.6, "倒下时对全场造成伤害"],
 	["治疗引爆", "engine", {}, "反", 2.4, "每次回血都转成对敌伤害"],
-	["打断", "time", {"op": "interrupt"}, "控", 2.6, "取消对方还没起效的技能"],
-	["打断·双倍力度", "time", {"op": "interrupt", "dbl": 1}, "控", 3.0, "更省数字的打断"],
 	["延后", "time", {"op": "delay"}, "控", 1.2, "把对方的技能往后推"],
 	["沉默", "status", {"st": "沉默", "tgt": "choose"}, "控", 2.4, "让对方施法者出不了招"],
 	["驱散", "remove", {"what": "限时效果"}, "控", 1.5, "拆掉对方布下的监听或减伤"],
@@ -191,7 +189,7 @@ static func describe_build(pool: Dictionary, deck: Dictionary) -> Array:
 	return lines
 
 # ------------------------------------------------------------ 抽词辅助轮 v2：每袋三条备选 + 推荐 + 针对
-const SCHOOL_LABEL := {"攻": "激进进攻", "守": "稳健防御", "反": "反制埋伏", "控": "打断控场"}
+const SCHOOL_LABEL := {"攻": "激进进攻", "守": "稳健防御", "反": "反制埋伏", "控": "沉默延后"}
 
 # 对手已公开的牌：关键词、技能类型、血少的卡、全场伤害、高伤害招
 static func foe_profile(foe: Dictionary) -> Dictionary:
@@ -230,15 +228,15 @@ static func _relevance(a: Dictionary, prof: Dictionary) -> Dictionary:
 	if "首挡" in prof.kws and int(params.get("rep", 0)) > 0:
 		cand.append({"bonus": 2.2, "note": "对手有带【首挡】的卡：多段攻击的第二下能打进去，首挡只能挡第一下"})
 	if (int(tags.get("heal", 0)) > 0 or int(tags.get("def", 0)) > 0) and role == "控":
-		cand.append({"bonus": 1.6, "note": "对手会治疗/上护盾：打断或沉默能让它出不了招"})
+		cand.append({"bonus": 1.6, "note": "对手会治疗/上护盾：沉默能让它之后出不了招"})
 	if int(tags.get("heal", 0)) > 0 and tid in ["tax", "burst"]:
 		cand.append({"bonus": 1.4, "note": "对手会回血：治疗惩罚/爆发伤害能压过它的治疗"})
-	if int(tags.get("trap", 0)) > 0 and (tid == "remove" or (tid == "time" and str(params.get("op", "")) == "interrupt")):
-		cand.append({"bonus": 1.6, "note": "对手布了埋伏：驱散或打断能提前拆掉它"})
+	if int(tags.get("trap", 0)) > 0 and tid == "remove":
+		cand.append({"bonus": 1.6, "note": "对手布了埋伏：驱散能提前拆掉它"})
 	if int(prof.get("aoe", 0)) > 0 and role in ["守", "反"]:
 		cand.append({"bonus": 2.0, "note": "对手有全场攻击：全队减伤、护盾、转移、回敬能一次挡住或还回去"})
 	if int(prof.get("big", 0)) > 0 and (role in ["守", "反", "控"]):
-		cand.append({"bonus": 1.7, "note": "对手有大招：减伤、护盾、改道、转为治疗、打断都能化解"})
+		cand.append({"bonus": 1.7, "note": "对手有大招：减伤、护盾、改道、转为治疗、延后都能化解"})
 	if int(tags.get("atk", 0)) >= 2 and role in ["守", "反"]:
 		cand.append({"bonus": 1.3, "note": "对手进攻型卡很多：减伤、改道、反噬都能克制它"})
 	if not prof.low.is_empty() and tid in ["atk1", "chase"]:

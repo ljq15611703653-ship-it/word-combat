@@ -21,6 +21,9 @@ const EVENT_TEXT := {
 	"enemy_down": "有敌方倒下", "round_end": "本轮结束",
 }
 const NO_OBSERVE := ["ally_down", "enemy_down", "round_end"]
+const MAX_PICK := 4        # “选择 一个 一个 …”最多选几个目标
+const MAX_TERMS := 6       # 一个数值式里最多几项（加上/减去连起来）
+const NUM_CN := {1: "一", 2: "两", 3: "三", 4: "四"}
 const REF_WORD := {
 	"event_damage": "该次伤害", "event_heal": "该次治疗", "actual": "实际数值", "raw": "原始数值",
 	"cur_hp": "当前生命", "max_hp": "生命上限", "lost_hp": "失去的生命", "count": "人数", "times": "次数",
@@ -34,8 +37,9 @@ const REF_TEXT := {
 	"ap": "剩余行动点", "paid": "已支付的行动点", "invested": "这个技能投入的数字", "overflow": "溢出的治疗", "prev": "上一步的实际数值",
 	"round_taken": "本轮累计受到的伤害", "remaining": "剩余护盾量",
 }
-const OP_WORD := {"max": "较高者", "min": "较低者", "sum": "合计", "diff": "差值"}
-const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "合计", "diff": "差值"}
+const OP_WORD := {"max": "较高者", "min": "较低者", "sum": "加上", "sub": "减去", "diff": "差值"}
+const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "加上", "sub": "减去", "diff": "差值"}
+const INFIX_OPS := ["sum", "sub"]      # 中缀：A 加上 B 减去 C，从左到右算（减不到 0 以下）
 const STATUSES := ["狂振", "牵连", "升华", "护盾", "易伤", "沉默"]
 const STATUS_DESC := {
 	"狂振": "造成与受到的伤害各+25%", "牵连": "与另一名友方平分受到的伤害", "升华": "受到的治疗不回血，转为下次造成伤害的增量",
@@ -55,8 +59,13 @@ static func target_words(t: Dictionary) -> Array:
 		"self": return ["自身"]
 		"source": return ["来源"]
 		"recipient": return ["接受者"]
-		"choose": return ["选择", "一个", s, "随从"]
-		"all": return ["全部", s, "随从"]
+		"choose":
+			var cw: Array = ["选择"]
+			for _i in pick_count(t):
+				cw.append("一个")
+			cw.append_array([s, "随从"])
+			return cw
+		"all": return ["全部", s, "随从"]      # 内部仍有，玩家拼不出来（已被“一个+一个”取代）
 		"each": return ["每个", s, "随从"]
 		"lowest": return ["最低生命", s, "随从"]
 		"highest": return ["最高生命", s, "随从"]
@@ -73,7 +82,7 @@ static func target_text(t: Dictionary) -> String:
 		"self": return "自身"
 		"source": return "来源随从"
 		"recipient": return "被作用的随从"
-		"choose": return "你选的一个" + s + "随从"
+		"choose": return ("你选的一个" if pick_count(t) == 1 else "你选的%s个" % NUM_CN.get(pick_count(t), str(pick_count(t)))) + s + "随从"
 		"all": return "全部" + s + "随从"
 		"each": return "每一个" + s + "随从"
 		"lowest": return "生命最低的" + s + "随从"
@@ -85,7 +94,12 @@ static func target_text(t: Dictionary) -> String:
 		"adjacent": return "相邻的" + s + "随从"
 	return "某某"
 
+static func pick_count(t: Dictionary) -> int:
+	return clampi(int(t.get("n", 1)), 1, MAX_PICK)
+
 static func is_single_pick(t: Dictionary) -> bool:
+	if t.pick == "choose" and pick_count(t) > 1:
+		return false
 	return not (t.pick in ["all", "each", "adjacent"])
 
 static func needs_choice(t: Dictionary) -> bool:
@@ -109,6 +123,8 @@ static func value_words(v: Dictionary) -> Array:
 		"num": return []
 		"ref":
 			var out: Array = []
+			if v.ref == "count" and v.has("of") and v.of.pick == "all":
+				return [SIDE_WORD[v.of.side] + "人数"]
 			if REF_WORD[v.ref] != "":
 				out.append(REF_WORD[v.ref])
 			if v.has("of"):
@@ -131,19 +147,35 @@ static func value_text(v: Dictionary) -> String:
 	match v.k:
 		"num": return str(int(v.n)) if int(v.n) >= 0 else "某某"
 		"ref":
+			if v.ref == "count" and v.has("of") and v.of.pick == "all":
+				return "%s存活的人数" % SIDE_TEXT.get(v.of.get("side", ""), "")
 			var s: String = REF_TEXT.get(v.ref, "某某")
 			if v.has("of"):
 				s = target_text(v.of) + "的" + s
 			return s
 		"op":
-			var a := value_text(v.a)
-			var b := value_text(v.b)
+			var a := _paren_text(v.a)
+			var b := _paren_text(v.b)
 			match v.op:
 				"max": return "%s 与 %s 中较大的" % [a, b]
 				"min": return "%s 与 %s 中较小的" % [a, b]
-				"sum": return "%s 加 %s" % [a, b]
+				"sum": return "%s 加上 %s" % [value_text(v.a), b]
+				"sub": return "%s 减去 %s（不小于 0）" % [value_text(v.a), b]
 				"diff": return "%s 与 %s 的差" % [a, b]
 	return "某某"
+
+static func _paren_text(v: Dictionary) -> String:
+	if v.k == "op" and (v.op in INFIX_OPS):
+		return "（" + value_text(v) + "）"
+	return value_text(v)
+
+# 一个数值式里的项数（加上/减去连起来的个数）
+static func value_terms(v: Dictionary) -> int:
+	if v.k == "op":
+		if v.op in INFIX_OPS:
+			return value_terms(v.a) + value_terms(v.b)
+		return maxi(1, value_terms(v.a) + value_terms(v.b))
+	return 1
 
 # 数值套上 双倍/一半 之后的人话：数字直接给最终值；非数字（引用）写“2倍的…”
 static func _num_text(node: Dictionary, v: Dictionary) -> String:
@@ -505,9 +537,16 @@ static func cost_with_choices(sk: Dictionary, choices: Dictionary) -> int:
 
 static func words_price(words: Array) -> int:
 	var p := 0
+	var picks := 0
+	var ones := 0
 	for w in words:
 		p += Lex.price(w)
-	return p
+		if w == "一个":
+			ones += 1
+		elif w == "选择":
+			picks += 1
+	# 每个“选择”后的第一个“一个”免费，之后每多一个加 2 点（选得越多越贵）
+	return p + 2 * maxi(0, ones - picks)
 
 # 补全技能的派生字段：编号、词、价格、费用、起手、文字。
 static func finalize(sk: Dictionary) -> Dictionary:
@@ -528,9 +567,58 @@ static func finalize(sk: Dictionary) -> Dictionary:
 static func _assign_ids(node: Dictionary, counter: Array) -> void:
 	counter[0] += 1
 	node["id"] = counter[0]
+	_assign_value_slots(node)
 	for key in ["child", "first", "then", "else", "a", "b"]:
 		if node.has(key) and node[key] is Dictionary and not node[key].is_empty():
 			_assign_ids(node[key], counter)
+
+# 数值/条件里写了“选择 一个 …”（例如 选择 一个 友方 随从 当前生命）：宣告时也要点一个人，给它一个槽
+static func _assign_value_slots(node: Dictionary) -> void:
+	var idx := [0]
+	match node.kind:
+		"dmg", "heal":
+			_slot_in_value(node.value, int(node.id), idx)
+		"until", "if":
+			_slot_in_cond(node.cond, int(node.id), idx)
+
+static func _slot_in_value(v: Dictionary, nid: int, idx: Array) -> void:
+	if v.k == "ref" and v.has("of") and v.ref != "count" and v.of.pick == "choose":
+		v.of["slot"] = "v%d_%d" % [nid, idx[0]]
+		idx[0] += 1
+	elif v.k == "op":
+		_slot_in_value(v.a, nid, idx)
+		_slot_in_value(v.b, nid, idx)
+
+static func _slot_in_cond(c: Dictionary, nid: int, idx: Array) -> void:
+	if c.has("has"):
+		if c.has.target.pick == "choose":
+			c.has.target["slot"] = "v%d_%d" % [nid, idx[0]]
+			idx[0] += 1
+	elif c.has("left"):
+		_slot_in_value(c.left, nid, idx)
+		_slot_in_value(c.right, nid, idx)
+
+static func _value_slot_specs(node: Dictionary) -> Array:
+	var out: Array = []
+	match node.kind:
+		"dmg", "heal":
+			_specs_in_value(node.value, out)
+		"until", "if":
+			var c: Dictionary = node.cond
+			if c.has("has"):
+				if c.has.target.has("slot"):
+					out.append(c.has.target)
+			elif c.has("left"):
+				_specs_in_value(c.left, out)
+				_specs_in_value(c.right, out)
+	return out
+
+static func _specs_in_value(v: Dictionary, out: Array) -> void:
+	if v.k == "ref" and v.has("of") and v.of.has("slot"):
+		out.append(v.of)
+	elif v.k == "op":
+		_specs_in_value(v.a, out)
+		_specs_in_value(v.b, out)
 
 # 宣告时必须作出的选择： [{key, kind:'target'|'remove'|'branch', node_id, spec, label}]
 static func choice_slots(sk: Dictionary) -> Array:
@@ -539,33 +627,42 @@ static func choice_slots(sk: Dictionary) -> Array:
 		_collect_choices(n, out, false)
 	return out
 
+# 目标槽：“选择 一个 一个 …”要点几个人就展开成几个槽（key、key#1、key#2…），彼此要选不同的人
+static func _push_target_slots(out: Array, key: String, node_id: int, spec: Dictionary, label: String) -> void:
+	var n := pick_count(spec) if spec.pick == "choose" else 1
+	for i in n:
+		out.append({"key": key if i == 0 else "%s#%d" % [key, i], "kind": "target", "node_id": node_id, "spec": spec,
+			"label": label if n == 1 else "%s（第 %d 个）" % [label, i + 1], "multi_idx": i, "multi_n": n})
+
 static func _collect_choices(node: Dictionary, out: Array, in_watch: bool) -> void:
+	for vs in _value_slot_specs(node):
+		out.append({"key": str(vs.slot), "kind": "target", "node_id": node.id, "spec": vs, "label": "引用：" + target_text(vs), "multi_idx": 0, "multi_n": 1})
 	match node.kind:
 		"dmg", "heal", "mit", "status", "swap", "remove":
 			if needs_choice(node.target):
-				out.append({"key": "t%d" % node.id, "kind": "target", "node_id": node.id, "spec": node.target, "label": target_text(node.target)})
+				_push_target_slots(out, "t%d" % node.id, node.id, node.target, target_text(node.target))
 			if node.kind == "status" and node.has("link") and needs_choice(node.link):
-				out.append({"key": "l%d" % node.id, "kind": "target", "node_id": node.id, "spec": node.link, "label": "牵连对象：" + target_text(node.link)})
+				_push_target_slots(out, "l%d" % node.id, node.id, node.link, "牵连对象：" + target_text(node.link))
 			if node.kind == "remove" and node.what == "限时效果":
 				out.append({"key": "r%d" % node.id, "kind": "remove", "node_id": node.id, "label": "要移除的限时效果"})
 		"split":
 			for i in node.branches.size():
 				var b: Dictionary = node.branches[i]
 				if needs_choice(b.target):
-					out.append({"key": "s%d_%d" % [node.id, i], "kind": "target", "node_id": node.id, "spec": b.target, "label": target_text(b.target)})
+					_push_target_slots(out, "s%d_%d" % [node.id, i], node.id, b.target, target_text(b.target))
 		"watch":
 			if not (node.event in NO_OBSERVE) and needs_choice(node.observe):
-				out.append({"key": "o%d" % node.id, "kind": "target", "node_id": node.id, "spec": node.observe, "label": "监听对象：" + target_text(node.observe)})
+				_push_target_slots(out, "o%d" % node.id, node.id, node.observe, "监听对象：" + target_text(node.observe))
 			_collect_choices(node.child, out, true)
 			if node.child.kind == "redirect" and needs_choice(node.child.target):
-				out.append({"key": "t%d" % node.child.id, "kind": "target", "node_id": node.child.id, "spec": node.child.target, "label": "转移给：" + target_text(node.child.target)})
+				_push_target_slots(out, "t%d" % node.child.id, node.child.id, node.child.target, "转移给：" + target_text(node.child.target))
 		"chain":
 			_collect_choices(node.first, out, in_watch)
 			_collect_choices(node.then, out, in_watch)
 		"copy":
 			_collect_choices(node.first, out, in_watch)
 			if needs_choice(node.target):
-				out.append({"key": "t%d" % node.id, "kind": "target", "node_id": node.id, "spec": node.target, "label": target_text(node.target)})
+				_push_target_slots(out, "t%d" % node.id, node.id, node.target, target_text(node.target))
 		"until":
 			_collect_choices(node.child, out, in_watch)
 		"if":
@@ -628,8 +725,7 @@ static func _check(node: Dictionary, out: Array, ctx: String) -> void:
 			out.append("转移/转为必须直接放在“当 即将受到伤害”之下")
 		"time":
 			if node.op == "interrupt":
-				if int(node.value.n) < 1:
-					out.append("打断要填入力度（至少1）")
+				out.append("“打断”已取消")
 			elif int(node.value.n) < 1 or int(node.value.n) > 19:
 				out.append("时间改动须填1到19秒")
 		"split":
@@ -672,6 +768,10 @@ static func _check(node: Dictionary, out: Array, ctx: String) -> void:
 static func _check_target(t: Dictionary, out: Array, in_watch: bool) -> void:
 	if (t.pick == "source" or t.pick == "recipient" or t.pick == "adjacent") and not in_watch:
 		out.append("“%s”只能在监听器的效果里使用" % target_text(t))
+	if t.pick == "all" or t.pick == "each":
+		out.append("“全部/每个”已取消：想作用于几个目标，就写几个“一个”（选择 一个 一个 …，最多%d个）" % MAX_PICK)
+	if t.pick == "choose" and (int(t.get("n", 1)) < 1 or int(t.get("n", 1)) > MAX_PICK):
+		out.append("“选择”后的“一个”要有 1 到 %d 个" % MAX_PICK)
 
 static func _check_value(v: Dictionary, out: Array, ctx: String) -> void:
 	match v.k:
@@ -685,10 +785,16 @@ static func _check_value(v: Dictionary, out: Array, ctx: String) -> void:
 			if v.ref == "times" and ctx == "":
 				out.append("“次数”只能在监听器里使用")
 			if v.has("of"):
-				_check_target(v.of, out, ctx != "")
+				if v.ref == "count":
+					if v.of.pick != "all":
+						out.append("人数只能写“敌方人数/友方人数”")
+				else:
+					_check_target(v.of, out, ctx != "")
 		"op":
 			_check_value(v.a, out, ctx)
 			_check_value(v.b, out, ctx)
+			if value_terms(v) > MAX_TERMS:
+				out.append("一个数值式最多 %d 项" % MAX_TERMS)
 
 # 对照词库存量：返回缺的词 {词名: 缺几张}
 static func missing(words: Array, pool: Dictionary) -> Dictionary:

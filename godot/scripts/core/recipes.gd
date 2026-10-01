@@ -12,9 +12,15 @@ const ALLY_PICKS := [
 ]
 const OBSERVE := [["self", "自身"], ["all", "全队"]]
 
+# “全部/全队”已取消：现在是“选择 一个 一个 一个 一个 …”选满 4 个（场上不够就选能选的）
+static func all4(side: String) -> Dictionary:
+	return G.T("choose", side, {"n": G.MAX_PICK})
+
 static func tspec(pick: String, side: String) -> Dictionary:
 	if pick == "self":
 		return G.T("self", "self")
+	if pick == "all":
+		return all4(side)
 	return G.T(pick, side)
 
 # -------- 模板目录（界面用） --------
@@ -32,7 +38,7 @@ static func catalog() -> Array:
 			]},
 		{"id": "atkA", "family": "攻", "title": "范围打击", "glyph": "轰", "blurb": "对全部（或逐个）敌人造成同样的伤害。",
 			"params": [
-				{"key": "scope", "label": "范围", "kind": "enum", "options": [["all", "全部同时"], ["each", "逐个依次"]], "default": "all"},
+				{"key": "scope", "label": "范围", "kind": "enum", "options": [["all", "选满 4 个"]], "default": "all"},
 				{"key": "n", "label": "伤害", "kind": "int", "min": 1, "max": 60, "default": 12},
 				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "rep", "label": "重复次数", "kind": "int", "min": 0, "max": 3, "default": 0},
@@ -86,8 +92,6 @@ static func catalog() -> Array:
 				{"key": "st", "label": "状态", "kind": "enum", "options": [["狂振", "狂振"], ["易伤", "易伤"], ["沉默", "沉默"], ["牵连", "牵连"], ["升华", "升华"]], "default": "易伤"},
 				{"key": "tgt", "label": "目标", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
 				{"key": "allyside", "label": "施加给己方", "kind": "bool", "default": false},
-				{"key": "n", "label": "沉默占用点数（只决定价格，不限制压制哪些技能）", "kind": "int", "min": 1, "max": 60, "default": 25},
-				{"key": "dbl", "label": "双倍次数（仅沉默）", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
 			]},
 		{"id": "redirect", "family": "反", "title": "改道", "glyph": "转", "blurb": "当被保护者即将受伤，把这次伤害转移给别人。",
@@ -118,7 +122,7 @@ static func catalog() -> Array:
 		{"id": "engine", "family": "反", "title": "治疗引爆", "glyph": "爆", "blurb": "给全队治疗；每次实际恢复，按恢复量对敌人造成伤害。",
 			"params": [
 				{"key": "n", "label": "治疗", "kind": "int", "min": 1, "max": 60, "default": 10},
-				{"key": "to", "label": "伤害对象", "kind": "enum", "options": [["all", "全部敌人"], ["lowest", "敌方最低生命"]], "default": "all"},
+				{"key": "to", "label": "伤害对象", "kind": "enum", "options": [["all", "选满 4 个敌人"], ["lowest", "敌方最低生命"]], "default": "all"},
 			]},
 		{"id": "tax", "family": "反", "title": "见招收税", "glyph": "税", "blurb": "敌人每发动一个技能，就对施法者造成伤害。",
 			"params": [
@@ -128,11 +132,9 @@ static func catalog() -> Array:
 			"params": [
 				{"key": "n", "label": "治疗", "kind": "int", "min": 1, "max": 60, "default": 6},
 			]},
-		{"id": "time", "family": "控", "title": "时间术", "glyph": "时", "blurb": "打断、延后对方已宣告的技能，或提前自己的。",
+		{"id": "time", "family": "控", "title": "时间术", "glyph": "时", "blurb": "延后对方已宣告的技能，或提前自己的。",
 			"params": [
-				{"key": "op", "label": "方式", "kind": "enum", "options": [["interrupt", "打断对方"], ["delay", "延后对方"], ["advance", "提前自己"]], "default": "interrupt"},
-				{"key": "power", "label": "打断占用点数（只决定价格，不限制打断哪些技能）", "kind": "int", "min": 1, "max": 60, "default": 30},
-				{"key": "dbl", "label": "双倍次数（仅打断力度）", "kind": "int", "min": 0, "max": 3, "default": 0},
+				{"key": "op", "label": "方式", "kind": "enum", "options": [["delay", "延后对方"], ["advance", "提前自己"]], "default": "delay"},
 				{"key": "sec", "label": "秒数（延后/提前用）", "kind": "int", "min": 1, "max": 19, "default": 4},
 			]},
 		{"id": "remove", "family": "控", "title": "驱散", "glyph": "散", "blurb": "移除一个已建立的限时效果，或目标身上的状态。",
@@ -169,7 +171,7 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			_timing(a1, p)
 			nodes = [a1]
 		"atkA":
-			var aa := G.dmg(G.T(p.scope, "enemy"), G.N(int(p.n)), {"dbl": int(p.dbl), "rep": int(p.rep)})
+			var aa := G.dmg(all4("enemy"), G.N(int(p.n)), {"dbl": int(p.dbl), "rep": int(p.rep)})
 			_timing(aa, p)
 			nodes = [aa]
 		"chase":
@@ -200,9 +202,7 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			if p.st == "牵连":
 				link = G.T("other", "ally")
 				tnode = G.T("choose", "ally")
-			var stn := G.status(p.st, tnode, int(p.dur), int(p.n) if p.st == "沉默" else 0, link)
-			if p.st == "沉默" and int(p.dbl) > 0:
-				stn["dbl"] = int(p.dbl)
+			var stn := G.status(p.st, tnode, int(p.dur), 0, link)
 			nodes = [stn]
 			title = "施加" + p.st
 		"redirect":
@@ -228,23 +228,21 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 				o["half"] = 1
 			nodes = [G.watch("damaged", _observe(p.obs), G.dmg(G.T("source", "ref"), G.REF("event_damage"), o), {"freq": p.freq})]
 		"burst":
-			nodes = [G.watch("down", G.T("self", "self"), G.dmg(G.T("all", "enemy"), G.N(int(p.n))), {"freq": "once"})]
+			nodes = [G.watch("down", G.T("self", "self"), G.dmg(all4("enemy"), G.N(int(p.n))), {"freq": "once"})]
 		"engine":
 			nodes = [
-				G.watch("healed", G.T("all", "ally"), G.dmg(G.T(p.to, "enemy"), G.REF("event_heal")), {"freq": "every"}),
-				G.heal(G.T("all", "ally"), G.N(int(p.n)), {"delay": 1}),
+				G.watch("healed", all4("ally"), G.dmg(tspec(p.to, "enemy"), G.REF("event_heal")), {"freq": "every"}),
+				G.heal(all4("ally"), G.N(int(p.n)), {"delay": 1}),
 			]
 		"tax":
-			nodes = [G.watch("cast", G.T("all", "enemy"), G.dmg(G.T("source", "ref"), G.N(int(p.n))), {"freq": "every"})]
+			nodes = [G.watch("cast", all4("enemy"), G.dmg(G.T("source", "ref"), G.N(int(p.n))), {"freq": "every"})]
 		"regen":
-			nodes = [G.watch("round_end", G.T("self", "self"), G.heal(G.T("all", "ally"), G.N(int(p.n))), {"freq": "once"})]
+			nodes = [G.watch("round_end", G.T("self", "self"), G.heal(all4("ally"), G.N(int(p.n))), {"freq": "once"})]
 		"time":
 			var sd: String = "ally" if p.op == "advance" else "enemy"
-			var tn := G.time_op(p.op, sd, int(p.power) if p.op == "interrupt" else int(p.sec))
-			if p.op == "interrupt" and int(p.dbl) > 0:
-				tn["dbl"] = int(p.dbl)
+			var tn := G.time_op(p.op, sd, int(p.sec))
 			nodes = [tn]
-			title = {"interrupt": "打断", "delay": "延后", "advance": "提前"}[p.op]
+			title = {"delay": "延后", "advance": "提前"}[p.op]
 		"remove":
 			var side2: String = "ally" if p.allyside else "enemy"
 			nodes = [G.remove(p.what, tspec("self" if p.allyside else "choose", side2))]
@@ -260,7 +258,7 @@ static func _timing(node: Dictionary, p: Dictionary) -> void:
 		node["sync"] = true
 
 static func _observe(obs: String) -> Dictionary:
-	return G.T("self", "self") if obs == "self" else G.T("all", "ally")
+	return G.T("self", "self") if obs == "self" else all4("ally")
 
 # 模板参数决定的“简短名字”
 static func short_name(sk: Dictionary) -> String:

@@ -38,7 +38,7 @@ static func _acts(st: Dictionary, sid: int) -> Array:
 		var opts: Array = []
 		if slot.kind == "target":
 			opts = E.slot_candidates(st, 0, slot)
-			if slot.spec.get("side", "enemy") != "enemy" and not opts.is_empty():
+			if slot.spec.get("side", "enemy") != "enemy" and not opts.is_empty() and int(slot.get("multi_n", 1)) == 1:
 				opts = [opts[0]]
 		elif slot.kind == "branch":
 			opts = [0, 1]
@@ -47,11 +47,25 @@ static func _acts(st: Dictionary, sid: int) -> Array:
 		if opts.is_empty():
 			return []
 		var nxt: Array = []
+		var multi: bool = slot.kind == "target" and int(slot.get("multi_idx", 0)) > 0
+		var base: String = str(slot.key).split("#")[0]
 		for c in combos:
+			var added := 0
 			for o in opts:
+				if multi:
+					# 同一组“选择 一个 一个 …”要选不同的人，按从小到大取，避免排列重复
+					var bad := false
+					for k in c:
+						if str(k).split("#")[0] == base and int(c[k]) >= int(o):
+							bad = true
+					if bad:
+						continue
 				var c2: Dictionary = c.duplicate()
 				c2[slot.key] = o
 				nxt.append(c2)
+				added += 1
+			if multi and added == 0:
+				nxt.append(c)
 		combos = nxt.slice(0, 12)
 	var out: Array = []
 	for ch in combos:

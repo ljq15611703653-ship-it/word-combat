@@ -200,9 +200,21 @@ static func can_declare(st: Dictionary, act: Dictionary, declared: Array = []) -
 		return "行动点不足（需要%d，还剩%d）" % [cost, available_ap(st, act.side, declared)]
 	if int(act.start) < min_start(st, act):
 		return "起手需要至少%d秒" % min_start(st, act)
+	var picked_in: Dictionary = {}
 	for slot in G.choice_slots(sk):
 		if slot.kind == "target" and not act.get("choices", {}).has(slot.key):
+			var alive_n: int = slot_candidates(st, act.side, slot).size()
+			if int(slot.get("multi_idx", 0)) >= 1 and alive_n <= int(slot.multi_idx):
+				continue      # 候选不够：多出来的“一个”不用选
 			return "还没有选择：" + slot.label
+		if slot.kind == "target" and int(slot.get("multi_n", 1)) > 1:
+			var base: String = "%d:%s" % [int(slot.node_id), str(slot.key).split("#")[0]]
+			var uidv: int = int(act.get("choices", {}).get(slot.key, -1))
+			if not picked_in.has(base):
+				picked_in[base] = []
+			if uidv in picked_in[base]:
+				return "“选择 一个 一个 …”要选不同的目标"
+			picked_in[base].append(uidv)
 		if slot.kind == "branch" and not act.get("choices", {}).has(slot.key):
 			return "还没有选择择一分支"
 	return ""
@@ -498,9 +510,13 @@ static func _targets(st: Dictionary, spec: Dictionary, ctx: Dictionary, key: Str
 			if _alive(_u(st, ctx.get("recipient", -1))):
 				out.append(ctx.recipient)
 		"choose", "other":
-			var uid: int = int(ctx.get("choices", {}).get(key, -1))
-			if _alive(_u(st, uid)):
-				out.append(uid)
+			var chs: Dictionary = ctx.get("choices", {})
+			var nsel: int = G.pick_count(spec) if spec.pick == "choose" else 1
+			for mi in nsel:
+				var kk: String = key if mi == 0 else "%s#%d" % [key, mi]
+				var uid: int = int(chs.get(kk, -1))
+				if _alive(_u(st, uid)) and not (uid in out):
+					out.append(uid)
 		"all", "each":
 			for u in alive_units(st, side):
 				out.append(u.uid)
@@ -558,7 +574,7 @@ static func _value(st: Dictionary, v: Dictionary, ctx: Dictionary) -> int:
 					return _targets(st, spec, ctx).size()
 				"cur_hp", "max_hp", "lost_hp", "round_taken", "remaining":
 					var spec2: Dictionary = v.get("of", G.T("self", "self"))
-					var ts := _targets(st, spec2, ctx)
+					var ts := _targets(st, spec2, ctx, str(spec2.get("slot", "")))
 					if ts.is_empty():
 						return 0
 					var u := _u(st, ts[0])
@@ -592,7 +608,7 @@ static func _cond(st: Dictionary, c: Dictionary, ctx: Dictionary) -> bool:
 		var side_i: int = int(ctx.side) if c.alive.side == "ally" else 1 - int(ctx.side)
 		return alive_units(st, side_i).size() >= int(c.alive.n)
 	if c.has("has"):
-		var ts := _targets(st, c.has.target, ctx)
+		var ts := _targets(st, c.has.target, ctx, str(c.has.target.get("slot", "")))
 		if ts.is_empty():
 			return false
 		return has_status(_u(st, ts[0]), c.has.status)
@@ -828,7 +844,12 @@ static func _observed(st: Dictionary, eff: Dictionary, subject: int) -> bool:
 		"all", "each":
 			return sub.side == side
 		"choose", "other":
-			return subject == int(eff.choices.get("o%d" % int(eff.get("node_id", 0)), -1))
+			var okey: String = "o%d" % int(eff.get("node_id", 0))
+			var nobs: int = G.pick_count(spec) if spec.pick == "choose" else 1
+			for mi in nobs:
+				if subject == int(eff.choices.get(okey if mi == 0 else "%s#%d" % [okey, mi], -1)):
+					return true
+			return false
 		"first":
 			var al := alive_units(st, side)
 			return not al.is_empty() and al[0].uid == subject

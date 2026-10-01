@@ -533,6 +533,6 @@ func _reset_field() -> void:
 func _next_id() -> int:
 	var best := -1
 	for lv in levels:
-		if int(lv.id) > int(level.id) and (best == -1 or int(lv.id) < best):
+		if int(lv.id) > int(level.id) and L.is_playable(lv) and (best == -1 or int(lv.id) < best):
 			best = int(lv.id)
 	return best

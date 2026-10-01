@@ -13,11 +13,14 @@ extends RefCounted
 
 const G = preload("res://scripts/core/grammar.gd")
 
-const PICKS := [["全部", "all"], ["每个", "each"], ["最低生命", "lowest"], ["最高生命", "highest"], ["最前", "first"],
+const PICKS := [["最低生命", "lowest"], ["最高生命", "highest"], ["最前", "first"],
 	["最后", "last"], ["随机", "random"], ["另一个", "other"], ["相邻", "adjacent"]]
 const SIDES := [["友方", "ally"], ["敌方", "enemy"]]
-const OPS := [["较高者", "max"], ["较低者", "min"], ["合计", "sum"], ["差值", "diff"]]
-const TARGET_REFS := ["cur_hp", "max_hp", "lost_hp", "round_taken", "remaining", "count"]
+const OPS := [["较高者", "max"], ["较低者", "min"], ["差值", "diff"]]      # 前缀：较高者 A B
+const INFIX := [["加上", "sum"], ["减去", "sub"]]                              # 中缀：A 加上 B 减去 C，从左到右
+const PAREN_L := "（"
+const PAREN_R := "）"
+const TARGET_REFS := ["cur_hp", "max_hp", "lost_hp", "round_taken", "remaining"]      # 人数写成“敌方人数/友方人数”
 const SIMPLE_REFS := ["event_damage", "event_heal", "actual", "raw", "overflow", "ap", "paid", "invested", "times"]
 const EVENTS := [["即将受到伤害", "pending_dmg"], ["受到伤害", "damaged"], ["造成伤害", "dealt"], ["恢复生命", "healed"],
 	["失去生命", "lost"], ["被选为目标", "targeted"], ["发动技能", "cast"], ["技能命中", "hit"], ["状态施加", "status_applied"],
@@ -120,10 +123,16 @@ func p_target(i: int, c: Dictionary) -> Array:
 			out.append({"i": i + 1, "v": G.T("source", "ref")})
 		if _w(i, "接受者"):
 			out.append({"i": i + 1, "v": G.T("recipient", "ref")})
-	if _w(i, "选择") and _w(i + 1, "一个"):
-		for s in _side(i + 2):
-			if _w(s.i, "随从"):
-				out.append({"i": s.i + 1, "v": G.T("choose", s.v)})
+	if _w(i, "选择"):
+		var j := i + 1
+		var cnt := 0
+		while cnt < G.MAX_PICK and _w(j, "一个"):
+			cnt += 1
+			j += 1
+		if cnt >= 1:
+			for s in _side(j):
+				if _w(s.i, "随从"):
+					out.append({"i": s.i + 1, "v": G.T("choose", s.v, {"n": cnt} if cnt > 1 else {})})
 	for pk in PICKS:
 		if pk[1] == "adjacent" and not c.get("watch", false):
 			continue
@@ -143,7 +152,37 @@ func _ref_ok(ref: String, c: Dictionary) -> bool:
 		"times": return bool(c.get("watch", false))
 	return true
 
-func p_value(i: int, c: Dictionary, depth: int = 0, allow_prev: bool = false) -> Array:
+# 数值式：项 { (加上|减去) 项 }，从左到右；项 = 数字 / 引用 / 敌方人数 / 前缀运算 / （数值式）
+func p_value(i: int, c: Dictionary, _depth: int = 0, allow_prev: bool = false) -> Array:
+	var key := "V%d|%s|%s|%s" % [i, str(c.get("watch", false)), str(c.get("event", "")), str(allow_prev)]
+	if _memo.has(key):
+		return _memo[key]
+	var done: Array = []
+	var cur: Array = []
+	for t in p_term(i, c):
+		cur.append({"i": t.i, "v": t.v})
+	for _k in G.MAX_TERMS:
+		var nxt: Array = []
+		for st in cur:
+			done.append(st)
+			for op in INFIX:
+				if _w(st.i, op[0]):
+					for t2 in p_term(st.i + 1, c):
+						var nv: Dictionary = G.OP(op[1], st.v, t2.v)
+						if G.value_terms(nv) <= G.MAX_TERMS:
+							nxt.append({"i": t2.i, "v": nv})
+		cur = nxt
+	for st2 in cur:
+		done.append(st2)
+	if allow_prev:
+		done.append({"i": i, "v": G.REF("prev")})
+	_memo[key] = done
+	return done
+
+func p_term(i: int, c: Dictionary) -> Array:
+	var key := "M%d|%s|%s" % [i, str(c.get("watch", false)), str(c.get("event", ""))]
+	if _memo.has(key):
+		return _memo[key]
 	var out: Array = []
 	var k := _num(i, "value")
 	if k >= 0:
@@ -151,22 +190,29 @@ func p_value(i: int, c: Dictionary, depth: int = 0, allow_prev: bool = false) ->
 	for ref in SIMPLE_REFS:
 		if _ref_ok(ref, c) and _w(i, G.REF_WORD[ref]):
 			out.append({"i": i + 1, "v": G.REF(ref)})
+	for s in SIDES:
+		if _w(i, s[0] + "人数"):
+			out.append({"i": i + 1, "v": G.REF("count", G.T("all", s[1]))})
 	for ref in TARGET_REFS:
 		var rw: String = G.REF_WORD[ref]
 		if _w(i, rw):
 			out.append({"i": i + 1, "v": G.REF(ref)})
 	for t in p_target(i, c):
+		if t.v.pick == "choose" and int(t.v.get("n", 1)) > 1:
+			continue      # 数值里的“选择 一个”只能选一个人
 		for ref in TARGET_REFS:
 			if _w(t.i, G.REF_WORD[ref]):
 				out.append({"i": t.i + 1, "v": G.REF(ref, t.v)})
-	if depth < 2:
-		for op in OPS:
-			if _w(i, op[0]):
-				for a in p_value(i + 1, c, depth + 1):
-					for b in p_value(a.i, c, depth + 1):
-						out.append({"i": b.i, "v": G.OP(op[1], a.v, b.v)})
-	if allow_prev:
-		out.append({"i": i, "v": G.REF("prev")})
+	for op in OPS:
+		if _w(i, op[0]):
+			for a in p_term(i + 1, c):
+				for b in p_term(a.i, c):
+					out.append({"i": b.i, "v": G.OP(op[1], a.v, b.v)})
+	if _p(i, PAREN_L):
+		for e in p_value(i + 1, c):
+			if _p(e.i, PAREN_R):
+				out.append({"i": e.i + 1, "v": e.v})
+	_memo[key] = out
 	return out
 
 func p_cond(i: int, c: Dictionary) -> Array:
@@ -365,9 +411,12 @@ func _status(j: int, c: Dictionary, t: Dictionary) -> Array:
 		var vals: Array = [{"i": j + 2, "n": 0}]
 		if st == "护盾" or st == "沉默":
 			vals = []
-			var k := _num(j + 2, "value")
-			if k >= 0:
-				vals.append({"i": j + 3, "n": k})
+			if st == "护盾":
+				var k := _num(j + 2, "value")
+				if k >= 0:
+					vals.append({"i": j + 3, "n": k})
+			else:
+				vals.append({"i": j + 2, "n": 0})
 		for vl in vals:
 			for d in _count_words(vl.i, "双倍", 3):
 				var links: Array = [{"i": d.i, "link": {}}]
@@ -383,10 +432,10 @@ func _status(j: int, c: Dictionary, t: Dictionary) -> Array:
 						out.append({"i": du.i, "v": node})
 	return out
 
-# ---- 时间术：延后/提前/打断 阵营 技能 数字 [双倍]
+# ---- 时间术：延后/提前 阵营 技能 数字 [双倍]（“打断”已取消）
 func _time(i: int) -> Array:
 	var out: Array = []
-	for op in [["延后", "delay"], ["提前", "advance"], ["打断", "interrupt"]]:
+	for op in [["延后", "delay"], ["提前", "advance"]]:
 		if _w(i, op[0]):
 			for s in _side(i + 1):
 				if _w(s.i, "技能"):
@@ -526,7 +575,10 @@ static func target_tokens(t: Dictionary) -> Array:
 		"source": out.append(W("来源"))
 		"recipient": out.append(W("接受者"))
 		"choose":
-			out.append_array([W("选择"), W("一个"), W(G.SIDE_WORD[t.side]), W("随从")])
+			out.append(W("选择"))
+			for _i in G.pick_count(t):
+				out.append(W("一个"))
+			out.append_array([W(G.SIDE_WORD[t.side]), W("随从")])
 		_:
 			for pk in PICKS:
 				if pk[1] == t.pick:
@@ -539,17 +591,32 @@ static func value_tokens(v: Dictionary) -> Array:
 		"num":
 			out.append(Num(int(v.n)))
 		"ref":
+			if v.ref == "count" and v.has("of") and v.of.pick == "all":
+				out.append(W(G.SIDE_WORD[v.of.side] + "人数"))
+				return out
 			if v.has("of"):
 				out.append_array(target_tokens(v.of))
 			if str(G.REF_WORD[v.ref]) != "":
 				out.append(W(G.REF_WORD[v.ref]))
 		"op":
-			for op in OPS:
-				if op[1] == v.op:
-					out.append(W(op[0]))
-			out.append_array(value_tokens(v.a))
-			out.append_array(value_tokens(v.b))
+			if v.op in G.INFIX_OPS:
+				out.append_array(value_tokens(v.a))
+				out.append(W(G.OP_WORD[v.op]))
+				out.append_array(_term_tokens(v.b))
+			else:
+				out.append(W(G.OP_WORD[v.op]))
+				out.append_array(_term_tokens(v.a))
+				out.append_array(_term_tokens(v.b))
 	return out
+
+# 作为“项”写出：中缀式要套括号
+static func _term_tokens(v: Dictionary) -> Array:
+	if v.k == "op" and (v.op in G.INFIX_OPS):
+		var out: Array = [Part(PAREN_L)]
+		out.append_array(value_tokens(v))
+		out.append(Part(PAREN_R))
+		return out
+	return value_tokens(v)
 
 static func cond_tokens(cd: Dictionary) -> Array:
 	var out: Array = []
@@ -609,7 +676,7 @@ static func node_tokens(node: Dictionary) -> Array:
 		"status":
 			out.append_array(target_tokens(node.target))
 			out.append_array([W("施加"), W(node.status)])
-			if node.status == "护盾" or node.status == "沉默":
+			if node.status == "护盾":
 				out.append(Num(int(node.value.n)))
 			out.append_array(_rep("双倍", int(node.get("dbl", 0))))
 			if node.has("link"):
@@ -623,7 +690,7 @@ static func node_tokens(node: Dictionary) -> Array:
 			out.append(W("换位"))
 			out.append_array(target_tokens(node.target))
 		"time":
-			var opw: String = {"delay": "延后", "advance": "提前", "interrupt": "打断"}[node.op]
+			var opw: String = {"delay": "延后", "advance": "提前"}.get(node.op, "延后")
 			out.append_array([W(opw), W(G.SIDE_WORD[node.side]), W("技能"), Num(int(node.value.n))])
 			out.append_array(_rep("双倍", int(node.get("dbl", 0))))
 		"redirect":

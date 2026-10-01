@@ -8,10 +8,15 @@ const L = preload("res://scripts/adventure/level_eval.gd")
 signal back()
 signal chosen(id)
 
+# 顺序解锁：前面最近的一个“能玩的关”通关了，这一关就开放（“待改”的关不挡路）
 static func is_unlocked(id: int, levels: Array) -> bool:
-	if id <= 1:
+	if id in Settings.adv_cleared:
 		return true
-	return (id - 1) in Settings.adv_cleared or id in Settings.adv_cleared
+	var prev := -1
+	for lv in levels:
+		if int(lv.id) < id and L.is_playable(lv):
+			prev = maxi(prev, int(lv.id))
+	return prev == -1 or prev in Settings.adv_cleared
 
 func setup() -> void:
 	Settings.load_all()
@@ -31,7 +36,11 @@ func setup() -> void:
 	var levels: Array = L.load_levels()
 	var head := K.hbox(14)
 	head.add_child(K.label("冒险 · 长难句训练营", 36, K.GOLD))
-	head.add_child(K.label("通关 %d / %d" % [Settings.adv_cleared.size(), levels.size()], 18, K.MUTED))
+	var playable_n := 0
+	for lv0 in levels:
+		if L.is_playable(lv0):
+			playable_n += 1
+	head.add_child(K.label("通关 %d / 可玩 %d（共 %d 关，其余待改写）" % [Settings.adv_cleared.size(), playable_n, levels.size()], 18, K.MUTED))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
@@ -51,7 +60,7 @@ func setup() -> void:
 	var next_id := -1
 	for lv in levels:
 		var id := int(lv.id)
-		if not (id in Settings.adv_cleared) and is_unlocked(id, levels):
+		if not (id in Settings.adv_cleared) and is_unlocked(id, levels) and L.is_playable(lv):
 			next_id = id
 			break
 	for ch in chapters:
@@ -91,16 +100,17 @@ func _chapters(levels: Array) -> Array:
 func _level_button(lv: Dictionary, is_next: bool, levels: Array) -> Control:
 	var id := int(lv.id)
 	var cleared: bool = id in Settings.adv_cleared
-	var open := is_unlocked(id, levels)
+	var playable: bool = L.is_playable(lv)
+	var open := is_unlocked(id, levels) and playable
 	var b := Button.new()
 	b.custom_minimum_size = Vector2(150, 64)
-	b.text = "%d  %s%s" % [id, str(lv.title), "  ✓" if cleared else ""]
+	b.text = "%d  %s%s" % [id, str(lv.title), "  ✓" if cleared else ("  待改" if not playable else "")]
 	b.add_theme_font_size_override("font_size", 16)
 	b.disabled = not open
 	var col: Color = K.GREEN.darkened(0.4) if cleared else (K.GOLD_D if is_next else (K.PANEL2 if open else Color("171a24")))
 	b.add_theme_stylebox_override("normal", K.style(col, K.GOLD if is_next else K.EDGE, 10, 2 if is_next else 1, 0))
 	b.add_theme_stylebox_override("hover", K.style(col.lightened(0.15), K.GOLD, 10, 2, 0))
 	b.add_theme_stylebox_override("disabled", K.style(Color("171a24"), Color("262b3a"), 10, 1, 0))
-	b.tooltip_text = str(lv.get("story", "")) if open else "先通关上一关"
+	b.tooltip_text = str(lv.get("story", "")) if open else ("这一关用了已经取消的词（全部/每个/打断/合计…），等待改写" if not playable else "先通关上一关")
 	b.pressed.connect(func(): chosen.emit(id))
 	return b

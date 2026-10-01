@@ -82,6 +82,8 @@ static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator
 				"N":
 					tok = S.Num(sample_number(e.role, rng))
 				"P":
+					if e.v in ["（", "）"]:
+						continue      # 括号不用于随机补全
 					tok = S.Part(e.v)
 			if not forced.is_empty():
 				if not (forced.t == tok.t and (tok.t == "N" or forced.v == tok.v)):

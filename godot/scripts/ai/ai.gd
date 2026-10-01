@@ -30,9 +30,9 @@ const PERSONAS := {
 		["shield", [{"tgt": "self"}], 15],
 	],
 	"控场": [
-		["time", [{"op": "interrupt"}], 0],
+		["status", [{"st": "沉默"}], 0],
 		["atk1", [{"dbl": 1}, {}], 14],
-		["status", [{"st": "沉默"}, {"st": "易伤"}], 0],
+		["status", [{"st": "易伤"}], 0],
 		["time", [{"op": "delay", "sec": 6}], 0],
 		["remove", [{"what": "限时效果"}], 0],
 		["tax", [{}], 10],
@@ -53,7 +53,7 @@ const PERSONAS := {
 		["atkA", [{"dbl": 1}, {}], 12],
 		["heal", [{"tgt": "self"}], 12],
 		["mit", [{"tgt": "self"}], 20],
-		["time", [{"op": "interrupt"}], 0],
+		["time", [{"op": "delay", "sec": 6}], 0],
 		["status", [{"st": "易伤"}], 0],
 	],
 }
@@ -62,15 +62,15 @@ const KW_PREF := {
 	"连锁": ["回春", "不屈", "首挡"], "均衡": ["首挡", "不屈", "回击", "回春"],
 }
 const PREFER_WORDS := {
-	"狂攻": ["双倍", "重复", "全部", "每个", "复制"], "守反": ["转移", "来源", "当", "即将受到伤害", "转为", "受到伤害"],
-	"控场": ["打断", "延后", "沉默", "易伤", "移除"], "连锁": ["恢复生命", "每次", "倒下", "发动技能", "回合结束"],
-	"均衡": ["转移", "双倍", "打断", "全部"],
+	"狂攻": ["双倍", "重复", "一个", "加上", "复制"], "守反": ["转移", "来源", "当", "即将受到伤害", "转为", "受到伤害"],
+	"控场": ["延后", "沉默", "易伤", "移除"], "连锁": ["恢复生命", "每次", "倒下", "发动技能", "回合结束"],
+	"均衡": ["转移", "双倍", "一个"],
 }
 
 const PERSONA_LABEL := {
 	"狂攻": "狂攻流：放大的大招先手压制，赌对手拆不掉",
 	"守反": "守反流：设伏改道、回敬，让对手的大招反噬自己",
-	"控场": "控场流：打断、沉默、拖节奏，让对手出不了招",
+	"控场": "控场流：沉默、延后、拖节奏，让对手出不了招",
 	"连锁": "连锁流：治疗引爆、遗志、收税，把对方的行动变成代价",
 	"均衡": "均衡流：攻守兼备，稳扎稳打",
 }
@@ -405,11 +405,28 @@ static func enumerate_actions(st: Dictionary, side: int, enemy, max_per_skill: i
 					combos = []
 					break
 				var nxt: Array = []
+				var multi: bool = slot.kind == "target" and int(slot.get("multi_idx", 0)) > 0
+				var base: String = str(slot.key).split("#")[0]
 				for c in combos:
+					var added := 0
 					for o in opts:
+						if multi:
+							# “选择 一个 一个 …”要选不同的人；按从小到大的顺序取，避免同一组人的不同排列
+							var dup := false
+							var mx := -1
+							for k in c:
+								if str(k).split("#")[0] == base:
+									if int(c[k]) == int(o):
+										dup = true
+									mx = maxi(mx, int(c[k]))
+							if dup or int(o) < mx:
+								continue
 						var c2: Dictionary = c.duplicate()
 						c2[slot.key] = o
 						nxt.append(c2)
+						added += 1
+					if multi and added == 0:
+						nxt.append(c)      # 候选不够：多出来的“一个”不选
 				combos = nxt
 				if combos.size() > 24:
 					combos = combos.slice(0, 24)
