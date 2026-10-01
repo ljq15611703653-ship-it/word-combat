@@ -61,7 +61,7 @@ func _unit_block(u: Dictionary) -> Control:
 	head.add_child(K.label(u.name, 22, K.TEXT))
 	head.add_child(K.chip("生命 %s" % (str(u.get("hp")) + "/" + str(u.max_hp) if u.has("hp") else str(u.max_hp)), Color("2c5c44"), 15))
 	if u.get("kw", "") != "":
-		head.add_child(K.chip("◈ " + u.kw, Color("6b5a22"), 15))
+		head.add_child(K.chip("◆ " + u.kw, Color("6b5a22"), 15))
 	v.add_child(head)
 	var skills: Array = u.get("skills", [])
 	if skills.is_empty():

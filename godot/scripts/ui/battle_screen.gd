@@ -665,7 +665,7 @@ func _fill_preview() -> void:
 	for l in info.cost:
 		v.add_child(K.wrap_label(l, 12, K.MUTED))
 	for l in info.effects:
-		v.add_child(K.wrap_label(("▸ " if not l.begins_with("（") else "") + l, 13, K.TEXT if not l.begins_with("（") else K.MUTED))
+		v.add_child(K.wrap_label(("› " if not l.begins_with("（") else "") + l, 13, K.TEXT if not l.begins_with("（") else K.MUTED))
 	if not info.fears.is_empty():
 		v.add_child(K.label("怕什么", 14, K.RED))
 		for l in info.fears:

@@ -8,8 +8,6 @@ const K = preload("res://scripts/ui/kit.gd")
 
 signal clicked(card)
 
-static var _font: SystemFont = null
-
 var uid := -1
 var side := 0
 var unit: Dictionary = {}
@@ -36,11 +34,8 @@ var _down_applied := false
 var _idle_t := 0.0
 var _busy_lunge := false
 
-static func get_font() -> SystemFont:
-	if _font == null:
-		_font = SystemFont.new()
-		_font.font_names = PackedStringArray(["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "SimHei"])
-	return _font
+static func get_font() -> Font:
+	return load("res://assets/fonts/NotoSansSC-subset.ttf")
 
 func _label(size_px: int, col: Color, y: float) -> Label3D:
 	var l := Label3D.new()
@@ -121,7 +116,7 @@ func refresh(u: Dictionary, sk: Array) -> void:
 	for s in u.get("statuses", []):
 		parts.append(str(s.name) + (" %d" % int(s.value) if s.name == "护盾" else ""))
 	if str(u.get("kw", "")) != "":
-		parts.append("◈" + str(u.kw) + ("(已用)" if u.get("kw_spent", false) else ""))
+		parts.append("◆" + str(u.kw) + ("(已用)" if u.get("kw_spent", false) else ""))
 	status_label.text = "  ".join(parts)
 	var is_down: bool = anim_down if anim_mode else int(u.get("down_round", -1)) != -1
 	_set_down(is_down, false)

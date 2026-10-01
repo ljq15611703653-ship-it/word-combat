@@ -71,7 +71,7 @@ func _build() -> void:
 		skill_name = t
 		name_custom = t.strip_edges() != "")
 	bar.add_child(name_edit)
-	var dice := K.button("🎲", "normal", 16)
+	var dice := K.button("随机", "normal", 16)
 	dice.custom_minimum_size = Vector2(44, 34)
 	dice.tooltip_text = "按这个技能的效果随机取一个名字"
 	dice.pressed.connect(func():
@@ -223,7 +223,7 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 	ptxt.clip_text = true
 	head.add_child(ptxt)
 	if on_delete.is_valid():
-		var del := K.button("✕", "ghost", 14)
+		var del := K.button("×", "ghost", 14)
 		del.custom_minimum_size = Vector2(32, 26)
 		del.pressed.connect(on_delete)
 		head.add_child(del)

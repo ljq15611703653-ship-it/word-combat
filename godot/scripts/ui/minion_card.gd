@@ -167,7 +167,7 @@ func refresh(u: Dictionary, sk: Array) -> void:
 	K.clear_children(kw_row)
 	var kw: String = u.get("kw", "")
 	if kw != "":
-		var kc := K.chip("◈ " + kw + ("（已用）" if u.get("kw_spent", false) else ""), Color("6b5a22") if not u.get("kw_spent", false) else Color("3a3a40"), 13)
+		var kc := K.chip("◆ " + kw + ("（已用）" if u.get("kw_spent", false) else ""), Color("6b5a22") if not u.get("kw_spent", false) else Color("3a3a40"), 13)
 		kc.tooltip_text = "被动关键词：" + kw
 		kw_row.add_child(kc)
 	# 技能

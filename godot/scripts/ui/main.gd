@@ -31,8 +31,7 @@ var slow := false
 func _ready() -> void:
 	Lex.load_all()
 	RenderingServer.set_default_clear_color(K.BG)
-	var f := SystemFont.new()
-	f.font_names = PackedStringArray(["Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "SimHei", "WenQuanYi Micro Hei"])
+	var f: Font = load("res://assets/fonts/NotoSansSC-subset.ttf")   # 内置字体：网页版没有系统字体可用
 	var th := Theme.new()
 	th.default_font = f
 	th.default_font_size = 18

@@ -149,7 +149,7 @@ func _build() -> void:
 	unit_name_edit.custom_minimum_size = Vector2(170, 34)
 	unit_name_edit.text_changed.connect(func(t): work.name = t if t.strip_edges() != "" else work.name)
 	nrow.add_child(unit_name_edit)
-	var dice := K.button("🎲", "normal", 18)
+	var dice := K.button("随机", "normal", 18)
 	dice.custom_minimum_size = Vector2(44, 34)
 	dice.tooltip_text = "按这张卡装的技能随机取一个名字"
 	dice.pressed.connect(func():
@@ -459,7 +459,7 @@ func _rebuild_params() -> void:
 	skill_name_edit.custom_minimum_size = Vector2(170, 32)
 	skill_name_edit.text_changed.connect(func(tx): sel_name = tx.strip_edges())
 	nm.add_child(skill_name_edit)
-	var sdice := K.button("🎲", "normal", 16)
+	var sdice := K.button("随机", "normal", 16)
 	sdice.custom_minimum_size = Vector2(44, 32)
 	sdice.tooltip_text = "按这个技能的效果随机取一个名字"
 	sdice.pressed.connect(func():

@@ -322,7 +322,7 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 	portrait.add_child(cc)
 	v.add_child(portrait)
 	if u.kw != "":
-		v.add_child(K.chip("◈ " + u.kw, Color("6b5a22"), 15))
+		v.add_child(K.chip("◆ " + u.kw, Color("6b5a22"), 15))
 	else:
 		v.add_child(K.label("◇ 无关键词", 14, K.MUTED))
 	for k in D.MAX_SKILLS:
