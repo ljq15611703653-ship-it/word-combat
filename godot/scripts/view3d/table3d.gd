@@ -22,6 +22,9 @@ var _hover_uid := -1
 var _t := 0.0
 var enabled_input := true
 var sway := Vector2.ZERO
+var intent_root: Node3D
+var _shake_amp := 0.0
+var _shake_t := 0.0
 
 func _ready() -> void:
 	_build_world()
@@ -91,6 +94,9 @@ func _build_world() -> void:
 	_build_opponent()
 	for s in 2:
 		_build_ap_stack(s)
+	intent_root = Node3D.new()
+	intent_root.name = "Intents"
+	add_child(intent_root)
 
 func _build_opponent() -> void:
 	opponent = Node3D.new()
@@ -255,6 +261,137 @@ func _process(delta: float) -> void:
 		var base := Vector3(0, 0.66, 1.0)
 		cam.position = base + Vector3(sway.x * 0.12, -sway.y * 0.05 + sin(_t * 0.9) * 0.004, sway.y * 0.06)
 		cam.rotation_degrees = Vector3(-33 - sway.y * 3.0, -sway.x * 4.0, 0)
+		if _shake_t > 0.0:
+			_shake_t -= delta
+			var k := _shake_amp * clampf(_shake_t / 0.35, 0.0, 1.0)
+			cam.position += Vector3(randf_range(-k, k), randf_range(-k, k), 0)
+			cam.rotation_degrees.z = randf_range(-k, k) * 40.0
 	if opponent != null:
 		opponent.position.y = sin(_t * 1.1) * 0.004
 		opponent.rotation_degrees.x = sin(_t * 0.7) * 0.8
+
+# ------------------------------------------------------------ 镜头震动（打击感）
+func shake(amp: float, dur: float = 0.35) -> void:
+	_shake_amp = maxf(_shake_amp if _shake_t > 0.0 else 0.0, amp)
+	_shake_t = maxf(_shake_t, dur)
+
+# ------------------------------------------------------------ 意图箭头：谁在第几秒打谁、打多少
+func clear_intents() -> void:
+	if intent_root == null:
+		return
+	for c in intent_root.get_children():
+		c.queue_free()
+
+func _unshaded(col: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = col
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.no_depth_test = true
+	m.render_priority = 3
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return m
+
+func _bez(p0: Vector3, p1: Vector3, p2: Vector3, t: float) -> Vector3:
+	return p0.lerp(p1, t).lerp(p1.lerp(p2, t), t)
+
+func _intent_label(text: String, col: Color, pos: Vector3, size_px: int = 54) -> Label3D:
+	var l := Label3D.new()
+	l.font = Minion3D.get_font()
+	l.text = text
+	l.font_size = size_px
+	l.pixel_size = 0.0011
+	l.modulate = col
+	l.outline_size = 16
+	l.outline_modulate = Color(0, 0, 0, 0.95)
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.render_priority = 6
+	l.position = pos
+	intent_root.add_child(l)
+	return l
+
+func _arc(a: Vector3, b: Vector3, col: Color, label: String) -> void:
+	var p0 := a + Vector3(0, 0.2, 0)
+	var p2 := b + Vector3(0, 0.2, 0)
+	var dist := p0.distance_to(p2)
+	var p1 := (p0 + p2) * 0.5 + Vector3(0, 0.12 + dist * 0.35, 0)
+	var im := ImmediateMesh.new()
+	var mi := MeshInstance3D.new()
+	mi.mesh = im
+	mi.material_override = _unshaded(Color(col.r, col.g, col.b, 0.85))
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLE_STRIP)
+	var n := 24
+	var w := 0.012
+	for i in n + 1:
+		var t := float(i) / n
+		var p := _bez(p0, p1, p2, t)
+		var tan := (_bez(p0, p1, p2, minf(1.0, t + 0.02)) - _bez(p0, p1, p2, maxf(0.0, t - 0.02))).normalized()
+		var to_cam := (cam.global_position - p).normalized() if cam != null else Vector3.UP
+		var side := tan.cross(to_cam).normalized() * w * (1.0 - 0.5 * t)
+		im.surface_add_vertex(p - side)
+		im.surface_add_vertex(p + side)
+	im.surface_end()
+	intent_root.add_child(mi)
+	# 箭头
+	var head := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.0
+	cm.bottom_radius = 0.028
+	cm.height = 0.06
+	head.mesh = cm
+	head.material_override = _unshaded(col)
+	intent_root.add_child(head)
+	var tip := p2
+	var dir := (p2 - _bez(p0, p1, p2, 0.93)).normalized()
+	head.position = tip - dir * 0.03
+	head.basis = Basis(Quaternion(Vector3.UP, dir))
+	# 沿弧线跑的小光点
+	var dot := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.016
+	sm.height = 0.032
+	dot.mesh = sm
+	dot.material_override = _unshaded(col.lightened(0.5))
+	intent_root.add_child(dot)
+	var tw := dot.create_tween().set_loops()
+	tw.tween_method(func(t: float): dot.position = _bez(p0, p1, p2, t), 0.0, 1.0, 1.1)
+	_intent_label(label, col.lightened(0.35), _bez(p0, p1, p2, 0.72) + Vector3(0, 0.05, 0), 64)
+
+# intents：[{host, side, start, name, hits:[{uid, dmg, heal, status}], tags:[..]}]
+func set_intents(intents: Array) -> void:
+	clear_intents()
+	if cam == null:
+		return
+	for it in intents:
+		var host: Node3D = minions.get(int(it.host))
+		if host == null:
+			continue
+		var foe: bool = int(it.side) == 1
+		var base_col: Color = Color("ff6a5a") if foe else Color("6aa8ff")
+		var placed_self := false
+		for h in it.hits:
+			var tgt: Node3D = minions.get(int(h.uid))
+			if tgt == null:
+				continue
+			var parts: Array = []
+			if int(h.dmg) > 0:
+				parts.append("-%d" % int(h.dmg))
+			if int(h.heal) > 0:
+				parts.append("+%d" % int(h.heal))
+			for st in h.status:
+				parts.append(str(st))
+			var col := base_col
+			if int(h.dmg) == 0:
+				col = Color("6ad49a") if int(h.heal) > 0 else Color("e8c060")
+			var label := "%d秒 %s" % [int(it.start), " ".join(parts)]
+			if int(h.uid) == int(it.host):
+				_intent_label(label, col, host.position + Vector3(0, 0.62, 0), 48)
+				placed_self = true
+			else:
+				_arc(host.position, tgt.position, col, label)
+		if not it.tags.is_empty():
+			var y := 0.70 if placed_self else 0.62
+			_intent_label("%d秒 %s" % [int(it.start), "·".join(it.tags)], Color("c8a0ff"), host.position + Vector3(0, y, 0), 48)
+		elif it.hits.is_empty():
+			_intent_label("%d秒 %s" % [int(it.start), str(it.name)], base_col.lightened(0.3), host.position + Vector3(0, 0.62, 0), 44)

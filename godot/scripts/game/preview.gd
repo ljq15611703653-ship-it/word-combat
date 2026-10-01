@@ -24,7 +24,7 @@ static func _name(st: Dictionary, uid: int) -> String:
 
 # 返回 {"cost": [..], "effects": [..], "fears": [..], "facts": [..]}
 static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: Array, enemy_declared: Array) -> Dictionary:
-	var out := {"cost": [], "effects": [], "fears": [], "facts": []}
+	var out := {"cost": [], "effects": [], "fears": [], "facts": [], "data": {}}
 	var sk: Dictionary = E.skill_of(st, act.sid)
 	if sk.is_empty():
 		return out
@@ -81,6 +81,21 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 		out.effects.append("%s：恢复 %d 点（生命 %d → %d）" % [_name(st, uid), int(heal[uid]), int(E._u(st, uid).hp), int(E._u(c, uid).hp)])
 	for uid in stat:
 		out.effects.append("%s：获得【%s】" % [_name(st, uid), "】【".join(stat[uid])])
+	var data := {"kills": [], "score": 0, "dmg": 0, "heal": 0, "status": [], "cost": cost, "ap_left": ap_left}
+	for uid in dmg:
+		if int(E._u(st, uid).side) != side:
+			data.dmg += int(dmg[uid])
+	for uid in heal:
+		if int(E._u(st, uid).side) == side:
+			data.heal += int(heal[uid])
+	for uid in downs:
+		if int(E._u(st, uid).side) != side:
+			data.kills.append(str(E._u(st, uid).name))
+			data.score += int(downs[uid])
+	for uid in stat:
+		for sn in stat[uid]:
+			data.status.append({"name": str(E._u(st, uid).name), "status": sn})
+	out.data = data
 	if out.effects.is_empty():
 		out.effects.append("这招不会直接改变生命：它是设伏、改时间或需要“条件满足/对手出招”才起作用的类型。")
 	elif other:
@@ -124,3 +139,47 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 	else:
 		out.fears.append("你是先手宣告：对手会看到你的全部行动再决定怎么应对。起效越晚、越贵的招越容易被针对。")
 	return out
+
+# 一个已宣告行动“写在牌面上的意图”：假设没有任何其他行动时，它会打谁、打多少（只是把牌面文字算清楚，不模拟双方交锋）
+static func intent_of(st: Dictionary, act: Dictionary) -> Dictionary:
+	var sk := E.skill_of(st, int(act.sid))
+	var host := E.host_of(st, int(act.sid))
+	var out := {"host": host, "side": int(act.side), "start": int(act.start), "name": str(sk.get("name", "")), "hits": [], "tags": []}
+	var c := E.clone_state(st)
+	var one: Dictionary = act.duplicate(true)
+	E.run_round(c, [one])
+	var by := {}
+	for e in c.events:
+		if not e.has("tgt") or int(e.get("src", host)) != host:
+			continue
+		var uid := int(e.tgt)
+		if not by.has(uid):
+			by[uid] = {"uid": uid, "dmg": 0, "heal": 0, "status": [], "t": int(e.t)}
+		match e.type:
+			"dmg": by[uid].dmg += int(e.amount)
+			"heal": by[uid].heal += int(e.amount)
+			"status": by[uid].status.append(str(e.status))
+			"mit": by[uid].status.append("减伤")
+	for uid in by:
+		var h: Dictionary = by[uid]
+		if h.dmg > 0 or h.heal > 0 or not h.status.is_empty():
+			out.hits.append(h)
+	for n in sk.get("nodes", []):
+		_tags(n, out.tags)
+	return out
+
+static func _tags(n: Dictionary, tags: Array) -> void:
+	match n.get("kind", ""):
+		"watch":
+			if not ("设伏" in tags):
+				tags.append("设伏")
+		"time":
+			var t: String = {"delay": "延后", "advance": "提前", "interrupt": "打断"}.get(n.op, "时间术")
+			if not (t in tags):
+				tags.append(t)
+		"swap":
+			if not ("换位" in tags):
+				tags.append("换位")
+	for key in ["child", "first", "then", "else", "a", "b"]:
+		if n.has(key) and n[key] is Dictionary and not n[key].is_empty():
+			_tags(n[key], tags)

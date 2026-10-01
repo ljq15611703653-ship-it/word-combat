@@ -30,6 +30,7 @@ var bar_fill: MeshInstance3D
 var ring: MeshInstance3D
 var flash_light: OmniLight3D
 var body: StaticBody3D
+var hud: Node3D
 var _down_applied := false
 var _idle_t := 0.0
 var _busy_lunge := false
@@ -66,17 +67,24 @@ func setup(u: Dictionary, sk: Array, which_side: int, m: String = "battle") -> v
 	pivot.add_child(model)
 	# 敌方面朝我方（+Z），我方面朝对面（-Z）
 	pivot.rotation.y = PI if side == 1 else 0.0
-	# 头顶信息
-	name_label = _label(44, Color("ece8da"), 0.37)
-	add_child(name_label)
-	bar_back = Proc.box(Vector3(0.16, 0.016, 0.004), Proc.mat(Color("0c0e14"), 0.9), Vector3(0, 0.325, 0))
-	add_child(bar_back)
-	bar_fill = Proc.box(Vector3(0.156, 0.012, 0.005), Proc.mat(K.GREEN, 0.5, 0.0, 0.4), Vector3(0, 0.325, 0.002))
-	add_child(bar_fill)
-	hp_label = _label(40, Color.WHITE, 0.30)
-	add_child(hp_label)
-	status_label = _label(36, Color("e0b85c"), 0.435)
-	add_child(status_label)
+	# 头顶信息（远处的对手一排放大，保证看得清）
+	hud = Node3D.new()
+	# 对手一排：信息放在头顶并放大；我方一排：信息放在脚前的桌面上，不挡住对面
+	hud.position = Vector3(0, 0.30, 0) if side == 1 else Vector3(0, 0.0, 0.15)
+	hud.scale = Vector3.ONE * (1.6 if side == 1 else 1.15)
+	add_child(hud)
+	name_label = _label(44, Color("ece8da"), 0.075)
+	hud.add_child(name_label)
+	bar_back = Proc.box(Vector3(0.14, 0.016, 0.004), Proc.mat(Color("0c0e14"), 0.9), Vector3(0, 0.035, 0))
+	bar_back.material_override.no_depth_test = true
+	bar_back.material_override.render_priority = 4
+	hud.add_child(bar_back)
+	bar_fill = Proc.box(Vector3(0.136, 0.012, 0.005), Proc.mat(K.GREEN, 0.5, 0.0, 0.4), Vector3(0, 0.035, 0.002))
+	hud.add_child(bar_fill)
+	hp_label = _label(44, Color.WHITE, 0.0)
+	hud.add_child(hp_label)
+	status_label = _label(36, Color("e0b85c"), 0.12)
+	hud.add_child(status_label)
 	# 选中圈
 	ring = Proc.torus(0.004, 0.085, Proc.mat(K.GOLD, 0.3, 0.0, 2.0), Vector3(0, 0.012, 0))
 	ring.visible = false
@@ -127,9 +135,12 @@ func refresh(u: Dictionary, sk: Array) -> void:
 func _set_hp_visual(hp: float, maxhp: int) -> void:
 	var r := clampf(hp / maxf(1.0, float(maxhp)), 0.0, 1.0)
 	bar_fill.scale.x = maxf(r, 0.001)
-	bar_fill.position.x = -0.078 * (1.0 - r)
+	bar_fill.position.x = -0.068 * (1.0 - r)
 	var col: Color = K.GREEN if r > 0.5 else (Color("d8b23a") if r > 0.25 else K.RED)
-	bar_fill.material_override = Proc.mat(col, 0.5, 0.0, 0.5)
+	var bm := Proc.mat(col, 0.5, 0.0, 0.5)
+	bm.no_depth_test = true
+	bm.render_priority = 5
+	bar_fill.material_override = bm
 	hp_label.text = "%d / %d" % [int(round(hp)), maxhp]
 
 func _set_down(down: bool, animate: bool) -> void:

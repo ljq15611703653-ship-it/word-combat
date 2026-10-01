@@ -15,6 +15,7 @@ const DraftScreen = preload("res://scripts/ui/draft_screen.gd")
 const BattleScreen = preload("res://scripts/ui/battle_screen.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const Tutorial = Tut
+const Pet = preload("res://scripts/ui/pet.gd")
 
 var m
 var screen: Control
@@ -36,6 +37,13 @@ func _ready() -> void:
 	th.default_font = f
 	th.default_font_size = 18
 	theme = th
+	# 桌宠在最上层（引导的遮罩之上）
+	var pet_layer := CanvasLayer.new()
+	pet_layer.layer = 10
+	add_child(pet_layer)
+	var pet := Pet.new()
+	pet.theme = th
+	pet_layer.add_child(pet)
 	Settings.load_all()
 	Sfx.muted = Settings.muted
 	var sfx := Sfx.new()
@@ -106,14 +114,14 @@ func _drive(s: Control) -> void:
 			_last_adj_left = left_now
 			_last_adj_round = int(m.st.round)
 			if m.adjust_side() == 0 and m.adjust_left(0) > 0:
-				s._open_editor(1)
+				s._open_editor(1)   # 改第二张卡（替换它唯一的技能）
 				await get_tree().create_timer(0.3).timeout
 				var pop = s.popup
 				if pop != null and is_instance_valid(pop):
 					for t in R.catalog():
 						var sk: Dictionary = R.build(t.id, {})
 						if G.missing(sk.words, pop.avail_for_slot()).is_empty() and pop._points_other() - pop._slot_budget() + int(sk.budget) <= 100 and G.problems(sk).is_empty():
-							pop.slot = 1
+							pop.slot = 0
 							pop._install(sk)
 							if pop.btn_commit.disabled:
 								continue
@@ -277,6 +285,7 @@ func _start_tutorial() -> void:
 	var words: Array = []
 	words.append_array(R.build("atk1", {"dbl": 1}).words)
 	words.append_array(R.build("mit", {}).words)
+	words.append_array(R.build("mit", {"tgt": "choose"}).words)
 	m.pools[0] = G.count_words(words)
 	m.pools[1] = {}
 	var dk: Dictionary = D.new_deck()
@@ -348,6 +357,21 @@ func _tut_test() -> void:
 		var hole: Rect2 = tut.current_hole()
 		var tgt: String = st.target
 		var b = battle_screen
+		if tgt.begins_with("b:mine"):
+			if b != null and is_instance_valid(b):
+				var u0: Dictionary = m.st.sides[0].units[int(tgt.substr(6))]
+				b._on_card_clicked(b.cards[u0.uid])
+			continue
+		if tgt.begins_with("e:param:") and not get_tree().get_nodes_in_group("tut:" + tgt).is_empty():
+			var obs: Array = get_tree().get_nodes_in_group("tut:" + tgt)[0].find_children("*", "OptionButton", true, false)
+			if not obs.is_empty():
+				var ob: OptionButton = obs[0]
+				var want: String = str(w).split(":")[2] if w is String else ""
+				for oi in ob.item_count:
+					if str(ob.get_item_metadata(oi)) == want:
+						ob.select(oi)
+						ob.item_selected.emit(oi)
+				continue
 		if tgt == "b:foe" or tgt == "b:foe:hurt":
 			if b != null and is_instance_valid(b):
 				for u in m.st.sides[1].units:
@@ -759,13 +783,17 @@ func _click_test_editor() -> void:
 	await get_tree().create_timer(0.3).timeout
 	var pop = s.popup
 	log.call("点击后弹出编辑器", pop != null and is_instance_valid(pop))
-	# 逐个点模板，直到“装入技能槽 1”可点
+	# 先切到“备选模板”页，再逐个点模板，直到“装上这个技能”可点
+	var tpl_tab := _find_button(pop, "备选模板（现成的招式）")
+	log.call("有“备选模板”标签", tpl_tab != null)
+	if tpl_tab != null:
+		await _click(tpl_tab)
 	var installed := false
 	for tid in ["atk1", "atkA", "heal", "mit", "shield", "redirect", "time", "swap"]:
 		if not pop.tpl_buttons.has(tid):
 			continue
 		await _click(pop.tpl_buttons[tid])
-		var ib := _find_button(pop, "装入技能槽 1")
+		var ib := _find_button(pop, "装上这个技能")
 		if ib != null:
 			await _click(ib)
 			installed = true
@@ -773,12 +801,12 @@ func _click_test_editor() -> void:
 			break
 	log.call("至少有一个模板凑得出词", installed)
 	# 复杂版标签
-	var tab_btn := _find_button(pop, "复杂版 · 自由拼词")
+	var tab_btn := _find_button(pop, "自由拼词（自己组合）")
 	log.call("有复杂版标签", tab_btn != null)
 	if tab_btn != null:
 		await _click(tab_btn)
 		log.call("切到复杂版后可见", pop.complex_root.visible and not pop.simple_root.visible)
-		var back := _find_button(pop, "简单版 · 选招式填空")
+		var back := _find_button(pop, "备选模板（现成的招式）")
 		await _click(back)
 		log.call("切回简单版", pop.simple_root.visible)
 	var commit := _find_button(pop, "确认修改")

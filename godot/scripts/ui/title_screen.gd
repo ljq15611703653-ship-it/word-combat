@@ -93,6 +93,16 @@ func _ready() -> void:
 		Settings.save_all()
 		cbtn.text = "辅助轮：开" if Settings.coach else "辅助轮：关")
 	lv_row.add_child(cbtn)
+	var pbtn := K.button("桌宠：开" if Settings.pet else "桌宠：关", "ghost", 16)
+	pbtn.tooltip_text = "小词会在你拼技能、准备出招时评价这一招（新手引导里它总会出现）。"
+	pbtn.pressed.connect(func():
+		Settings.pet = not Settings.pet
+		Settings.save_all()
+		var P = load("res://scripts/ui/pet.gd")
+		if P.inst != null:
+			P.inst.visible = Settings.pet
+		pbtn.text = "桌宠：开" if Settings.pet else "桌宠：关")
+	lv_row.add_child(pbtn)
 	v.add_child(lv_row)
 	v.add_child(desc)
 	refresh_lv.call()

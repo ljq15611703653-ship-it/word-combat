@@ -6,7 +6,7 @@ const G = preload("res://scripts/core/grammar.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 
 const BUDGET := 100
-const MAX_SKILLS := 2
+const MAX_SKILLS := 1      # 一个随从一招（招里可以用“并”连多个效果）
 const NAMES := ["剑灵", "盾卫", "咒师", "弓手", "魂使"]
 const GLYPHS := ["剑", "盾", "咒", "弓", "魂"]
 const KEYWORDS := ["首挡", "不屈", "回击", "回春", "同调", "免疫狂振", "免疫牵连", "免疫升华"]

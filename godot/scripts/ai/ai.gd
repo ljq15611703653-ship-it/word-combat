@@ -108,7 +108,7 @@ static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGener
 	var used := {}
 	var chosen: Array = []
 	for entry in PERSONAS[persona]:
-		if chosen.size() >= 7:
+		if chosen.size() >= 5 * D.MAX_SKILLS:
 			break
 		var placed := false
 		for v in entry[1]:
@@ -129,6 +129,8 @@ static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGener
 		for tgt in ["choose", "lowest", "first", "last", "random", "highest"]:
 			var sk2 := R.build("atk1", {"tgt": tgt, "n": 14})
 			if G.missing(sk2.words, _avail(pool, used)).is_empty():
+				if chosen.size() >= 5 * D.MAX_SKILLS:
+					chosen.pop_back()
 				chosen.append(sk2)
 				_add_used(used, sk2.words)
 				break
@@ -181,11 +183,16 @@ static func _fit_and_place(deck: Dictionary, chosen: Array, num_cap: int) -> voi
 			skills.append(R.build(sk.template, p))
 		else:
 			skills.append(sk)
-	# 指派到卡：依次放到各卡，每卡至多2个
+	# 指派到卡：依次放到还有空槽的卡（每卡至多 MAX_SKILLS 个），放不下的丢弃
 	for i in skills.size():
-		var idx: int = i % 5
-		if deck.units[idx].skills.size() >= D.MAX_SKILLS:
-			idx = (idx + 1) % 5
+		var idx := -1
+		for k in 5:
+			var j: int = (i + k) % 5
+			if deck.units[j].skills.size() < D.MAX_SKILLS:
+				idx = j
+				break
+		if idx == -1:
+			break
 		deck.units[idx].skills.append(skills[i])
 
 static func _place_keywords(deck: Dictionary, pool: Dictionary, used: Dictionary, persona: String) -> void:

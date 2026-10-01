@@ -183,8 +183,38 @@ func _bag_panel(i: int) -> Control:
 	head.add_child(rec)
 	rec_chips[i] = rec
 	v.add_child(head)
+	# 默认只看“这袋能帮你什么”和几个稀有词；想看全部再展开（减少每轮的阅读量）
+	var sum := K.vbox(4)
+	if Settings.coach and coach_info.has("per_bag"):
+		sum.add_child(K.wrap_label("这袋能帮你：" + _bag_line(i), 17, K.GREEN))
+	var rares: Array = []
+	for w in cnt:
+		if str(Lex.words[w].rarity) != "基础" and not (w in rares):
+			rares.append(w)
+	# 奇术排前面，最多列 8 个
+	rares.sort_custom(func(a, b):
+		var ra: int = 0 if str(Lex.words[a].rarity) == "奇术" else 1
+		var rb: int = 0 if str(Lex.words[b].rarity) == "奇术" else 1
+		return ra < rb or (ra == rb and Lex.words[a].id < Lex.words[b].id))
+	if rares.size() > 8:
+		rares = rares.slice(0, 8)
+	var rflow := HFlowContainer.new()
+	rflow.add_theme_constant_override("h_separation", 6)
+	rflow.add_theme_constant_override("v_separation", 6)
+	rflow.add_child(K.label("值得注意的词：" if not rares.is_empty() else "全是基础词", 15, K.MUTED))
+	for w in rares:
+		rflow.add_child(K.word_tag(w, true, int(cnt[w])))
+	sum.add_child(rflow)
+	v.add_child(sum)
 	var grid := GridContainer.new()
 	grid.columns = 7
+	grid.visible = false
+	var more := K.button("展开看全部 %d 个词 ▾" % bag.size(), "ghost", 15)
+	more.custom_minimum_size = Vector2(0, 32)
+	more.pressed.connect(func():
+		grid.visible = not grid.visible
+		more.text = ("收起 ▴" if grid.visible else "展开看全部 %d 个词 ▾" % bag.size()))
+	v.add_child(more)
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)
 	var keys: Array = cnt.keys()

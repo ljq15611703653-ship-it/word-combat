@@ -18,6 +18,8 @@ var sum_box: VBoxContainer
 var name_edit: LineEdit
 var skill_name := "自拟招式"
 var name_custom := false
+var add_menu: PopupMenu
+var appraise_host: Control = null   # 编辑器弹窗：负责强度回执
 const Namer = preload("res://scripts/core/namer.gd")
 
 const TARGET_OPTS := [
@@ -89,12 +91,11 @@ func _build() -> void:
 	add.flat = false
 	add.add_theme_font_size_override("font_size", 17)
 	add.add_theme_stylebox_override("normal", K.style(K.PANEL2, K.EDGE, 10, 1))
-	var pop := add.get_popup()
-	for k in EFFECT_KINDS:
-		pop.add_item(KIND_TITLES[k])
-	pop.id_pressed.connect(func(i):
+	add_menu = add.get_popup()
+	add_menu.id_pressed.connect(func(i):
 		nodes.append(_new_node(EFFECT_KINDS[i]))
 		_rerender())
+	_refill_add_menu()
 	bar.add_child(add)
 	var hint := K.label("多个节点用「并」连在同一个技能里，自动计词", 14, K.MUTED)
 	bar.add_child(hint)
@@ -122,7 +123,39 @@ func load_skill(sk: Dictionary, avail_words: Dictionary, pts_other: int) -> void
 	name_custom = bool(sk.get("custom_name", false))
 	slot_old_budget = int(sk.get("budget", 0))
 	name_edit.text = skill_name
+	_refill_add_menu()
 	_rerender()
+
+# 每种效果的“核心词”：手上有这些词才排在前面（其余放到“缺词”分组，避免一上来看到一大堆用不了的东西）
+const CORE_WORDS := {
+	"dmg": [["造成", "伤害"], ["减少", "当前生命"]], "heal": [["恢复", "生命"], ["增加", "当前生命"]], "mit": [["减伤"]],
+	"status": [["施加"]], "remove": [["移除"]], "watch": [["当"]], "time": [["打断", "技能"], ["延后", "技能"], ["提前", "技能"]],
+	"swap": [["换位"]], "split": [["分流"]], "chain": [["接续"]], "copy": [["复制"]], "if": [["若"]], "choose": [["择一"]], "until": [["直到"]],
+}
+
+func kind_ready(k: String) -> bool:
+	for alt in CORE_WORDS.get(k, [[]]):
+		var ok := true
+		for w in alt:
+			if int(avail.get(w, 0)) <= 0:
+				ok = false
+		if ok:
+			return true
+	return false
+
+func _refill_add_menu() -> void:
+	if add_menu == null:
+		return
+	add_menu.clear()
+	add_menu.add_separator("你手上的词拼得出")
+	for i in EFFECT_KINDS.size():
+		if kind_ready(EFFECT_KINDS[i]):
+			add_menu.add_item(KIND_TITLES[EFFECT_KINDS[i]], i)
+	add_menu.add_separator("缺词（拿到词以后才能用）")
+	for i in EFFECT_KINDS.size():
+		if not kind_ready(EFFECT_KINDS[i]):
+			add_menu.add_item(KIND_TITLES[EFFECT_KINDS[i]] + "（缺词）", i)
+			add_menu.set_item_disabled(add_menu.get_item_index(i), true)
 
 # ------------------------------------------------------------ 新节点
 func _new_node(kind: String) -> Dictionary:
@@ -199,11 +232,15 @@ func _render_summary() -> void:
 	var over: bool = points_other - 0 + int(sk.budget) > D.BUDGET
 	if over:
 		sum_box.add_child(K.wrap_label("点数超出预算", 14, K.RED))
+	if probs.is_empty() and appraise_host != null and is_instance_valid(appraise_host):
+		var rb := K.vbox(3)
+		sum_box.add_child(rb)
+		appraise_host.appraise_into(rb, sk)
 	var sp := Control.new()
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sum_box.add_child(sp)
 	var ok := probs.is_empty() and miss.is_empty() and not over
-	var b := K.button("装入技能槽", "primary" if ok else "normal", 20)
+	var b := K.button("装上这个技能", "primary" if ok else "normal", 20)
 	b.disabled = not ok
 	b.pressed.connect(func(): changed.emit(_sk()))
 	sum_box.add_child(b)

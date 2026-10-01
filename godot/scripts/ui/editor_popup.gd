@@ -6,6 +6,8 @@ extends Control
 
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const K = preload("res://scripts/ui/kit.gd")
+const Appraise = preload("res://scripts/game/appraise.gd")
+const Pet = preload("res://scripts/ui/pet.gd")
 const Icon = preload("res://scripts/ui/icon.gd")
 const G = preload("res://scripts/core/grammar.gd")
 const R = preload("res://scripts/core/recipes.gd")
@@ -30,6 +32,8 @@ var kw_option: OptionButton
 var slot_box: VBoxContainer
 var info_box: VBoxContainer
 var tab_hint: Label
+var _ap_token := 0
+var _last_ap_sig := ""
 var tab_holder: Control
 var simple_root: Control
 var complex_root
@@ -183,7 +187,7 @@ func _build() -> void:
 	kw_option.item_selected.connect(_on_kw)
 	kw_row.add_child(kw_option)
 	lv.add_child(kw_row)
-	lv.add_child(K.label("技能槽（点选后在右侧编辑）", 15, K.MUTED))
+	lv.add_child(K.label("这张卡的技能（在右侧编辑）", 15, K.MUTED))
 	slot_box = K.vbox(8)
 	lv.add_child(slot_box)
 	var sp2 := Control.new()
@@ -219,6 +223,7 @@ func _build() -> void:
 	complex_root = Complex.new()
 	complex_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	complex_root.changed.connect(_on_complex_changed)
+	complex_root.appraise_host = self
 	tab_holder.add_child(complex_root)
 	Tut.tag(complex_root, "e:complex")
 	_show_tab(b_simple, b_complex)
@@ -295,7 +300,7 @@ func _refresh_left() -> void:
 		var v := K.vbox(4)
 		p.add_child(v)
 		var row := K.hbox(6)
-		row.add_child(K.label("技能槽 %d" % (k + 1), 16, K.GOLD if k == slot else K.MUTED))
+		row.add_child(K.label(("技能槽 %d" % (k + 1)) if D.MAX_SKILLS > 1 else "技能", 16, K.GOLD if k == slot else K.MUTED))
 		var spc := Control.new()
 		spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(spc)
@@ -496,7 +501,8 @@ func _rebuild_params() -> void:
 				ob.select(sel)
 				ob.item_selected.connect(func(i):
 					sel_params[prm.key] = ob.get_item_metadata(i)
-					_update_preview())
+					_update_preview()
+					Tut.fire("param:%s:%s" % [prm.key, str(ob.get_item_metadata(i))]))
 				ob.custom_minimum_size.x = 220
 				row.add_child(ob)
 			"int":
@@ -535,7 +541,7 @@ func _update_preview() -> void:
 	Tut.vars["price"] = int(preview_skill.price)
 	Tut.vars["windup"] = int(preview_skill.windup)
 	Tut.tag(preview_box, "e:preview")
-	_render_skill_preview(preview_box, preview_skill, "装入技能槽 %d" % (slot + 1), func():
+	_render_skill_preview(preview_box, preview_skill, ("装入技能槽 %d" % (slot + 1)) if D.MAX_SKILLS > 1 else "装上这个技能", func():
 		_install(preview_skill))
 	_refresh_info()
 
@@ -562,6 +568,10 @@ func _render_skill_preview(box: VBoxContainer, sk: Dictionary, btn_text: String,
 	var probs := G.problems(sk)
 	var over: bool = _points_other() - _slot_budget() + int(sk.budget) > D.BUDGET
 	var ok := miss.is_empty() and probs.is_empty() and not over
+	if probs.is_empty():
+		var rb := K.vbox(3)
+		box.add_child(rb)
+		appraise_into(rb, sk)
 	if not miss.is_empty():
 		var t := "缺少："
 		for w in miss:
@@ -619,3 +629,39 @@ func _merged_units() -> Array:
 	for i in base_deck.units.size():
 		units.append(work if i == unit_idx else base_deck.units[i])
 	return units
+
+# ---------------------------------------------------------------- 强度回执（两个编辑页共用）
+func appraise_into(box: VBoxContainer, sk: Dictionary) -> void:
+	box.add_child(K.label("强度回执：计算中…", 14, K.MUTED))
+	_ap_token += 1
+	var tok := _ap_token
+	if is_inside_tree():
+		await get_tree().create_timer(0.3).timeout
+	if tok != _ap_token or not is_instance_valid(box):
+		return
+	var work_copy: Dictionary = work.duplicate(true)
+	var info: Dictionary = Appraise.appraise(sk, base_deck, unit_idx, work_copy)
+	if not is_instance_valid(box):
+		return
+	K.clear_children(box)
+	var panel := K.panel(Color("2a2414") if info.big else Color("17202e"), K.GOLD if info.big else Color("2f5f93"), 8, 2 if info.big else 1)
+	var v := K.vbox(3)
+	panel.add_child(v)
+	v.add_child(K.label("★ 超级厉害的技能！" if info.big else "强度回执", 16, K.GOLD))
+	if info.summary != "":
+		v.add_child(K.wrap_label("预计（对手不动时）：" + str(info.summary) + "。", 14, K.TEXT))
+	if info.ok and int(info.best.get("dmg", 0)) + int(info.best.get("score", 0)) > 0:
+		if info.counters.is_empty():
+			v.add_child(K.wrap_label("对手现在公开的牌里：没有能拆它的招！", 14, K.GREEN))
+		else:
+			var names: Array = []
+			for c in info.counters:
+				names.append("【%s】" % c.name)
+			v.add_child(K.wrap_label("对手现在公开的牌里能削弱它的：" + "、".join(names), 14, Color("e8b0aa")))
+	for w in info.weak.slice(0, 3):
+		v.add_child(K.wrap_label("· 怕：" + str(w), 13, K.MUTED))
+	box.add_child(panel)
+	var sig := "%s|%d|%s" % [sk.get("text", ""), int(work.max_hp), str(info.summary)]
+	if sig != _last_ap_sig and str(info.line) != "":
+		_last_ap_sig = sig
+		Pet.chat(str(info.line), "excited" if info.big else "talk", 7.0)

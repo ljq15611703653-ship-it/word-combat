@@ -297,8 +297,7 @@ func _show_suggestion(idx: int, nd: Dictionary, persona: String) -> void:
 func _unit_panel(i: int, u: Dictionary) -> Control:
 	var p := K.panel(Color("1d2233"), K.BLUE.darkened(0.3), 14, 2, 8)
 	p.custom_minimum_size = Vector2(290, 0)
-	if i == 0:
-		Tut.tag(p, "b:unit0")
+	Tut.tag(p, "b:unit%d" % i)
 	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var v := K.vbox(6)
 	p.add_child(v)
@@ -339,7 +338,7 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 			v.add_child(sp2)
 		else:
 			var e := K.panel(Color(1, 1, 1, 0.03), K.EDGE, 8, 1)
-			e.add_child(K.label("＋ 空技能槽", 15, K.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
+			e.add_child(K.label("＋ 还没有技能", 15, K.MUTED, HORIZONTAL_ALIGNMENT_CENTER))
 			v.add_child(e)
 	var sp3 := Control.new()
 	sp3.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -347,8 +346,7 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 	var edit := K.button("编辑", "primary", 18)
 	edit.pressed.connect(func(): _open_editor(i))
 	edit.disabled = mode == "adjust" and m.adjust_side() != 0
-	if i == 0:
-		Tut.tag(edit, "b:edit0")
+	Tut.tag(edit, "b:edit%d" % i)
 	v.add_child(edit)
 	p.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	return p
@@ -357,6 +355,8 @@ func _open_editor(i: int) -> void:
 	if mode == "adjust" and (m.adjust_side() != 0 or m.adjust_left(0) <= 0):
 		return
 	Tut.fire("editor_open")
+	var Appr = load("res://scripts/game/appraise.gd")
+	Appr.ctx = {"foe": m.decks[1], "foe_ap": int(m.st.sides[1].ap)}
 	var pop := EditorPopup.new()
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(pop)

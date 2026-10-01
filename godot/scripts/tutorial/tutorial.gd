@@ -1,9 +1,10 @@
 extends Control
-# 新手引导覆盖层：压暗全屏、只留一个“洞”给玩家操作，附一个对话框。
+# 新手引导覆盖层：压暗全屏、只留一个“洞”给玩家操作；说话由桌宠“小词”的气泡负责。
 # 步骤数据在 data/tutorial.json；界面里用 Tut.tag(控件, "名字") 登记可高亮的控件，
 # 用 Tut.fire("事件") 告诉引导“玩家做了某事”。没有引导运行时，这些调用什么都不做。
 
 const K = preload("res://scripts/ui/kit.gd")
+const Pet = preload("res://scripts/ui/pet.gd")
 
 signal finished(completed: bool)
 
@@ -16,13 +17,9 @@ var idx := -1
 var dim: Array = []
 var full_dim: ColorRect
 var frame: Panel
-var dlg: PanelContainer
-var title_l: Label
-var text_l: Label
 var next_b: Button
 var skip_b: Button
 var exit_b: Button
-var prog_l: Label
 var hole := Rect2()
 var _t := 0.0
 
@@ -45,7 +42,6 @@ func start(from_id: String = "") -> void:
 	active = self
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	z_index = 100
 	for i in 4:
 		var r := ColorRect.new()
 		r.color = Color(0, 0, 0, 0.62)
@@ -66,38 +62,6 @@ func start(from_id: String = "") -> void:
 	frame.add_theme_stylebox_override("panel", sb)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(frame)
-	dlg = K.panel(Color("141a2a"), K.GOLD, 16, 3, 16)
-	dlg.custom_minimum_size = Vector2(760, 0)
-	var v := K.vbox(8)
-	dlg.add_child(v)
-	var head := K.hbox(10)
-	title_l = K.label("", 24, K.GOLD)
-	head.add_child(title_l)
-	var sp := Control.new()
-	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(sp)
-	prog_l = K.label("", 14, K.MUTED)
-	head.add_child(prog_l)
-	v.add_child(head)
-	text_l = K.wrap_label("", 21, K.TEXT)
-	v.add_child(text_l)
-	var row := K.hbox(10)
-	exit_b = K.button("退出引导", "ghost", 15)
-	exit_b.pressed.connect(func(): _finish(false))
-	row.add_child(exit_b)
-	var sp2 := Control.new()
-	sp2.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(sp2)
-	skip_b = K.button("跳过这步", "ghost", 15)
-	skip_b.pressed.connect(advance)
-	row.add_child(skip_b)
-	next_b = K.button("下一步  ▶", "primary", 20)
-	next_b.custom_minimum_size = Vector2(170, 44)
-	next_b.pressed.connect(advance)
-	row.add_child(next_b)
-	v.add_child(row)
-	add_child(dlg)
-	dlg.mouse_filter = Control.MOUSE_FILTER_STOP
 	var start_idx := 0
 	if from_id != "":
 		for i in steps.size():
@@ -111,6 +75,8 @@ func _exit_tree() -> void:
 		active = null
 		providers.clear()
 		vars.clear()
+	if Pet.inst != null and is_instance_valid(Pet.inst):
+		Pet.inst.tutorial_end()
 
 func cur() -> Dictionary:
 	return steps[idx] if idx >= 0 and idx < steps.size() else {}
@@ -123,27 +89,38 @@ func advance() -> void:
 	_enter()
 
 func _finish(ok: bool) -> void:
+	if Pet.inst != null and is_instance_valid(Pet.inst):
+		Pet.inst.tutorial_end()
 	finished.emit(ok)
 	active = null
 	queue_free()
 
 func _enter() -> void:
 	var s := cur()
-	title_l.text = str(s.get("title", ""))
-	text_l.text = _fmt(str(s.get("text", "")))
 	var w = s.get("wait", "next")
 	var is_next: bool = w is String and w == "next"
-	next_b.visible = is_next
-	next_b.text = str(s.get("button", "下一步  ▶"))
-	skip_b.visible = not is_next and not bool(s.get("hide", false))
-	prog_l.text = "%d / %d" % [idx + 1, steps.size()]
 	var hidden: bool = bool(s.get("hide", false))
-	dlg.visible = not hidden
 	full_dim.visible = false
 	for r in dim:
 		r.visible = false
 	frame.visible = false
-	exit_b.visible = not hidden
+	next_b = null
+	skip_b = null
+	exit_b = null
+	if Pet.inst == null or not is_instance_valid(Pet.inst):
+		return
+	if hidden:
+		Pet.inst.tutorial_show("", "（看着就好……）", [], Rect2(), "bottom")
+		return
+	var btns: Array = [{"id": "exit", "label": "退出引导", "style": "ghost", "size": 14, "cb": func(): _finish(false)}]
+	if not is_next:
+		btns.append({"id": "skip", "label": "跳过这步", "style": "ghost", "size": 14, "cb": advance})
+	else:
+		btns.append({"id": "next", "label": str(s.get("button", "下一步  ▶")), "style": "primary", "size": 18, "expand": true, "cb": advance})
+	var made: Dictionary = Pet.inst.tutorial_show("%s   %d/%d" % [str(s.get("title", "")), idx + 1, steps.size()], _fmt(str(s.get("text", ""))), btns, current_hole(), str(s.get("pos", "")))
+	next_b = made.get("next")
+	skip_b = made.get("skip")
+	exit_b = made.get("exit")
 	_layout()
 
 func _fmt(t: String) -> String:
@@ -217,20 +194,5 @@ func _layout() -> void:
 		frame.position = hole.position
 		frame.size = hole.size
 		frame.modulate.a = 0.55 + 0.45 * (0.5 + 0.5 * sin(_t * 5.0))
-	if dlg.visible:
-		var ds := dlg.get_combined_minimum_size()
-		dlg.size = ds
-		var x := (vp.x - ds.x) * 0.5
-		var y := vp.y - ds.y - 28.0
-		if has_hole:
-			var cy := hole.get_center().y
-			if cy > vp.y * 0.5:
-				y = 28.0
-		var pos_hint: String = str(s.get("pos", ""))
-		if pos_hint == "top":
-			y = 28.0
-		elif pos_hint == "bottom":
-			y = vp.y - ds.y - 28.0
-		elif pos_hint == "center":
-			y = (vp.y - ds.y) * 0.5
-		dlg.position = Vector2(x, y)
+	if Pet.inst != null and is_instance_valid(Pet.inst):
+		Pet.inst.tutorial_anchor(hole if has_hole else Rect2())

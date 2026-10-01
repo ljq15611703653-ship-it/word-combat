@@ -1,5 +1,5 @@
 extends Node
-# 音效：全部由代码合成（没有音频素材）。Sfx.play("名字")；Sfx.muted 可静音。
+# 音效：默认由代码合成；res://assets/sfx/<名字>.ogg|wav|mp3 存在时自动改用素材。Sfx.play("名字")；Sfx.muted 可静音。
 
 static var instance: Node = null
 static var muted := false
@@ -30,13 +30,31 @@ func _ready() -> void:
 		"lose": _tone([[392.0, 0.18], [330.0, 0.18], [262.0, 0.18], [196.0, 0.4]], 0.45),
 	}
 
+static var _overrides := {}
+
+# 素材替换：res://assets/sfx/<名字>.ogg / .wav / .mp3 存在就用它，否则用代码合成的音
+static func _override(name: String) -> AudioStream:
+	if _overrides.has(name):
+		return _overrides[name]
+	var found: AudioStream = null
+	for ext in ["ogg", "wav", "mp3"]:
+		var path := "res://assets/sfx/%s.%s" % [name, ext]
+		if ResourceLoader.exists(path):
+			found = load(path)
+			break
+	_overrides[name] = found
+	return found
+
 static func play(name: String) -> void:
-	if muted or instance == null or not _bank.has(name):
+	if muted or instance == null:
+		return
+	var ov := _override(name)
+	if ov == null and not _bank.has(name):
 		return
 	var self_node: Node = instance
 	var p: AudioStreamPlayer = self_node._players[self_node._next % self_node._players.size()]
 	self_node._next += 1
-	p.stream = _bank[name]
+	p.stream = ov if ov != null else _bank[name]
 	p.play()
 
 # ---------------------------------------------------------------- 合成

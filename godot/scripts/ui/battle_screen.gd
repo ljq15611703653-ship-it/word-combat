@@ -13,6 +13,9 @@ const Sfx = preload("res://scripts/ui/sfx.gd")
 const Preview = preload("res://scripts/game/preview.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const Icon = preload("res://scripts/ui/icon.gd")
+const Pet = preload("res://scripts/ui/pet.gd")
+const Appraise = preload("res://scripts/game/appraise.gd")
+const FxPlayer = preload("res://scripts/fx/fx_player.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
 const Table3D = preload("res://scripts/view3d/table3d.gd")
 
@@ -53,6 +56,9 @@ var auto_human := false
 static var use_3d := true
 var table: Node3D
 var preview_box: VBoxContainer
+var _pet_token := 0
+var fx: Node
+var _last_foe_said := -1
 var table_box: Control
 
 func begin(match_obj) -> void:
@@ -203,6 +209,9 @@ func _build() -> void:
 	toast_label.add_theme_constant_override("outline_size", 8)
 	toast_label.position = Vector2(300, 318)
 	toast_label.size = Vector2(1000, 60)
+	fx = FxPlayer.new()
+	add_child(fx)
+	fx.setup(self, fx_layer, table if use_3d else null, score_label)
 	toast_label.modulate.a = 0.0
 	toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	fx_layer.add_child(toast_label)
@@ -270,6 +279,18 @@ func _update_marks() -> void:
 			var sk := E.skill_of(m.st, a.sid)
 			timeline.marks.append({"t": int(a.start), "label": sk.name, "side": side})
 	timeline.queue_redraw()
+	_update_intents()
+
+# 牌桌上的意图箭头：已宣告的行动（双方都公开）写在牌面上会打谁、打多少
+func _update_intents() -> void:
+	if not use_3d or table == null or busy:
+		return
+	var list: Array = []
+	if m.phase == "declare":
+		for side in 2:
+			for a in m.declared[side]:
+				list.append(Preview.intent_of(m.st, a))
+	table.set_intents(list)
 
 func _describe_act(act: Dictionary) -> String:
 	if act.is_empty() or act.get("sid", -1) < 0:
@@ -454,6 +475,9 @@ func _show_enemy_declared() -> void:
 		Tut.tag(box, "b:foeacts")
 		Tut.vars["foe_t"] = int(foe_acts[0].start)
 		Tut.fire("foe_declared")
+		if _last_foe_said != int(m.st.round):
+			_last_foe_said = int(m.st.round)
+			_pet_foe_facts(foe_acts)
 		var col := K.vbox(2)
 		box.add_child(col)
 		var chip := K.chip("对手已宣告 %d 个行动（你看得到全部）" % foe_acts.size(), K.RED.darkened(0.2), 15)
@@ -680,6 +704,39 @@ func _render_action_panel() -> void:
 		action_box.add_child(preview_box)
 		_fill_preview()
 
+# 小词：对手宣告了什么（只说事实：哪一秒、打谁、多少）
+func _pet_foe_facts(foe_acts: Array) -> void:
+	var first: Dictionary = {}
+	for a in foe_acts:
+		var it := Preview.intent_of(m.st, a)
+		for h in it.hits:
+			if int(E._u(m.st, int(h.uid)).side) == 0 and int(h.dmg) > 0:
+				if first.is_empty() or int(it.start) < int(first.start):
+					first = {"start": it.start, "name": it.name, "tgt": E._u(m.st, int(h.uid)).name, "dmg": h.dmg}
+	if first.is_empty():
+		Pet.chat("对手宣告了 %d 个行动，看桌上的箭头！这回没有直接打你的。" % foe_acts.size(), "talk")
+	else:
+		Pet.chat("小心！对手宣告了 %d 个行动：第 %d 秒，【%s】要打你的%s %d 点！桌上的红箭头就是它。" % [foe_acts.size(), int(first.start), first.name, first.tgt, int(first.dmg)], "sad")
+
+# 小词：准备出招时感叹一句（只用自己确定知道的信息，假设对手不动）
+func _pet_action_line(info: Dictionary) -> void:
+	_pet_token += 1
+	var tok := _pet_token
+	await get_tree().create_timer(0.45).timeout
+	if tok != _pet_token or not is_instance_valid(self) or sel_sid < 0:
+		return
+	var sk := E.skill_of(m.st, sel_sid)
+	var d: Dictionary = info.get("data", {})
+	var kills: Array = d.get("kills", [])
+	var cost := int(d.get("cost", 0))
+	var big := kills.size() >= 2 or int(d.get("score", 0)) >= 25 or int(d.get("dmg", 0)) >= 30
+	var pricey := cost >= 35 or cost * 10 >= E.available_ap(m.st, 0, m.declared[0]) * 6
+	var line := Appraise.pet_line(sk, d, big, pricey, cost, false)
+	line = line.replace("你这个技能将会", "【%s】将会" % sk.name)
+	if not big:
+		line += "（假设对手不还手）"
+	Pet.chat(line, "excited" if big else "talk", 7.0)
+
 # 辅助轮：出招预判（只用自己确定知道的信息）
 func _fill_preview() -> void:
 	if preview_box == null or not is_instance_valid(preview_box):
@@ -691,6 +748,7 @@ func _fill_preview() -> void:
 			preview_box.add_child(K.wrap_label("选好目标后，这里会告诉你：这招打出去预计会怎样、要小心什么。", 13, K.MUTED))
 			return
 	var info: Dictionary = Preview.analyze(m.st, 0, act, m.declared[0], m.public_declared(1))
+	_pet_action_line(info)
 	var box := K.panel(Color("17202e"), Color("2f5f93"), 8, 1)
 	var v := K.vbox(2)
 	box.add_child(v)
@@ -751,6 +809,9 @@ func _tut_setup() -> void:
 			if u.down_round == -1:
 				rs.append(_card_rect(int(u.uid)))
 		return _union_rect(rs)
+	for i in m.st.sides[0].units.size():
+		var uid_i: int = int(m.st.sides[0].units[i].uid)
+		Tut.providers["b:mine%d" % i] = func() -> Rect2: return _card_rect(uid_i)
 	Tut.providers["b:foe:hurt"] = func() -> Rect2:
 		for u in m.st.sides[1].units:
 			if u.down_round == -1 and int(u.hp) < int(u.max_hp):
@@ -788,6 +849,10 @@ func _confirm() -> void:
 # ---------------------------------------------------------------- 结算与动画
 func _resolve() -> void:
 	busy = true
+	fx.reset_round()
+	fx.speed = speed
+	if use_3d and table != null:
+		table.clear_intents()
 	my_turn = false
 	_render_action_panel()
 	# 结算前的快照，供动画从旧状态开始
@@ -855,17 +920,17 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if c != null:
 				c.flash(K.BLUE if e.side == 0 else K.RED)
 			toast("%s：%s" % ["你" if e.side == 0 else "对手", sk.name], K.BLUE if e.side == 0 else K.RED)
-			Sfx.play("cast")
+			fx.play("cast", {"uid": int(e.host), "who": "mine" if e.side == 0 else "foe", "skill": sk.name})
 			return 0.45
 		"dmg":
 			var c2 = _card(int(e.tgt))
 			if int(e.amount) > 0:
 				if c2 != null:
-					c2.float_text("-%d" % int(e.amount), K.RED)
+					c2.float_text("-%d" % int(e.amount), K.RED, 30 + mini(int(e.amount), 30))
 					c2.shake()
 					c2.flash(K.RED)
 				_line_fx(int(e.src), int(e.tgt), K.RED)
-				Sfx.play("hit")
+				fx.hit(int(e.amount), {"uid": int(e.tgt), "who": "mine" if int(E._u(m.st, int(e.tgt)).side) == 1 else "foe"})
 				timeline.add_dot(float(t), K.RED, E._u(m.st, int(e.tgt)).side)
 				_log("　%s 对 %s 造成 [color=#e0605a]%d[/color]%s" % [_uname(int(e.src)), _uname(int(e.tgt)), int(e.amount), "" if int(e.raw) == int(e.amount) else "（原 %d）" % int(e.raw)])
 				return 0.3
@@ -878,7 +943,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if c3 != null:
 				c3.float_text("+%d" % int(e.actual) if int(e.actual) > 0 else "满", K.GREEN)
 				c3.flash(K.GREEN)
-				Sfx.play("heal")
+			fx.play("heal", {"uid": int(e.tgt), "amount": int(e.actual)})
 			timeline.add_dot(float(t), K.GREEN, E._u(m.st, int(e.tgt)).side)
 			_log("　%s 恢复 [color=#62c483]%d[/color]" % [_uname(int(e.tgt)), int(e.actual)])
 			return 0.25
@@ -893,14 +958,14 @@ func _play_event(e: Dictionary, t: int) -> float:
 			var c5 = _card(int(e.tgt))
 			if c5 != null:
 				c5.float_text("格挡!", K.GOLD, 28)
-				Sfx.play("block")
+			fx.play("block", {"uid": int(e.tgt)})
 			_log("　%s 的首挡生效" % _uname(int(e.tgt)))
 			return 0.25
 		"shield":
 			var c6 = _card(int(e.tgt))
 			if c6 != null:
 				c6.float_text("盾 -%d" % int(e.absorbed), K.BLUE, 24)
-				Sfx.play("block")
+			fx.play("shield", {"uid": int(e.tgt), "amount": int(e.absorbed)})
 			return 0.2
 		"mit":
 			var c7 = _card(int(e.tgt))
@@ -921,8 +986,8 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if c9 != null:
 				c9.flash(K.PURPLE)
 				c9.float_text("触发!", K.PURPLE, 26)
-				Sfx.play("magic")
 			_log("　[color=#a279d6]%s 的监听触发[/color]" % _uname(int(e.host)))
+			fx.trigger(t, {"uid": int(e.host)})
 			return 0.35
 		"redirect":
 			var cf = _card(int(e.from))
@@ -941,7 +1006,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			return 0.45
 		"interrupt":
 			toast("打断！对方的招式落空", K.GOLD)
-			Sfx.play("interrupt")
+			fx.play("interrupt", {"who": "mine" if e.side == 0 else "foe"})
 			_log("[color=#e0b85c]第%d秒 %s打断了%s的技能[/color]" % [t, "你" if e.side == 0 else "对手", "对手" if e.side == 0 else "你"])
 			return 0.6
 		"delay":
@@ -972,7 +1037,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 				cd.refresh(cd.unit, cd.skills)
 				cd.float_text("倒下", K.RED, 34)
 				cd.shake()
-				Sfx.play("down")
+			fx.play("kill", {"uid": int(e.tgt), "who": "mine" if int(e.score_side) == 0 else "foe", "score": int(e.score), "name": _uname(int(e.tgt))})
 			disp_score[int(e.score_side)] += int(e.score)
 			_update_hud()
 			toast("%s 倒下！ %s +%d分" % [_uname(int(e.tgt)), "你" if int(e.score_side) == 0 else "对手", int(e.score)], K.RED if int(e.score_side) == 1 else K.GREEN)
@@ -983,6 +1048,7 @@ func _play_event(e: Dictionary, t: int) -> float:
 			if ck != null:
 				ck.float_text(str(e.kw), K.GOLD, 26)
 			_log("　%s 的关键词【%s】生效" % [_uname(int(e.tgt)), str(e.kw)])
+			fx.trigger(t, {"uid": int(e.tgt)})
 			return 0.35
 		"immune":
 			var ci = _card(int(e.tgt))
@@ -1012,6 +1078,18 @@ func _play_event(e: Dictionary, t: int) -> float:
 			_log("　[color=#9aa2b8]%s[/color]" % str(e.get("why", "没有效果")))
 			return 0.25
 	return 0.0
+
+# ---------------------------------------------------------------- 打击感
+func _screen_of(uid: int) -> Vector2:
+	if use_3d and table != null:
+		return table.screen_pos(uid) + table_box.get_global_rect().position
+	var c = _card(uid)
+	if c == null:
+		return get_viewport_rect().size * 0.5
+	return (c as Control).get_global_rect().get_center()
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 
 func _line_fx(from_uid: int, to_uid: int, col: Color) -> void:
 	var a = _card(from_uid)
