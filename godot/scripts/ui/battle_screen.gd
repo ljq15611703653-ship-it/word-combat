@@ -10,6 +10,8 @@ const MinionCard = preload("res://scripts/ui/minion_card.gd")
 const Timeline = preload("res://scripts/ui/timeline.gd")
 const DeckView = preload("res://scripts/ui/deck_view.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
+const Preview = preload("res://scripts/game/preview.gd")
+const Settings = preload("res://scripts/ui/settings.gd")
 const Table3D = preload("res://scripts/view3d/table3d.gd")
 
 signal next_round()
@@ -48,6 +50,7 @@ var _built := false
 var auto_human := false
 static var use_3d := true
 var table: Node3D
+var preview_box: VBoxContainer
 var table_box: Control
 
 func begin(match_obj) -> void:
@@ -127,7 +130,7 @@ func _build() -> void:
 		table_box = SubViewportContainer.new()
 		table_box.stretch = true
 		table_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		table_box.custom_minimum_size = Vector2(0, 330)
+		table_box.custom_minimum_size = Vector2(0, 250)
 		var svp := SubViewport.new()
 		svp.msaa_3d = Viewport.MSAA_4X
 		svp.handle_input_locally = true
@@ -585,7 +588,8 @@ func _render_action_panel() -> void:
 		sel_start = int(x)
 		vl.text = "第 %d 秒" % int(x)
 		timeline.start_hint = sel_start
-		timeline.queue_redraw())
+		timeline.queue_redraw()
+		_fill_preview())
 	srow.add_child(sl)
 	srow.add_child(vl)
 	var en_list: Array = m.public_declared(1)
@@ -620,6 +624,40 @@ func _render_action_panel() -> void:
 	action_box.add_child(btns)
 	if err != "":
 		action_box.add_child(K.wrap_label(err, 13, K.RED))
+	preview_box = null
+	if Settings.coach:
+		preview_box = K.vbox(2)
+		action_box.add_child(preview_box)
+		_fill_preview()
+
+# 辅助轮：出招预判（只用自己确定知道的信息）
+func _fill_preview() -> void:
+	if preview_box == null or not is_instance_valid(preview_box):
+		return
+	K.clear_children(preview_box)
+	var act := _current_act()
+	for slot in G.choice_slots(E.skill_of(m.st, sel_sid)):
+		if slot.kind == "target" and not sel_choices.has(slot.key):
+			preview_box.add_child(K.wrap_label("选好目标后，这里会告诉你：这招打出去预计会怎样、要小心什么。", 13, K.MUTED))
+			return
+	var info: Dictionary = Preview.analyze(m.st, 0, act, m.declared[0], m.public_declared(1))
+	var box := K.panel(Color("17202e"), Color("2f5f93"), 8, 1)
+	var v := K.vbox(2)
+	box.add_child(v)
+	v.add_child(K.label("出招预判", 14, K.GOLD))
+	for l in info.cost:
+		v.add_child(K.wrap_label(l, 12, K.MUTED))
+	for l in info.effects:
+		v.add_child(K.wrap_label(("▸ " if not l.begins_with("（") else "") + l, 13, K.TEXT if not l.begins_with("（") else K.MUTED))
+	if not info.fears.is_empty():
+		v.add_child(K.label("怕什么", 14, K.RED))
+		for l in info.fears:
+			v.add_child(K.wrap_label("⚠ " + l, 13, Color("e8b0aa")))
+	if not info.facts.is_empty():
+		v.add_child(K.label("对手已宣告（事实）", 14, K.BLUE))
+		for l in info.facts:
+			v.add_child(K.wrap_label("· " + l, 12, K.MUTED))
+	preview_box.add_child(box)
 
 func _pass() -> void:
 	m.submit(0, {})
