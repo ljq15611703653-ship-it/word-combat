@@ -200,6 +200,14 @@ func _build() -> void:
 	bottom.add_child(ap)
 	v.add_child(bottom)
 	# 特效层
+	if use_3d:
+		var plates := Control.new()
+		plates.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		plates.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		plates.clip_contents = false
+		add_child(plates)
+		table.plate_layer = plates
+		table.plate_origin = table_box
 	fx_layer = Control.new()
 	fx_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	fx_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -207,7 +215,7 @@ func _build() -> void:
 	toast_label = K.label("", 40, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	toast_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	toast_label.add_theme_constant_override("outline_size", 8)
-	toast_label.position = Vector2(300, 318)
+	toast_label.position = Vector2(300, 196)
 	toast_label.size = Vector2(1000, 60)
 	fx = FxPlayer.new()
 	add_child(fx)
@@ -246,6 +254,9 @@ func _rebuild_rows() -> void:
 	cards.clear()
 	if use_3d:
 		table.setup_state(m.st, _skills_of)
+		table.relayout(m.st, false)
+		for uid2 in table.minions:
+			table.minions[uid2].set_top_view(table.view == "top", false)
 		for uid in table.minions:
 			cards[uid] = table.minions[uid]
 			cards[uid].clicked.connect(_on_card_clicked)
@@ -447,6 +458,8 @@ func _next_declare() -> void:
 		return
 	if m.human[s]:
 		my_turn = true
+		if use_3d and table != null:
+			table.set_view("top")
 		_clear_selection()
 		_show_enemy_declared()
 		_rebuild_hand()
@@ -455,6 +468,8 @@ func _next_declare() -> void:
 			_auto_play()
 	else:
 		my_turn = false
+		if use_3d and table != null:
+			table.set_view("seat")
 		_render_action_panel()
 		_ai_turn(s)
 
@@ -848,11 +863,13 @@ func _confirm() -> void:
 
 # ---------------------------------------------------------------- 结算与动画
 func _resolve() -> void:
+	if use_3d and table != null:
+		table.set_view("seat")
 	busy = true
 	fx.reset_round()
 	fx.speed = speed
 	if use_3d and table != null:
-		table.clear_intents()
+		table.set_intents([])
 	my_turn = false
 	_render_action_panel()
 	# 结算前的快照，供动画从旧状态开始

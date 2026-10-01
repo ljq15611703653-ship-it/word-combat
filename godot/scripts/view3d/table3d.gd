@@ -23,6 +23,20 @@ var _t := 0.0
 var enabled_input := true
 var sway := Vector2.ZERO
 var intent_root: Node3D
+# 两种视角：seat = 坐在桌前（第一人称，看结算）；top = 俯视棋盘（宣告时，像炉石一样摆开 5 对 5）
+const VIEWS := {
+	"seat": {"pos": Vector3(0, 0.66, 1.0), "rot": Vector3(-33, 0, 0), "fov": 56.0, "dx": 0.31, "sway": 1.0},
+	"top": {"pos": Vector3(0, 1.1, 0.6), "rot": Vector3(-64, 0, 0), "fov": 50.0, "dx": 0.42, "sway": 0.25},
+}
+var view := "seat"
+var plate_layer: Control = null        # 2D 铭牌层（由战斗界面提供）
+var plate_origin: Control = null       # 3D 视口在屏幕上的位置
+var cam_pos := Vector3(0, 0.66, 1.0)
+var cam_rot := Vector3(-33, 0, 0)
+var sway_k := 1.0
+var slot_dx := 0.31
+var _last_intents: Array = []
+var _last_state: Dictionary = {}
 var _shake_amp := 0.0
 var _shake_t := 0.0
 
@@ -30,6 +44,18 @@ func _ready() -> void:
 	_build_world()
 
 # ------------------------------------------------------------ 场景
+# 素材替换：res://assets/table/<名字>.tscn|.glb|.gltf 存在就用它
+static func asset(name: String) -> Node3D:
+	for ext in ["tscn", "glb", "gltf"]:
+		var path := "res://assets/table/%s.%s" % [name, ext]
+		if ResourceLoader.exists(path):
+			var res = load(path)
+			if res is PackedScene:
+				var n = res.instantiate()
+				if n is Node3D:
+					return n
+	return null
+
 func _build_world() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
@@ -66,24 +92,30 @@ func _build_world() -> void:
 	add_child(floor_m)
 	# 桌子：木框 + 绿呢桌面
 	var wood := Proc.mat(Color("4a2e1c"), 0.6, 0.05)
-	add_child(Proc.box(Vector3(2.7, 0.1, 1.8), wood, Vector3(0, -0.05, 0)))
+	var custom_table := asset("table")
+	if custom_table != null:
+		add_child(custom_table)
+	var code_table := Node3D.new()
+	code_table.visible = custom_table == null
+	add_child(code_table)
+	code_table.add_child(Proc.box(Vector3(2.7, 0.1, 1.8), wood, Vector3(0, -0.05, 0)))
 	var felt := MeshInstance3D.new()
 	var fpm := PlaneMesh.new()
 	fpm.size = Vector2(2.45, 1.55)
 	felt.mesh = fpm
 	felt.position = Vector3(0, 0.001, 0)
 	felt.material_override = Proc.mat(Color("1f5a40"), 0.95)
-	add_child(felt)
+	code_table.add_child(felt)
 	for sx in [-1, 1]:
-		add_child(Proc.box(Vector3(0.08, 0.04, 1.8), wood, Vector3(sx * 1.31, 0.02, 0)))
+		code_table.add_child(Proc.box(Vector3(0.08, 0.04, 1.8), wood, Vector3(sx * 1.31, 0.02, 0)))
 	for sz in [-1, 1]:
-		add_child(Proc.box(Vector3(2.7, 0.04, 0.08), wood, Vector3(0, 0.02, sz * 0.86)))
+		code_table.add_child(Proc.box(Vector3(2.7, 0.04, 0.08), wood, Vector3(0, 0.02, sz * 0.86)))
 	for lx in [-1.2, 1.2]:
 		for lz in [-0.75, 0.75]:
-			add_child(Proc.box(Vector3(0.12, 0.7, 0.12), wood, Vector3(lx, -0.45, lz)))
+			code_table.add_child(Proc.box(Vector3(0.12, 0.7, 0.12), wood, Vector3(lx, -0.45, lz)))
 	# 桌面中线（我方/对方分界）
 	var line := Proc.box(Vector3(2.2, 0.002, 0.006), Proc.mat(Color("2f7a58"), 0.8), Vector3(0, 0.003, 0))
-	add_child(line)
+	code_table.add_child(line)
 	# 我的相机：第一人称坐在桌前
 	cam = Camera3D.new()
 	cam.position = Vector3(0, 0.66, 1.0)
@@ -99,6 +131,12 @@ func _build_world() -> void:
 	add_child(intent_root)
 
 func _build_opponent() -> void:
+	var custom := asset("opponent")
+	if custom != null:
+		opponent = custom
+		opponent.position = Vector3(0, 0, -0.85)
+		add_child(opponent)
+		return
 	opponent = Node3D.new()
 	opponent.position = Vector3(0, 0, -0.85)
 	var robe := Proc.mat(Color("2a2438"), 0.8)
@@ -149,7 +187,10 @@ func set_ap(s: int, value: int, animate: bool = true) -> void:
 	var have := stack.get_child_count()
 	while have < chips:
 		var col: Color = K.GOLD if s == 0 else Color("d88a82")
-		var chip := Proc.cyl(0.05, 0.05, 0.014, Proc.mat(col, 0.3, 0.7, 0.2), Vector3(0, 0.02 + have * 0.016, 0))
+		var chip: Node3D = asset("chip_mine" if s == 0 else "chip_foe")
+		if chip == null:
+			chip = Proc.cyl(0.05, 0.05, 0.014, Proc.mat(col, 0.3, 0.7, 0.2))
+		chip.position = Vector3(0, 0.02 + have * 0.016, 0)
 		stack.add_child(chip)
 		if animate:
 			chip.position.y += 0.25
@@ -181,7 +222,7 @@ func set_ap(s: int, value: int, animate: bool = true) -> void:
 
 # ------------------------------------------------------------ 随从
 func slot_pos(s: int, idx: int) -> Vector3:
-	return Vector3((float(idx) - 2.0) * SLOT_DX, 0.0, ROW_Z if s == 0 else -ROW_Z)
+	return Vector3((float(idx) - 2.0) * slot_dx, 0.0, ROW_Z if s == 0 else -ROW_Z)
 
 func clear_minions() -> void:
 	for uid in minions:
@@ -189,12 +230,14 @@ func clear_minions() -> void:
 	minions.clear()
 
 func setup_state(st: Dictionary, skills_of: Callable) -> void:
+	_last_state = st
 	clear_minions()
 	for s in 2:
 		var units: Array = st.sides[s].units
 		for i in units.size():
 			var u: Dictionary = units[i]
 			var m := Minion3D.new()
+			m.table = self
 			add_child(m)
 			m.position = slot_pos(s, i)
 			m.setup(u, skills_of.call(u), s, "battle")
@@ -258,9 +301,9 @@ func _process(delta: float) -> void:
 	_t += delta
 	if cam != null:
 		# 第一人称的头部：轻微呼吸 + 随鼠标探身
-		var base := Vector3(0, 0.66, 1.0)
-		cam.position = base + Vector3(sway.x * 0.12, -sway.y * 0.05 + sin(_t * 0.9) * 0.004, sway.y * 0.06)
-		cam.rotation_degrees = Vector3(-33 - sway.y * 3.0, -sway.x * 4.0, 0)
+		var sw := sway * sway_k
+		cam.position = cam_pos + Vector3(sw.x * 0.12, -sw.y * 0.05 + sin(_t * 0.9) * 0.004 * sway_k, sw.y * 0.06)
+		cam.rotation_degrees = cam_rot + Vector3(-sw.y * 3.0, -sw.x * 4.0, 0)
 		if _shake_t > 0.0:
 			_shake_t -= delta
 			var k := _shake_amp * clampf(_shake_t / 0.35, 0.0, 1.0)
@@ -360,6 +403,7 @@ func _arc(a: Vector3, b: Vector3, col: Color, label: String) -> void:
 
 # intents：[{host, side, start, name, hits:[{uid, dmg, heal, status}], tags:[..]}]
 func set_intents(intents: Array) -> void:
+	_last_intents = intents
 	clear_intents()
 	if cam == null:
 		return
@@ -395,3 +439,35 @@ func set_intents(intents: Array) -> void:
 			_intent_label("%d秒 %s" % [int(it.start), "·".join(it.tags)], Color("c8a0ff"), host.position + Vector3(0, y, 0), 48)
 		elif it.hits.is_empty():
 			_intent_label("%d秒 %s" % [int(it.start), str(it.name)], base_col.lightened(0.3), host.position + Vector3(0, 0.62, 0), 44)
+
+# ------------------------------------------------------------ 视角切换
+func set_view(v: String, animate: bool = true) -> void:
+	if not VIEWS.has(v) or (v == view and animate):
+		return
+	view = v
+	var cfg: Dictionary = VIEWS[v]
+	var dur := 0.55 if animate else 0.0
+	clear_intents()
+	var t := create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	if dur <= 0.0:
+		cam_pos = cfg.pos
+		cam_rot = cfg.rot
+		cam.fov = cfg.fov
+		sway_k = cfg.sway
+		slot_dx = cfg.dx
+	else:
+		t.tween_property(self, "cam_pos", cfg.pos, dur)
+		t.tween_property(self, "cam_rot", cfg.rot, dur)
+		t.tween_property(cam, "fov", cfg.fov, dur)
+		t.tween_property(self, "sway_k", cfg.sway, dur)
+		t.tween_property(self, "slot_dx", cfg.dx, dur)
+	for uid in minions:
+		(minions[uid] as Node3D).call("set_top_view", v == "top", animate)
+	# 随从跟着滑到新间距；箭头等镜头停稳后按新角度重画
+	if not _last_state.is_empty():
+		var t2 := create_tween()
+		t2.tween_method(func(_x: float): relayout(_last_state, false), 0.0, 1.0, maxf(dur, 0.01))
+		t2.tween_callback(func(): set_intents(_last_intents))
+
+func plate_offset() -> Vector2:
+	return plate_origin.get_global_rect().position if plate_origin != null else Vector2.ZERO

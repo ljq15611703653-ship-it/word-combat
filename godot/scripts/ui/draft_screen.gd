@@ -209,11 +209,11 @@ func _bag_panel(i: int) -> Control:
 	var grid := GridContainer.new()
 	grid.columns = 7
 	grid.visible = false
-	var more := K.button("展开看全部 %d 个词 ▾" % bag.size(), "ghost", 15)
+	var more := K.button("展开看全部 %d 个词 ▼" % bag.size(), "ghost", 15)
 	more.custom_minimum_size = Vector2(0, 32)
 	more.pressed.connect(func():
 		grid.visible = not grid.visible
-		more.text = ("收起 ▴" if grid.visible else "展开看全部 %d 个词 ▾" % bag.size()))
+		more.text = ("收起 ▲" if grid.visible else "展开看全部 %d 个词 ▼" % bag.size()))
 	v.add_child(more)
 	grid.add_theme_constant_override("h_separation", 8)
 	grid.add_theme_constant_override("v_separation", 8)

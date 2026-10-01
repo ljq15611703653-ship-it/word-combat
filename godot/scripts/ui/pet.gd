@@ -12,6 +12,8 @@ const BUBBLE_W := 460.0
 
 var body: Control
 var tex: TextureRect
+var mood_tex := {}           # 心情 → 图片（res://assets/pet/pet_<心情>.png）
+var base_tex: Texture2D
 var bubble: PanelContainer
 var tail: Control
 var title_l: Label
@@ -46,9 +48,14 @@ func _ready() -> void:
 	body.draw.connect(_draw_body)
 	body.gui_input.connect(_on_body_input)
 	add_child(body)
-	if ResourceLoader.exists("res://assets/pet/pet.png"):
+	for md in ["normal", "talk", "excited", "sad"]:
+		var mp := "res://assets/pet/pet_%s.png" % md
+		if ResourceLoader.exists(mp):
+			mood_tex[md] = load(mp)
+	if ResourceLoader.exists("res://assets/pet/pet.png") or not mood_tex.is_empty():
 		tex = TextureRect.new()
-		tex.texture = load("res://assets/pet/pet.png")
+		tex.texture = load("res://assets/pet/pet.png") if ResourceLoader.exists("res://assets/pet/pet.png") else mood_tex.values()[0]
+		base_tex = tex.texture
 		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		tex.size = BODY
@@ -285,6 +292,8 @@ func _draw_body() -> void:
 	var bob := sin(_t * 2.2) * 3.0
 	var hop := -sin(_hop * PI) * 22.0 if _hop > 0.0 else 0.0
 	if tex != null:
+		var want: String = "talk" if _talking() and mood == "normal" else mood
+		tex.texture = mood_tex.get(want, base_tex)
 		tex.position = Vector2(0, bob + hop)
 		return
 	var squash := 1.0 + (sin(_t * 18.0) * 0.03 if _talking() else 0.0)

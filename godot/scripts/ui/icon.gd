@@ -19,7 +19,22 @@ static func make(glyph: String, px: float, color: Color) -> Control:
 	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return c
 
+# 素材替换：res://assets/icons/<kind>.png 存在就画图片
+static var _tex := {}
+static func _icon_tex(k: String) -> Texture2D:
+	if not _tex.has(k):
+		var path := "res://assets/icons/%s.png" % k
+		_tex[k] = load(path) if ResourceLoader.exists(path) else null
+	return _tex[k]
+
 func _draw() -> void:
+	var tx := _icon_tex(kind)
+	if tx != null:
+		var side := minf(size.x, size.y)
+		if side <= 1.0:
+			side = minf(custom_minimum_size.x, custom_minimum_size.y)
+		draw_texture_rect(tx, Rect2(Vector2((size.x - side) * 0.5, (size.y - side) * 0.5), Vector2(side, side)), false, col)
+		return
 	var s := minf(size.x, size.y)
 	if s <= 1.0:
 		s = minf(custom_minimum_size.x, custom_minimum_size.y)
