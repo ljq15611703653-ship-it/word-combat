@@ -193,12 +193,14 @@ static func describe_build(pool: Dictionary, deck: Dictionary) -> Array:
 # ------------------------------------------------------------ 抽词辅助轮 v2：每袋三条备选 + 推荐 + 针对
 const SCHOOL_LABEL := {"攻": "激进进攻", "守": "稳健防御", "反": "反制埋伏", "控": "打断控场"}
 
-# 对手已公开的牌：关键词、技能类型、血少的卡
+# 对手已公开的牌：关键词、技能类型、血少的卡、全场伤害、高伤害招
 static func foe_profile(foe: Dictionary) -> Dictionary:
 	var kws: Array = []
 	var tags := {}
 	var low: Array = []
-	var names: Array = []
+	var aoe := 0
+	var big := 0
+	var heavy: Array = []
 	for u in foe.get("units", []):
 		if str(u.get("kw", "")) != "":
 			kws.append(str(u.kw))
@@ -209,24 +211,44 @@ static func foe_profile(foe: Dictionary) -> Dictionary:
 			tags[t] = int(tags.get(t, 0)) + 1
 			if "沉默" in sk.words or "打断" in sk.words:
 				tags["ctl"] = int(tags.get("ctl", 0)) + 1
-	return {"kws": kws, "tags": tags, "low": low}
+			if t == "atk":
+				if "全部" in sk.words:
+					aoe += 1
+				if int(sk.get("cost", 0)) >= 28:
+					big += 1
+					heavy.append(str(sk.get("name", "")))
+	return {"kws": kws, "tags": tags, "low": low, "aoe": aoe, "big": big, "heavy": heavy}
 
-# 这条路线针对对手已亮出的牌有什么用：返回 {bonus, note}
+# 这条路线针对对手已亮出的牌有什么用：返回 {bonus, note}。“针对”不只是打断：挡住它、反弹它、拆掉它、抢先打倒它都算。
 static func _relevance(a: Dictionary, prof: Dictionary) -> Dictionary:
 	var params: Dictionary = a.params
 	var tid: String = str(a.tid)
+	var role: String = str(a.role)
 	var tags: Dictionary = prof.tags
+	var best := {"bonus": 0.0, "note": ""}
+	var cand: Array = []
 	if "首挡" in prof.kws and int(params.get("rep", 0)) > 0:
-		return {"bonus": 2.2, "note": "对手有带【首挡】的卡：多段攻击的第二下能打进去，首挡只能挡第一下"}
-	if (int(tags.get("heal", 0)) > 0 or int(tags.get("def", 0)) > 0) and str(a.role) == "控":
-		return {"bonus": 1.6, "note": "对手会治疗/上护盾：打断或沉默能让它出不了招"}
+		cand.append({"bonus": 2.2, "note": "对手有带【首挡】的卡：多段攻击的第二下能打进去，首挡只能挡第一下"})
+	if (int(tags.get("heal", 0)) > 0 or int(tags.get("def", 0)) > 0) and role == "控":
+		cand.append({"bonus": 1.6, "note": "对手会治疗/上护盾：打断或沉默能让它出不了招"})
+	if int(tags.get("heal", 0)) > 0 and tid in ["tax", "burst"]:
+		cand.append({"bonus": 1.4, "note": "对手会回血：治疗惩罚/爆发伤害能压过它的治疗"})
 	if int(tags.get("trap", 0)) > 0 and (tid == "remove" or (tid == "time" and str(params.get("op", "")) == "interrupt")):
-		return {"bonus": 1.6, "note": "对手布了埋伏：驱散或打断能提前拆掉它"}
-	if int(tags.get("atk", 0)) >= 2 and str(a.role) in ["守", "反"]:
-		return {"bonus": 1.3, "note": "对手进攻型卡很多：减伤、改道、反噬都能克制它"}
+		cand.append({"bonus": 1.6, "note": "对手布了埋伏：驱散或打断能提前拆掉它"})
+	if int(prof.get("aoe", 0)) > 0 and role in ["守", "反"]:
+		cand.append({"bonus": 2.0, "note": "对手有全场攻击：全队减伤、护盾、转移、回敬能一次挡住或还回去"})
+	if int(prof.get("big", 0)) > 0 and (role in ["守", "反", "控"]):
+		cand.append({"bonus": 1.7, "note": "对手有大招：减伤、护盾、改道、转为治疗、打断都能化解"})
+	if int(tags.get("atk", 0)) >= 2 and role in ["守", "反"]:
+		cand.append({"bonus": 1.3, "note": "对手进攻型卡很多：减伤、改道、反噬都能克制它"})
 	if not prof.low.is_empty() and tid in ["atk1", "chase"]:
-		return {"bonus": 1.3, "note": "对手有血很少的卡（%s）：单点或追击能直接斩杀" % str(prof.low[0])}
-	return {"bonus": 0.0, "note": ""}
+		cand.append({"bonus": 1.3, "note": "对手有血很少的卡（%s）：单点或追击能直接斩杀" % str(prof.low[0])})
+	if "不屈" in prof.kws and (int(params.get("rep", 0)) > 0 or int(params.get("dbl", 0)) > 0):
+		cand.append({"bonus": 1.1, "note": "对手有【不屈】：一下打不死也会留 1 点血，爆发或多段才能一口气打倒"})
+	for c in cand:
+		if float(c.bonus) > float(best.bonus):
+			best = c
+	return best
 
 static func _how_text(sk: Dictionary) -> String:
 	var S = load("res://scripts/compose/sentence.gd")

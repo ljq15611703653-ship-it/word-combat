@@ -11,6 +11,7 @@ const Lex = preload("res://scripts/core/lexicon.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
 const Namer = preload("res://scripts/core/namer.gd")
 const Coach = preload("res://scripts/core/coach.gd")
+const R = preload("res://scripts/core/recipes.gd")
 
 var rng := RandomNumberGenerator.new()
 var st: Dictionary = {}
@@ -148,8 +149,15 @@ func _ai_targeted_card(side: int, k: int) -> Dictionary:
 			sc -= 1.0
 		cands.append({"sc": sc, "a": a})
 	cands.sort_custom(func(x, y): return x.sc > y.sc)
-	for c in cands.slice(0, 6):
-		var sk: Dictionary = c.a.skill
+	# 给后面还没拼的卡留预算：每张卡的数字大致不超过“剩余数字预算 ÷ 剩余张数”
+	var hp_floor: int = 8 * D.COUNT
+	var nums_used := 0
+	for u0 in decks[side].units:
+		for sk0 in u0.skills:
+			nums_used += int(sk0.budget)
+	var share: int = maxi(5, (D.BUDGET - hp_floor - nums_used) / maxi(1, D.COUNT - k))
+	for c in cands.slice(0, 8):
+		var sk: Dictionary = _shrink_skill(c.a, share)
 		var u := {"name": "", "glyph": D.GLYPHS[k % D.GLYPHS.size()], "max_hp": 10, "kw": "", "skills": [sk.duplicate(true)]}
 		# 关键词：有就带上（首挡/回击等是白送的强度）
 		for kw in ["首挡", "回击", "不屈", "回春", "同调"]:
@@ -169,6 +177,19 @@ func _ai_targeted_card(side: int, k: int) -> Dictionary:
 		if D.validate(nd, pools[side]).ok:
 			return nd.units[k]
 	return {}
+
+# 把技能里的“数字”按比例缩小，直到点数不超过 cap（缩不动就原样返回）
+func _shrink_skill(a: Dictionary, cap: int) -> Dictionary:
+	var sk: Dictionary = a.skill
+	if int(sk.budget) <= cap or not a.params.has("n"):
+		return sk
+	var p: Dictionary = a.params.duplicate()
+	for f in [0.75, 0.55, 0.4, 0.3]:
+		p["n"] = maxi(3, int(round(float(a.params.n) * f)))
+		var s2: Dictionary = R.build(str(a.tid), p)
+		if int(s2.budget) <= cap or int(p.n) <= 3:
+			return s2
+	return sk
 
 func _ai_template_card(side: int, k: int) -> Dictionary:
 	var left: Dictionary = pools[side].duplicate()
@@ -409,6 +430,20 @@ func submit(side: int, act: Dictionary) -> String:
 	declared[side].append(act.duplicate(true))
 	return ""
 
+const COUNTER_CATS := ["interrupt", "silence", "redirect", "reflect", "mit", "shield", "convert", "delay"]
+
+func _skill_cat(sk: Dictionary) -> String:
+	var t := str(sk.get("template", ""))
+	var p: Dictionary = sk.get("params", {})
+	if t == "time":
+		return str(p.get("op", "time"))
+	if t == "status" and str(p.get("st", "")) == "沉默":
+		return "silence"
+	return t
+
+func _act_cat(a: Dictionary) -> String:
+	return _skill_cat(E.skill_of(st, int(a.sid)))
+
 func ai_declare() -> void:
 	var t0 := Time.get_ticks_msec()
 	var s := declare_side()
@@ -416,14 +451,44 @@ func ai_declare() -> void:
 		scripted_ai.call(self, s)
 		declare_done[s] = true
 		return
+	var second: bool = s != declare_order[0]
 	var enemy_list: Array = []
-	if s != declare_order[0]:
+	if second:
 		enemy_list = declared[1 - s].duplicate(true)
+		# 后手先单独评估“应对类”技能：只要模拟里比不出更好，就用（看得见对手全部宣告）
+		var guard0 := 0
+		while guard0 < 4:
+			guard0 += 1
+			var base_acts: Array = enemy_list + declared[s]
+			var base_v := Ai.evaluate(Ai._sim(st, base_acts), s)
+			var best := {}
+			var best_v := base_v + 0.01
+			for a in Ai.enumerate_actions(st, s, enemy_list, 8, declared[s]):
+				if a.is_empty() or not (_act_cat(a) in COUNTER_CATS):
+					continue
+				var v := Ai.evaluate(Ai._sim(st, base_acts + [a]), s)
+				if v > best_v:
+					best_v = v
+					best = a
+			if best.is_empty() or submit(s, best) != "":
+				break
+	# 先手：持有打断/沉默时，给下一轮（那时是后手，才打得中）留够行动点
+	var reserve := 0
+	if not second:
+		for u in E.alive_units(st, s):
+			for sid in u.skill_ids:
+				var sk: Dictionary = E.skill_of(st, sid)
+				if _skill_cat(sk) in ["interrupt", "silence"]:
+					reserve = maxi(reserve, int(sk.get("cost", 0)) - int(st.rules.ap_gain))
 	var guard := 0
 	while guard < E.MAX_ACTIONS:
 		guard += 1
 		var act := Ai.choose_action(st, s, enemy_list, declared[s], rng, fast_ai, ai_epsilon)
 		if act.is_empty():
+			break
+		if not second and _skill_cat(E.skill_of(st, int(act.sid))) in ["interrupt", "silence", "delay"]:
+			break      # 先手时对手还没出牌，打断/沉默/延后没有目标，不空放
+		if reserve > 0 and E.available_ap(st, s, declared[s]) - E.action_cost(st, act) < reserve:
 			break
 		if submit(s, act) != "":
 			break
