@@ -264,10 +264,6 @@ static func _rep(word: String, n: int) -> Array:
 
 static func words_of(node: Dictionary) -> Array:
 	var w := _words_core(node)
-	if node.get("now", false):
-		w.append("立即")
-	elif int(node.get("early", 0)) > 0:
-		w.append("之前")
 	if node.get("sync", false):
 		w.append("同时")
 	return w
@@ -686,14 +682,9 @@ static func verb_text(kind: String, alt: int, target: String, value: String, is_
 
 static func node_text(node: Dictionary) -> String:
 	var t := _node_text_core(node)
-	var pre := ""
-	if node.get("now", false):
-		pre = "立即（最早也要等本节点自己的起手），"
-	elif int(node.get("early", 0)) > 0:
-		pre = "提前%d秒，" % int(node.early)
 	if node.get("sync", false):
 		t += "（重复/逐个同时落下）"
-	return pre + t
+	return t
 
 static func _node_text_core(node: Dictionary) -> String:
 	match node.kind:
@@ -770,11 +761,6 @@ static func effective_num(node: Dictionary) -> int:
 	for i in int(node.get("half", 0)):
 		v = (v + 1) / 2
 	return v
-
-# 单个节点自己的起手：（数字+词价）÷10。“立即/之前”最早只能到这里，不能绕过大招自己的起手
-static func node_windup(node: Dictionary) -> int:
-	var c: int = int(nums_of(node).ap) + words_price(words_of(node))
-	return mini(c / 10, 19)
 
 # 打断/沉默的力度换算：力度P能压制操作费不超过 1.25×P 的技能
 static func silence_limit(p: int) -> int:

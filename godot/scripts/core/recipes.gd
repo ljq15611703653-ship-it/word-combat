@@ -28,8 +28,6 @@ static func catalog() -> Array:
 				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "rep", "label": "重复次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "alt", "label": "写法", "kind": "enum", "options": [[0, "造成伤害"], [1, "减少当前生命"]], "default": 0},
-				{"key": "now", "label": "立即（第0秒就打）", "kind": "bool", "default": false},
-				{"key": "early", "label": "之前（比起点提前几秒）", "kind": "int", "min": 0, "max": 10, "default": 0},
 				{"key": "sync", "label": "同时（重复一起落下）", "kind": "bool", "default": false},
 			]},
 		{"id": "atkA", "family": "攻", "title": "范围打击", "glyph": "轰", "blurb": "对全部（或逐个）敌人造成同样的伤害。",
@@ -38,7 +36,6 @@ static func catalog() -> Array:
 				{"key": "n", "label": "伤害", "kind": "int", "min": 1, "max": 60, "default": 12},
 				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "rep", "label": "重复次数", "kind": "int", "min": 0, "max": 3, "default": 0},
-				{"key": "now", "label": "立即（第0秒就打）", "kind": "bool", "default": false},
 				{"key": "sync", "label": "同时（重复/逐个一起落下）", "kind": "bool", "default": false},
 			]},
 		{"id": "chase", "family": "攻", "title": "追击", "glyph": "追", "blurb": "反复打生命最低的敌人，直到它的当前生命低于门槛。每次重新付数字。",
@@ -259,10 +256,6 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 	return G.finalize(sk)
 
 static func _timing(node: Dictionary, p: Dictionary) -> void:
-	if p.get("now", false):
-		node["now"] = true
-	if int(p.get("early", 0)) > 0:
-		node["early"] = int(p.early)
 	if p.get("sync", false):
 		node["sync"] = true
 

@@ -48,10 +48,6 @@ func rand_value(ctx: String, allow_prev: bool = false) -> Dictionary:
 
 func mods(n: Dictionary) -> Dictionary:
 	if rng.randf() < 0.12:
-		n["now"] = true
-	elif rng.randf() < 0.12:
-		n["early"] = rng.randi_range(1, 6)
-	if rng.randf() < 0.12:
 		n["sync"] = true
 	if rng.randf() < 0.25:
 		n["dbl"] = rng.randi_range(0, 2)

@@ -40,7 +40,7 @@ const KIND_TITLES := {
 	"redirect": "转移", "convert": "转为治疗",
 }
 const EFFECT_KINDS := ["dmg", "heal", "mit", "status", "remove", "watch", "time", "swap", "split", "chain", "copy", "if", "choose", "until"]
-const TIMED_KINDS := ["dmg", "heal", "mit", "status", "remove", "watch", "swap", "time"]
+const TIMED_KINDS := ["dmg", "heal"]
 const KIND_COL := {
 	"dmg": Color("8a3a36"), "heal": Color("2f7a55"), "mit": Color("2f5a8a"), "status": Color("8a6a2a"), "remove": Color("2f7a7a"),
 	"watch": Color("7a4aa0"), "time": Color("2f7a7a"), "swap": Color("4a5a7a"), "split": Color("8a3a36"), "chain": Color("8a4a36"),
@@ -209,7 +209,7 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 	var in_watch := ctx != ""
 	var chg := on_change
 	if kind in TIMED_KINDS and not nested:
-		v.add_child(_timing_row(node, kind in ["dmg", "heal"], chg))
+		v.add_child(_timing_row(node, true, chg))
 	match kind:
 		"dmg", "heal":
 			v.add_child(_row("写法", _enum(["造成伤害" if kind == "dmg" else "恢复生命", "减少当前生命" if kind == "dmg" else "增加当前生命"], int(node.get("alt", 0)), func(i):
@@ -417,25 +417,9 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(_child_slot(node, "b", ctx, chg, false))
 	return p
 
-# 立即 / 之前 / 同时：时间词
+# 同时：重复/逐个一起落下（落点的时间由宣告时的“起效时间”决定，不由词决定）
 func _timing_row(node: Dictionary, with_sync: bool, chg: Callable) -> Control:
 	var r := K.hbox(10)
-	var cb := CheckBox.new()
-	cb.text = "立即（第0秒）"
-	cb.button_pressed = bool(node.get("now", false))
-	cb.toggled.connect(func(on):
-		if on:
-			node["now"] = true
-		else:
-			node.erase("now")
-		chg.call())
-	r.add_child(cb)
-	r.add_child(_row("之前(秒)", _spin(int(node.get("early", 0)), 0, 10, func(x):
-		if x > 0:
-			node["early"] = x
-		else:
-			node.erase("early")
-		chg.call())))
 	if with_sync:
 		var cs := CheckBox.new()
 		cs.text = "同时（重复/逐个一起落）"

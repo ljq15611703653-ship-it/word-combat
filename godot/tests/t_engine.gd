@@ -173,32 +173,11 @@ func _init() -> void:
 	check(st.sides[1].units[2].down_round == 1, "下一轮仍在修整")
 	E.begin_round(st)
 	check(st.sides[1].units[2].down_round == -1 and st.sides[1].units[2].hp == 10, "再下一轮满血复出")
-	print("— 新实现的七个词：立即/之前/同时/直到/本轮/已生效/剩余")
-	# 立即：第0秒就执行，不等起手
-	var nowd := G.dmg(G.T("choose","enemy"), G.N(5)); nowd["now"] = true
-	var skn := S("立即", [nowd, G.dmg(G.T("choose","enemy"), G.N(30))])
-	check(skn.words.has("立即") and skn.words.has("并"), "立即：词计入，多节点要并")
-	var stn := play(deck([skn]), deck([S("全10", [G.dmg(G.T("all","enemy"), G.N(10))])]), {"t1": 10, "t2": 12}, {}, 8, 3)
-	var evn := []
-	for e in stn.events: if e.type == "dmg" and e.tgt == 10: evn.append(e.t)
-	check(evn.size() > 0 and evn[0] <= 1, "便宜节点立即落在第0–1秒（立即这个词自己价格4，计入节点起手）%s" % str(evn))
-	var bign := G.dmg(G.T("all","enemy"), G.N(30)); bign["now"] = true
-	var skb := S("立即大招", [bign])
-	stn = play(deck([skb]), deck([]), {}, {}, 9)
-	var tb := -1
-	for e in stn.events: if e.type == "dmg" and tb == -1: tb = e.t
-	check(tb == G.node_windup(bign) and tb >= 3, "立即不能让大招绕过自己的起手：落在第%d秒" % tb)
-	# 之前：比起点早N秒
-	var erl := G.dmg(G.T("choose","enemy"), G.N(5)); erl["early"] = 3
-	var ske := S("之前", [erl])
-	stn = play(deck([ske]), deck([]), {"t1": 10}, {}, 8)
-	var tick_e := -1
-	for e in stn.events: if e.type == "dmg" and tick_e == -1: tick_e = e.t
-	check(tick_e == 5 and ske.words.has("之前"), "之前3秒：起点第8秒的节点落在第5秒 (t=%d)" % tick_e)
+	print("— 新实现的词：同时/直到/本轮/已生效/剩余")
 	# 同时：重复一起落下
 	var syn := G.dmg(G.T("choose","enemy"), G.N(5), {"rep": 2}); syn["sync"] = true
 	var sks := S("同时", [syn])
-	stn = play(deck([sks]), deck([]), {"t1": 10}, {}, 4)
+	var stn := play(deck([sks]), deck([]), {"t1": 10}, {}, 4)
 	var ticks_s := {}
 	for e in stn.events: if e.type == "dmg": ticks_s[e.t] = int(ticks_s.get(e.t, 0)) + 1
 	check(ticks_s.size() == 1 and sks.words.has("同时") and hps(stn,1)[0] == 5, "同时：三次伤害同一秒，共15点 %s hp=%d" % [str(ticks_s), hps(stn,1)[0]])

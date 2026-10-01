@@ -16,7 +16,8 @@ const add=[
 ['106','易伤','状态','进阶','状态：受到的伤害增加50%（向上取整）。'],
 ['107','沉默','状态','进阶','状态：不能发动新技能；已在时间轴上的技能不受影响。'],
 ];
-const rows=[...old.map(([id,w,c,r,d])=>[id,w,c,r,d]),...add];
+const DROP=new Set(['053','054']); // 立即、之前：时间由宣告时的“起效时间”决定，不做成词
+const rows=[...old.map(([id,w,c,r,d])=>[id,w,c,r,d]),...add].filter(r=>!DROP.has(r[0]));
 const out=['id\t词\t类别\t稀有度\t价格\t已实现\t权重\t含义'];
 for(const [id,w,c,r,d] of rows){
   out.push([id,w,c,r,price(id),NOIMPL.has(id)?0:1,common.has(id)?3:medium.has(id)?2:1,d].join('\t'));

@@ -32,10 +32,6 @@ func rand_attack() -> Dictionary:
 				d["rep"] = rng.randi_range(1, 2)
 			if rng.randf() < 0.15:
 				d["delay"] = rng.randi_range(1, 5)
-			if rng.randf() < 0.3:
-				d["now"] = true
-			elif rng.randf() < 0.2:
-				d["early"] = rng.randi_range(1, 6)
 			if rng.randf() < 0.25:
 				d["sync"] = true
 			nodes.append(d)

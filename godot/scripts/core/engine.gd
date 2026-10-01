@@ -286,13 +286,9 @@ static func _log(st: Dictionary, t: int, type: String, data: Dictionary) -> void
 		e[k] = data[k]
 	st.events.append(e)
 
-# 顶层节点落在时间轴的哪一秒：立即=第0秒；之前N=比技能起点早N秒；时间术另加“之后”的延后
+# 顶层节点落在时间轴的哪一秒：技能起点（由玩家在宣告时选的“起效时间”决定）；时间术另加“之后”的延后
 static func _node_tick(n: Dictionary, start: int) -> int:
 	var t := start
-	if n.get("now", false):
-		t = mini(G.node_windup(n), start)
-	elif int(n.get("early", 0)) > 0:
-		t = maxi(mini(G.node_windup(n), start), start - int(n.early))
 	if n.kind == "time":
 		t += int(n.get("delay", 0))
 	return t
