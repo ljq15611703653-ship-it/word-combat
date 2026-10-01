@@ -772,7 +772,7 @@ static func _node_text_core(node: Dictionary) -> String:
 		"redirect":
 			return "改由%s承受这次伤害（每个被保护的随从最多转移 %s 点%s）" % [target_text(node.target), "某某" if int(node.value.n) < 0 else str(int(node.value.n)), mods_clause(node, "上限")]
 		"convert":
-			return "把这次伤害变成等量的治疗（每个被保护的随从最多转换 %s 点%s）" % ["某某" if int(node.value.n) < 0 else str(int(node.value.n)), mods_clause(node, "上限")]
+			return "伤害照常落下，随后返还等量治疗（共用上限 %s 点%s；致命伤救不回）" % ["某某" if int(node.value.n) < 0 else str(int(node.value.n)), mods_clause(node, "上限")]
 		"time":
 			var who: String = SIDE_TEXT.get(node.side, "某某") + "接下来第一个起效的技能"
 			var tn: String = "某某" if int(node.value.n) < 0 else str(int(node.value.n))

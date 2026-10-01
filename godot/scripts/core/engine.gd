@@ -891,7 +891,7 @@ static func _fire(st: Dictionary, event: String, info: Dictionary, defer: bool) 
 # ================================================================ 事件结算
 static func _ledger(st: Dictionary, u: Dictionary) -> Dictionary:
 	if not st.ledger.has(u.uid):
-		st.ledger[u.uid] = {"dmg": 0, "heal": 0, "v": int(u.hp)}
+		st.ledger[u.uid] = {"dmg": 0, "heal": 0, "v": int(u.hp), "dead": false}
 	return st.ledger[u.uid]
 
 static func _apply(st: Dictionary, e: Dictionary) -> void:
@@ -925,7 +925,9 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 		if rw.is_empty():
 			break
 		used[rw.eid] = true
-		var used_cap: int = int(rw.caps.get(e.tgt, 0))
+		# 转移：每个被保护的随从各算一份上限；转为治疗：整句话共用一份上限，谁先挨打算谁的
+		var shared: bool = rw.child.kind == "convert"
+		var used_cap: int = int(rw.get("cap_used", 0)) if shared else int(rw.caps.get(e.tgt, 0))
 		var room: int = int(rw.cap) - used_cap
 		if room <= 0:
 			continue
@@ -933,7 +935,10 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 			rw.spent = true
 		rw.times += 1
 		var moved: int = mini(room, int(e.amount))
-		rw.caps[e.tgt] = used_cap + moved
+		if shared:
+			rw["cap_used"] = used_cap + moved
+		else:
+			rw.caps[e.tgt] = used_cap + moved
 		if rw.child.kind == "redirect":
 			var ctx := {"side": rw.side, "host": rw.host, "choices": rw.choices, "source": e.src, "recipient": e.tgt}
 			var to := _targets(st, rw.child.target, ctx, "t%d" % rw.child.id)
@@ -948,11 +953,9 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 					return
 				tgt = _u(st, e.tgt)
 		else:
+			# 伤害照常落下，被转换的部分在落下之后才以治疗返还；致命伤直接倒下，治疗救不回来
 			_log(st, t, "convert", {"tgt": e.tgt, "amount": moved, "host": rw.host})
-			_apply_heal(st, {"kind": "heal", "src": e.src, "tgt": e.tgt, "amount": moved, "root": e.root}, tgt, t)
-			e["amount"] = int(e.amount) - moved
-			if int(e.amount) <= 0:
-				return
+			e["convert_back"] = int(e.get("convert_back", 0)) + moved
 	_fire(st, "pending_dmg", {"subject": e.tgt, "src": e.src, "recipient": e.tgt, "amount": int(e.amount), "raw": int(e.amount), "root": e.root}, false)
 	tgt = _u(st, e.tgt)
 	if not _alive(tgt):
@@ -1015,6 +1018,14 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 		st.round_taken[tgt.uid] = int(st.round_taken.get(tgt.uid, 0)) + dmg
 	L.dmg += dmg
 	L.v = maxi(0, int(L.v) - dmg)
+	# 按先后顺序结算：血量降到 0 的那一刻就倒下（【不屈】可保命一次），之后同一秒的治疗救不回来
+	if int(L.v) == 0 and dmg > 0 and not L.dead:
+		if tgt.kw == "不屈" and not tgt.kw_spent:
+			tgt.kw_spent = true
+			L.v = 1
+			_log(st, t, "keyword", {"tgt": tgt.uid, "kw": "不屈"})
+		else:
+			L.dead = true
 	_log(st, t, "dmg", {"src": e.src, "tgt": tgt.uid, "amount": dmg, "raw": int(e.raw), "actual": actual})
 	# 6. 实际失血后的触发
 	if dmg > 0:
@@ -1030,6 +1041,9 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 			tgt.kw_spent = true
 			_log(st, t, "keyword", {"tgt": tgt.uid, "kw": "回击"})
 			_apply(st, {"kind": "dmg", "src": tgt.uid, "tgt": e.src, "amount": 1, "root": e.root})
+	var back: int = int(e.get("convert_back", 0))
+	if back > 0 and not L.dead:
+		_apply_heal(st, {"kind": "heal", "src": e.src, "tgt": tgt.uid, "amount": back, "root": e.root}, tgt, t)
 	_after_actual(st, e, dmg, tgt)
 
 static func _apply_heal(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int) -> void:
@@ -1040,11 +1054,15 @@ static func _apply_heal(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int) 
 		_after_actual(st, e, 0, tgt)
 		return
 	var L := _ledger(st, tgt)
+	if L.dead:
+		# 这一秒里已经被打倒了：治疗来晚了，救不回来
+		_log(st, t, "heal", {"src": e.src, "tgt": tgt.uid, "amount": amount, "actual": 0, "late": true})
+		return
 	var act := mini(amount, int(tgt.max_hp) - int(L.v))
 	act = maxi(act, 0)
 	var overflow := amount - act
-	L.heal += amount
-	L.v = mini(int(tgt.max_hp), int(L.v) + amount)
+	L.heal += act
+	L.v = mini(int(tgt.max_hp), int(L.v) + act)
 	_log(st, t, "heal", {"src": e.src, "tgt": tgt.uid, "amount": amount, "actual": act})
 	if act > 0:
 		_fire(st, "healed", {"subject": tgt.uid, "src": e.src, "recipient": tgt.uid, "amount": act, "overflow": overflow, "root": e.root}, false)
@@ -1109,11 +1127,7 @@ static func _settle(st: Dictionary, t: int) -> void:
 			if u.down_round != -1 or not st.ledger.has(u.uid):
 				continue
 			var L: Dictionary = st.ledger[u.uid]
-			var hp: int = clampi(int(u.hp) - int(L.dmg) + int(L.heal), 0, int(u.max_hp))
-			if hp == 0 and u.kw == "不屈" and not u.kw_spent:
-				u.kw_spent = true
-				hp = 1
-				_log(st, t, "keyword", {"tgt": u.uid, "kw": "不屈"})
+			var hp: int = clampi(int(L.v), 0, int(u.max_hp))
 			u.hp = hp
 			if hp == 0:
 				downs.append(u)

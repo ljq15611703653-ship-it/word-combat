@@ -126,16 +126,22 @@ func _ai_targeted_card(side: int, k: int) -> Dictionary:
 	var prof: Dictionary = Coach.foe_profile(revealed_deck(1 - side))
 	var mine_tids := {}
 	var mine_roles := {}
+	var counters_have := 0
 	for u in decks[side].units:
 		for sk in u.skills:
 			mine_tids[str(sk.get("template", ""))] = true
 			mine_roles[str(sk.get("kind_tag", ""))] = int(mine_roles.get(str(sk.get("kind_tag", "")), 0)) + 1
+			if str(sk.get("kind_tag", "atk")) != "atk":
+				counters_have += 1
 	var cands: Array = []
 	for a in Coach.route_status(avail):
 		if int(a.n) != 0:
 			continue
 		var rel: Dictionary = Coach._relevance(a, prof)
-		var sc: float = float(a.w) + float(rel.bonus) * 1.6 + rng.randf() * 0.6
+		var sc: float = float(a.w) + float(rel.bonus) * 3.2 + rng.randf() * 0.6
+		# 更爱针对：应对/反制/控场类的路线有额外加分；自己的牌里应对类还不到两张时，加得更多
+		if str(a.role) != "攻":
+			sc += 1.0 + (1.6 if counters_have < 2 and k >= 1 else 0.0)
 		if mine_tids.has(str(a.tid)):
 			sc -= 1.2
 		if str(a.role) == "守" and int(mine_roles.get("def", 0)) + int(mine_roles.get("heal", 0)) >= 2:

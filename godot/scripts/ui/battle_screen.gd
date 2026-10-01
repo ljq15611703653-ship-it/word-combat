@@ -18,6 +18,7 @@ const Appraise = preload("res://scripts/game/appraise.gd")
 const FxPlayer = preload("res://scripts/fx/fx_player.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
 const Table3D = preload("res://scripts/view3d/table3d.gd")
+const Highlight = preload("res://scripts/fx/highlight.gd")
 
 signal next_round()
 signal quit_to_title()
@@ -946,6 +947,15 @@ func _coach_round(events: Array) -> void:
 		if best < 80:
 			best = 80
 			pick = {"text": line, "uids": [int(e2.tgt)]}
+	var down_by_t := {}
+	for e4 in events:
+		if str(e4.type) == "down":
+			down_by_t[int(e4.t)] = int(down_by_t.get(int(e4.t), 0)) + 1
+		elif str(e4.type) == "interrupt":
+			Highlight.play("perfect_counter", {"kind": "interrupt", "side": int(e4.side)}, self)
+	for tt in down_by_t:
+		if int(down_by_t[tt]) >= 2:
+			Highlight.play("multi_kill", {"count": int(down_by_t[tt])}, self)
 	if pick.is_empty():
 		return
 	for uid in pick.uids:

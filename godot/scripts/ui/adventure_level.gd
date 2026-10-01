@@ -11,7 +11,9 @@ const E = preload("res://scripts/core/engine.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Composer = preload("res://scripts/compose/composer.gd")
 const Pet = preload("res://scripts/ui/pet.gd")
-const MinionCard = preload("res://scripts/ui/minion_card.gd")
+const Highlight = preload("res://scripts/fx/highlight.gd")
+const Table3D = preload("res://scripts/view3d/table3d.gd")
+const Preview = preload("res://scripts/game/preview.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 
 signal back()
@@ -102,11 +104,8 @@ func _build() -> void:
 	top.add_child(bk)
 	v.add_child(top)
 	# 战场
-	var field := K.hbox(14)
-	v.add_child(field)
-	field.add_child(_side_panel(0))
-	field.add_child(_middle_panel())
-	field.add_child(_side_panel(1))
+	_make_table(v)
+	v.add_child(_info_bar())
 	# 拼句台
 	composer = Composer.new()
 	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -114,6 +113,8 @@ func _build() -> void:
 	composer.changed.connect(_on_changed)
 	v.add_child(composer)
 	composer.setup(L.tray_of(level), [])
+	if composer.hint_label != null:
+		composer.hint_label.add_theme_font_size_override("font_size", 15)
 	if composer.sugg_group != null:
 		composer.sugg_group.visible = false     # 冒险里不给“接下来三句话”的现成答案，靠小词教
 	# 底栏：提示 / 出招
@@ -138,76 +139,85 @@ func _build() -> void:
 func _units_of(side: int) -> Array:
 	return level.me if side == 0 else level.foe
 
-const CARD_SIZE := Vector2(112, 150)
 var _st: Dictionary = {}
+var table: Node3D
+var table_box: SubViewportContainer
 
-func _side_panel(side: int) -> Control:
-	var p := K.panel(K.PANEL, K.GOLD_D if side == 0 else K.RED.darkened(0.3), 12, 2, 6)
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var v := K.vbox(2)
-	p.add_child(v)
-	v.add_child(K.label("你的阵容" if side == 0 else "对手的阵容（红字是已经宣告的招）", 14, K.MUTED))
-	var row := K.hbox(6)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	v.add_child(row)
-	if _st.is_empty():
-		_st = L.build_state(level, {}).st
-	var units: Array = _units_of(side)
-	var foe_acts := {}
-	if side == 1:
-		for fa in L.foe_actions(level, _st):
-			foe_acts[int(fa.unit)] = fa
-	for i in units.size():
-		var su: Dictionary = _st.sides[side].units[i]
-		var uid: int = int(su.uid)
-		uid_name[uid] = str(su.name)
-		var cell := K.vbox(1)
-		var c := MinionCard.new(CARD_SIZE)
-		cell.add_child(c)
-		var sks: Array = []
-		for sid in su.skill_ids:
-			sks.append(E.skill_of(_st, sid))
-		c.setup(su, sks, side, "battle")
-		if side == 1 and foe_acts.has(i):
-			var fa2: Dictionary = foe_acts[i]
-			var chs: Dictionary = fa2.act.get("choices", {})
-			var tgt_uid := -1
-			for k in chs:
-				if chs[k] is int or chs[k] is float:
-					tgt_uid = int(chs[k])
-					break
-			var tn := str(uid_name.get(tgt_uid, ""))
-			var al := K.wrap_label("⚠ 第 %d 秒 %s" % [int(fa2.act.start), ("→ " + tn) if tn != "" else ""], 13, K.RED)
-			al.custom_minimum_size = Vector2(CARD_SIZE.x, 0)
-			cell.add_child(al)
-		unit_boxes[uid] = {"card": c, "hp": int(su.hp), "max": int(su.max_hp), "init": su.duplicate(true), "skills": sks}
-		row.add_child(cell)
-	return p
+# 真实的 3D 牌桌：和正式对战一样，对手坐在对面，随从摆在桌上，已宣告的招用意图箭头标出来
+func _make_table(parent: Control) -> void:
+	table_box = SubViewportContainer.new()
+	table_box.stretch = true
+	table_box.custom_minimum_size = Vector2(0, 262)
+	var svp := SubViewport.new()
+	svp.msaa_3d = Viewport.MSAA_4X
+	svp.handle_input_locally = true
+	svp.physics_object_picking = false
+	table_box.add_child(svp)
+	table = Table3D.new()
+	svp.add_child(table)
+	parent.add_child(table_box)
+	var plates := Control.new()
+	plates.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	plates.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(plates)
+	table.plate_layer = plates
+	table.plate_origin = table_box
+	_st = L.build_state(level, {}).st
+	table.setup_state(_st, func(u): return _skills_of_unit(u))
+	table.relayout(_st, false)
+	# 关卡里没有的空位不摆出来
+	var intents: Array = []
+	for side in 2:
+		var units: Array = _units_of(side)
+		for i in _st.sides[side].units.size():
+			var su: Dictionary = _st.sides[side].units[i]
+			var uid: int = int(su.uid)
+			if i >= units.size():
+				if table.minions.has(uid):
+					table.minions[uid].queue_free()
+					table.minions.erase(uid)
+				continue
+			uid_name[uid] = str(su.name)
+			table.minions[uid].set_top_view(true, false)
+			unit_boxes[uid] = {"card": table.minions[uid], "hp": int(su.hp), "max": int(su.max_hp), "init": su.duplicate(true), "skills": _skills_of_unit(su)}
+	for fa in L.foe_actions(level, _st):
+		intents.append(Preview.intent_of(_st, fa.act))
+	table.set_view("top", false)
+	table.set_intents(intents)
 
-func _middle_panel() -> Control:
+func _skills_of_unit(u: Dictionary) -> Array:
+	var out: Array = []
+	for sid in u.skill_ids:
+		out.append(E.skill_of(_st, sid))
+	return out
+
+func _info_bar() -> Control:
+	var row := K.hbox(10)
 	var p := K.panel(Color("1f2330"), K.GOLD_D, 12, 2, 8)
-	p.custom_minimum_size = Vector2(420, 0)
 	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	p.size_flags_stretch_ratio = 1.3
-	var v := K.vbox(4)
+	p.size_flags_stretch_ratio = 1.6
+	var v := K.vbox(3)
 	p.add_child(v)
-	v.add_child(K.wrap_label(str(level.story), 15, K.TEXT))
-	var gl := K.vbox(1)
-	gl.add_child(K.label("目标：", 15, K.GOLD))
+	v.add_child(K.wrap_label(str(level.story), 14, K.TEXT))
+	var gl := K.hbox(14)
+	gl.add_child(K.label("目标：", 14, K.GOLD))
 	for g in level.goal:
 		var t := _goal_text(g)
 		if t != "":
 			gl.add_child(K.label("· " + t, 14, K.TEXT))
 	v.add_child(gl)
-	# 对手的话
+	row.add_child(p)
 	var op: Dictionary = level.get("opp", {})
-	var oh := K.hbox(6)
+	var q := K.panel(Color("2a1a1d"), K.RED.darkened(0.3), 12, 2, 8)
+	q.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var qv := K.vbox(3)
+	q.add_child(qv)
 	opp_name_label = K.label("%s%s" % [str(op.get("name", "对手")), ("（%s）" % str(op.title)) if str(op.get("title", "")) != "" else ""], 15, K.RED)
-	oh.add_child(opp_name_label)
-	v.add_child(oh)
-	opp_text = K.wrap_label("", 16, Color("f0c8c0"))
-	v.add_child(opp_text)
-	return p
+	qv.add_child(opp_name_label)
+	opp_text = K.wrap_label("", 15, Color("f0c8c0"))
+	qv.add_child(opp_text)
+	row.add_child(q)
+	return row
 
 func _goal_text(g: Dictionary) -> String:
 	match str(g.t):
@@ -397,7 +407,7 @@ func _set_hp(uid: int, hp: int) -> void:
 	if b.is_empty():
 		return
 	b.hp = maxi(0, hp)
-	var c: MinionCard = b.card
+	var c = b.card
 	if not c.anim_mode:
 		c.begin_anim(int(b.hp), false)
 	c.animate_hp(int(b.hp), 0.3)
@@ -406,7 +416,7 @@ func _flash(uid: int, col: Color, text: String) -> void:
 	var b: Dictionary = unit_boxes.get(uid, {})
 	if b.is_empty():
 		return
-	var c: MinionCard = b.card
+	var c = b.card
 	c.float_text(text, col, 26)
 	c.flash(col)
 	if col == K.RED:
@@ -476,6 +486,9 @@ func _show_result(res: Dictionary, tokens: Array) -> void:
 	v.add_child(row)
 	if res.win:
 		_won = true
+		Highlight.play("level_clear", {"id": int(level.id), "hints_used": hints_used, "boss": int(level.id) % 10 == 0}, self)
+		if int(level.id) % 10 == 0:
+			Highlight.play("boss_defeated", {"id": int(level.id), "chapter": int(level.chapter)}, self)
 		if not (int(level.id) in Settings.adv_cleared):
 			Settings.adv_cleared.append(int(level.id))
 			Settings.save_all()
@@ -511,7 +524,7 @@ func _reset_field() -> void:
 	for uid in unit_boxes:
 		var b: Dictionary = unit_boxes[uid]
 		b.hp = int(b.init.hp)
-		var c: MinionCard = b.card
+		var c = b.card
 		c.end_anim()
 		c.refresh(b.init, b.skills)
 	_opp_say("再来一次？我随时奉陪。")
