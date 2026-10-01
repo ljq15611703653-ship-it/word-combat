@@ -11,6 +11,22 @@ const MAP := {
 	"叠": "stack", "追": "arrow", "税": "coin", "遗": "ghost",
 }
 
+# 外观配件（appearance.json 里的 proc 名）→ 图标种类。卡面 2D 配件用它；放 res://assets/icons/<种类>.png 即可换图
+const PROC_MAP := {
+	"shield": "shield", "buckler": "shield", "cape": "cape", "thorns": "thorns", "vines": "vines", "twin_ring": "ring",
+	"amulet": "amulet", "ring_double": "ring", "afterimage": "ghost", "hourglass": "clock", "mirror": "mirror", "wand": "wand",
+	"sword": "sword", "halo": "halo", "chains": "chains", "mask": "mask", "book": "book",
+}
+
+static func make_proc(proc: String, px: float, color: Color) -> Control:
+	var c := new()
+	c.kind = PROC_MAP.get(proc, "star")
+	c.col = color
+	c.custom_minimum_size = Vector2(px, px)
+	c.size = Vector2(px, px)
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return c
+
 static func make(glyph: String, px: float, color: Color) -> Control:
 	var c := new()
 	c.kind = MAP.get(glyph, "star")
@@ -111,6 +127,46 @@ func _draw() -> void:
 		"coin":
 			draw_circle(P.call(50, 50), 40 * u, col)
 			draw_circle(P.call(50, 50), 26 * u, dark)
+		"cape":
+			draw_colored_polygon(PackedVector2Array([P.call(28, 10), P.call(72, 10), P.call(90, 92), P.call(50, 76), P.call(10, 92)]), col)
+			draw_line(P.call(30, 12), P.call(70, 12), dark, 8 * u)
+		"thorns":
+			for i in 5:
+				var bx := 16.0 + i * 17.0
+				draw_colored_polygon(PackedVector2Array([P.call(bx, 88), P.call(bx + 8, 88), P.call(bx + 4, 18 + (i % 2) * 14)]), col)
+		"vines":
+			draw_arc(P.call(40, 50), 36 * u, -1.2, 2.6, 20, col, 8 * u)
+			draw_circle(P.call(72, 24), 9 * u, col.lightened(0.15))
+			draw_circle(P.call(20, 66), 9 * u, col.lightened(0.15))
+		"ring":
+			draw_arc(P.call(50, 50), 38 * u, 0, TAU, 32, col, 9 * u)
+			draw_arc(P.call(50, 50), 22 * u, 0, TAU, 28, dark, 6 * u)
+		"amulet":
+			draw_line(P.call(18, 12), P.call(50, 54), dark, 5 * u)
+			draw_line(P.call(82, 12), P.call(50, 54), dark, 5 * u)
+			draw_colored_polygon(PackedVector2Array([P.call(50, 40), P.call(72, 62), P.call(50, 92), P.call(28, 62)]), col)
+		"wand":
+			draw_line(P.call(20, 88), P.call(66, 34), dark, 9 * u)
+			var wp := PackedVector2Array()
+			for i in 10:
+				var r := 24.0 if i % 2 == 0 else 10.0
+				wp.append(P.call(72 + cos(TAU * i / 10.0 - PI / 2) * r, 28 + sin(TAU * i / 10.0 - PI / 2) * r))
+			draw_colored_polygon(wp, col)
+		"halo":
+			draw_arc(P.call(50, 50), 36 * u, 0, TAU, 32, col, 9 * u)
+			draw_arc(P.call(50, 50), 36 * u, 0, TAU, 32, col.lightened(0.4), 3 * u)
+		"chains":
+			for i in 3:
+				draw_arc(P.call(24 + i * 26, 50), 16 * u, 0, TAU, 20, col, 7 * u)
+		"mask":
+			draw_colored_polygon(PackedVector2Array([P.call(14, 24), P.call(86, 24), P.call(80, 62), P.call(50, 92), P.call(20, 62)]), col)
+			draw_circle(P.call(35, 46), 8 * u, dark)
+			draw_circle(P.call(65, 46), 8 * u, dark)
+		"book":
+			draw_rect(Rect2(P.call(18, 14), Vector2(64, 74) * u), col)
+			draw_rect(Rect2(P.call(18, 14), Vector2(10, 74) * u), dark)
+			draw_line(P.call(40, 36), P.call(72, 36), dark, 5 * u)
+			draw_line(P.call(40, 54), P.call(72, 54), dark, 5 * u)
 		"ghost":
 			draw_circle(P.call(50, 40), 28 * u, col)
 			draw_rect(Rect2(P.call(22, 40), Vector2(56, 44) * u), col)

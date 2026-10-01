@@ -34,7 +34,7 @@
   {
    "id": "unit",
    "title": "一张卡长什么样",
-   "text": "一张卡上有：\n· 名字（上面）和【生命】（右上角的绿色数字，被打到 0 就倒下）；\n· 关键词（金色小条，给它一个特殊能力，现在先不管）；\n· 一个【技能】：这张卡会的招式。一个人物只有一招，但一招里可以连好几个效果。现在还是空的。",
+   "text": "一张卡上有：\n· 名字（上面）和【生命】（右上角的绿色数字，被打到 0 就倒下）；\n· 关键词（金色小条，现在先不管）；\n· 一个【技能】：这张卡会的招式。一个人物只有一招，但一招里可以连好几个效果。现在还是空的。",
    "target": "b:unit0",
    "wait": "next"
   },
@@ -63,42 +63,70 @@
   {
    "id": "ed_left",
    "title": "编辑窗口",
-   "text": "这是编辑窗口。左边是这张卡本身：名字、生命、关键词、它的技能。\n右边是给这张卡设计技能的地方。",
+   "text": "这是编辑窗口。左边是这张卡本身：名字、生命、技能名。关键词在最下面一排。\\n右边是【拼句台】——你的技能要在这里，亲手一个词一个词拼出来。",
    "target": "e:left",
    "wait": "next"
   },
   {
-   "id": "ed_free",
-   "title": "自由拼词",
-   "text": "右边默认就是【自由拼词】：你可以像搭积木一样，自己添加效果节点、选目标、填数字，想怎么组合都行。\n第一次可能不知从何下手——所以游戏还准备了一些【备选模板】，我们先用它们学。",
-   "target": "e:complex",
+   "id": "ed_rail",
+   "title": "句子轨",
+   "text": "上面这条绿色的是【句子轨】。你拼的每一张牌，都会像钢印一样“邦”地烙在这里，连成一句话。",
+   "target": "c:rail",
    "wait": "next"
   },
   {
-   "id": "ed_tab",
-   "title": "备选模板",
-   "text": "点上面的【备选模板】。注意：它们只是“现成的备选招式”，用来省事，并不是你唯一能用的技能。",
-   "target": "e:tab_simple",
-   "wait": "tab:simple"
+   "id": "ed_next",
+   "title": "拼第一个词",
+   "text": "下面发亮的，是【现在能接】的词，不能接的词点不了。\n我们先拼：对一个敌人造成 5 点伤害。\n第一步，点【选择】。",
+   "target": "c:next",
+   "wait": "w:选择"
   },
   {
-   "id": "ed_tpl",
-   "title": "选一个招式",
-   "text": "我们挑最简单的【单点打击】：对一个敌人造成伤害。它已经选好了（金色边框）。",
-   "target": "e:tpl:atk1",
+   "id": "ed_w2",
+   "title": "接着拼",
+   "text": "对！看，它被烙上去了。接着依次点【一个】【敌方】【随从】。每一步，能接的才会发亮。",
+   "target": "c:next",
+   "wait": "w:随从"
+  },
+  {
+   "id": "ed_hint",
+   "title": "人话提示",
+   "text": "看这里：这句话“到目前为止”的人话版。“某某”是你还没定的地方。",
+   "target": "c:hint",
    "wait": "next"
   },
   {
-   "id": "ed_param",
+   "id": "ed_sugg",
+   "title": "三种可能",
+   "text": "这三句，是按你现在的拼法，接下来可能变成的样子——它们也是用词拼出来的。你可以照着走，也可以自己来。",
+   "target": "c:sugg",
+   "wait": "next"
+  },
+  {
+   "id": "ed_verb",
+   "title": "动词",
+   "text": "现在点【造成】。",
+   "target": "c:next",
+   "wait": "w:造成"
+  },
+  {
+   "id": "ed_num",
    "title": "填数字",
-   "text": "这里的【伤害】是一个数字，你可以拖动它。\n先把它拖到 5（对手的稻草人有 10 点生命，我们分两次打）。",
-   "target": "e:param:n",
-   "wait": "param:n:5"
+   "text": "该填数字了：伤害多少点？在这个框里输入 5，按回车（或点【烙】），它会变成一张金属数字牌烙进去。\n想改的时候，点那张数字牌，改完会重新烙一次。",
+   "target": "c:number",
+   "wait": "n:5"
   },
   {
-   "id": "ed_preview",
-   "title": "你看到的就是会发生的",
-   "text": "看这里的预览：你拼的东西自动变成了一句话。\n这个游戏最重要的规矩：你拼什么词，它就做什么事，看到的就是会发生的。",
+   "id": "ed_end",
+   "title": "收尾",
+   "text": "最后点【伤害】，把句子收尾。",
+   "target": "c:next",
+   "wait": "w:伤害"
+  },
+  {
+   "id": "ed_done",
+   "title": "你拼出了一个技能",
+   "text": "成句了！看左边：这句话被翻译成了人话。\n这就是这个游戏最重要的规矩：你拼什么词，它就做什么事，看到的就是会发生的。",
    "target": "e:preview",
    "wait": "next"
   },
@@ -110,39 +138,40 @@
    "wait": "next"
   },
   {
-   "id": "ed_name",
-   "title": "起名字",
-   "text": "给招式起个名字吧。可以自己填，也可以点旁边的【随机】按钮，让游戏按你的效果随机起一个。",
-   "target": "e:name",
-   "wait": "dice"
-  },
-  {
    "id": "ed_dbl",
    "title": "更强，更贵",
-   "text": "想更强？把【双倍次数】拖到 1 试试：伤害会翻倍，但“双倍”这个词也要花点数，所以费用会上涨。",
-   "target": "e:param:dbl",
-   "wait": "param:dbl:1"
+   "text": "想更强？再点一张【双倍】：数字翻倍，但这个词也要花点数，所以费用会涨。",
+   "target": "c:next",
+   "wait": "w:双倍"
   },
   {
-   "id": "ed_dbl0",
-   "title": "拖回 0",
-   "text": "看到了吗：伤害变大了，费用也涨了。这就是取舍。\n我们先练手，把双倍次数拖回 0，再继续。",
-   "target": "e:param:dbl",
-   "wait": "param:dbl:0"
+   "id": "ed_undo",
+   "title": "撤回",
+   "text": "看到了吗：伤害变大了，费用也涨了。这就是取舍。我们先练手，点【撤回一张】把它拿掉。",
+   "target": "c:undo",
+   "wait": "undo"
   },
   {
-   "id": "ed_install",
-   "title": "装进去",
-   "text": "点【装上这个技能】，把它装到这张卡上。",
-   "target": "e:install",
-   "wait": "installed"
+   "id": "ed_name",
+   "title": "给随从起名",
+   "text": "给你的随从起个名字吧！自己填，或点【随机】让游戏按它的技能随机起一个。\n技能的名字可以在下面单独起。",
+   "target": "e:name",
+   "wait": "named"
   },
   {
    "id": "ed_commit",
-   "title": "确认",
-   "text": "装好了。最后点【确认修改】，把它写进这张卡。",
+   "title": "确定",
+   "text": "点【确定，拼好了】。所有的词会飞起来，咔咔拼成一句话。",
    "target": "e:commit",
-   "wait": "committed"
+   "wait": "commit_pressed"
+  },
+  {
+   "id": "w_c",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "committed",
+   "hide": true
   },
   {
    "id": "back",
@@ -299,39 +328,33 @@
    "wait": "editor_open"
   },
   {
-   "id": "a_tab",
-   "title": "备选模板",
-   "text": "再点【备选模板】。",
-   "target": "e:tab_simple",
-   "wait": "tab:simple"
+   "id": "a_compose",
+   "title": "拼减伤",
+   "text": "我们给盾卫拼一个减伤：给一个友方随从减伤 20。\n依次点：【选择】【一个】【友方】【随从】【减伤】。",
+   "target": "c:next",
+   "wait": "w:减伤"
   },
   {
-   "id": "a_tpl",
-   "title": "选减伤",
-   "text": "在右边选【减伤】模板：让自己受到的伤害变小。",
-   "target": "e:tpl:mit",
-   "wait": "tpl:mit"
-  },
-  {
-   "id": "a_tgt",
-   "title": "套在别人头上",
-   "text": "把【目标】改成「所选一个」：这样出招时，你可以把减伤套在任何一个队友身上。",
-   "target": "e:param:tgt",
-   "wait": "param:tgt:choose"
-  },
-  {
-   "id": "a_install",
-   "title": "装入",
-   "text": "点【装上这个技能】。",
-   "target": "e:install",
-   "wait": "installed"
+   "id": "a_num",
+   "title": "填数字",
+   "text": "输入 20，按回车。",
+   "target": "c:number",
+   "wait": "n:20"
   },
   {
    "id": "a_commit",
-   "title": "确认",
-   "text": "点【确认修改】。确认后会直接进入战斗（没用完的调整次数会作废）。",
+   "title": "确定",
+   "text": "成句了。点【确定，拼好了】。",
    "target": "e:commit",
-   "wait": "committed"
+   "wait": "commit_pressed"
+  },
+  {
+   "id": "w_c2",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "committed",
+   "hide": true
   },
   {
    "id": "w_b2",

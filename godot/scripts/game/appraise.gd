@@ -130,7 +130,7 @@ static func appraise(sk: Dictionary, my_deck: Dictionary, unit_idx: int, unit: D
 				break
 	# ---- 它怕什么（结构 + 公开信息）
 	out.weak.append("起手要 %d 秒：这期间施法者倒下，这招就落空。" % int(out.windup))
-	out.weak.append("力度 ≥ %d 的【打断】或【沉默】能整招压掉它。" % int(ceil(float(out.cost) / 1.25)))
+	out.weak.append("费用不超过 %d 的招会被【打断】或【沉默】整招压掉；你这招要花更多才压不住。" % int(ceil(float(out.cost) / 1.25)))
 	if int(best.get("dmg", 0)) > 0:
 		out.weak.append("对手的减伤、护盾、改道会削弱它。")
 		for fu in ctx.get("foe", D.new_deck()).units:
@@ -139,10 +139,10 @@ static func appraise(sk: Dictionary, my_deck: Dictionary, unit_idx: int, unit: D
 				out.weak.append("对手的%s%s。" % [fu.name, KW_NOTE[kw]])
 	# ---- 评级
 	var kills: Array = best.get("kills", [])
-	out.big = kills.size() >= 2 or int(best.get("score", 0)) >= 25 or int(best.get("dmg", 0)) >= 40 or (kills.size() >= 1 and out.counters.is_empty())
+	out.big = kills.size() >= 2 or int(best.get("score", 0)) >= 25 or int(best.get("dmg", 0)) >= 40
 	out.pricey = int(out.cost) >= 40
 	out.summary = outcome_text(best)
-	out.line = pet_line(sk, best, out.big, out.pricey, int(out.cost), out.counters.is_empty() and (int(best.get("dmg", 0)) > 0))
+	out.line = build_line(sk, best, out.big, out.pricey, int(out.cost), int(out.windup), out.counters.is_empty() and (int(best.get("dmg", 0)) > 0))
 	return out
 
 static func outcome_text(best: Dictionary) -> String:
@@ -179,17 +179,17 @@ static func _short_target(t: Dictionary) -> String:
 
 static func _num(node: Dictionary) -> String:
 	if node.has("value") and node.value.get("k", "") == "num":
-		return str(G.effective_num(node))
+		return str(int(node.value.n))
 	return "相应的"
 
 static func clause(node: Dictionary) -> String:
 	match node.get("kind", ""):
 		"dmg":
-			var s := "对%s造成 %s 点伤害" % [_short_target(node.target), _num(node)]
+			var s := "对%s造成 %s 点伤害%s" % [_short_target(node.target), _num(node), G.mods_clause(node, "伤害")]
 			if int(node.get("rep", 0)) > 0:
 				s += "，连打 %d 下" % (int(node.rep) + 1)
 			return s
-		"heal": return "给%s回 %s 点血" % [_short_target(node.target), _num(node)]
+		"heal": return "给%s回 %s 点血%s" % [_short_target(node.target), _num(node), G.mods_clause(node, "治疗")]
 		"mit": return "让%s少受伤害" % _short_target(node.target)
 		"status": return "给%s挂上【%s】" % [_short_target(node.target), node.status]
 		"remove": return "清掉%s身上的%s" % [_short_target(node.target), node.what]
@@ -198,8 +198,8 @@ static func clause(node: Dictionary) -> String:
 		"convert": return "把伤害变成治疗"
 		"time":
 			match node.op:
-				"delay": return "把对手的招往后推 %d 秒" % G.effective_num(node)
-				"advance": return "让自己的招提前 %d 秒" % G.effective_num(node)
+				"delay": return "把对手的招往后推 %d 秒%s" % [int(node.value.n), G.mods_clause(node, "秒数")]
+				"advance": return "让自己的招提前 %d 秒%s" % [int(node.value.n), G.mods_clause(node, "秒数")]
 				_: return "打断对手的招"
 		"swap": return "和%s换位置" % _short_target(node.target)
 		"split": return "把 %d 点伤害分给好几个敌人" % int(node.total)
@@ -235,3 +235,52 @@ static func pet_line(sk: Dictionary, best: Dictionary, big: bool, pricey: bool, 
 	elif pricey:
 		pre = "好贵！要花 %d 行动点——" % cost
 	return pre + body
+
+# 拼技能时小词说的话：只评价“这招强不强”（威力、代价、拆不拆得掉），不点名对方随从。
+# “打上去会怎样”留到战斗里准备出招时再说（battle_screen._pet_action_line）。
+static func build_line(sk: Dictionary, best: Dictionary, big: bool, pricey: bool, cost: int, windup: int, uncounterable: bool) -> String:
+	var kills: int = (best.get("kills", []) as Array).size()
+	var dmg := int(best.get("dmg", 0))
+	var heal := int(best.get("heal", 0))
+	var pre := ""
+	if big:
+		pre = ["哇！这是超级厉害的技能！", "大招！你拼出了一个大招！", "这招好猛！"][randi() % 3]
+	elif kills >= 1 or dmg >= 20:
+		pre = "不错，这招挺能打。"
+	elif pricey:
+		pre = "这招有点贵哦。"
+	var cs := clauses(sk)
+	var what: String = "它会" + (str(cs[0]) if not cs.is_empty() else "做点什么")
+	if cs.size() >= 2:
+		what += "，然后" + str(cs[1])
+	var power := ""
+	if kills >= 2:
+		power = "威力足够一下放倒两个满血随从"
+	elif kills == 1:
+		power = "威力足够一下放倒一个满血随从"
+	elif dmg > 0:
+		power = "一下能打出 %d 点伤害" % dmg
+	elif heal > 0 or nominal(sk, "heal") > 0:
+		power = "回血量 %d 点，适合保命" % maxi(heal, nominal(sk, "heal"))
+	else:
+		power = "它是埋伏、防守或控制类，强不强要看对手怎么出手"
+	var line := "%s%s。%s；代价是 %d 行动点、起手 %d 秒。" % [pre, what, power, cost, windup]
+	if uncounterable:
+		line += "对手现在的牌还拆不掉它！"
+	return line
+
+# 技能里写明的数值总和（不看场上情况），比如满血时治疗实际回 0，这里仍按牌面算
+static func nominal(sk: Dictionary, kind: String) -> int:
+	var total := 0
+	for n in sk.get("nodes", []):
+		total += _nominal_node(n, kind)
+	return total
+
+static func _nominal_node(n: Dictionary, kind: String) -> int:
+	var t := 0
+	if n.get("kind", "") == kind and n.has("value") and n.value.get("k", "") == "num":
+		t += G.effective_num(n) * (1 + int(n.get("rep", 0)))
+	for key in ["child", "first", "then", "else", "a", "b"]:
+		if n.has(key) and n[key] is Dictionary and not n[key].is_empty():
+			t += _nominal_node(n[key], kind)
+	return t

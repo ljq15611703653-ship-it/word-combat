@@ -1,7 +1,8 @@
 extends RefCounted
 # 一局对战的流程控制（与界面无关）。人类默认是0号位；两边都可设为电脑，用于批量模拟。
 #
-# 每轮：开始（行动点）→ 抽词（两袋各25词，先手先选）→ 调整（各三次，交替、公开）→ 宣告（先手宣告完→后手宣告）→ 时间轴结算。
+# 开局：各发 12 个基础词 → 连选 OPENING_DRAFTS 轮词袋（每轮两袋，先挑的一方交替）→ 用全部词构筑 → 第 1 轮直接开打。
+# 第 2 轮起每轮：开始（行动点）→ 抽词（两袋各25词，先手先选）→ 调整（各三次，交替、公开）→ 宣告（先手宣告完→后手宣告）→ 时间轴结算。
 
 const E = preload("res://scripts/core/engine.gd")
 const G = preload("res://scripts/core/grammar.gd")
@@ -32,9 +33,13 @@ var fast_ai := false
 var ai_epsilon := 0.0
 var max_think_ms := 0
 var rounds_played := 0
+const OPENING_DRAFTS := 5
+var opening_idx := 0           # 开局选词进行到第几袋
+var opening_total := OPENING_DRAFTS
+var round1_draft := false      # 调试演示用：第 1 轮也抽词
 var scripted_ai: Callable = Callable()   # 教学：由脚本替电脑宣告
 
-func start(human0: bool = true, seed_val: int = -1, human1: bool = false) -> void:
+func start(human0: bool = true, seed_val: int = -1, human1: bool = false, openings: int = OPENING_DRAFTS) -> void:
 	Lex.load_all()
 	if seed_val < 0:
 		rng.randomize()
@@ -47,15 +52,36 @@ func start(human0: bool = true, seed_val: int = -1, human1: bool = false) -> voi
 			pools[s][w] = int(pools[s].get(w, 0)) + 1
 		personas[s] = Ai.pick_persona(rng)
 	decks = [D.new_deck(), D.new_deck()]
-	for s in 2:
-		if not human[s]:
-			decks[s] = Ai.build_deck(pools[s], personas[s], rng)
 	st = E.make_state(decks, 0, {}, rng.randi() & 0x7fffffff)
-	phase = "build"
 	winner = -1
 	log_lines = []
 	rounds_played = 0
-	say("对局开始。双方各得18个起始词，先完成构筑。")
+	opening_idx = 0
+	opening_total = openings
+	say("对局开始。双方各得 %d 个基础词，先轮流选 %d 轮词袋，再构筑。" % [Lex.OPENING_COUNT, opening_total])
+	if opening_total > 0:
+		_next_opening()
+	else:
+		_finish_opening()
+
+# 开局选词：每次两袋，先挑的一方交替
+func _next_opening() -> void:
+	phase = "opening"
+	bags = [Lex.draw_bag(rng), Lex.draw_bag(rng)]
+	picker = (int(st.first) + opening_idx) % 2
+	bag_choice = -1
+
+func _finish_opening() -> void:
+	phase = "build"
+	for s in 2:
+		if not human[s]:
+			decks[s] = Ai.build_deck(pools[s], personas[s], rng)
+			E.set_deck(st, s, decks[s], false)
+
+# 所有开局选词都交给电脑（调试演示、批量模拟用）
+func auto_opening() -> void:
+	while phase == "opening":
+		ai_pick_bag()
 
 func say(t: String) -> void:
 	log_lines.append(t)
@@ -86,11 +112,16 @@ func ready_for_round() -> bool:
 func begin_round() -> Array:
 	var revived := E.begin_round(st)
 	rounds_played = st.round
-	bags = [Lex.draw_bag(rng), Lex.draw_bag(rng)]
 	picker = E.first_side(st)
-	phase = "draft"
 	bag_choice = -1
 	say("—— 第 %d 轮 ——  先手：%s" % [st.round, "你" if human[picker] else "对手"])
+	if int(st.round) == 1 and opening_total > 0 and not round1_draft:
+		# 刚用开局选的词构筑完：第 1 轮直接开打
+		bags = []
+		phase = "adjust_done"
+		return revived
+	bags = [Lex.draw_bag(rng), Lex.draw_bag(rng)]
+	phase = "draft"
 	return revived
 
 func pick_bag(side: int, idx: int) -> void:
@@ -99,6 +130,14 @@ func pick_bag(side: int, idx: int) -> void:
 		pools[side][w] = int(pools[side].get(w, 0)) + 1
 	for w in bags[1 - idx]:
 		pools[1 - side][w] = int(pools[1 - side].get(w, 0)) + 1
+	if phase == "opening":
+		say("开局选词 %d/%d：%s 选择了%s袋。" % [opening_idx + 1, opening_total, "你" if human[side] else "对手", "左" if idx == 0 else "右"])
+		opening_idx += 1
+		if opening_idx < opening_total:
+			_next_opening()
+		else:
+			_finish_opening()
+		return
 	say("%s 选择了%s袋。" % ["你" if human[side] else "对手", "左" if idx == 0 else "右"])
 	var f := E.first_side(st)
 	adjust_steps = [f, 1 - f, f, 1 - f, f, 1 - f]
@@ -238,6 +277,10 @@ func resolve() -> Dictionary:
 func step_auto() -> bool:
 	# 推进一步，返回是否仍在进行。仅在所有需要决策的一方都是电脑时使用。
 	match phase:
+		"opening":
+			if human[picker]:
+				return false
+			ai_pick_bag()
 		"build":
 			for s in 2:
 				if human[s]:

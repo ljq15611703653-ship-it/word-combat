@@ -17,6 +17,7 @@ signal finished()                      # 构筑完成 / 结束调整
 signal adjusted(unit_idx, unit)        # 调整模式下确认了一张卡的修改
 
 var m
+var first_card := false     # 开局的第一张牌：自动打开编辑器，拼完并起名才能继续
 var mode := "initial"
 var wd: Dictionary
 var card_row: HBoxContainer
@@ -39,6 +40,15 @@ func setup(match_obj, m_mode: String) -> void:
 	_build()
 	refresh()
 	Tut.fire("screen:adjust" if mode == "adjust" else "screen:build")
+	if first_card and mode == "initial":
+		call_deferred("_open_first_card")
+
+func _open_first_card() -> void:
+	if not is_inside_tree():
+		return
+	var Pet = load("res://scripts/ui/pet.gd")
+	Pet.chat("先拼一张属于你自己的牌吧！用词拼出一句话，再给你的随从起个名字。", "talk", 8.0)
+	_open_editor(0)
 
 func _build() -> void:
 	K.clear_children(self)
@@ -170,7 +180,7 @@ func refresh() -> void:
 	var sub: Label = find_child("sub", true, false)
 	if sub != null:
 		if mode == "initial":
-			sub.text = "①点「编辑」  ②选招式、调数值（绿=有词，红=缺词）  ③装入技能槽并确认。点数 = 生命 + 技能数字，共 100；至少装一个技能。"
+			sub.text = "①点「编辑」  ②选招式、调数值（绿=有词，红=缺词）  ③装入技能槽并确认。点数 = 生命 + 技能数字，共 100；至少装一个技能。每张卡一个技能。"
 		else:
 			sub.text = "你还有 %d 次调整，对手 %d 次。每次只能改一张卡。" % [m.adjust_left(0), m.adjust_left(1)]
 	_refresh_coach(deck)
@@ -360,6 +370,7 @@ func _open_editor(i: int) -> void:
 	var pop := EditorPopup.new()
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(pop)
+	pop.require_name = first_card and mode == "initial" and i == 0 and _deck_has_no_skill()
 	pop.open(_deck(), i, m.pools[0], mode)
 	pop.cancelled.connect(func(): _close_popup(pop))
 	pop.committed.connect(func(unit):
@@ -372,6 +383,12 @@ func _open_editor(i: int) -> void:
 		else:
 			adjusted.emit(i, unit))
 	popup = pop
+
+func _deck_has_no_skill() -> bool:
+	for u in _deck().units:
+		if not u.skills.is_empty():
+			return false
+	return true
 
 func _close_popup(pop: Control) -> void:
 	pop.queue_free()

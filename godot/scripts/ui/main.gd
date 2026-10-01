@@ -118,13 +118,15 @@ func _drive(s: Control) -> void:
 				await get_tree().create_timer(0.3).timeout
 				var pop = s.popup
 				if pop != null and is_instance_valid(pop):
+					var S = load("res://scripts/compose/sentence.gd")
 					for t in R.catalog():
 						var sk: Dictionary = R.build(t.id, {})
 						if G.missing(sk.words, pop.avail_for_slot()).is_empty() and pop._points_other() - pop._slot_budget() + int(sk.budget) <= 100 and G.problems(sk).is_empty():
-							pop.slot = 0
-							pop._install(sk)
+							pop.composer.setup(pop.avail_for_slot(), S.tokens_of_skill(sk.nodes))
+							pop._on_composed(false)
 							if pop.btn_commit.disabled:
 								continue
+							pop._install(pop.cur_skill)
 							pop.committed.emit(pop.work)
 							done = true
 							print("  [驱动] 调整：装入 ", t.id)
@@ -164,16 +166,20 @@ func _new_game(seed_val: int = -1) -> void:
 	m.fast_ai = Settings.level < 2
 	if auto:
 		m.human = [false, false]
+		m.auto_opening()
 		m.decks[0] = Ai.build_deck(m.pools[0], m.personas[0], m.rng)
 		m.commit_deck(0, m.decks[0])
 		_begin_round()
+	elif m.phase == "opening":
+		_show_draft()
 	else:
-		_show_build("initial")
+		_show_build("initial", not driver_on)
 
 # ---------------------------------------------------------------- 构筑
-func _show_build(mode: String) -> void:
+func _show_build(mode: String, first_card: bool = false) -> void:
 	var s := BuildScreen.new()
 	_set_screen(s)
+	s.first_card = first_card
 	s.setup(m, mode)
 	if mode == "initial":
 		s.finished.connect(func():
@@ -202,10 +208,11 @@ func _begin_round() -> void:
 	m.begin_round()
 	if tut_on:
 		_tut_prepare_round()
-		if int(m.st.round) == 1:
-			m.begin_declare()
-			_show_battle()
-			return
+	if m.phase == "adjust_done":
+		# 第 1 轮：刚用开局选的词构筑完，直接开打
+		m.begin_declare()
+		_show_battle()
+		return
 	_show_draft()
 
 # ---------------------------------------------------------------- 抽词
@@ -221,13 +228,22 @@ func _show_draft() -> void:
 		d.picked.connect(func(i):
 			m.pick_bag(0, i)
 			d.show_human_choice(i))
-		d.finished.connect(_continue_adjust)
+		d.finished.connect(_after_draft)
 	else:
 		d.finished.connect(func():
 			m.pick_bag(picker, ai_idx)
-			_continue_adjust())
+			_after_draft())
 		if auto:
 			d.get_tree().create_timer(1.2).timeout.connect(func(): d.finished.emit())
+
+# 选完一袋之后：开局选词就接着选下一袋 / 进构筑；对战中进调整
+func _after_draft() -> void:
+	if m.phase == "opening":
+		_show_draft()
+	elif m.phase == "build":
+		_show_build("initial", not driver_on)   # 开局选词一结束，先拼自己的第一张牌并起名
+	else:
+		_continue_adjust()
 
 # ---------------------------------------------------------------- 调整
 func _continue_adjust() -> void:
@@ -278,7 +294,8 @@ func _start_tutorial() -> void:
 	tut_on = true
 	tut_skip_adjust = false
 	m = Match.new()
-	m.start(true, 20260, false)
+	m.start(true, 20260, false, 0)
+	m.opening_total = 5   # 教学用固定词库：第 1 轮直接开打，第 2 轮起抽词
 	m.ai_epsilon = 0.0
 	m.fast_ai = true
 	# 词库：刚好够装“单点打击（含双倍）”与“减伤”
@@ -357,6 +374,29 @@ func _tut_test() -> void:
 		var hole: Rect2 = tut.current_hole()
 		var tgt: String = st.target
 		var b = battle_screen
+		if w is String and w == "named":
+			var nr := get_tree().get_nodes_in_group("tut:e:name")
+			if not nr.is_empty():
+				for bt in nr[0].find_children("*", "Button", true, false):
+					await _click(bt)
+			continue
+		if w is String and w.begins_with("w:"):
+			var seq: Array = {"ed_w2": ["一个", "敌方", "随从"], "a_compose": ["选择", "一个", "友方", "随从", "减伤"]}.get(id, [str(w).substr(2)])
+			for word in seq:
+				await get_tree().create_timer(0.2).timeout
+				var wn := get_tree().get_nodes_in_group("tut:c:next:" + word)
+				if wn.is_empty():
+					break
+				await _click(wn[0])
+			continue
+		if w is String and w.begins_with("n:"):
+			var nn := get_tree().get_nodes_in_group("tut:c:number")
+			if not nn.is_empty():
+				var les: Array = nn[0].find_children("*", "LineEdit", true, false)
+				if not les.is_empty():
+					les[0].text = str(w).substr(2)
+					les[0].text_submitted.emit(str(w).substr(2))
+			continue
 		if tgt.begins_with("b:mine"):
 			if b != null and is_instance_valid(b):
 				var u0: Dictionary = m.st.sides[0].units[int(tgt.substr(6))]
@@ -423,14 +463,7 @@ func _tut_prepare_round() -> void:
 	var E = load("res://scripts/core/engine.gd")
 	var R = load("res://scripts/core/recipes.gd")
 	tut_skip_adjust = false
-	if int(m.st.round) == 1:
-		# 第一轮：跳过抽词与调整，直接战斗（后面的轮次才教这两件事）
-		m.pick_bag(0, 0)
-		while m.phase == "adjust":
-			m.skip_adjust(0)
-			m.skip_adjust(1)
-		m.phase = "adjust_done"
-	elif int(m.st.round) == 2:
+	if int(m.st.round) == 2:
 		m.st.sides[0].ap = 60   # 教学：保证防守和进攻两个行动都付得起
 		var sk: Dictionary = R.build("atk1", {"n": 6})
 		sk["name"] = "稻草拳"
@@ -458,9 +491,14 @@ func _on_tut_finished(completed: bool) -> void:
 func _run_demo(demo: String) -> void:
 	m = Match.new()
 	m.start(true, 7, false)
+	if demo != "opening":
+		m.auto_opening()
+		m.round1_draft = true
 	match demo:
 		"title":
 			_show_title()
+		"opening":
+			_show_draft()
 		"build":
 			_show_build("initial")
 		"draft":
@@ -505,29 +543,6 @@ func _run_demo(demo: String) -> void:
 				m.st.sides[1].units[3].down_round = 1
 				m.st.sides[1].units[3].hp = 0
 				bb._rebuild_rows()
-		"complex2":
-			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
-			m.commit_deck(0, m.decks[0])
-			var s2 := BuildScreen.new()
-			_set_screen(s2)
-			s2.setup(m, "initial")
-			s2._open_editor(2)
-			await get_tree().create_timer(0.3).timeout
-			var G = load("res://scripts/core/grammar.gd")
-			var pp = s2.popup
-			pp.tab = "complex"
-			pp.complex_root.visible = true
-			pp.simple_root.visible = false
-			pp.complex_root.avail = {}
-			for w in Lex.implemented():
-				pp.complex_root.avail[w] = 4
-			pp.complex_root.nodes = [
-				G.watch("pending_dmg", G.T("all", "ally"), G.redirect(G.T("source", "ref"), 25), {"freq": "every"}),
-				G.watch("damaged", G.T("self", "self"), G.chain(G.dmg(G.T("source", "ref"), G.REF("event_damage"), {"dbl": 1}), G.heal(G.T("self", "self"), G.REF("prev"))), {"freq": "every"}),
-			]
-			pp.complex_root.skill_name = "嵌套示例"
-			pp.complex_root.name_edit.text = "嵌套示例"
-			pp.complex_root._rerender()
 		"minions3d":
 			_demo_minions3d()
 		"tuttest":
@@ -577,18 +592,47 @@ func _run_demo(demo: String) -> void:
 			m.st.sides[0].ap = 45
 			m.st.sides[1].ap = 45
 			_continue_adjust_demo()
-		"editor", "simple", "complex":
+		"editor", "editor2", "editor3", "cast", "dbl":
+			for w in Lex.implemented():
+				m.pools[0][w] = maxi(int(m.pools[0].get(w, 0)), 3)
 			m.decks[0] = Ai.build_deck(m.pools[0], "均衡", m.rng)
 			m.commit_deck(0, m.decks[0])
 			var s := BuildScreen.new()
 			_set_screen(s)
 			s.setup(m, "initial")
 			s._open_editor(0)
-			if demo == "complex" and s.popup != null:
-				s.popup.tab = "complex"
-				s.popup.complex_root.visible = true
-				s.popup.simple_root.visible = false
-				s.popup.complex_root.load_skill(s.popup._current_skill(), s.popup.avail_for_slot(), s.popup._points_other())
+			await get_tree().create_timer(0.4).timeout
+			var cp = s.popup.composer
+			if demo != "editor3":
+				cp.setup(s.popup.avail_for_slot(), [])
+				s.popup._on_composed()
+			if demo == "editor2":
+				for w in ["选择", "一个", "敌方", "随从", "造成"]:
+					cp.add_word(w)
+					await get_tree().create_timer(0.12).timeout
+			elif demo == "dbl":
+				for w in ["选择", "一个", "敌方", "随从", "造成"]:
+					cp.add_word(w)
+					await get_tree().create_timer(0.1).timeout
+				cp.add_number(5, "value")
+				await get_tree().create_timer(0.1).timeout
+				cp.add_word("伤害")
+				await get_tree().create_timer(0.1).timeout
+				cp.add_word("双倍")
+			elif demo == "cast":
+				var G4 = load("res://scripts/core/grammar.gd")
+				var S4 = load("res://scripts/compose/sentence.gd")
+				cp.setup(s.popup.avail_for_slot(), S4.tokens_of_skill([G4.dmg(G4.T("all", "enemy"), G4.N(14), {"dbl": 2, "rep": 1})]))
+				s.popup._on_composed()
+				await get_tree().create_timer(0.5).timeout
+				s.popup.stage.cast(3, "atk")
+			elif demo == "editor3":
+				var G3 = load("res://scripts/core/grammar.gd")
+				var S3 = load("res://scripts/compose/sentence.gd")
+				var nodes3: Array = [G3.watch("pending_dmg", G3.T("all", "ally"), G3.redirect(G3.T("source", "ref"), 25), {"freq": "every"}),
+					G3.dmg(G3.T("choose", "enemy"), G3.N(14), {"dbl": 1})]
+				cp.setup(s.popup.avail_for_slot(), S3.tokens_of_skill(nodes3))
+				s.popup._on_composed()
 
 # ---- 真实鼠标点击的集成测试：把鼠标事件注入视口，走“点技能牌 → 点目标 → 点宣告”
 func _click(c: Control) -> void:
@@ -605,6 +649,16 @@ func _click(c: Control) -> void:
 	ev2.global_position = pos
 	ev2.pressed = false
 	get_viewport().push_input(ev2)
+	await get_tree().create_timer(0.15).timeout
+
+func _click_at(pos: Vector2) -> void:
+	for pressed in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.position = pos
+		ev.global_position = pos
+		ev.pressed = pressed
+		get_viewport().push_input(ev)
 	await get_tree().create_timer(0.15).timeout
 
 func _find_button(root: Node, text: String) -> Button:
@@ -684,7 +738,11 @@ func _click_test() -> void:
 					break
 			if enemy_uid == -1:
 				break
-			await _click(b.cards[enemy_uid])
+			if b.cards[enemy_uid] is Control:
+				await _click(b.cards[enemy_uid])
+			else:
+				# 3D 牌桌：在随从的屏幕位置真实点击（走射线拾取）
+				await _click_at(b._screen_of(enemy_uid))
 		log.call("点击目标卡后选择槽已补全", b.picking.is_empty())
 		var confirm := _find_button(b.action_box, "宣告 ✓")
 		log.call("出现可点击的“宣告 ✓”按钮", confirm != null)
@@ -783,38 +841,63 @@ func _click_test_editor() -> void:
 	await get_tree().create_timer(0.3).timeout
 	var pop = s.popup
 	log.call("点击后弹出编辑器", pop != null and is_instance_valid(pop))
-	# 先切到“备选模板”页，再逐个点模板，直到“装上这个技能”可点
-	var tpl_tab := _find_button(pop, "备选模板（现成的招式）")
-	log.call("有“备选模板”标签", tpl_tab != null)
-	if tpl_tab != null:
-		await _click(tpl_tab)
-	var installed := false
-	for tid in ["atk1", "atkA", "heal", "mit", "shield", "redirect", "time", "swap"]:
-		if not pop.tpl_buttons.has(tid):
-			continue
-		await _click(pop.tpl_buttons[tid])
-		var ib := _find_button(pop, "装上这个技能")
-		if ib != null:
-			await _click(ib)
-			installed = true
-			log.call("选模板 %s 并装入" % tid, pop.work.skills.size() == 1)
+	# 用真实点击一张一张拼：先让提示模块随机选出“一句能拼成的话”，再逐张去点“现在能接”的那张牌
+	var H = load("res://scripts/compose/hints.gd")
+	var cp = pop.composer
+	cp.setup(pop.avail_for_slot(), [])
+	var rng2 := RandomNumberGenerator.new()
+	rng2.seed = 5
+	var plan: Dictionary = {}
+	for tries in 30:
+		plan = H.walk([], cp.avail, rng2, {})
+		if plan.ok and plan.tokens.size() >= 4 and plan.tokens.size() <= 9:
 			break
-	log.call("至少有一个模板凑得出词", installed)
-	# 复杂版标签
-	var tab_btn := _find_button(pop, "自由拼词（自己组合）")
-	log.call("有复杂版标签", tab_btn != null)
-	if tab_btn != null:
-		await _click(tab_btn)
-		log.call("切到复杂版后可见", pop.complex_root.visible and not pop.simple_root.visible)
-		var back := _find_button(pop, "备选模板（现成的招式）")
-		await _click(back)
-		log.call("切回简单版", pop.simple_root.visible)
-	var commit := _find_button(pop, "确认修改")
-	log.call("“确认修改”可点", commit != null)
+	log.call("词库里能拼出一句话", plan.get("ok", false))
+	var placed := 0
+	await get_tree().create_timer(0.2).timeout
+	for tok in plan.get("tokens", []):
+		await get_tree().create_timer(0.1).timeout   # 等界面重新排版，再按牌的位置去点
+		if tok.t == "W":
+			var nodes := get_tree().get_nodes_in_group("tut:c:next:" + str(tok.v))
+			if nodes.is_empty():
+				print("  [调试] 第 %d 张 %s 找不到；牌=%s 能接=%s" % [placed + 1, tok.v, str(cp.tokens.map(func(x): return x.v)), str(cp.opts.words_have)])
+				break
+			await _click(nodes[0])
+		elif tok.t == "N":
+			if cp._num_edit == null or not is_instance_valid(cp._num_edit):
+				break
+			cp._num_edit.text = str(tok.v)
+			cp._num_edit.text_submitted.emit(str(tok.v))
+			await get_tree().create_timer(0.1).timeout
+		else:
+			cp.add_part(str(tok.v))
+		placed += 1
+		await get_tree().create_timer(0.05).timeout
+	log.call("真实点击拼出了 %d 张牌并成句" % placed, cp.is_complete() and placed == plan.get("tokens", []).size())
+	log.call("成句后有“人话”", not pop.cur_skill.is_empty())
+	# 点掉一张再接回去（撤回）
+	var n_before: int = cp.tokens.size()
+	await _click(cp.back_btn)
+	log.call("点“撤回一张”后少一张牌", cp.tokens.size() == n_before - 1)
+	var last_tok: Dictionary = plan.tokens[plan.tokens.size() - 1]
+	if last_tok.t == "W":
+		var nodes2 := get_tree().get_nodes_in_group("tut:c:next:" + str(last_tok.v))
+		if not nodes2.is_empty():
+			await _click(nodes2[0])
+	elif last_tok.t == "N":
+		cp.add_number(int(last_tok.v), "value")
+	log.call("重新接上后仍然成句", cp.is_complete())
+	pop.unit_name_edit.text = "小剑"
+	pop.unit_name_edit.text_changed.emit("小剑")
+	var commit: Button = pop.btn_commit
+	log.call("“确定”可点", commit != null and not commit.disabled)
 	if commit != null:
 		await _click(commit)
-		await get_tree().create_timer(0.3).timeout
-		log.call("确认后牌组里有技能", s.wd.units[0].skills.size() == 1)
+		var wait := 0.0
+		while s.wd.units[0].skills.size() != 1 and wait < 12.0:
+			await get_tree().create_timer(0.2).timeout
+			wait += 0.2
+		log.call("飞词组句之后牌组里有技能（%.1f 秒）" % wait, s.wd.units[0].skills.size() == 1)
 	var start_btn := _find_button(s, "开始对战  →")
 	log.call("装好技能后“开始对战”可点", start_btn != null)
 	if start_btn != null:

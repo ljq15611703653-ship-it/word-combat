@@ -1,8 +1,7 @@
 extends Control
-# 卡牌编辑器弹窗：一张随从卡的生命、关键词、两个技能槽。
-# 两个标签页共用同一份数据：
-#   简单版 —— 选一个“招式模板”，填空（参数），立刻预览费用与所需词；
-#   复杂版 —— 直接拼节点树（见 complex_editor.gd）。
+# 卡牌编辑器弹窗：一张随从卡的名字、生命、关键词和它唯一的技能。
+# 技能只能“拼”出来：在右边的拼句台里把词一张一张接成一句话（见 scripts/compose/）。
+# 没有模板、没有滑块——每个数字也是手填、烙成一张牌。拼好点“确定”，所有牌飞起来合成一句人话。
 
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const K = preload("res://scripts/ui/kit.gd")
@@ -10,11 +9,15 @@ const Appraise = preload("res://scripts/game/appraise.gd")
 const Pet = preload("res://scripts/ui/pet.gd")
 const Icon = preload("res://scripts/ui/icon.gd")
 const G = preload("res://scripts/core/grammar.gd")
-const R = preload("res://scripts/core/recipes.gd")
 const D = preload("res://scripts/core/deck.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
-const Complex = preload("res://scripts/ui/complex_editor.gd")
 const Namer = preload("res://scripts/core/namer.gd")
+const S = preload("res://scripts/compose/sentence.gd")
+const Composer = preload("res://scripts/compose/composer.gd")
+const FX = preload("res://scripts/compose/stamp_fx.gd")
+const CardFace = preload("res://scripts/ui/card_face.gd")
+const MinionStage = preload("res://scripts/view3d/minion_stage.gd")
+const Sfx = preload("res://scripts/ui/sfx.gd")
 
 signal committed(unit)
 signal cancelled()
@@ -23,37 +26,36 @@ var base_deck: Dictionary
 var pool: Dictionary
 var unit_idx := 0
 var work: Dictionary          # 正在编辑的这张卡
-var slot := 0
+var slot := 0                 # 一人一招，恒为 0
 var mode := "initial"
-var tab := "complex"
+var require_name := false     # 开局第一张牌：必须给随从起名才能确定
+var _named := false
 
 var hp_label: Label
-var kw_option: OptionButton
+var skill_name_edit: LineEdit
+var kw_slot: Control
+var card_face: Control
+var stage: Control
+var kw_flow: HFlowContainer
+var kw_desc: Label
+var fx_top: Control
 var slot_box: VBoxContainer
 var info_box: VBoxContainer
-var tab_hint: Label
-var _ap_token := 0
-var _last_ap_sig := ""
-var tab_holder: Control
-var simple_root: Control
-var complex_root
 var btn_commit: Button
 var budget_label: Label
-
-# 简单版状态
-var sel_tid := "atk1"
-var sel_params := {}
-var preview_skill: Dictionary = {}
-var param_box: VBoxContainer
-var preview_box: VBoxContainer
-var sel_name := ""            # 玩家给当前技能起的名字（空=用模板名）
-var skill_name_edit: LineEdit
+var composer: Control
 var unit_name_edit: LineEdit
+var sum_box: VBoxContainer
+var rb_box: VBoxContainer
+var sel_name := ""            # 玩家给技能起的名字（空=按效果自动起）
+var cur_skill: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
-var tpl_buttons := {}
+var _ap_token := 0
+var _last_ap_sig := ""
+var _committing := false
 
 func _unhandled_key_input(ev: InputEvent) -> void:
-	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and visible:
+	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and visible and not _committing:
 		get_viewport().set_input_as_handled()
 		cancelled.emit()
 
@@ -64,12 +66,16 @@ func open(deck: Dictionary, idx: int, pool_words: Dictionary, m: String) -> void
 	mode = m
 	work = D.clone(deck).units[idx]
 	slot = 0
+	var sk: Dictionary = work.skills[0] if not work.skills.is_empty() else {}
+	sel_name = str(sk.get("name", "")) if sk.get("custom_name", false) else ""
 	_build()
-	_load_slot()
+	var init: Array = S.tokens_of_skill(sk.nodes) if sk.has("nodes") else []
+	composer.setup(avail_for_slot(), init)
+	_on_composed()
 
 # ---------------------------------------------------------------- 可用性计算
 func _other_used() -> Dictionary:
-	# 除“当前正在编辑的技能槽”以外，牌组其余部分用掉的词
+	# 除“当前正在编辑的这个技能”以外，牌组其余部分用掉的词
 	var used := {}
 	for i in base_deck.units.size():
 		if i == unit_idx:
@@ -78,11 +84,6 @@ func _other_used() -> Dictionary:
 			used[w] = int(used.get(w, 0)) + 1
 	if work.kw != "":
 		used[work.kw] = int(used.get(work.kw, 0)) + 1
-	for k in work.skills.size():
-		if k == slot:
-			continue
-		for w in work.skills[k].words:
-			used[w] = int(used.get(w, 0)) + 1
 	return used
 
 func avail_for_slot() -> Dictionary:
@@ -101,10 +102,10 @@ func _points_other() -> int:
 		for sk in base_deck.units[i].skills:
 			total += int(sk.budget)
 	total += int(work.max_hp)
-	for k in work.skills.size():
-		if k != slot:
-			total += int(work.skills[k].budget)
 	return total
+
+func _slot_budget() -> int:
+	return int(work.skills[0].budget) if not work.skills.is_empty() else 0
 
 # ---------------------------------------------------------------- 构建界面
 func _build() -> void:
@@ -116,154 +117,178 @@ func _build() -> void:
 	add_child(dim)
 	var win := K.panel(Color("171b29"), K.GOLD_D, 18, 2, 18)
 	win.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	win.offset_left = 40
-	win.offset_right = -40
-	win.offset_top = 28
-	win.offset_bottom = -28
+	win.offset_left = 28
+	win.offset_right = -28
+	win.offset_top = 20
+	win.offset_bottom = -20
 	add_child(win)
-	var root := K.vbox(10)
+	var root := K.vbox(8)
 	win.add_child(root)
 	# 标题栏
 	var head := K.hbox(12)
-	head.add_child(K.label("编辑【%s】" % work.name, 28, K.GOLD))
-	head.add_child(K.label("改动将写入牌组" if mode == "initial" else "本次调整只能改这一张卡（消耗1次调整）", 15, K.MUTED))
+	head.add_child(K.label("编辑【%s】" % work.name, 26, K.GOLD))
+	head.add_child(K.label("改动将写入牌组" if mode == "initial" else "本次调整只能改这一张卡（消耗1次调整）", 14, K.MUTED))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
-	budget_label = K.label("", 18, K.TEXT)
+	budget_label = K.label("", 17, K.TEXT)
 	head.add_child(budget_label)
 	root.add_child(head)
-	var body := K.hbox(14)
+	var body := K.hbox(12)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(body)
-	# 左栏
+	# ---------------- 左栏：这张卡本身
 	var left := K.panel(K.PANEL, K.EDGE, 12, 1)
 	left.custom_minimum_size = Vector2(380, 0)
 	Tut.tag(left, "e:left")
 	body.add_child(left)
-	var lv := K.vbox(10)
-	left.add_child(lv)
-	var glyph_c := CenterContainer.new()
-	glyph_c.add_child(Icon.make(work.glyph, 76, Color("c9b27a")))
-	lv.add_child(glyph_c)
+	var lsc := ScrollContainer.new()
+	lsc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	left.add_child(lsc)
+	var lv := K.vbox(8)
+	lv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lsc.add_child(lv)
+	# 卡面（2D）和随从（3D）并排：拼一个词，两边都会跟着变
+	var pv := K.hbox(6)
+	pv.alignment = BoxContainer.ALIGNMENT_CENTER
+	card_face = CardFace.new()
+	card_face.custom_minimum_size = CardFace.SIZE
+	pv.add_child(card_face)
+	stage = MinionStage.new()
+	stage.custom_minimum_size = Vector2(196, 196)
+	pv.add_child(stage)
+	Tut.tag(pv, "e:preview3d")
+	lv.add_child(pv)
 	var nrow := K.hbox(6)
-	nrow.add_child(K.label("卡名", 18, K.MUTED))
+	nrow.add_child(K.label("卡名", 17, K.MUTED))
 	unit_name_edit = LineEdit.new()
 	unit_name_edit.max_length = 8
 	unit_name_edit.text = work.name
-	unit_name_edit.custom_minimum_size = Vector2(170, 34)
-	unit_name_edit.text_changed.connect(func(t): work.name = t if t.strip_edges() != "" else work.name)
+	unit_name_edit.custom_minimum_size = Vector2(150, 34)
+	unit_name_edit.text_changed.connect(func(t):
+		work.name = t if t.strip_edges() != "" else work.name
+		_named = true
+		_refresh_preview(false)
+		_refresh_info()
+		Tut.fire("named"))
 	nrow.add_child(unit_name_edit)
-	var dice := K.button("随机", "normal", 18)
-	dice.custom_minimum_size = Vector2(44, 34)
+	var dice := K.button("随机", "normal", 15)
+	dice.custom_minimum_size = Vector2(54, 34)
 	dice.tooltip_text = "按这张卡装的技能随机取一个名字"
 	dice.pressed.connect(func():
 		_rng.randomize()
 		work.name = Namer.minion_name(work, _rng)
-		unit_name_edit.text = work.name)
+		unit_name_edit.text = work.name
+		_named = true
+		_refresh_preview(false)
+		_refresh_info()
+		Tut.fire("named"))
 	nrow.add_child(dice)
+	Tut.tag(nrow, "e:name")
 	lv.add_child(nrow)
 	var hp_row := K.hbox(6)
-	hp_row.add_child(K.label("生命", 18, K.MUTED))
+	hp_row.add_child(K.label("生命", 17, K.MUTED))
 	for d in [-5, -1]:
-		var b := K.button(str(d), "normal", 16)
-		b.custom_minimum_size = Vector2(44, 34)
+		var b := K.button(str(d), "normal", 15)
+		b.custom_minimum_size = Vector2(42, 34)
 		b.pressed.connect(func(): _hp(d))
 		hp_row.add_child(b)
-	hp_label = K.label("", 26, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER)
-	hp_label.custom_minimum_size.x = 60
+	hp_label = K.label("", 24, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER)
+	hp_label.custom_minimum_size.x = 54
 	hp_row.add_child(hp_label)
 	for d in [1, 5]:
-		var b2 := K.button("+%d" % d, "normal", 16)
-		b2.custom_minimum_size = Vector2(44, 34)
+		var b2 := K.button("+%d" % d, "normal", 15)
+		b2.custom_minimum_size = Vector2(42, 34)
 		b2.pressed.connect(func(): _hp(d))
 		hp_row.add_child(b2)
+	Tut.tag(hp_row, "e:hp")
 	lv.add_child(hp_row)
-	var kw_row := K.hbox(6)
-	kw_row.add_child(K.label("关键词", 18, K.MUTED))
-	kw_option = OptionButton.new()
-	kw_option.add_theme_font_size_override("font_size", 16)
-	kw_option.custom_minimum_size.x = 200
-	kw_option.item_selected.connect(_on_kw)
-	kw_row.add_child(kw_option)
-	lv.add_child(kw_row)
-	lv.add_child(K.label("这张卡的技能（在右侧编辑）", 15, K.MUTED))
-	slot_box = K.vbox(8)
-	lv.add_child(slot_box)
-	var sp2 := Control.new()
-	sp2.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	lv.add_child(sp2)
-	# 右栏
-	var right := K.vbox(8)
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(right)
-	var tabs := K.hbox(8)
-	var b_complex := K.button("自由拼词（自己组合）", "primary", 18)
-	var b_simple := K.button("备选模板（现成的招式）", "normal", 18)
-	Tut.tag(b_simple, "e:tab_simple")
-	b_simple.pressed.connect(func():
-		tab = "simple"
-		_show_tab(b_simple, b_complex)
-		Tut.fire("tab:simple"))
-	b_complex.pressed.connect(func():
-		tab = "complex"
-		_show_tab(b_simple, b_complex))
-	tabs.add_child(b_complex)
-	tabs.add_child(b_simple)
-	tab_hint = K.label("", 14, K.MUTED)
-	tabs.add_child(tab_hint)
-	Tut.tag(tabs, "e:tabs")
-	right.add_child(tabs)
-	tab_holder = Control.new()
-	tab_holder.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tab_holder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right.add_child(tab_holder)
-	simple_root = _build_simple()
-	tab_holder.add_child(simple_root)
-	complex_root = Complex.new()
-	complex_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	complex_root.changed.connect(_on_complex_changed)
-	complex_root.appraise_host = self
-	tab_holder.add_child(complex_root)
-	Tut.tag(complex_root, "e:complex")
-	_show_tab(b_simple, b_complex)
-	# 底栏
-	var foot := K.hbox(12)
+	lv.add_child(HSeparator.new())
+	# 技能名（和随从名分开起）
+	var snrow := K.hbox(6)
+	snrow.add_child(K.label("技能名", 17, K.MUTED))
+	skill_name_edit = LineEdit.new()
+	skill_name_edit.max_length = 10
+	skill_name_edit.placeholder_text = "拼好后自动起一个"
+	skill_name_edit.text = sel_name
+	skill_name_edit.custom_minimum_size = Vector2(150, 34)
+	skill_name_edit.text_changed.connect(func(tx):
+		sel_name = tx.strip_edges()
+		_on_composed(false)
+		Tut.fire("skill_named"))
+	snrow.add_child(skill_name_edit)
+	var sdice := K.button("随机", "normal", 15)
+	sdice.custom_minimum_size = Vector2(54, 34)
+	sdice.tooltip_text = "按这个技能的效果随机取一个名字"
+	sdice.pressed.connect(func():
+		_rng.randomize()
+		if not cur_skill.is_empty():
+			sel_name = Namer.skill_name(cur_skill, _rng)
+			skill_name_edit.text = sel_name
+			_on_composed(false)
+		Tut.fire("skill_named"))
+	snrow.add_child(sdice)
+	Tut.tag(snrow, "e:skillname")
+	lv.add_child(snrow)
+	# 技能小结
+	sum_box = K.vbox(4)
+	Tut.tag(sum_box, "e:preview")
+	lv.add_child(sum_box)
+	rb_box = K.vbox(3)
+	lv.add_child(rb_box)
 	info_box = K.vbox(2)
-	info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	foot.add_child(info_box)
-	var cancel := K.button("取消", "normal", 20)
-	cancel.custom_minimum_size = Vector2(130, 46)
-	cancel.pressed.connect(func(): cancelled.emit())
+	lv.add_child(info_box)
+	# ---------------- 右栏：拼句台
+	composer = Composer.new()
+	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	composer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	composer.changed.connect(func(): _on_composed())
+	composer.hint_ready.connect(func(): _refresh_preview())
+	body.add_child(composer)
+	# ---------------- 关键词：底下摆一排，点一张烙到这张卡上
+	var kwp := K.panel(Color("1d2233"), K.GOLD_D, 10, 1)
+	var kwh := K.hbox(10)
+	kwp.add_child(kwh)
+	var kwv := K.vbox(2)
+	kwv.add_child(K.label("关键词", 16, K.GOLD))
+	kwv.add_child(K.label("一张卡最多一个", 12, K.MUTED))
+	kwh.add_child(kwv)
+	kw_slot = Control.new()
+	kw_slot.custom_minimum_size = Vector2(66, 82)
+	kwh.add_child(kw_slot)
+	kw_desc = K.wrap_label("", 13, K.MUTED)
+	kw_desc.custom_minimum_size = Vector2(190, 0)
+	kwh.add_child(kw_desc)
+	kwh.add_child(VSeparator.new())
+	kw_flow = HFlowContainer.new()
+	kw_flow.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	kw_flow.add_theme_constant_override("h_separation", 6)
+	kwh.add_child(kw_flow)
+	Tut.tag(kwp, "e:kw")
+	kwp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	# ---------------- 底栏：左下角留给桌宠“小词”，关键词一排摆在中间，确定在右边
+	var foot := K.hbox(12)
+	var pet_gap := Control.new()
+	pet_gap.custom_minimum_size = Vector2(112, 0)
+	foot.add_child(pet_gap)
+	foot.add_child(kwp)
+	var cancel := K.button("取消", "normal", 19)
+	cancel.custom_minimum_size = Vector2(100, 44)
+	cancel.pressed.connect(func():
+		if not _committing:
+			cancelled.emit())
 	foot.add_child(cancel)
-	btn_commit = K.button("确认修改", "primary", 20)
-	btn_commit.custom_minimum_size = Vector2(180, 46)
+	btn_commit = K.button("确定，拼好了", "primary", 20)
+	btn_commit.custom_minimum_size = Vector2(170, 44)
 	Tut.tag(btn_commit, "e:commit")
-	btn_commit.pressed.connect(func(): committed.emit(work))
+	btn_commit.pressed.connect(_on_commit)
 	foot.add_child(btn_commit)
 	root.add_child(foot)
+	fx_top = Control.new()
+	fx_top.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	fx_top.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(fx_top)
 	_refresh_left()
-
-func _show_tab(b_simple: Button, b_complex: Button) -> void:
-	for pair in [[b_simple, "simple"], [b_complex, "complex"]]:
-		var b: Button = pair[0]
-		var active: bool = tab == pair[1]
-		var base: Color = K.GOLD if active else K.PANEL2
-		b.add_theme_stylebox_override("normal", K.style(base, K.EDGE if not active else Color("fff0c0"), 10, 1, 4))
-		b.add_theme_color_override("font_color", Color("20180a") if active else K.TEXT)
-		b.add_theme_color_override("font_hover_color", Color("20180a") if active else K.TEXT)
-	simple_root.visible = tab == "simple"
-	complex_root.visible = tab == "complex"
-	tab_hint.text = "你可以像搭积木一样自己组合效果；没灵感就看看右边的「备选模板」。" if tab == "complex" else "这些只是现成的备选招式，省事用的；想要更自由的组合，回到「自由拼词」。"
-	if tab == "complex":
-		complex_root.load_skill(_current_skill(), avail_for_slot(), _points_other())
-	else:
-		_update_preview()
-
-func _current_skill() -> Dictionary:
-	if slot < work.skills.size():
-		return work.skills[slot]
-	return {}
 
 # ---------------------------------------------------------------- 左栏
 func _hp(d: int) -> void:
@@ -272,365 +297,217 @@ func _hp(d: int) -> void:
 		nv = D.BUDGET - (_points_other() - int(work.max_hp))
 	work.max_hp = maxi(1, nv)
 	_refresh_left()
-	_update_preview()
+	_on_composed(false)
 
-func _on_kw(i: int) -> void:
-	work.kw = "" if i == 0 else kw_option.get_item_text(i).split(" ")[0]
-	_refresh_left()
-	_update_preview()
+func _pick_kw(kw: String) -> void:
+	if composer == null or _committing:
+		return
+	var same: bool = work.kw == kw
+	work.kw = "" if same else kw
+	Sfx.play("click" if same else "stamp")
+	_refresh_left(not same)
+	composer.setup(avail_for_slot(), composer.tokens)   # 关键词占用的词变了
+	_on_composed(false)
+	Tut.fire("kw:" + str(work.kw))
 
-func _refresh_left() -> void:
+func _refresh_left(stamp_kw: bool = false) -> void:
 	hp_label.text = str(work.max_hp)
-	# 关键词
-	var used := _other_used_no_kw()
-	kw_option.clear()
-	kw_option.add_item("（无）")
-	var sel := 0
+	# 关键词：槽里是已烙上的，下面一排是还能选的
+	var used := _other_used()
+	if work.kw != "":
+		used[work.kw] = int(used.get(work.kw, 0)) - 1
+	K.clear_children(kw_slot)
+	if work.kw != "":
+		var t := K.word_card(work.kw, 1, -1, Vector2(66, 82))
+		t.mouse_filter = Control.MOUSE_FILTER_STOP
+		t.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		t.tooltip_text = "点一下取下这个关键词"
+		var cur: String = work.kw
+		t.gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+				_pick_kw(cur))
+		kw_slot.add_child(t)
+		if stamp_kw:
+			await get_tree().process_frame
+			if is_instance_valid(t):
+				FX.stamp(t, fx_top)
+		kw_desc.text = str(Lex.get_word(work.kw).desc)
+	else:
+		var ph := Panel.new()
+		ph.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = Color(1, 1, 1, 0.04)
+		sb.border_color = Color(1, 1, 1, 0.3)
+		sb.set_border_width_all(2)
+		sb.set_corner_radius_all(9)
+		ph.add_theme_stylebox_override("panel", sb)
+		kw_slot.add_child(ph)
+		kw_desc.text = "还没有关键词。点右边一张，烙到这张卡上。"
+	K.clear_children(kw_flow)
+	var any := false
 	for kw in D.KEYWORDS:
 		var have := int(pool.get(kw, 0)) - int(used.get(kw, 0))
-		if have > 0 or work.kw == kw:
-			kw_option.add_item("%s 〔%s〕" % [kw, Lex.get_word(kw).desc.substr(0, 14)])
-			if work.kw == kw:
-				sel = kw_option.item_count - 1
-	kw_option.select(sel)
-	# 技能槽
-	K.clear_children(slot_box)
-	for k in D.MAX_SKILLS:
-		var p := K.panel(K.PANEL2 if k != slot else Color("33405f"), K.GOLD if k == slot else K.EDGE, 10, 2 if k == slot else 1)
-		var v := K.vbox(4)
-		p.add_child(v)
-		var row := K.hbox(6)
-		row.add_child(K.label(("技能槽 %d" % (k + 1)) if D.MAX_SKILLS > 1 else "技能", 16, K.GOLD if k == slot else K.MUTED))
-		var spc := Control.new()
-		spc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(spc)
-		if k < work.skills.size():
-			row.add_child(K.label("费用 %d" % int(work.skills[k].cost), 15, K.GOLD))
-			var clr := K.button("清空", "ghost", 14)
-			clr.custom_minimum_size = Vector2(56, 26)
-			clr.pressed.connect(func():
-				work.skills.remove_at(k)
-				slot = mini(slot, maxi(0, work.skills.size()))
-				_refresh_left()
-				_load_slot())
-			row.add_child(clr)
-		v.add_child(row)
-		if k < work.skills.size():
-			v.add_child(K.label(work.skills[k].name, 18, K.TEXT))
-			v.add_child(K.wrap_label(work.skills[k].text, 14, K.MUTED))
-		else:
-			v.add_child(K.label("（空）", 15, K.MUTED))
-		Tut.tag(p, "e:slot%d" % k)
-		p.gui_input.connect(func(ev):
+		if have <= 0 or kw == work.kw:
+			continue
+		any = true
+		var c := K.word_card(kw, 1, -1, Vector2(66, 82))
+		c.mouse_filter = Control.MOUSE_FILTER_STOP
+		c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var kk: String = kw
+		c.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-				slot = k
-				_refresh_left()
-				_load_slot()
-				Tut.fire("slot:%d" % k))
-		slot_box.add_child(p)
-	# 点数
+				_pick_kw(kk))
+		Tut.tag(c, "e:kw:" + kw)
+		kw_flow.add_child(c)
+	if not any:
+		kw_flow.add_child(K.label("（你现在没有可用的关键词）" if work.kw == "" else "（没有别的关键词了）", 14, K.MUTED))
 	var pts := _points_other()
 	budget_label.text = "点数 %d / %d" % [pts, D.BUDGET]
 	budget_label.add_theme_color_override("font_color", K.RED if pts > D.BUDGET else K.TEXT)
 
-func _other_used_no_kw() -> Dictionary:
-	var used := {}
-	for i in base_deck.units.size():
-		if i == unit_idx:
-			continue
-		for w in D.used_words({"units": [base_deck.units[i]]}):
-			used[w] = int(used.get(w, 0)) + 1
-	for k in work.skills.size():
-		for w in work.skills[k].words:
-			used[w] = int(used.get(w, 0)) + 1
-	return used
+# ---------------------------------------------------------------- 拼句台变化后
+func _auto_name(nodes: Array) -> String:
+	var r := RandomNumberGenerator.new()
+	r.seed = hash(G.describe(G.skill("x", nodes)))
+	return Namer.skill_name(G.finalize(G.skill("x", nodes.duplicate(true))), r)
 
-# ---------------------------------------------------------------- 简单版
-func _build_simple() -> Control:
-	var root := HBoxContainer.new()
-	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	root.add_theme_constant_override("separation", 12)
-	# 模板网格
-	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(520, 0)
-	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	var grid := GridContainer.new()
-	grid.columns = 3
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
-	sc.add_child(grid)
-	for t in R.catalog():
-		var b := _template_card(t)
-		grid.add_child(b)
-	root.add_child(sc)
-	# 参数与预览
-	var right := K.panel(K.PANEL, K.EDGE, 12, 1)
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var rv := K.vbox(8)
-	right.add_child(rv)
-	param_box = K.vbox(6)
-	rv.add_child(param_box)
-	rv.add_child(HSeparator.new())
-	preview_box = K.vbox(6)
-	preview_box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	rv.add_child(preview_box)
-	root.add_child(right)
-	return root
-
-func _template_card(t: Dictionary) -> Control:
-	var fam_col: Color = {"攻": Color("8a3a36"), "守": Color("2f7a55"), "控": Color("2f7a7a"), "反": Color("7a4aa0")}.get(t.family, K.EDGE)
-	var p := PanelContainer.new()
-	p.custom_minimum_size = Vector2(158, 124)
-	p.add_theme_stylebox_override("panel", K.style(Color("1f2538"), fam_col, 10, 2, 3))
-	p.name = "tpl_" + t.id
-	Tut.tag(p, "e:tpl:" + t.id)
-	var v := K.vbox(2)
-	p.add_child(v)
-	var top := K.hbox(6)
-	top.add_child(Icon.make(str(t.glyph), 38, fam_col.lightened(0.45)))
-	var col := K.vbox(0)
-	col.add_child(K.label(t.title, 17, K.TEXT))
-	col.add_child(K.chip(t.family, fam_col, 11))
-	top.add_child(col)
-	v.add_child(top)
-	var bl := K.wrap_label(t.blurb, 12, K.MUTED)
-	bl.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	v.add_child(bl)
-	p.gui_input.connect(func(ev):
-		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-			_select_template(t.id, {})
-			Tut.fire("tpl:" + str(t.id)))
-	tpl_buttons[t.id] = p
-	return p
-
-# 缺词总数（用于“自动凑词”）
-func _missing_total(tid: String, p: Dictionary) -> int:
-	var sk := R.build(tid, p)
-	var miss := G.missing(sk.words, avail_for_slot())
-	var n := 0
-	for w in miss:
-		n += int(miss[w])
-	return n
-
-# 新选一个模板时：若默认参数凑不出词，就在各个“选项型”参数里挑缺词最少的取值
-func _auto_fit(tid: String, p: Dictionary) -> Dictionary:
-	var cur := p.duplicate()
-	var best := _missing_total(tid, cur)
-	if best == 0:
-		return cur
-	for prm in R.template(tid).params:
-		if prm.kind != "enum":
-			continue
-		for o in prm.options:
-			var trial := cur.duplicate()
-			trial[prm.key] = o[0]
-			var m := _missing_total(tid, trial)
-			if m < best:
-				best = m
-				cur = trial
-		if best == 0:
-			break
-	return cur
-
-func _select_template(tid: String, params: Dictionary) -> void:
-	sel_tid = tid
-	sel_params = R.defaults(tid)
-	for k in params:
-		sel_params[k] = params[k]
-	if params.is_empty():
-		sel_params = _auto_fit(tid, sel_params)
-	for id in tpl_buttons:
-		var t: Dictionary = R.template(id)
-		var fam_col: Color = {"攻": Color("8a3a36"), "守": Color("2f7a55"), "控": Color("2f7a7a"), "反": Color("7a4aa0")}.get(t.family, K.EDGE)
-		tpl_buttons[id].add_theme_stylebox_override("panel", K.style(Color("2c3552") if id == tid else Color("1f2538"), K.GOLD if id == tid else fam_col, 10, 3 if id == tid else 2, 3))
-	_rebuild_params()
-	_update_preview()
-
-func _load_slot() -> void:
-	var sk := _current_skill()
-	sel_name = str(sk.get("name", "")) if sk.get("custom_name", false) else ''
-	if sk.is_empty():
-		_select_template(sel_tid if sel_tid != "" else "atk1", {})
-	elif sk.has("template"):
-		_select_template(sk.template, sk.params)
-	else:
-		_select_template(sel_tid, {})
-	if tab == "complex":
-		complex_root.load_skill(sk, avail_for_slot(), _points_other())
-
-func _rebuild_params() -> void:
-	K.clear_children(param_box)
-	var t: Dictionary = R.template(sel_tid)
-	param_box.add_child(K.label("%s  ·  %s" % [t.title, t.family], 22, K.GOLD))
-	param_box.add_child(K.wrap_label(t.blurb, 15, K.MUTED))
-	var nm := K.hbox(8)
-	nm.add_child(K.label("技能名", 16, K.TEXT))
-	skill_name_edit = LineEdit.new()
-	skill_name_edit.max_length = 10
-	skill_name_edit.placeholder_text = String(t.title)
-	skill_name_edit.text = sel_name
-	skill_name_edit.custom_minimum_size = Vector2(170, 32)
-	skill_name_edit.text_changed.connect(func(tx): sel_name = tx.strip_edges())
-	nm.add_child(skill_name_edit)
-	var sdice := K.button("随机", "normal", 16)
-	sdice.custom_minimum_size = Vector2(44, 32)
-	sdice.tooltip_text = "按这个技能的效果随机取一个名字"
-	sdice.pressed.connect(func():
-		_rng.randomize()
-		sel_name = Namer.skill_name(preview_skill, _rng)
-		skill_name_edit.text = sel_name
-		Tut.fire("dice"))
-	nm.add_child(sdice)
-	Tut.tag(nm, "e:name")
-	param_box.add_child(nm)
-	for prm in t.params:
-		var row := K.hbox(8)
-		var lab := K.label(prm.label, 16, K.TEXT)
-		lab.custom_minimum_size.x = 150
-		row.add_child(lab)
-		match prm.kind:
-			"enum":
-				var ob := OptionButton.new()
-				ob.add_theme_font_size_override("font_size", 16)
-				var sel := 0
-				for i in prm.options.size():
-					ob.add_item(prm.options[i][1])
-					ob.set_item_metadata(i, prm.options[i][0])
-					if str(prm.options[i][0]) == str(sel_params[prm.key]):
-						sel = i
-				ob.select(sel)
-				ob.item_selected.connect(func(i):
-					sel_params[prm.key] = ob.get_item_metadata(i)
-					_update_preview()
-					Tut.fire("param:%s:%s" % [prm.key, str(ob.get_item_metadata(i))]))
-				ob.custom_minimum_size.x = 220
-				row.add_child(ob)
-			"int":
-				var sl := HSlider.new()
-				sl.min_value = prm.min
-				sl.max_value = prm.max
-				sl.step = 1
-				sl.value = int(sel_params[prm.key])
-				sl.custom_minimum_size = Vector2(240, 28)
-				var val := K.label(str(int(sel_params[prm.key])), 20, K.GOLD)
-				val.custom_minimum_size.x = 40
-				sl.value_changed.connect(func(v):
-					sel_params[prm.key] = int(v)
-					val.text = str(int(v))
-					_update_preview()
-					Tut.fire("param:%s:%d" % [prm.key, int(v)]))
-				row.add_child(sl)
-				row.add_child(val)
-			"bool":
-				var cb := CheckBox.new()
-				cb.button_pressed = bool(sel_params[prm.key])
-				cb.toggled.connect(func(on):
-					sel_params[prm.key] = on
-					_update_preview())
-				row.add_child(cb)
-		Tut.tag(row, "e:param:" + str(prm.key))
-		param_box.add_child(row)
-
-func _update_preview() -> void:
-	if preview_box == null:
+func _on_composed(refresh_receipt: bool = true) -> void:
+	if composer == null or sum_box == null:
 		return
-	K.clear_children(preview_box)
-	preview_skill = R.build(sel_tid, sel_params)
-	Tut.vars["cost"] = int(preview_skill.cost)
-	Tut.vars["nums"] = int(preview_skill.ap_nums)
-	Tut.vars["price"] = int(preview_skill.price)
-	Tut.vars["windup"] = int(preview_skill.windup)
-	Tut.tag(preview_box, "e:preview")
-	_render_skill_preview(preview_box, preview_skill, ("装入技能槽 %d" % (slot + 1)) if D.MAX_SKILLS > 1 else "装上这个技能", func():
-		_install(preview_skill))
+	var nodes: Array = composer.skill_nodes()
+	cur_skill = {}
+	if not nodes.is_empty():
+		var nm: String = sel_name if sel_name != "" else _auto_name(nodes)
+		var sk: Dictionary = G.finalize(G.skill(nm, nodes.duplicate(true)))
+		if sel_name != "":
+			sk["custom_name"] = true
+			sk["base_name"] = sel_name
+		cur_skill = sk
+		skill_name_edit.placeholder_text = nm
+	_render_summary()
+	_refresh_preview()
+	if refresh_receipt:
+		_render_receipt()
 	_refresh_info()
+	Tut.vars["cost"] = int(cur_skill.get("cost", 0))
+	Tut.vars["nums"] = int(cur_skill.get("ap_nums", 0))
+	Tut.vars["price"] = int(cur_skill.get("price", 0))
+	Tut.vars["windup"] = int(cur_skill.get("windup", 0))
+	Tut.fire("composed")
+	if not cur_skill.is_empty():
+		Tut.fire("complete")
 
-func _render_skill_preview(box: VBoxContainer, sk: Dictionary, btn_text: String, on_install: Callable) -> void:
-	var avail := avail_for_slot()
-	box.add_child(K.label("预览", 15, K.MUTED))
-	box.add_child(K.wrap_label(sk.text, 19, K.TEXT))
-	var stats := K.hbox(8)
-	stats.add_child(K.chip("操作费 %d" % int(sk.cost), Color("6b5a22"), 16))
-	stats.add_child(K.chip("起手 ≥ %d 秒" % int(sk.windup), Color("2f5f93"), 16))
-	stats.add_child(K.chip("占用点数 %d" % int(sk.budget), Color("4a4f66"), 16))
-	box.add_child(stats)
-	box.add_child(K.label("所需词（绿=有，红=缺）", 15, K.MUTED))
-	var flow := HFlowContainer.new()
-	flow.add_theme_constant_override("h_separation", 6)
-	flow.add_theme_constant_override("v_separation", 6)
-	var cnt := G.count_words(sk.words)
-	var keys: Array = cnt.keys()
-	keys.sort_custom(func(a, b): return Lex.words[a].id < Lex.words[b].id)
-	var miss := G.missing(sk.words, avail)
-	for w in keys:
-		flow.add_child(K.word_tag(w, not miss.has(w), int(cnt[w])))
-	box.add_child(flow)
-	var probs := G.problems(sk)
-	var over: bool = _points_other() - _slot_budget() + int(sk.budget) > D.BUDGET
-	var ok := miss.is_empty() and probs.is_empty() and not over
-	if probs.is_empty():
-		var rb := K.vbox(3)
-		box.add_child(rb)
-		appraise_into(rb, sk)
-	if not miss.is_empty():
-		var t := "缺少："
-		for w in miss:
-			t += "%s×%d  " % [w, miss[w]]
-		box.add_child(K.wrap_label(t, 15, K.RED))
-	for pr in probs:
-		box.add_child(K.wrap_label("× " + str(pr), 15, K.RED))
-	if over:
-		box.add_child(K.wrap_label("点数超出预算：请减少生命或填入的数字", 15, K.RED))
-	var sp := Control.new()
-	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	box.add_child(sp)
-	var b := K.button(btn_text, "primary" if ok else "normal", 20)
-	b.disabled = not ok
-	b.pressed.connect(on_install)
-	Tut.tag(b, "e:install")
-	box.add_child(b)
+func _preview_unit() -> Dictionary:
+	return {"name": str(work.name), "glyph": str(work.glyph), "kw": str(work.kw), "max_hp": int(work.max_hp)}
 
-func _slot_budget() -> int:
-	return int(work.skills[slot].budget) if slot < work.skills.size() else 0
+func _refresh_preview(animate: bool = true) -> void:
+	if card_face == null or stage == null or composer == null:
+		return
+	var sks: Array = []
+	if not cur_skill.is_empty():
+		sks = [cur_skill]
+	elif not composer.tokens.is_empty():
+		sks = [composer.partial_skill()]
+	var u := _preview_unit()
+	card_face.set_unit(u, sks, animate)
+	stage.set_unit(u, sks, animate)
 
-func _install(sk: Dictionary) -> void:
-	var copy: Dictionary = sk.duplicate(true)
-	if tab == "simple" and sel_name != "":
-		copy["name"] = sel_name
-		copy["base_name"] = sel_name
-		copy["custom_name"] = true
-	if slot < work.skills.size():
-		work.skills[slot] = copy
-	else:
-		work.skills.append(copy)
-		slot = work.skills.size() - 1
-	_refresh_left()
-	_update_preview()
-	Tut.fire("installed")
+func _render_summary() -> void:
+	K.clear_children(sum_box)
+	sum_box.add_child(K.label("这个技能", 15, K.MUTED))
+	if cur_skill.is_empty():
+		sum_box.add_child(K.wrap_label("（还没拼成一句完整的话）", 15, K.MUTED))
+		return
+	sum_box.add_child(K.label(cur_skill.name, 20, K.TEXT))
+	sum_box.add_child(K.wrap_label(cur_skill.text, 16, K.TEXT))
+	var stats := K.hbox(6)
+	stats.add_child(K.chip("操作费 %d" % int(cur_skill.cost), Color("6b5a22"), 14))
+	stats.add_child(K.chip("起手 ≥ %d 秒" % int(cur_skill.windup), Color("2f5f93"), 14))
+	stats.add_child(K.chip("占用点数 %d" % int(cur_skill.budget), Color("4a4f66"), 14))
+	sum_box.add_child(stats)
+	sum_box.add_child(K.wrap_label("操作费 = 起步 %d + 填的数字 %d + 词价 %d；越强越贵" % [G.START_FEE, int(cur_skill.ap_nums), int(cur_skill.price)], 12, K.MUTED))
 
-func _on_complex_changed(sk: Dictionary) -> void:
-	# 复杂版点“装入”时给出完整技能
-	_install(sk)
+func _render_receipt() -> void:
+	K.clear_children(rb_box)
+	if cur_skill.is_empty() or not G.problems(cur_skill).is_empty():
+		return
+	appraise_into(rb_box, cur_skill)
 
 func _refresh_info() -> void:
 	K.clear_children(info_box)
-	var pts := _points_other()
-	var v := D.validate({"units": _merged_units()}, pool)
-	if v.ok:
-		info_box.add_child(K.label("当前牌组合法。", 16, K.GREEN))
+	var ok := false
+	var msgs: Array = []
+	if cur_skill.is_empty():
+		msgs.append("还没有拼出完整的技能：把句子拼完整再点确定。")
 	else:
-		for e in v.errors.slice(0, 3):
-			info_box.add_child(K.label("· " + str(e), 15, K.RED))
-	btn_commit.disabled = not v.ok
-	btn_commit.tooltip_text = "" if v.ok else "牌组还不合法，无法确认"
+		for p in G.problems(cur_skill):
+			msgs.append(str(p))
+		if _points_other() - _slot_budget() + int(cur_skill.budget) > D.BUDGET:
+			msgs.append("点数超出预算：减少生命或把数字填小一点")
+		if require_name and not _named:
+			msgs.append("给你的随从起个名字再确定（自己填，或点卡名旁边的“随机”）")
+		var miss := G.missing(cur_skill.words, avail_for_slot())
+		for w in miss:
+			msgs.append("缺词：%s×%d" % [w, miss[w]])
+		ok = msgs.is_empty()
+	if ok:
+		var merged := {"units": _merged_units()}
+		var v := D.validate(merged, pool)
+		if v.ok:
+			info_box.add_child(K.label("当前牌组合法。", 15, K.GREEN))
+		else:
+			ok = false
+			for e in v.errors.slice(0, 2):
+				info_box.add_child(K.label("· " + str(e), 14, K.RED))
+	else:
+		for m2 in msgs.slice(0, 3):
+			info_box.add_child(K.label("· " + str(m2), 14, K.RED if not cur_skill.is_empty() else K.MUTED))
+	btn_commit.disabled = not ok
 
 func _merged_units() -> Array:
 	var units: Array = []
 	for i in base_deck.units.size():
-		units.append(work if i == unit_idx else base_deck.units[i])
+		if i == unit_idx:
+			var w2: Dictionary = work.duplicate(true)
+			w2.skills = [cur_skill.duplicate(true)] if not cur_skill.is_empty() else []
+			units.append(w2)
+		else:
+			units.append(base_deck.units[i])
 	return units
 
-# ---------------------------------------------------------------- 强度回执（两个编辑页共用）
+# ---------------------------------------------------------------- 确定
+func _install(sk: Dictionary) -> void:
+	var copy: Dictionary = sk.duplicate(true)
+	work.skills = [copy]
+	_refresh_left()
+
+func _on_commit() -> void:
+	if _committing or cur_skill.is_empty() or btn_commit.disabled:
+		return
+	_committing = true
+	btn_commit.disabled = true
+	Tut.fire("commit_pressed")
+	await composer.play_combine(str(cur_skill.text))
+	if not is_inside_tree():
+		return
+	# 组句特效结束后，随从当场对着空气放出这个技能：越厉害越炫
+	var info: Dictionary = Appraise.appraise(cur_skill, base_deck, unit_idx, work.duplicate(true))
+	var tier := 0
+	if info.big:
+		tier = 3
+	elif int(info.best.get("dmg", 0)) >= 25 or int(cur_skill.cost) >= 35:
+		tier = 2
+	elif int(cur_skill.cost) >= 20:
+		tier = 1
+	Tut.fire("casting")
+	await stage.cast(tier, str(cur_skill.get("kind_tag", "atk")))
+	if not is_inside_tree():
+		return
+	_install(cur_skill)
+	Tut.fire("installed")
+	committed.emit(work)
+
+# ---------------------------------------------------------------- 强度回执 + 小词感叹
 func appraise_into(box: VBoxContainer, sk: Dictionary) -> void:
 	box.add_child(K.label("强度回执：计算中…", 14, K.MUTED))
 	_ap_token += 1

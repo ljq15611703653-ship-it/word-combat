@@ -91,10 +91,12 @@ static func draw_bag(rng: RandomNumberGenerator, size: int = 25) -> Array:
 	return bag
 
 # 开局12词：一套完整基础攻击句 + 一套应对句（自身治疗/自身减伤/受伤时转移给来源），其余基础词随机。
+const OPENING_COUNT := 12      # 开局发的基础词（含一套基础攻击句 + 一套应对句）
+
 static func opening_words(rng: RandomNumberGenerator) -> Array:
 	load_all()
 	var attacks := [
-		["造成", "伤害", "选择", "目标", "一个", "敌方", "随从"],
+		["造成", "伤害", "选择", "一个", "敌方", "随从"],
 		["造成", "伤害", "最前", "敌方", "随从"],
 		["造成", "伤害", "最低生命", "敌方", "随从"],
 		["造成", "伤害", "随机", "敌方", "随从"],
@@ -113,6 +115,6 @@ static func opening_words(rng: RandomNumberGenerator) -> Array:
 		if w.impl and w.rarity == "基础":
 			for i in int(w.weight):
 				basics.append(n)
-	while out.size() < 18:
+	while out.size() < OPENING_COUNT:
 		out.append(basics[rng.randi() % basics.size()])
 	return out
