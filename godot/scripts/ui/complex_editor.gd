@@ -36,14 +36,15 @@ const WATCH_TARGET_OPTS := [
 ]
 const KIND_TITLES := {
 	"dmg": "造成伤害", "heal": "恢复生命", "mit": "减伤", "status": "施加状态", "remove": "移除", "watch": "当…就…（监听）",
-	"time": "时间术", "swap": "换位", "split": "分流", "chain": "接续", "copy": "复制", "if": "若…否则…", "choose": "择一",
+	"time": "时间术", "swap": "换位", "split": "分流", "chain": "接续", "copy": "复制", "if": "若…否则…", "choose": "择一", "until": "直到…（重复）",
 	"redirect": "转移", "convert": "转为治疗",
 }
-const EFFECT_KINDS := ["dmg", "heal", "mit", "status", "remove", "watch", "time", "swap", "split", "chain", "copy", "if", "choose"]
+const EFFECT_KINDS := ["dmg", "heal", "mit", "status", "remove", "watch", "time", "swap", "split", "chain", "copy", "if", "choose", "until"]
+const TIMED_KINDS := ["dmg", "heal", "mit", "status", "remove", "watch", "swap", "time"]
 const KIND_COL := {
 	"dmg": Color("8a3a36"), "heal": Color("2f7a55"), "mit": Color("2f5a8a"), "status": Color("8a6a2a"), "remove": Color("2f7a7a"),
 	"watch": Color("7a4aa0"), "time": Color("2f7a7a"), "swap": Color("4a5a7a"), "split": Color("8a3a36"), "chain": Color("8a4a36"),
-	"copy": Color("8a4a36"), "if": Color("5a6a3a"), "choose": Color("5a6a3a"), "redirect": Color("7a4aa0"), "convert": Color("7a4aa0"),
+	"copy": Color("8a4a36"), "if": Color("5a6a3a"), "choose": Color("5a6a3a"), "until": Color("5a6a3a"), "redirect": Color("7a4aa0"), "convert": Color("7a4aa0"),
 }
 
 func _ready() -> void:
@@ -119,6 +120,7 @@ func _new_node(kind: String) -> Dictionary:
 		"chain": return G.chain(G.dmg(G.T("choose", "enemy"), G.N(10)), G.heal(G.T("self", "self"), G.REF("prev")))
 		"copy": return G.copy_to(G.dmg(G.T("choose", "enemy"), G.N(10)), G.T("lowest", "enemy"))
 		"if": return G.if_node({"left": G.REF("cur_hp", G.T("self", "self")), "cmp": "lt", "right": G.N(10)}, G.heal(G.T("self", "self"), G.N(10)))
+		"until": return G.until_node(G.cmp_cond(G.REF("cur_hp", G.T("lowest", "enemy")), "lt", G.N(5)), G.dmg(G.T("lowest", "enemy"), G.N(8)))
 		"choose": return G.pick_one(G.dmg(G.T("choose", "enemy"), G.N(10)), G.heal(G.T("self", "self"), G.N(10)))
 		"redirect": return G.redirect(G.T("source", "ref"))
 		"convert": return G.convert_heal()
@@ -206,6 +208,8 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 	v.add_child(head)
 	var in_watch := ctx != ""
 	var chg := on_change
+	if kind in TIMED_KINDS and not nested:
+		v.add_child(_timing_row(node, kind in ["dmg", "heal"], chg))
 	match kind:
 		"dmg", "heal":
 			v.add_child(_row("写法", _enum(["造成伤害" if kind == "dmg" else "恢复生命", "减少当前生命" if kind == "dmg" else "增加当前生命"], int(node.get("alt", 0)), func(i):
@@ -380,13 +384,16 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(K.label("先：", 15, K.GOLD))
 			v.add_child(_child_slot(node, "first", ctx, chg, false, ["dmg", "heal"]))
 			v.add_child(_row("把实际数值复制给", _target(node.target, in_watch, chg)))
-		"if":
-			var c: Dictionary = node.cond
-			v.add_child(_row("若 左值", _value(c.left, ctx, chg, allow_prev)))
-			v.add_child(_row("比较", _enum(["小于", "不小于"], 0 if c.cmp == "lt" else 1, func(i):
-				c["cmp"] = "lt" if i == 0 else "ge"
+		"until":
+			v.add_child(K.label("反复执行下面的效果（每次重新付数字，至多再重复 %d 次），直到：" % G.UNTIL_MAX, 15, K.GOLD))
+			v.add_child(_cond_editor(node.cond, ctx, chg, allow_prev))
+			v.add_child(_row("间隔(秒,0=默认2)", _spin(int(node.get("gap", 0)), 0, 9, func(x):
+				node["gap"] = x
 				chg.call())))
-			v.add_child(_row("右值", _value(c.right, ctx, chg, allow_prev)))
+			v.add_child(_child_slot(node, "child", ctx, chg, false, ["dmg", "heal", "mit", "status", "split", "chain", "copy"]))
+		"if":
+			v.add_child(K.label("若：", 15, K.GOLD))
+			v.add_child(_cond_editor(node.cond, ctx, chg, allow_prev))
 			v.add_child(K.label("则：", 15, K.GOLD))
 			v.add_child(_child_slot(node, "then", ctx, chg, false))
 			var has_else: bool = node.has("else")
@@ -409,6 +416,65 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 			v.add_child(K.label("分支 B：", 15, K.GOLD))
 			v.add_child(_child_slot(node, "b", ctx, chg, false))
 	return p
+
+# 立即 / 之前 / 同时：时间词
+func _timing_row(node: Dictionary, with_sync: bool, chg: Callable) -> Control:
+	var r := K.hbox(10)
+	var cb := CheckBox.new()
+	cb.text = "立即（第0秒）"
+	cb.button_pressed = bool(node.get("now", false))
+	cb.toggled.connect(func(on):
+		if on:
+			node["now"] = true
+		else:
+			node.erase("now")
+		chg.call())
+	r.add_child(cb)
+	r.add_child(_row("之前(秒)", _spin(int(node.get("early", 0)), 0, 10, func(x):
+		if x > 0:
+			node["early"] = x
+		else:
+			node.erase("early")
+		chg.call())))
+	if with_sync:
+		var cs := CheckBox.new()
+		cs.text = "同时（重复/逐个一起落）"
+		cs.button_pressed = bool(node.get("sync", false))
+		cs.toggled.connect(func(on):
+			if on:
+				node["sync"] = true
+			else:
+				node.erase("sync")
+			chg.call())
+		r.add_child(cs)
+	return r
+
+# 条件：比较，或“已生效”（目标身上有某状态）
+func _cond_editor(c: Dictionary, ctx: String, chg: Callable, allow_prev: bool) -> Control:
+	var box := K.vbox(4)
+	var is_has: bool = c.has("has")
+	box.add_child(_row("条件类型", _enum(["比较两个数", "已生效（有某状态）"], 1 if is_has else 0, func(i):
+		if i == 1 and not c.has("has"):
+			c.clear()
+			c["has"] = {"target": G.T("self", "self"), "status": "易伤"}
+		elif i == 0 and c.has("has"):
+			c.clear()
+			c["left"] = G.REF("cur_hp", G.T("self", "self"))
+			c["cmp"] = "lt"
+			c["right"] = G.N(10)
+		chg.call())))
+	if is_has:
+		box.add_child(_row("目标", _target(c.has.target, ctx != "", chg)))
+		box.add_child(_row("状态", _enum(G.STATUSES, G.STATUSES.find(c.has.status), func(i):
+			c.has["status"] = G.STATUSES[i]
+			chg.call())))
+	else:
+		box.add_child(_row("左值", _value(c.left, ctx, chg, allow_prev)))
+		box.add_child(_row("比较", _enum(["小于", "不小于"], 0 if c.cmp == "lt" else 1, func(i):
+			c["cmp"] = "lt" if i == 0 else "ge"
+			chg.call())))
+		box.add_child(_row("右值", _value(c.right, ctx, chg, allow_prev)))
+	return box
 
 func _child_slot(parent: Dictionary, key: String, ctx: String, chg: Callable, allow_rewrite: bool, kinds: Array = []) -> Control:
 	var child_ctx := ctx
@@ -501,7 +567,8 @@ func _ref_opts(ctx: String, allow_prev: bool) -> Array:
 	if allow_prev:
 		out.append(["前一效果的实际数值", "prev"])
 	out += [["当前生命", "cur_hp"], ["生命上限", "max_hp"], ["失去的生命", "lost_hp"], ["人数", "count"],
-		["可用行动点", "ap"], ["支付的行动点", "paid"], ["已投入数字", "invested"]]
+		["可用行动点", "ap"], ["支付的行动点", "paid"], ["已投入数字", "invested"],
+		["本轮（累计受到的伤害）", "round_taken"], ["剩余（护盾量）", "remaining"]]
 	return out
 
 func _value(v: Dictionary, ctx: String, on_change: Callable, allow_prev: bool = false) -> Control:
@@ -533,7 +600,7 @@ func _value(v: Dictionary, ctx: String, on_change: Callable, allow_prev: bool = 
 		else:
 			v["k"] = "ref"
 			v["ref"] = refs[i - 1][1]
-			if v.ref in ["cur_hp", "max_hp", "lost_hp"]:
+			if v.ref in ["cur_hp", "max_hp", "lost_hp", "round_taken", "remaining"]:
 				v["of"] = G.T("self", "self")
 			elif v.ref == "count":
 				v["of"] = G.T("all", "enemy")

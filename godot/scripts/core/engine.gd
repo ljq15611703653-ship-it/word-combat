@@ -15,7 +15,7 @@ static func make_state(decks: Array, first: int = 0, rules: Dictionary = {}, see
 	var st := {
 		"round": 0, "first": first, "sides": [], "effects": [], "next_eid": 1, "lib": {}, "seed": seed_val,
 		"winner": -1, "rules": DEFAULT_RULES.duplicate(), "events": [], "acts": [], "items": [], "ledger": {},
-		"guard": 0, "root_ctr": 0, "used": {}, "cur_t": 0, "abs_now": 0, "sid_ctr": 0, "log": [],
+		"guard": 0, "root_ctr": 0, "used": {}, "cur_t": 0, "abs_now": 0, "sid_ctr": 0, "log": [], "round_taken": {},
 	}
 	for k in rules:
 		st.rules[k] = rules[k]
@@ -66,6 +66,7 @@ static func clone_state(st: Dictionary) -> Dictionary:
 	c.effects = []
 	for e in st.effects:
 		c.effects.append(e.duplicate(false))
+	c.round_taken = st.round_taken.duplicate()
 	c.events = []
 	c.items = []
 	c.acts = []
@@ -132,6 +133,7 @@ static func begin_round(st: Dictionary) -> Array:
 	st.round += 1
 	st.events = []
 	st.used = {}
+	st.round_taken = {}
 	var revived: Array = []
 	for s in 2:
 		var side: Dictionary = st.sides[s]
@@ -251,7 +253,7 @@ static func run_round(st: Dictionary, acts: Array) -> Dictionary:
 			"invested": int(sk2.budget), "origin_prefix": "%d:%d" % [rec2.side, rec2.sid]}
 		st.items.append({"t": rec2.start, "kind": "start", "act": ai, "ctx": ctx0, "node": {}})
 		for n in sk2.nodes:
-			_schedule(st, rec2.start + (int(n.get("delay", 0)) if n.kind == "time" else 0), n, ctx0)
+			_schedule(st, _node_tick(n, int(rec2.start)), n, ctx0)
 	# 时间轴
 	for t in TICKS:
 		st.cur_t = t
@@ -283,6 +285,17 @@ static func _log(st: Dictionary, t: int, type: String, data: Dictionary) -> void
 	for k in data:
 		e[k] = data[k]
 	st.events.append(e)
+
+# 顶层节点落在时间轴的哪一秒：立即=第0秒；之前N=比技能起点早N秒；时间术另加“之后”的延后
+static func _node_tick(n: Dictionary, start: int) -> int:
+	var t := start
+	if n.get("now", false):
+		t = 0
+	elif int(n.get("early", 0)) > 0:
+		t = maxi(0, start - int(n.early))
+	if n.kind == "time":
+		t += int(n.get("delay", 0))
+	return t
 
 static func _schedule(st: Dictionary, t: int, node: Dictionary, ctx: Dictionary) -> void:
 	if t > TICKS - 1:
@@ -520,12 +533,20 @@ static func _value(st: Dictionary, v: Dictionary, ctx: Dictionary) -> int:
 				"count":
 					var spec: Dictionary = v.get("of", G.T("all", "enemy"))
 					return _targets(st, spec, ctx).size()
-				"cur_hp", "max_hp", "lost_hp":
+				"cur_hp", "max_hp", "lost_hp", "round_taken", "remaining":
 					var spec2: Dictionary = v.get("of", G.T("self", "self"))
 					var ts := _targets(st, spec2, ctx)
 					if ts.is_empty():
 						return 0
 					var u := _u(st, ts[0])
+					if v.ref == "round_taken":
+						return int(st.round_taken.get(u.uid, 0))
+					if v.ref == "remaining":
+						var sh := 0
+						for ss in u.statuses:
+							if ss.name == "护盾":
+								sh += int(ss.value)
+						return sh
 					if v.ref == "cur_hp":
 						return _vhp(st, u)
 					if v.ref == "max_hp":
@@ -541,6 +562,17 @@ static func _value(st: Dictionary, v: Dictionary, ctx: Dictionary) -> int:
 				"sum": return a + b
 				"diff": return absi(a - b)
 	return 0
+
+# 条件：比较，或“已生效”（目标身上有某状态）
+static func _cond(st: Dictionary, c: Dictionary, ctx: Dictionary) -> bool:
+	if c.has("has"):
+		var ts := _targets(st, c.has.target, ctx)
+		if ts.is_empty():
+			return false
+		return has_status(_u(st, ts[0]), c.has.status)
+	var l := _value(st, c.left, ctx)
+	var r := _value(st, c.right, ctx)
+	return l < r if c.cmp == "lt" else l >= r
 
 static func _apply_mods(node: Dictionary, amt: int) -> int:
 	for i in int(node.get("dbl", 0)):
@@ -649,14 +681,23 @@ static func _exec(st: Dictionary, node: Dictionary, ctx: Dictionary) -> void:
 			c4["on_copy"] = {"spec": node.target, "key": "t%d" % node.id, "ctx": ctx}
 			_exec_effect(st, node.first, c4)
 		"if":
-			var c: Dictionary = node.cond
-			var l := _value(st, c.left, ctx)
-			var r := _value(st, c.right, ctx)
-			var ok: bool = l < r if c.cmp == "lt" else l >= r
-			if ok:
+			if _cond(st, node.cond, ctx):
 				_exec(st, node.then, ctx)
 			elif node.has("else"):
 				_exec(st, node["else"], ctx)
+		"until":
+			var it: int = int(ctx.get("iter", 0))
+			if _cond(st, node.cond, ctx):
+				return
+			var c5 := ctx.duplicate()
+			c5.erase("delayed")
+			c5.erase("iter")
+			_exec(st, node.child, c5)
+			if it < G.UNTIL_MAX:
+				var c6 := ctx.duplicate()
+				c6["iter"] = it + 1
+				c6["delayed"] = true
+				_schedule(st, t + (int(node.get("gap", 0)) if int(node.get("gap", 0)) > 0 else 2), node, c6)
 		"choose":
 			var which: int = int(ctx.get("choices", {}).get("b%d" % node.id, 0))
 			_exec(st, node.b if which == 1 else node.a, ctx)
@@ -673,7 +714,7 @@ static func _exec_effect(st: Dictionary, node: Dictionary, ctx: Dictionary) -> v
 	if ctx.has("only"):
 		targets = [ctx.only] if ctx.only in targets else []
 	# 逐个：每个目标错开一秒
-	if node.target.pick == "each" and not ctx.has("only") and targets.size() > 1:
+	if node.target.pick == "each" and not ctx.has("only") and targets.size() > 1 and not node.get("sync", false):
 		for i in targets.size():
 			var c := ctx.duplicate()
 			c["only"] = targets[i]
@@ -685,7 +726,7 @@ static func _exec_effect(st: Dictionary, node: Dictionary, ctx: Dictionary) -> v
 		return
 	# 重复
 	var reps := int(node.get("rep", 0))
-	if reps > 0 and not ctx.get("is_rep", false):
+	if reps > 0 and not ctx.get("is_rep", false) and not node.get("sync", false):
 		var gap: int = int(node.get("rep_gap", 0)) if int(node.get("rep_gap", 0)) > 0 else 2
 		for k in range(1, reps + 1):
 			var c2 := ctx.duplicate()
@@ -700,6 +741,13 @@ static func _exec_effect(st: Dictionary, node: Dictionary, ctx: Dictionary) -> v
 		if ctx.has("on_copy"):
 			e["on_copy"] = ctx.on_copy
 		_emit(st, e)
+	# 同时：重复的各次在同一秒一起落下
+	if reps > 0 and not ctx.get("is_rep", false) and node.get("sync", false):
+		for k in reps:
+			var c3 := ctx.duplicate()
+			c3["is_rep"] = true
+			c3["delayed"] = true
+			_exec_effect(st, node, c3)
 
 static func _emit(st: Dictionary, e: Dictionary) -> void:
 	_fire(st, "targeted", {"subject": e.tgt, "src": e.src, "recipient": e.tgt, "amount": int(e.get("amount", 0)), "root": e.root}, false)
@@ -939,6 +987,8 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 		_log(st, t, "block", {"tgt": tgt.uid})
 	var L := _ledger(st, tgt)
 	var actual := mini(dmg, int(L.v))
+	if dmg > 0:
+		st.round_taken[tgt.uid] = int(st.round_taken.get(tgt.uid, 0)) + dmg
 	L.dmg += dmg
 	L.v = maxi(0, int(L.v) - dmg)
 	_log(st, t, "dmg", {"src": e.src, "tgt": tgt.uid, "amount": dmg, "raw": int(e.raw), "actual": actual})

@@ -25,11 +25,14 @@ const REF_WORD := {
 	"event_damage": "该次伤害", "event_heal": "该次治疗", "actual": "实际数值", "raw": "原始数值",
 	"cur_hp": "当前生命", "max_hp": "生命上限", "lost_hp": "失去的生命", "count": "人数", "times": "次数",
 	"ap": "可用行动点", "paid": "支付的行动点", "invested": "已投入数字", "overflow": "溢出", "prev": "",
+	"round_taken": "本轮", "remaining": "剩余",
 }
+const UNTIL_MAX := 4       # “直到”最多重复执行的次数（首次之外），每次重新付数字
 const REF_TEXT := {
 	"event_damage": "该次伤害", "event_heal": "该次治疗", "actual": "实际数值", "raw": "原始数值",
 	"cur_hp": "当前生命", "max_hp": "生命上限", "lost_hp": "已损失的生命", "count": "人数", "times": "本轮已触发次数",
 	"ap": "剩余行动点", "paid": "已支付的行动点", "invested": "本技能已投入的数字", "overflow": "溢出的治疗", "prev": "前一效果的实际数值",
+	"round_taken": "本轮累计受到的伤害", "remaining": "剩余护盾量",
 }
 const OP_WORD := {"max": "较高者", "min": "较低者", "sum": "合计", "diff": "差值"}
 const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "合计", "diff": "差值"}
@@ -207,6 +210,43 @@ static func if_node(cond: Dictionary, then: Dictionary, els: Dictionary = {}) ->
 static func pick_one(a: Dictionary, b: Dictionary) -> Dictionary:
 	return {"kind": "choose", "a": a, "b": b}
 
+static func until_node(cond: Dictionary, child: Dictionary, gap: int = 0) -> Dictionary:
+	return {"kind": "until", "cond": cond, "child": child, "gap": gap}
+
+static func has_cond(target: Dictionary, status_name: String) -> Dictionary:
+	return {"has": {"target": target, "status": status_name}}
+
+static func cmp_cond(left: Dictionary, cmp: String, right: Dictionary) -> Dictionary:
+	return {"left": left, "cmp": cmp, "right": right}
+
+static func cond_words(c: Dictionary) -> Array:
+	if c.has("has"):
+		var w: Array = ["已生效", c.has.status]
+		w.append_array(target_words(c.has.target))
+		return w
+	var out: Array = value_words(c.left)
+	out.append_array(value_words(c.right))
+	return out
+
+static func cond_nums(c: Dictionary) -> int:
+	if c.has("has"):
+		return 0
+	return value_nums(c.left) + value_nums(c.right)
+
+static func cond_text(c: Dictionary) -> String:
+	if c.has("has"):
+		return "%s已生效【%s】" % [target_text(c.has.target), c.has.status]
+	return "%s %s %s" % [value_text(c.left), "小于" if c.cmp == "lt" else "不小于", value_text(c.right)]
+
+static func cond_check(c: Dictionary, out: Array, ctx: String) -> void:
+	if c.has("has"):
+		if not (c.has.status in STATUSES):
+			out.append("未知状态：" + str(c.has.status))
+		_check_target(c.has.target, out, ctx != "")
+	else:
+		_check_value(c.left, out, ctx)
+		_check_value(c.right, out, ctx)
+
 static func skill(name: String, nodes: Array) -> Dictionary:
 	return {"name": name, "nodes": nodes}
 
@@ -223,6 +263,16 @@ static func _rep(word: String, n: int) -> Array:
 	return out
 
 static func words_of(node: Dictionary) -> Array:
+	var w := _words_core(node)
+	if node.get("now", false):
+		w.append("立即")
+	elif int(node.get("early", 0)) > 0:
+		w.append("之前")
+	if node.get("sync", false):
+		w.append("同时")
+	return w
+
+static func _words_core(node: Dictionary) -> Array:
 	var w: Array = []
 	match node.kind:
 		"dmg", "heal":
@@ -313,10 +363,15 @@ static func words_of(node: Dictionary) -> Array:
 			w.append("复制")
 			w.append_array(words_of(node.first))
 			w.append_array(target_words(node.target))
+		"until":
+			w.append("直到")
+			w.append_array(cond_words(node.cond))
+			w.append_array(words_of(node.child))
+			if int(node.get("gap", 0)) > 0:
+				w.append("间隔")
 		"if":
 			w.append("若")
-			w.append_array(value_words(node.cond.left))
-			w.append_array(value_words(node.cond.right))
+			w.append_array(cond_words(node.cond))
 			w.append_array(words_of(node.then))
 			if node.has("else"):
 				w.append("否则")
@@ -377,9 +432,13 @@ static func nums_of(node: Dictionary, choices: Dictionary = {}) -> Dictionary:
 			var a3 := nums_of(node.first, choices)
 			b += a3.budget
 			ap += a3.ap
+		"until":
+			var uc := nums_of(node.child, choices)
+			b += uc.budget + cond_nums(node.cond)
+			ap += uc.ap * (1 + UNTIL_MAX) + cond_nums(node.cond)
 		"if":
-			b += value_nums(node.cond.left) + value_nums(node.cond.right)
-			ap += value_nums(node.cond.left) + value_nums(node.cond.right)
+			b += cond_nums(node.cond)
+			ap += cond_nums(node.cond)
 			var t1 := nums_of(node.then, choices)
 			b += t1.budget
 			ap += t1.ap
@@ -473,6 +532,8 @@ static func _collect_choices(node: Dictionary, out: Array, in_watch: bool) -> vo
 			_collect_choices(node.first, out, in_watch)
 			if needs_choice(node.target):
 				out.append({"key": "t%d" % node.id, "kind": "target", "node_id": node.id, "spec": node.target, "label": target_text(node.target)})
+		"until":
+			_collect_choices(node.child, out, in_watch)
 		"if":
 			_collect_choices(node.then, out, in_watch)
 			if node.has("else"):
@@ -560,9 +621,13 @@ static func _check(node: Dictionary, out: Array, ctx: String) -> void:
 				out.append("复制只能复制伤害或治疗")
 			if not is_single_pick(node.target):
 				out.append("复制的目标只能是单个随从（每个结果各复制一份，给多个目标会成平方放大）")
+		"until":
+			cond_check(node.cond, out, ctx)
+			_check(node.child, out, ctx)
+			if not (node.child.kind in ["dmg", "heal", "mit", "status", "split", "chain", "copy"]):
+				out.append("“直到”只能重复伤害、治疗、减伤、状态、分流、接续或复制")
 		"if":
-			_check_value(node.cond.left, out, ctx)
-			_check_value(node.cond.right, out, ctx)
+			cond_check(node.cond, out, ctx)
 			_check(node.then, out, ctx)
 			if node.has("else"):
 				_check(node["else"], out, ctx)
@@ -620,6 +685,17 @@ static func verb_text(kind: String, alt: int, target: String, value: String, is_
 	return "使%s当前生命增加 %s" % [target, value]
 
 static func node_text(node: Dictionary) -> String:
+	var t := _node_text_core(node)
+	var pre := ""
+	if node.get("now", false):
+		pre = "立即，"
+	elif int(node.get("early", 0)) > 0:
+		pre = "提前%d秒，" % int(node.early)
+	if node.get("sync", false):
+		t += "（重复/逐个同时落下）"
+	return pre + t
+
+static func _node_text_core(node: Dictionary) -> String:
 	match node.kind:
 		"dmg", "heal":
 			var t := verb_text(node.kind, int(node.get("alt", 0)), target_text(node.target), _mods_text(node) + value_text(node.value), node.value.k == "num")
@@ -675,9 +751,10 @@ static func node_text(node: Dictionary) -> String:
 			return node_text(node.first) + "，接着以其实际数值：" + node_text(node.then)
 		"copy":
 			return node_text(node.first) + "，并把实际数值复制给" + target_text(node.target)
+		"until":
+			return "重复执行【%s】（每%d秒一次，至多再 %d 次，每次重新付数字），直到 %s" % [node_text(node.child), int(node.get("gap", 0)) if int(node.get("gap", 0)) > 0 else 2, UNTIL_MAX, cond_text(node.cond)]
 		"if":
-			var c: Dictionary = node.cond
-			var s3 := "若 %s %s %s：%s" % [value_text(c.left), "小于" if c.cmp == "lt" else "不小于", value_text(c.right), node_text(node.then)]
+			var s3 := "若 %s：%s" % [cond_text(node.cond), node_text(node.then)]
 			if node.has("else"):
 				s3 += "；否则：" + node_text(node["else"])
 			return s3
@@ -714,7 +791,7 @@ static func kind_tag(sk: Dictionary) -> String:
 
 static func _node_tag(n: Dictionary) -> String:
 	match n.kind:
-		"dmg", "split", "copy", "chain": return "atk"
+		"dmg", "split", "copy", "chain", "until": return "atk"
 		"heal": return "heal"
 		"mit": return "def"
 		"watch": return "trap"

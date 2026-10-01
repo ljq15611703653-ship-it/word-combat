@@ -47,6 +47,12 @@ func rand_value(ctx: String, allow_prev: bool = false) -> Dictionary:
 	return G.OP(pick(["max", "min", "sum", "diff"]), G.N(rng.randi_range(1, 10)), rand_value(ctx, allow_prev) if rng.randf() < 0.5 else G.N(5))
 
 func mods(n: Dictionary) -> Dictionary:
+	if rng.randf() < 0.12:
+		n["now"] = true
+	elif rng.randf() < 0.12:
+		n["early"] = rng.randi_range(1, 6)
+	if rng.randf() < 0.12:
+		n["sync"] = true
 	if rng.randf() < 0.25:
 		n["dbl"] = rng.randi_range(0, 2)
 	if rng.randf() < 0.1:
@@ -63,7 +69,7 @@ func rand_node(depth: int, ctx: String, allow_prev: bool = false, simple_only: b
 	var in_watch := ctx != ""
 	var kinds := ["dmg", "dmg", "heal", "mit", "status", "remove", "time", "swap", "split"]
 	if not simple_only and depth < 3:
-		kinds += ["watch", "watch", "chain", "copy", "if", "choose"]
+		kinds += ["watch", "watch", "chain", "copy", "if", "choose", "until"]
 	var k: String = pick(kinds)
 	match k:
 		"dmg":
@@ -98,8 +104,11 @@ func rand_node(depth: int, ctx: String, allow_prev: bool = false, simple_only: b
 			return G.chain(first, then)
 		"copy":
 			return G.copy_to(G.dmg(rand_target(in_watch), rand_value(ctx)), rand_target(in_watch))
+		"until":
+			var uc := G.has_cond(rand_target(in_watch, false), pick(G.STATUSES)) if rng.randf() < 0.4 else G.cmp_cond(G.REF("cur_hp", G.T("lowest", "enemy")), "lt", G.N(rng.randi_range(1, 12)))
+			return G.until_node(uc, pick([G.dmg(rand_target(in_watch), rand_value(ctx)), G.heal(rand_target(in_watch), rand_value(ctx)), G.mit(rand_target(in_watch), "pct", 8)]), pick([0, 1, 3]))
 		"if":
-			var cond := {"left": rand_value(ctx), "cmp": pick(["lt", "ge"]), "right": rand_value(ctx)}
+			var cond := G.has_cond(rand_target(in_watch, false), pick(G.STATUSES)) if rng.randf() < 0.3 else {"left": rand_value(ctx), "cmp": pick(["lt", "ge"]), "right": rand_value(ctx)}
 			var n := G.if_node(cond, rand_node(depth + 1, ctx, allow_prev, true))
 			if rng.randf() < 0.5:
 				n["else"] = rand_node(depth + 1, ctx, allow_prev, true)

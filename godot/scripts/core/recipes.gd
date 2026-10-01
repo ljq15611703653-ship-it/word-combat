@@ -28,6 +28,9 @@ static func catalog() -> Array:
 				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "rep", "label": "重复次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "alt", "label": "写法", "kind": "enum", "options": [[0, "造成伤害"], [1, "减少当前生命"]], "default": 0},
+				{"key": "now", "label": "立即（第0秒就打）", "kind": "bool", "default": false},
+				{"key": "early", "label": "之前（比起点提前几秒）", "kind": "int", "min": 0, "max": 10, "default": 0},
+				{"key": "sync", "label": "同时（重复一起落下）", "kind": "bool", "default": false},
 			]},
 		{"id": "atkA", "family": "攻", "title": "范围打击", "glyph": "轰", "blurb": "对全部（或逐个）敌人造成同样的伤害。",
 			"params": [
@@ -35,6 +38,13 @@ static func catalog() -> Array:
 				{"key": "n", "label": "伤害", "kind": "int", "min": 1, "max": 60, "default": 12},
 				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "rep", "label": "重复次数", "kind": "int", "min": 0, "max": 3, "default": 0},
+				{"key": "now", "label": "立即（第0秒就打）", "kind": "bool", "default": false},
+				{"key": "sync", "label": "同时（重复/逐个一起落下）", "kind": "bool", "default": false},
+			]},
+		{"id": "chase", "family": "攻", "title": "追击", "glyph": "追", "blurb": "反复打生命最低的敌人，直到它的当前生命低于门槛。每次重新付数字。",
+			"params": [
+				{"key": "n", "label": "每次伤害", "kind": "int", "min": 1, "max": 30, "default": 8},
+				{"key": "th", "label": "直到当前生命低于", "kind": "int", "min": 1, "max": 20, "default": 4},
 			]},
 		{"id": "split", "family": "攻", "title": "分流打击", "glyph": "分", "blurb": "总伤害拆成两段，打两个目标。总额只付一次。",
 			"params": [
@@ -158,9 +168,16 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 	var title: String = template(tid).title
 	match tid:
 		"atk1":
-			nodes = [G.dmg(tspec(p.tgt, "enemy"), G.N(int(p.n)), {"alt": int(p.alt), "dbl": int(p.dbl), "rep": int(p.rep)})]
+			var a1 := G.dmg(tspec(p.tgt, "enemy"), G.N(int(p.n)), {"alt": int(p.alt), "dbl": int(p.dbl), "rep": int(p.rep)})
+			_timing(a1, p)
+			nodes = [a1]
 		"atkA":
-			nodes = [G.dmg(G.T(p.scope, "enemy"), G.N(int(p.n)), {"dbl": int(p.dbl), "rep": int(p.rep)})]
+			var aa := G.dmg(G.T(p.scope, "enemy"), G.N(int(p.n)), {"dbl": int(p.dbl), "rep": int(p.rep)})
+			_timing(aa, p)
+			nodes = [aa]
+		"chase":
+			var low := G.T("lowest", "enemy")
+			nodes = [G.until_node(G.cmp_cond(G.REF("cur_hp", low), "lt", G.N(int(p.th))), G.dmg(low, G.N(int(p.n))))]
 		"split":
 			var part1 := int(ceil(int(p.n) * 0.6))
 			nodes = [G.split("dmg", int(p.n), [
@@ -240,6 +257,14 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 	sk["template"] = tid
 	sk["params"] = p
 	return G.finalize(sk)
+
+static func _timing(node: Dictionary, p: Dictionary) -> void:
+	if p.get("now", false):
+		node["now"] = true
+	if int(p.get("early", 0)) > 0:
+		node["early"] = int(p.early)
+	if p.get("sync", false):
+		node["sync"] = true
 
 static func _observe(obs: String) -> Dictionary:
 	return G.T("self", "self") if obs == "self" else G.T("all", "ally")
