@@ -6,6 +6,7 @@ const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
 const D = preload("res://scripts/core/deck.gd")
+const RevealScreen = preload("res://scripts/ui/reveal_screen.gd")
 const Match = preload("res://scripts/game/match.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
@@ -164,6 +165,8 @@ func _show_title() -> void:
 func _new_game(seed_val: int = -1) -> void:
 	m = Match.new()
 	m.start(not auto, seed_val, false)
+	if not auto and not driver_on:
+		m.begin_staged()
 	m.ai_epsilon = [0.45, 0.12, 0.0][Settings.level]
 	m.fast_ai = Settings.level < 2
 	if auto:
@@ -174,8 +177,35 @@ func _new_game(seed_val: int = -1) -> void:
 		_begin_round()
 	elif m.phase == "opening":
 		_show_draft()
+	elif m.phase == "build_card":
+		_show_card_build()
 	else:
 		_show_build("initial", not driver_on)
+
+# ---------------------------------------------------------------- 逐张构筑 / 亮相
+func _show_card_build() -> void:
+	var s := BuildScreen.new()
+	_set_screen(s)
+	s.focus = int(m.card_idx)
+	s.setup(m, "initial")
+	s.card_done.connect(func(i, unit):
+		var r: Dictionary = m.commit_card(0, i, unit)
+		if not r.ok:
+			s.show_error(str(r.errors[0]))
+			s._open_focus()
+			return
+		_show_reveal())
+
+func _show_reveal() -> void:
+	var r := RevealScreen.new()
+	_set_screen(r)
+	r.setup(m)
+	r.finished.connect(func():
+		m.after_reveal()
+		if m.phase == "opening":
+			_show_draft()
+		else:
+			_begin_round())
 
 # ---------------------------------------------------------------- 构筑
 func _show_build(mode: String, first_card: bool = false) -> void:
@@ -242,6 +272,8 @@ func _show_draft() -> void:
 func _after_draft() -> void:
 	if m.phase == "opening":
 		_show_draft()
+	elif m.phase == "build_card":
+		_show_card_build()
 	elif m.phase == "build":
 		_show_build("initial", not driver_on)   # 开局选词一结束，先拼自己的第一张牌并起名
 	else:
@@ -310,7 +342,7 @@ func _start_tutorial() -> void:
 	m.pools[1] = {}
 	var dk: Dictionary = D.new_deck()
 	var names := ["稻草人甲", "稻草人乙", "稻草人丙", "稻草人丁", "稻草人戊"]
-	for i in 5:
+	for i in D.COUNT:
 		dk.units[i].name = names[i]
 		dk.units[i].glyph = "盾"
 		dk.units[i].max_hp = 10
@@ -355,7 +387,7 @@ func _start_first_match() -> void:
 	m.fast_ai = true
 	var mine: Dictionary = D.new_deck()
 	var names := ["示范甲", "示范乙", "示范丙", "示范丁", "示范戊"]
-	for i in 5:
+	for i in D.COUNT:
 		mine.units[i].name = names[i]
 		mine.units[i].max_hp = 12
 	var combo: Dictionary = R.build("atk1", {"n": 12, "rep": 1})
@@ -375,7 +407,7 @@ func _start_first_match() -> void:
 	m.pools[1] = {}
 	var foe: Dictionary = D.new_deck()
 	var fn := ["守门人", "对手乙", "对手丙", "对手丁", "对手戊"]
-	for i in 5:
+	for i in D.COUNT:
 		foe.units[i].name = fn[i]
 		foe.units[i].glyph = "盾"
 		foe.units[i].max_hp = 10
@@ -637,6 +669,24 @@ func _run_demo(demo: String) -> void:
 			_tut_test()
 		"fmtest":
 			_tut_test(true)
+		"card2":
+			m.start(true, 11, false)
+			m.begin_staged()
+			var u0: Dictionary = m.ai_make_card(0, 0)
+			m.commit_card(0, 0, u0)
+			m.after_reveal()
+			m.ai_pick_bag()
+			_show_card_build()
+		"reveal":
+			m.start(true, 11, false)
+			m.begin_staged()
+			for kk in 2:
+				var uu: Dictionary = m.ai_make_card(0, m.card_idx)
+				m.commit_card(0, m.card_idx, uu)
+				if kk == 0:
+					m.after_reveal()
+					m.ai_pick_bag()
+			_show_reveal()
 		"clicktest":
 			await _click_test()
 		"clicktest2":

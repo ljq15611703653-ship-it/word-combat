@@ -1,5 +1,5 @@
 extends Control
-# 构筑 / 调整界面：五张随从卡 + 词库。点击卡牌进入编辑器。
+# 构筑 / 调整界面：四张随从卡 + 词库。点击卡牌进入编辑器。
 
 const K = preload("res://scripts/ui/kit.gd")
 const Icon = preload("res://scripts/ui/icon.gd")
@@ -14,10 +14,12 @@ const Settings = preload("res://scripts/ui/settings.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 
 signal finished()                      # 构筑完成 / 结束调整
+signal card_done(unit_idx, unit)       # 逐张构筑：拼好了第 focus 张
 signal adjusted(unit_idx, unit)        # 调整模式下确认了一张卡的修改
 
 var m
 var main_root: Control
+var focus := -1            # >=0：逐张构筑，正在拼第 focus 张（其余卡已亮相、不能改）
 var first_card := false     # 开局的第一张牌：自动打开编辑器，拼完并起名才能继续
 var mode := "initial"
 var wd: Dictionary
@@ -41,15 +43,28 @@ func setup(match_obj, m_mode: String) -> void:
 	_build()
 	refresh()
 	Tut.fire("screen:adjust" if mode == "adjust" else "screen:build")
-	if first_card and mode == "initial":
+	if focus >= 0:
+		call_deferred("_open_focus")
+	elif first_card and mode == "initial":
 		call_deferred("_open_first_card")
+
+func _open_focus() -> void:
+	if not is_inside_tree():
+		return
+	var Pet = load("res://scripts/ui/pet.gd")
+	if focus == 0:
+		main_root.modulate.a = 0.0
+		Pet.chat("先拼你的第一张牌：用词拼出一句话，再给它起个名字。初始词够你拼出一个像样的。", "talk", 8.0)
+	else:
+		Pet.chat("对手已经亮出 %d 张牌了，看看有没有能针对它们的拼法。双方这一张是同时拼、同时亮。" % focus, "talk", 8.0)
+	_open_editor(focus)
 
 func _open_first_card() -> void:
 	if not is_inside_tree():
 		return
 	var Pet = load("res://scripts/ui/pet.gd")
 	Pet.chat("先拼一张属于你自己的牌吧！用词拼出一句话，再给你的随从起个名字。", "talk", 8.0)
-	main_root.modulate.a = 0.0      # 从零开始：先只有这一张空白的牌，五张卡的总览等拼完再翻出来
+	main_root.modulate.a = 0.0      # 从零开始：先只有这一张空白的牌，四张卡的总览等拼完再翻出来
 	_open_editor(0)
 
 func _build() -> void:
@@ -68,7 +83,7 @@ func _build() -> void:
 	root.add_child(v)
 	# 顶栏
 	var top := K.hbox(14)
-	var title := K.label("初始构筑" if mode == "initial" else "第 %d 轮 · 调整" % m.st.round, 34, K.GOLD)
+	var title := K.label(("拼第 %d / %d 张" % [focus + 1, D.COUNT]) if focus >= 0 else ("初始构筑" if mode == "initial" else "第 %d 轮 · 调整" % m.st.round), 34, K.GOLD)
 	top.add_child(title)
 	var sub := K.label("", 16, K.MUTED)
 	sub.name = "sub"
@@ -92,6 +107,7 @@ func _build() -> void:
 	finish_btn.custom_minimum_size = Vector2(230, 48)
 	Tut.tag(finish_btn, "b:finish")
 	finish_btn.pressed.connect(_on_finish)
+	finish_btn.visible = focus < 0
 	top.add_child(finish_btn)
 	v.add_child(top)
 	# 点数条
@@ -118,7 +134,7 @@ func _build() -> void:
 		for ln in recent:
 			lv.add_child(K.label(str(ln), 14, K.TEXT))
 		v.add_child(box)
-	# 五张卡
+	# 四张卡
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -165,7 +181,7 @@ func refresh() -> void:
 	budget_label.add_theme_color_override("font_color", K.RED if b.total > D.BUDGET else K.TEXT)
 	# 卡
 	K.clear_children(card_row)
-	for i in 5:
+	for i in D.COUNT:
 		card_row.add_child(_unit_panel(i, deck.units[i]))
 	# 词库
 	K.clear_children(pool_row)
@@ -201,7 +217,7 @@ func refresh() -> void:
 # ---------------------------------------------------------------- 辅助轮
 func _refresh_coach(deck: Dictionary) -> void:
 	K.clear_children(coach_box)
-	if not Settings.coach:
+	if not Settings.coach or focus >= 0:
 		return
 	var box := K.panel(Color("1f2a26"), K.GREEN.darkened(0.2), 10, 1)
 	var col := K.vbox(3)
@@ -214,7 +230,7 @@ func _refresh_coach(deck: Dictionary) -> void:
 	var row := K.hbox(10)
 	if mode == "initial":
 		var auto := K.button("自动组合", "primary", 17)
-		auto.tooltip_text = "用你现有的词一键配出五张能跑的牌，之后仍可逐张修改"
+		auto.tooltip_text = "用你现有的词一键配出四张能跑的牌，之后仍可逐张修改"
 		auto.pressed.connect(func(): _auto_compose(false))
 		row.add_child(auto)
 		var nxt := K.button("换一批", "normal", 17)
@@ -358,7 +374,7 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 	v.add_child(sp3)
 	var edit := K.button("编辑", "primary", 18)
 	edit.pressed.connect(func(): _open_editor(i))
-	edit.disabled = mode == "adjust" and m.adjust_side() != 0
+	edit.disabled = (mode == "adjust" and m.adjust_side() != 0) or focus >= 0
 	Tut.tag(edit, "b:edit%d" % i)
 	v.add_child(edit)
 	p.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -369,11 +385,12 @@ func _open_editor(i: int) -> void:
 		return
 	Tut.fire("editor_open")
 	var Appr = load("res://scripts/game/appraise.gd")
-	Appr.ctx = {"foe": m.decks[1], "foe_ap": int(m.st.sides[1].ap)}
+	Appr.ctx = {"foe": m.public_deck(1), "foe_ap": int(m.st.sides[1].ap)}
 	var pop := EditorPopup.new()
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(pop)
-	pop.require_name = first_card and mode == "initial" and i == 0 and _deck_has_no_skill()
+	pop.skip_option = focus >= 1
+	pop.require_name = focus >= 0 or (first_card and mode == "initial" and i == 0 and _deck_has_no_skill())
 	pop.open(_deck(), i, m.pools[0], mode)
 	pop.cancelled.connect(func():
 		_close_popup(pop)
@@ -382,6 +399,9 @@ func _open_editor(i: int) -> void:
 		Tut.fire("committed")
 		_close_popup(pop)
 		_reveal_board()
+		if focus >= 0:
+			card_done.emit(i, unit)
+			return
 		if mode == "initial":
 			wd.units[i] = unit
 			D.rename_skills(wd)
@@ -390,7 +410,7 @@ func _open_editor(i: int) -> void:
 			adjusted.emit(i, unit))
 	popup = pop
 
-# 第一张牌拼完：五张卡的总览从暗处翻出来
+# 第一张牌拼完：四张卡的总览从暗处翻出来
 func _reveal_board() -> void:
 	if main_root != null and main_root.modulate.a < 1.0:
 		var tw := create_tween()
@@ -411,7 +431,7 @@ func _peek_enemy() -> void:
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(dv)
 	var units: Array = []
-	for u in m.decks[1].units:
+	for u in m.public_deck(1).units:
 		units.append(u)
 	dv.open("对手的牌组（公开）", units, "对手性格：" + str(m.personas[1]))
 	dv.closed.connect(func():

@@ -185,7 +185,7 @@ static func describe_build(pool: Dictionary, deck: Dictionary) -> Array:
 		if info.target_unit >= 0:
 			lines.append("建议：编辑【%s】，装入【%s】（%s）：%s" % [deck.units[info.target_unit].name, info.ready[0].name, info.ready[0].role, info.ready[0].desc])
 		else:
-			lines.append("五张卡的技能槽都满了；想装新招，先在某张卡里清空一个技能槽。")
+			lines.append("四张卡的技能槽都满了；想装新招，先在某张卡里清空一个技能槽。")
 	for c in info.chase.slice(0, 2):
 		lines.append("再凑 %d 个词就能做【%s】（%s）：%s" % [c.n, c.name, c.role, _missing_text(c.missing)])
 	return lines

@@ -9,6 +9,7 @@ const G = preload("res://scripts/core/grammar.gd")
 const D = preload("res://scripts/core/deck.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
+const Namer = preload("res://scripts/core/namer.gd")
 
 var rng := RandomNumberGenerator.new()
 var st: Dictionary = {}
@@ -33,10 +34,13 @@ var fast_ai := false
 var ai_epsilon := 0.0
 var max_think_ms := 0
 var rounds_played := 0
-const OPENING_DRAFTS := 5
+const OPENING_DRAFTS := 3     # 四张卡：第 1 张用初始词，之后每张卡之前选一袋词
 var opening_idx := 0           # 开局选词进行到第几袋
 var opening_total := OPENING_DRAFTS
 var round1_draft := false      # 调试演示用：第 1 轮也抽词
+var staged := false            # 逐张构筑：每轮双方同时拼一张，同时亮相，再选词拼下一张
+var card_idx := 0              # 正在拼的是第几张
+var card_ready := [false, false]
 var scripted_ai: Callable = Callable()   # 教学：由脚本替电脑宣告
 
 func start(human0: bool = true, seed_val: int = -1, human1: bool = false, openings: int = OPENING_DRAFTS) -> void:
@@ -77,6 +81,105 @@ func _finish_opening() -> void:
 		if not human[s]:
 			decks[s] = Ai.build_deck(pools[s], personas[s], rng)
 			E.set_deck(st, s, decks[s], false)
+
+# ---------------------------------------------------------------- 逐张构筑（同时拼、同时亮）
+func begin_staged() -> void:
+	staged = true
+	opening_idx = 0
+	opening_total = D.COUNT - 1
+	card_idx = 0
+	for s2 in 2:
+		for u in decks[s2].units:
+			u.max_hp = 8      # 没拼的卡先按 8 点生命占位，拼到它时再自己调
+		E.set_deck(st, s2, decks[s2], false)
+	_begin_card()
+
+func _begin_card() -> void:
+	phase = "build_card"
+	card_ready = [false, false]
+	for s in 2:
+		if not human[s]:
+			_ai_build_card(s, card_idx)
+			card_ready[s] = true
+
+# 电脑拼第 k 张（测试里也用它代替人类）：用“还没用掉的词”配一副，取其中带技能的一张；点数不超预算
+func ai_make_card(side: int, k: int) -> Dictionary:
+	var left: Dictionary = pools[side].duplicate()
+	for w in D.used_words(decks[side]):
+		left[w] = int(left.get(w, 0)) - 1
+		if int(left[w]) <= 0:
+			left.erase(w)
+	var nums_used := 0
+	for i in decks[side].units.size():
+		if i != k:
+			for sk in decks[side].units[i].skills:
+				nums_used += int(sk.budget)
+	var hp_others := 0
+	for i in decks[side].units.size():
+		if i != k:
+			hp_others += int(decks[side].units[i].max_hp)
+	var nums_room: int = maxi(6, D.BUDGET - hp_others - nums_used - 8)
+	var cap0: int = clampi(int(float(nums_room) * 4.0 / float(D.COUNT - k)), 8, 34)
+	for cap in [cap0, int(cap0 * 0.6), int(cap0 * 0.35), 6]:
+		var full: Dictionary = Ai.build_deck(left, personas[side], rng, maxi(4, cap))
+		var pick := -1
+		for i in full.units.size():
+			if not full.units[i].skills.is_empty() and (pick == -1 or i == k):
+				pick = i
+		if pick == -1:
+			continue
+		var u: Dictionary = full.units[pick].duplicate(true)
+		u["name"] = Namer.minion_name(u, rng)
+		var nd := D.clone(decks[side])
+		u["max_hp"] = mini(int(u.max_hp), 10)
+		nd.units[k] = u
+		while int(D.budget_used(nd).total) > D.BUDGET and int(nd.units[k].max_hp) > 3:
+			nd.units[k].max_hp -= 1
+		D.rename_skills(nd)
+		if D.validate(nd, pools[side]).ok:
+			return nd.units[k]
+	return {}
+
+func _ai_build_card(side: int, k: int) -> void:
+	var u: Dictionary = ai_make_card(side, k)
+	if u.is_empty():
+		return
+	var nd := D.clone(decks[side])
+	nd.units[k] = u
+	D.rename_skills(nd)
+	decks[side] = nd
+	E.set_deck(st, side, nd, false)
+
+# 人类拼好第 k 张
+func commit_card(side: int, k: int, unit: Dictionary) -> Dictionary:
+	var nd := D.clone(decks[side])
+	nd.units[k] = unit
+	D.rename_skills(nd)
+	var v := D.validate(nd, pools[side])
+	if not v.ok:
+		return v
+	decks[side] = nd
+	E.set_deck(st, side, nd, false)
+	card_ready[side] = true
+	if card_ready[0] and card_ready[1]:
+		phase = "reveal"
+	return v
+
+# 亮相看完了：还有下一张就先选词，否则开打
+func after_reveal() -> void:
+	if card_idx + 1 < D.COUNT:
+		_next_opening()
+	else:
+		phase = "ready"
+
+# 对手公开的牌组：拼卡阶段，本张还没亮出来的不给看
+func public_deck(side: int) -> Dictionary:
+	var d := D.clone(decks[side])
+	if staged and phase == "build_card":
+		for i in range(card_idx, d.units.size()):
+			d.units[i].skills = []
+			d.units[i].kw = ""
+	return d
 
 # 所有开局选词都交给电脑（调试演示、批量模拟用）
 func auto_opening() -> void:
@@ -133,6 +236,10 @@ func pick_bag(side: int, idx: int) -> void:
 	if phase == "opening":
 		say("开局选词 %d/%d：%s 选择了%s袋。" % [opening_idx + 1, opening_total, "你" if human[side] else "对手", "左" if idx == 0 else "右"])
 		opening_idx += 1
+		if staged:
+			card_idx += 1
+			_begin_card()
+			return
 		if opening_idx < opening_total:
 			_next_opening()
 		else:

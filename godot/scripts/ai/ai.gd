@@ -103,12 +103,12 @@ static func _params_for(tid: String, variant: Dictionary, n: int) -> Dictionary:
 	return p
 
 # ------------------------------------------------------------ 构筑
-static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGenerator, num_cap: int = 42) -> Dictionary:
+static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGenerator, num_cap: int = 34) -> Dictionary:
 	var deck := D.new_deck()
 	var used := {}
 	var chosen: Array = []
 	for entry in PERSONAS[persona]:
-		if chosen.size() >= 5 * D.MAX_SKILLS:
+		if chosen.size() >= D.COUNT * D.MAX_SKILLS:
 			break
 		var placed := false
 		for v in entry[1]:
@@ -129,7 +129,7 @@ static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGener
 		for tgt in ["choose", "lowest", "first", "last", "random", "highest"]:
 			var sk2 := R.build("atk1", {"tgt": tgt, "n": 14})
 			if G.missing(sk2.words, _avail(pool, used)).is_empty():
-				if chosen.size() >= 5 * D.MAX_SKILLS:
+				if chosen.size() >= D.COUNT * D.MAX_SKILLS:
 					chosen.pop_back()
 				chosen.append(sk2)
 				_add_used(used, sk2.words)
@@ -147,7 +147,7 @@ static func _fill_empty_units(deck: Dictionary, pool: Dictionary) -> void:
 		["heal", {"tgt": "self", "n": 6}], ["mit", {"tgt": "self", "n": 10}], ["shield", {"tgt": "self", "n": 8}],
 		["atk1", {"n": 6}], ["tax", {"n": 6}],
 	]
-	for i in 5:
+	for i in D.COUNT:
 		if not deck.units[i].skills.is_empty():
 			continue
 		for fb in fallbacks:
@@ -186,8 +186,8 @@ static func _fit_and_place(deck: Dictionary, chosen: Array, num_cap: int) -> voi
 	# 指派到卡：依次放到还有空槽的卡（每卡至多 MAX_SKILLS 个），放不下的丢弃
 	for i in skills.size():
 		var idx := -1
-		for k in 5:
-			var j: int = (i + k) % 5
+		for k in D.COUNT:
+			var j: int = (i + k) % D.COUNT
 			if deck.units[j].skills.size() < D.MAX_SKILLS:
 				idx = j
 				break
@@ -197,7 +197,7 @@ static func _fit_and_place(deck: Dictionary, chosen: Array, num_cap: int) -> voi
 
 static func _place_keywords(deck: Dictionary, pool: Dictionary, used: Dictionary, persona: String) -> void:
 	var avail := _avail(pool, used)
-	var slot := 4
+	var slot := D.COUNT - 1
 	for kw in KW_PREF[persona]:
 		while int(avail.get(kw, 0)) > 0 and slot >= 0:
 			deck.units[slot].kw = kw
@@ -221,18 +221,18 @@ static func _spread_hp(deck: Dictionary, chosen: Array) -> void:
 		weights.append(w)
 		wsum += w
 	var left := hp_pool
-	for i in 5:
+	for i in D.COUNT:
 		var hp: int = maxi(1, int(floor(float(hp_pool) * weights[i] / wsum)))
 		deck.units[i].max_hp = hp
 		left -= hp
 	var i2 := 0
 	while left > 0:
-		deck.units[i2 % 5].max_hp += 1
+		deck.units[i2 % D.COUNT].max_hp += 1
 		left -= 1
 		i2 += 1
 	while left < 0:
 		var big := 0
-		for j in 5:
+		for j in D.COUNT:
 			if deck.units[j].max_hp > deck.units[big].max_hp:
 				big = j
 		deck.units[big].max_hp -= 1
@@ -259,14 +259,14 @@ static func adjust_step(deck: Dictionary, pool: Dictionary, persona: String, rng
 			# 找槽位：先找有空位的卡，否则替换本系列里优先级最低的技能
 			var new_deck := D.clone(deck)
 			var target := -1
-			for i in 5:
+			for i in D.COUNT:
 				if new_deck.units[i].skills.size() < D.MAX_SKILLS:
 					target = i
 					break
 			var replaced := -1
 			if target == -1:
 				var worst_rank := -1
-				for i in 5:
+				for i in D.COUNT:
 					for k in new_deck.units[i].skills.size():
 						var rank := _rank_of(persona, new_deck.units[i].skills[k])
 						if rank > worst_rank:
@@ -292,7 +292,7 @@ static func adjust_step(deck: Dictionary, pool: Dictionary, persona: String, rng
 				sk = R.build(sk.template, p2)
 			if int(sk.budget) > free:
 				continue
-			if D.budget_used(new_deck).nums + int(sk.budget) > 50:
+			if D.budget_used(new_deck).nums + int(sk.budget) > 40:
 				continue
 			new_deck.units[target].skills.append(sk)
 			D.rename_skills(new_deck)

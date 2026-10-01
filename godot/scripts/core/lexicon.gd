@@ -87,11 +87,18 @@ static func draw_bag(rng: RandomNumberGenerator, size: int = 25) -> Array:
 		guard += 1
 		if basics >= size * 2 / 5 or guard > 50:
 			break
+	# 保底：每袋都有“造成 伤害”，不至于整袋拼不出任何攻击
+	for core in ["造成", "伤害"]:
+		if not (core in bag):
+			var idx := rng.randi() % bag.size()
+			while bag[idx] in ["造成", "伤害"]:
+				idx = rng.randi() % bag.size()
+			bag[idx] = core
 	bag.sort_custom(func(a, b): return words[a].id < words[b].id)
 	return bag
 
 # 开局12词：一套完整基础攻击句 + 一套应对句（自身治疗/自身减伤/受伤时转移给来源），其余基础词随机。
-const OPENING_COUNT := 12      # 开局发的基础词（含一套基础攻击句 + 一套应对句）
+const OPENING_COUNT := 26      # 开局发的基础词（含一套基础攻击句 + 一套应对句）
 
 static func opening_words(rng: RandomNumberGenerator) -> Array:
 	load_all()
@@ -107,7 +114,10 @@ static func opening_words(rng: RandomNumberGenerator) -> Array:
 		["当", "即将受到伤害", "自身", "转移", "来源"],
 	]
 	var out: Array = []
-	out.append_array(attacks[rng.randi() % attacks.size()])
+	var a1 := rng.randi() % attacks.size()
+	var a2 := (a1 + 1 + rng.randi() % (attacks.size() - 1)) % attacks.size()
+	out.append_array(attacks[a1])
+	out.append_array(attacks[a2])        # 两套不同的攻击句：第一张卡就能拼得有分量
 	out.append_array(responses[rng.randi() % responses.size()])
 	var basics: Array = []
 	for n in order:

@@ -1,19 +1,19 @@
 extends RefCounted
-# 牌组：五张随从卡。每张卡：名字、生命、至多一个关键词、至多两个技能。
-# 构筑预算100点 = 五张卡的生命 + 所有技能的填入数字（含持续秒数）。
+# 牌组：四张随从卡。每张卡：名字、生命、至多一个关键词、至多两个技能。
+# 构筑预算80点 = 四张卡的生命 + 所有技能的填入数字（含持续秒数）。
 
 const G = preload("res://scripts/core/grammar.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 
-const BUDGET := 100
+const BUDGET := 80      # 四张卡：生命 + 数字 共 80 点
+const COUNT := 4        # 每方随从数
 const MAX_SKILLS := 1      # 一个随从一招（招里可以用“并”连多个效果）
-const NAMES := ["剑灵", "盾卫", "咒师", "弓手", "魂使"]
-const GLYPHS := ["剑", "盾", "咒", "弓", "魂"]
+const GLYPHS := ["剑", "盾", "咒", "弓"]
 const KEYWORDS := ["首挡", "不屈", "回击", "回春", "同调", "免疫狂振", "免疫牵连", "免疫升华"]
 
 static func new_deck() -> Dictionary:
 	var units: Array = []
-	for i in 5:
+	for i in COUNT:
 		units.append({"name": "", "glyph": GLYPHS[i], "max_hp": 12, "kw": "", "skills": []})
 	return {"units": units}
 

@@ -28,6 +28,7 @@ var unit_idx := 0
 var work: Dictionary          # 正在编辑的这张卡
 var slot := 0                 # 一人一招，恒为 0
 var mode := "initial"
+var skip_option := false      # 逐张构筑：词不够时允许这张卡不装技能，直接亮相
 var require_name := false     # 开局第一张牌：必须给随从起名才能确定
 var _named := false
 
@@ -279,6 +280,18 @@ func _build() -> void:
 			cancelled.emit())
 	cancel.visible = not require_name      # 开局第一张牌：不能取消，必须拼出来
 	foot.add_child(cancel)
+	if skip_option:
+		var skip := K.button("不装技能，直接亮相", "normal", 17)
+		skip.custom_minimum_size = Vector2(190, 44)
+		skip.tooltip_text = "词不够凑成一句话时，这张卡先当一个只有生命的肉盾"
+		skip.pressed.connect(func():
+			if _committing:
+				return
+			work.skills = []
+			if str(work.name).strip_edges() == "":
+				work.name = Namer.minion_name(work, _rng)
+			committed.emit(work))
+		foot.add_child(skip)
 	btn_commit = K.button("确定，拼好了", "primary", 20)
 	btn_commit.custom_minimum_size = Vector2(170, 44)
 	Tut.tag(btn_commit, "e:commit")
