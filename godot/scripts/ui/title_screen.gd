@@ -8,6 +8,7 @@ const Sfx = preload("res://scripts/ui/sfx.gd")
 
 signal start_game()
 signal watch_demo()
+signal start_tutorial()
 
 var rules_panel: Control
 
@@ -53,6 +54,10 @@ func _ready() -> void:
 	b1.pressed.connect(func(): start_game.emit())
 	v.add_child(b1)
 	Settings.load_all()
+	var bt := K.button("新手教学（从头教起，约10分钟）" + ("" if Settings.tutorial_done else "  ← 第一次玩点这里"), "primary" if not Settings.tutorial_done else "normal", 22)
+	bt.custom_minimum_size = Vector2(0, 52)
+	bt.pressed.connect(func(): start_tutorial.emit())
+	v.add_child(bt)
 	var lv_row := K.hbox(8)
 	lv_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var desc := K.label("", 15, K.MUTED, HORIZONTAL_ALIGNMENT_CENTER)

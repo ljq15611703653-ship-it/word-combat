@@ -13,10 +13,15 @@ const TitleScreen = preload("res://scripts/ui/title_screen.gd")
 const BuildScreen = preload("res://scripts/ui/build_screen.gd")
 const DraftScreen = preload("res://scripts/ui/draft_screen.gd")
 const BattleScreen = preload("res://scripts/ui/battle_screen.gd")
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
+const Tutorial = Tut
 
 var m
 var screen: Control
 var battle_screen
+var tut_on := false
+var tut_skip_adjust := false
+var tut_coach_backup := true
 var auto := false
 var driver_on := false
 var _last_adj_left := -1
@@ -67,6 +72,9 @@ func _set_screen(c: Control) -> void:
 	screen = c
 	add_child(c)
 	c.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	for n in get_children():
+		if n is Tut:
+			move_child(n, get_child_count() - 1)   # 引导层始终在最上面（GUI 点击按树序）
 	if driver_on:
 		_drive(c)
 
@@ -133,9 +141,11 @@ func _drive(s: Control) -> void:
 
 # ---------------------------------------------------------------- 标题
 func _show_title() -> void:
+	_tut_end()
 	var t := TitleScreen.new()
 	_set_screen(t)
 	t.start_game.connect(_new_game)
+	t.start_tutorial.connect(_start_tutorial)
 	t.watch_demo.connect(func():
 		auto = true
 		_new_game())
@@ -168,6 +178,8 @@ func _show_build(mode: String) -> void:
 	else:
 		s.finished.connect(func():
 			m.skip_adjust(0)
+			if tut_on:
+				tut_skip_adjust = true
 			_continue_adjust())
 		s.adjusted.connect(func(idx, unit):
 			var r: Dictionary = m.apply_adjust(0, idx, unit)
@@ -175,10 +187,18 @@ func _show_build(mode: String) -> void:
 				s.show_error(str(r.errors[0]))
 				s.refresh()
 				return
+			if tut_on:
+				tut_skip_adjust = true
 			_continue_adjust())
 
 func _begin_round() -> void:
 	m.begin_round()
+	if tut_on:
+		_tut_prepare_round()
+		if int(m.st.round) == 1:
+			m.begin_declare()
+			_show_battle()
+			return
 	_show_draft()
 
 # ---------------------------------------------------------------- 抽词
@@ -207,12 +227,15 @@ func _continue_adjust() -> void:
 	while m.phase == "adjust":
 		var s: int = m.adjust_side()
 		if m.human[s]:
-			if m.adjust_left(s) <= 0:
+			if m.adjust_left(s) <= 0 or (tut_on and tut_skip_adjust):
 				m.skip_adjust(s)
 				continue
 			_show_build("adjust")
 			return
-		m.ai_adjust()
+		if tut_on:
+			m.skip_adjust(s)
+		else:
+			m.ai_adjust()
 	m.begin_declare()
 	_show_battle()
 
@@ -235,6 +258,178 @@ func _auto_press_next(b) -> void:
 	await b.get_tree().create_timer(0.2).timeout
 	if is_instance_valid(b) and m.phase == "resolved":
 		pass
+
+# ---------------------------------------------------------------- 新手教学
+func _start_tutorial() -> void:
+	var R = load("res://scripts/core/recipes.gd")
+	var G = load("res://scripts/core/grammar.gd")
+	var D = load("res://scripts/core/deck.gd")
+	var E = load("res://scripts/core/engine.gd")
+	Settings.load_all()
+	tut_coach_backup = Settings.coach
+	Settings.coach = true
+	tut_on = true
+	tut_skip_adjust = false
+	m = Match.new()
+	m.start(true, 20260, false)
+	m.ai_epsilon = 0.0
+	m.fast_ai = true
+	# 词库：刚好够装“单点打击（含双倍）”与“减伤”
+	var words: Array = []
+	words.append_array(R.build("atk1", {"dbl": 1}).words)
+	words.append_array(R.build("mit", {}).words)
+	m.pools[0] = G.count_words(words)
+	m.pools[1] = {}
+	var dk: Dictionary = D.new_deck()
+	var names := ["稻草人甲", "稻草人乙", "稻草人丙", "稻草人丁", "稻草人戊"]
+	for i in 5:
+		dk.units[i].name = names[i]
+		dk.units[i].glyph = "盾"
+		dk.units[i].max_hp = 10
+	m.decks[1] = dk
+	m.personas[1] = "均衡"
+	var mine: Dictionary = D.new_deck()
+	m.decks[0] = mine
+	m.st = E.make_state(m.decks, 0, {}, 4242)
+	m.scripted_ai = func(mm, side: int):
+		# 稻草人只在第 2 轮挥一拳（第 6 秒打第一张卡），其余时候站着不动
+		if int(mm.st.round) == 2 and not mm.declared[side].is_empty():
+			return
+		if int(mm.st.round) == 2:
+			var sk_ids: Array = E._u(mm.st, 10).skill_ids
+			if not sk_ids.is_empty():
+				var ch := {}
+				for slot in G.choice_slots(E.skill_of(mm.st, int(sk_ids[0]))):
+					ch[slot.key] = 0
+				mm.submit(side, {"side": side, "sid": int(sk_ids[0]), "choices": ch, "start": 6})
+	_show_build("initial")
+	var tut := Tut.new()
+	add_child(tut)
+	tut.start()
+	tut.finished.connect(_on_tut_finished)
+
+# 自动走完整个新手引导：每一步都按提示去做（真实点击/拖动），检查能否走到结尾
+func _tut_test() -> void:
+	_start_tutorial()
+	var ok := true
+	var last_id := ""
+	var same := 0
+	var steps_done := 0
+	for it in 900:
+		await get_tree().create_timer(0.22).timeout
+		var tut = null
+		for c in get_children():
+			if c is Tut:
+				tut = c
+		if tut == null:
+			break
+		var st: Dictionary = tut.cur()
+		if st.is_empty():
+			continue
+		var id: String = st.id
+		if id == last_id:
+			same += 1
+		else:
+			same = 0
+			last_id = id
+			steps_done += 1
+			print("  [引导测试] 步骤 ", id)
+		if same > 45:
+			print("  [引导测试] 失败：卡在步骤 ", id, " 目标=", st.target, " 洞=", tut.current_hole())
+			ok = false
+			break
+		if bool(st.get("hide", false)):
+			continue
+		var w = st.get("wait", "next")
+		if w is String and w == "next":
+			await _click(tut.next_b)
+			if same == 3:
+				print("  [调试] 点击位置 ", tut.next_b.get_global_rect().get_center(), " 悬停=", get_viewport().gui_get_hovered_control(), " 可见=", tut.next_b.is_visible_in_tree(), " disabled=", tut.next_b.disabled)
+			continue
+		var hole: Rect2 = tut.current_hole()
+		var tgt: String = st.target
+		var b = battle_screen
+		if tgt == "b:foe" or tgt == "b:foe:hurt":
+			if b != null and is_instance_valid(b):
+				for u in m.st.sides[1].units:
+					if u.down_round == -1 and (tgt == "b:foe" or int(u.hp) < int(u.max_hp)):
+						b._on_card_clicked(b.cards[u.uid])
+						break
+			continue
+		if tgt.begins_with("e:param:") or tgt == "b:start":
+			var nodes := get_tree().get_nodes_in_group("tut:" + tgt)
+			if nodes.is_empty():
+				continue
+			var sl: HSlider = nodes[0].find_child("*", true, false) as HSlider
+			for ch in nodes[0].find_children("*", "HSlider", true, false):
+				sl = ch
+			var val := 5.0
+			if id == "ed_dbl":
+				val = 1.0
+			elif id == "ed_dbl0":
+				val = 0.0
+			elif id == "r2_slider":
+				val = 3.0
+			if sl != null:
+				sl.value = val
+			continue
+		if tgt == "e:name":
+			var nodes2 := get_tree().get_nodes_in_group("tut:e:name")
+			if not nodes2.is_empty():
+				for bt in nodes2[0].find_children("*", "Button", true, false):
+					await _click(bt)
+			continue
+		if hole.size.x > 2.0:
+			var pos := hole.get_center()
+			var ev := InputEventMouseButton.new()
+			ev.button_index = MOUSE_BUTTON_LEFT
+			ev.position = pos
+			ev.global_position = pos
+			ev.pressed = true
+			get_viewport().push_input(ev)
+			var ev2 := ev.duplicate()
+			ev2.pressed = false
+			get_viewport().push_input(ev2)
+		else:
+			print("  [引导测试] 步骤 ", id, " 目标没有矩形：", tgt)
+	var done: bool = tut_on == false and Settings.tutorial_done
+	print("【新手引导测试结束】", "全部通过 共%d步" % steps_done if (ok and done) else "有失败 (ok=%s done=%s steps=%d)" % [ok, done, steps_done])
+	get_tree().quit(0 if (ok and done) else 1)
+
+func _tut_prepare_round() -> void:
+	var E = load("res://scripts/core/engine.gd")
+	var R = load("res://scripts/core/recipes.gd")
+	tut_skip_adjust = false
+	if int(m.st.round) == 1:
+		# 第一轮：跳过抽词与调整，直接战斗（后面的轮次才教这两件事）
+		m.pick_bag(0, 0)
+		while m.phase == "adjust":
+			m.skip_adjust(0)
+			m.skip_adjust(1)
+		m.phase = "adjust_done"
+	elif int(m.st.round) == 2:
+		m.st.sides[0].ap = 60   # 教学：保证防守和进攻两个行动都付得起
+		var sk: Dictionary = R.build("atk1", {"n": 6})
+		sk["name"] = "稻草拳"
+		m.decks[1].units[0].skills = [sk]
+		E.set_deck(m.st, 1, m.decks[1], false)
+
+func _tut_end() -> void:
+	if not tut_on:
+		return
+	tut_on = false
+	Settings.coach = tut_coach_backup
+	for c in get_children():
+		if c is Tut:
+			c.queue_free()
+	Tut.providers.clear()
+	Tut.vars.clear()
+
+func _on_tut_finished(completed: bool) -> void:
+	if completed:
+		Settings.tutorial_done = true
+		Settings.save_all()
+	_show_title()
 
 # ---------------------------------------------------------------- 调试演示
 func _run_demo(demo: String) -> void:
@@ -312,6 +507,8 @@ func _run_demo(demo: String) -> void:
 			pp.complex_root._rerender()
 		"minions3d":
 			_demo_minions3d()
+		"tuttest":
+			_tut_test()
 		"clicktest":
 			await _click_test()
 		"clicktest2":

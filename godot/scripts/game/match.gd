@@ -32,6 +32,7 @@ var fast_ai := false
 var ai_epsilon := 0.0
 var max_think_ms := 0
 var rounds_played := 0
+var scripted_ai: Callable = Callable()   # 教学：由脚本替电脑宣告
 
 func start(human0: bool = true, seed_val: int = -1, human1: bool = false) -> void:
 	Lex.load_all()
@@ -195,6 +196,10 @@ func submit(side: int, act: Dictionary) -> String:
 func ai_declare() -> void:
 	var t0 := Time.get_ticks_msec()
 	var s := declare_side()
+	if scripted_ai.is_valid():
+		scripted_ai.call(self, s)
+		declare_done[s] = true
+		return
 	var enemy_list: Array = []
 	if s != declare_order[0]:
 		enemy_list = declared[1 - s].duplicate(true)

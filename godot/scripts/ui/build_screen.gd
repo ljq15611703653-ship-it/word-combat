@@ -2,6 +2,7 @@ extends Control
 # 构筑 / 调整界面：五张随从卡 + 词库。点击卡牌进入编辑器。
 
 const K = preload("res://scripts/ui/kit.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
 const D = preload("res://scripts/core/deck.gd")
 const G = preload("res://scripts/core/grammar.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
@@ -10,6 +11,7 @@ const DeckView = preload("res://scripts/ui/deck_view.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
 const Coach = preload("res://scripts/core/coach.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
 
 signal finished()                      # 构筑完成 / 结束调整
 signal adjusted(unit_idx, unit)        # 调整模式下确认了一张卡的修改
@@ -36,6 +38,7 @@ func setup(match_obj, m_mode: String) -> void:
 	wd = D.clone(m.decks[0])
 	_build()
 	refresh()
+	Tut.fire("screen:adjust" if mode == "adjust" else "screen:build")
 
 func _build() -> void:
 	K.clear_children(self)
@@ -74,6 +77,7 @@ func _build() -> void:
 	top.add_child(tgc)
 	finish_btn = K.button("开始对战  →" if mode == "initial" else "结束调整  →", "primary", 21)
 	finish_btn.custom_minimum_size = Vector2(230, 48)
+	Tut.tag(finish_btn, "b:finish")
 	finish_btn.pressed.connect(_on_finish)
 	top.add_child(finish_btn)
 	v.add_child(top)
@@ -83,6 +87,7 @@ func _build() -> void:
 	budget_bar = HBoxContainer.new()
 	budget_bar.add_theme_constant_override("separation", 0)
 	budget_bar.custom_minimum_size = Vector2(700, 26)
+	Tut.tag(budget_bar, "b:budget")
 	bb.add_child(budget_bar)
 	budget_label = K.label("", 18, K.TEXT)
 	bb.add_child(budget_label)
@@ -108,10 +113,12 @@ func _build() -> void:
 	card_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	card_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	Tut.tag(card_row, "b:cards")
 	scroll.add_child(card_row)
 	v.add_child(scroll)
 	# 词库
 	var pool_panel := K.panel(K.PANEL, K.EDGE, 12, 1)
+	Tut.tag(pool_panel, "b:pool")
 	var pv := K.vbox(4)
 	pool_panel.add_child(pv)
 	pv.add_child(K.label("你的词库（已用 / 拥有）", 15, K.MUTED))
@@ -290,6 +297,8 @@ func _show_suggestion(idx: int, nd: Dictionary, persona: String) -> void:
 func _unit_panel(i: int, u: Dictionary) -> Control:
 	var p := K.panel(Color("1d2233"), K.BLUE.darkened(0.3), 14, 2, 8)
 	p.custom_minimum_size = Vector2(290, 0)
+	if i == 0:
+		Tut.tag(p, "b:unit0")
 	p.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var v := K.vbox(6)
 	p.add_child(v)
@@ -309,7 +318,7 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 	portrait.custom_minimum_size = Vector2(0, 120)
 	portrait.add_theme_stylebox_override("panel", K.style(pcol, pcol.lightened(0.3), 10, 1))
 	var cc := CenterContainer.new()
-	cc.add_child(K.label(u.glyph, 84, Color(1, 1, 1, 0.88), HORIZONTAL_ALIGNMENT_CENTER))
+	cc.add_child(Icon.make(u.glyph, 96, Color(1, 1, 1, 0.9)))
 	portrait.add_child(cc)
 	v.add_child(portrait)
 	if u.kw != "":
@@ -338,6 +347,8 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 	var edit := K.button("编辑", "primary", 18)
 	edit.pressed.connect(func(): _open_editor(i))
 	edit.disabled = mode == "adjust" and m.adjust_side() != 0
+	if i == 0:
+		Tut.tag(edit, "b:edit0")
 	v.add_child(edit)
 	p.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	return p
@@ -345,12 +356,14 @@ func _unit_panel(i: int, u: Dictionary) -> Control:
 func _open_editor(i: int) -> void:
 	if mode == "adjust" and (m.adjust_side() != 0 or m.adjust_left(0) <= 0):
 		return
+	Tut.fire("editor_open")
 	var pop := EditorPopup.new()
 	overlay_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	overlay_layer.add_child(pop)
 	pop.open(_deck(), i, m.pools[0], mode)
 	pop.cancelled.connect(func(): _close_popup(pop))
 	pop.committed.connect(func(unit):
+		Tut.fire("committed")
 		_close_popup(pop)
 		if mode == "initial":
 			wd.units[i] = unit
@@ -377,6 +390,7 @@ func _peek_enemy() -> void:
 		overlay_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE)
 
 func _on_finish() -> void:
+	Tut.fire("build_finish")
 	finished.emit()
 
 func show_error(text: String) -> void:

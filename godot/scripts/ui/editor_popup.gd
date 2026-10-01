@@ -4,7 +4,9 @@ extends Control
 #   简单版 —— 选一个“招式模板”，填空（参数），立刻预览费用与所需词；
 #   复杂版 —— 直接拼节点树（见 complex_editor.gd）。
 
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const K = preload("res://scripts/ui/kit.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
 const G = preload("res://scripts/core/grammar.gd")
 const R = preload("res://scripts/core/recipes.gd")
 const D = preload("res://scripts/core/deck.gd")
@@ -132,11 +134,13 @@ func _build() -> void:
 	# 左栏
 	var left := K.panel(K.PANEL, K.EDGE, 12, 1)
 	left.custom_minimum_size = Vector2(380, 0)
+	Tut.tag(left, "e:left")
 	body.add_child(left)
 	var lv := K.vbox(10)
 	left.add_child(lv)
-	var glyph := K.label(work.glyph, 70, Color("c9b27a"), HORIZONTAL_ALIGNMENT_CENTER)
-	lv.add_child(glyph)
+	var glyph_c := CenterContainer.new()
+	glyph_c.add_child(Icon.make(work.glyph, 76, Color("c9b27a")))
+	lv.add_child(glyph_c)
 	var nrow := K.hbox(6)
 	nrow.add_child(K.label("卡名", 18, K.MUTED))
 	unit_name_edit = LineEdit.new()
@@ -222,6 +226,7 @@ func _build() -> void:
 	foot.add_child(cancel)
 	btn_commit = K.button("确认修改", "primary", 20)
 	btn_commit.custom_minimum_size = Vector2(180, 46)
+	Tut.tag(btn_commit, "e:commit")
 	btn_commit.pressed.connect(func(): committed.emit(work))
 	foot.add_child(btn_commit)
 	root.add_child(foot)
@@ -302,11 +307,13 @@ func _refresh_left() -> void:
 			v.add_child(K.wrap_label(work.skills[k].text, 14, K.MUTED))
 		else:
 			v.add_child(K.label("（空）", 15, K.MUTED))
+		Tut.tag(p, "e:slot%d" % k)
 		p.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 				slot = k
 				_refresh_left()
-				_load_slot())
+				_load_slot()
+				Tut.fire("slot:%d" % k))
 		slot_box.add_child(p)
 	# 点数
 	var pts := _points_other()
@@ -363,10 +370,11 @@ func _template_card(t: Dictionary) -> Control:
 	p.custom_minimum_size = Vector2(158, 124)
 	p.add_theme_stylebox_override("panel", K.style(Color("1f2538"), fam_col, 10, 2, 3))
 	p.name = "tpl_" + t.id
+	Tut.tag(p, "e:tpl:" + t.id)
 	var v := K.vbox(2)
 	p.add_child(v)
 	var top := K.hbox(6)
-	top.add_child(K.label(t.glyph, 34, fam_col.lightened(0.45)))
+	top.add_child(Icon.make(str(t.glyph), 38, fam_col.lightened(0.45)))
 	var col := K.vbox(0)
 	col.add_child(K.label(t.title, 17, K.TEXT))
 	col.add_child(K.chip(t.family, fam_col, 11))
@@ -377,7 +385,8 @@ func _template_card(t: Dictionary) -> Control:
 	v.add_child(bl)
 	p.gui_input.connect(func(ev):
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
-			_select_template(t.id, {}))
+			_select_template(t.id, {})
+			Tut.fire("tpl:" + str(t.id)))
 	tpl_buttons[t.id] = p
 	return p
 
@@ -456,8 +465,10 @@ func _rebuild_params() -> void:
 	sdice.pressed.connect(func():
 		_rng.randomize()
 		sel_name = Namer.skill_name(preview_skill, _rng)
-		skill_name_edit.text = sel_name)
+		skill_name_edit.text = sel_name
+		Tut.fire("dice"))
 	nm.add_child(sdice)
+	Tut.tag(nm, "e:name")
 	param_box.add_child(nm)
 	for prm in t.params:
 		var row := K.hbox(8)
@@ -492,7 +503,8 @@ func _rebuild_params() -> void:
 				sl.value_changed.connect(func(v):
 					sel_params[prm.key] = int(v)
 					val.text = str(int(v))
-					_update_preview())
+					_update_preview()
+					Tut.fire("param:%s:%d" % [prm.key, int(v)]))
 				row.add_child(sl)
 				row.add_child(val)
 			"bool":
@@ -502,6 +514,7 @@ func _rebuild_params() -> void:
 					sel_params[prm.key] = on
 					_update_preview())
 				row.add_child(cb)
+		Tut.tag(row, "e:param:" + str(prm.key))
 		param_box.add_child(row)
 
 func _update_preview() -> void:
@@ -509,6 +522,11 @@ func _update_preview() -> void:
 		return
 	K.clear_children(preview_box)
 	preview_skill = R.build(sel_tid, sel_params)
+	Tut.vars["cost"] = int(preview_skill.cost)
+	Tut.vars["nums"] = int(preview_skill.ap_nums)
+	Tut.vars["price"] = int(preview_skill.price)
+	Tut.vars["windup"] = int(preview_skill.windup)
+	Tut.tag(preview_box, "e:preview")
 	_render_skill_preview(preview_box, preview_skill, "装入技能槽 %d" % (slot + 1), func():
 		_install(preview_skill))
 	_refresh_info()
@@ -551,6 +569,7 @@ func _render_skill_preview(box: VBoxContainer, sk: Dictionary, btn_text: String,
 	var b := K.button(btn_text, "primary" if ok else "normal", 20)
 	b.disabled = not ok
 	b.pressed.connect(on_install)
+	Tut.tag(b, "e:install")
 	box.add_child(b)
 
 func _slot_budget() -> int:
@@ -569,6 +588,7 @@ func _install(sk: Dictionary) -> void:
 		slot = work.skills.size() - 1
 	_refresh_left()
 	_update_preview()
+	Tut.fire("installed")
 
 func _on_complex_changed(sk: Dictionary) -> void:
 	# 复杂版点“装入”时给出完整技能

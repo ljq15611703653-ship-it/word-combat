@@ -11,6 +11,7 @@ const Timeline = preload("res://scripts/ui/timeline.gd")
 const DeckView = preload("res://scripts/ui/deck_view.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Preview = preload("res://scripts/game/preview.gd")
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
 const Table3D = preload("res://scripts/view3d/table3d.gd")
 
@@ -71,7 +72,9 @@ func begin(match_obj) -> void:
 	_update_hud()
 	_update_marks()
 	banner_clear()
+	_tut_setup()
 	_next_declare()
+	Tut.fire("screen:battle")
 
 # ---------------------------------------------------------------- 骨架
 func _build() -> void:
@@ -152,6 +155,7 @@ func _build() -> void:
 	banner = K.vbox(2)
 	mv.add_child(banner)
 	timeline = Timeline.new()
+	Tut.tag(timeline, "b:timeline")
 	mv.add_child(timeline)
 	v.add_child(mid)
 	# 我方排
@@ -317,7 +321,10 @@ func _rebuild_hand() -> void:
 	for u in m.st.sides[0].units:
 		for sid in u.skill_ids:
 			var sk := E.skill_of(m.st, sid)
-			hand_row.add_child(_skill_card(sk, u, ap))
+			var hc := _skill_card(sk, u, ap)
+			hand_row.add_child(hc)
+			Tut.tag(hc, "b:hand")
+			Tut.tag(hc, "b:hand:" + str(sk.get("kind_tag", "atk")))
 	if hand_row.get_child_count() == 0:
 		hand_row.add_child(K.label("你还没有任何技能。", 20, K.MUTED))
 
@@ -413,6 +420,9 @@ func _show_enemy_declared() -> void:
 	var foe_acts: Array = m.public_declared(1)
 	if not foe_acts.is_empty():
 		var box := K.panel(Color("3a1f24"), K.RED, 8, 2)
+		Tut.tag(box, "b:foeacts")
+		Tut.vars["foe_t"] = int(foe_acts[0].start)
+		Tut.fire("foe_declared")
 		var col := K.vbox(2)
 		box.add_child(col)
 		var chip := K.chip("对手已宣告 %d 个行动（你看得到全部）" % foe_acts.size(), K.RED.darkened(0.2), 15)
@@ -465,6 +475,7 @@ func _select_skill(sid: int) -> void:
 	_rebuild_hand()
 	_advance_picking()
 	_render_action_panel()
+	Tut.fire("select_skill")
 
 func _advance_picking() -> void:
 	_clear_highlights()
@@ -489,6 +500,7 @@ func _on_card_clicked(card) -> void:
 	sel_choices[picking.key] = card.uid
 	_advance_picking()
 	_render_action_panel()
+	Tut.fire("target_picked")
 
 func _current_act() -> Dictionary:
 	return {"side": 0, "sid": sel_sid, "choices": sel_choices, "start": sel_start}
@@ -513,6 +525,7 @@ func _render_action_panel() -> void:
 		action_box.add_child(K.wrap_label("点选下方的技能牌，付得起就可以宣告多个（每个技能一轮一次）。先手宣告完，后手看见全部后再宣告。已宣告 %d 个。" % m.declared[0].size(), 14, K.MUTED))
 		var passb := K.button("完成宣告  →" if not m.declared[0].is_empty() else "本轮不行动（攒行动点）", "primary" if not m.declared[0].is_empty() else "normal", 17)
 		passb.pressed.connect(_pass)
+		Tut.tag(passb, "b:finish_decl")
 		action_box.add_child(passb)
 		return
 	var sk := E.skill_of(m.st, sel_sid)
@@ -589,7 +602,9 @@ func _render_action_panel() -> void:
 		vl.text = "第 %d 秒" % int(x)
 		timeline.start_hint = sel_start
 		timeline.queue_redraw()
-		_fill_preview())
+		_fill_preview()
+		Tut.fire("start:%d" % sel_start))
+	Tut.tag(srow, "b:start")
 	srow.add_child(sl)
 	srow.add_child(vl)
 	var en_list: Array = m.public_declared(1)
@@ -614,6 +629,7 @@ func _render_action_panel() -> void:
 	ok.disabled = err != ""
 	ok.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ok.pressed.connect(_confirm)
+	Tut.tag(ok, "b:confirm")
 	btns.add_child(ok)
 	var cancel := K.button("重选", "normal", 16)
 	cancel.pressed.connect(func():
@@ -627,6 +643,7 @@ func _render_action_panel() -> void:
 	preview_box = null
 	if Settings.coach:
 		preview_box = K.vbox(2)
+		Tut.tag(preview_box, "b:preview")
 		action_box.add_child(preview_box)
 		_fill_preview()
 
@@ -659,7 +676,56 @@ func _fill_preview() -> void:
 			v.add_child(K.wrap_label("· " + l, 12, K.MUTED))
 	preview_box.add_child(box)
 
+# ---------------------------------------------------------------- 新手引导：目标矩形与变量
+func _card_rect(uid: int) -> Rect2:
+	if not cards.has(uid):
+		return Rect2()
+	if use_3d and table != null:
+		var p: Vector2 = table.screen_pos(uid) + table_box.get_global_rect().position
+		return Rect2(p - Vector2(58, 100), Vector2(116, 150))
+	var c: Control = cards[uid]
+	return c.get_global_rect()
+
+func _union_rect(rects: Array) -> Rect2:
+	var r := Rect2()
+	var first := true
+	for x in rects:
+		if first:
+			r = x
+			first = false
+		else:
+			r = r.merge(x)
+	return r
+
+func _tut_setup() -> void:
+	if not Tut.is_on():
+		return
+	Tut.vars["ap"] = int(m.st.sides[0].ap)
+	for u in m.st.sides[0].units:
+		for sid in u.skill_ids:
+			var sk := E.skill_of(m.st, sid)
+			if str(sk.get("kind_tag", "")) == "atk":
+				Tut.vars["skill"] = str(sk.name)
+	Tut.providers["b:ap"] = func() -> Rect2:
+		if use_3d and table != null:
+			var holder: Node3D = table.ap_stacks[0].get_parent()
+			var p: Vector2 = table.cam.unproject_position(holder.global_position + Vector3(0, 0.1, 0)) + table_box.get_global_rect().position
+			return Rect2(p - Vector2(80, 80), Vector2(160, 150))
+		return ap_label.get_global_rect()
+	Tut.providers["b:foe"] = func() -> Rect2:
+		var rs: Array = []
+		for u in m.st.sides[1].units:
+			if u.down_round == -1:
+				rs.append(_card_rect(int(u.uid)))
+		return _union_rect(rs)
+	Tut.providers["b:foe:hurt"] = func() -> Rect2:
+		for u in m.st.sides[1].units:
+			if u.down_round == -1 and int(u.hp) < int(u.max_hp):
+				return _card_rect(int(u.uid))
+		return Rect2()
+
 func _pass() -> void:
+	Tut.fire("pass")
 	m.submit(0, {})
 	my_turn = false
 	_clear_selection()
@@ -673,6 +739,7 @@ func _confirm() -> void:
 	var err: String = m.submit(0, act)
 	if err != "":
 		return
+	Tut.fire("declared")
 	_clear_selection()
 	_update_marks()
 	_update_hud()
@@ -998,6 +1065,7 @@ func _after_round() -> void:
 	if m.winner != -1:
 		_show_game_over()
 		return
+	Tut.fire("round_done")
 	action_box.add_child(K.label("本轮结算完毕", 22, K.GOLD))
 	var alive0 := E.alive_units(m.st, 0).size()
 	var alive1 := E.alive_units(m.st, 1).size()
@@ -1005,7 +1073,10 @@ func _after_round() -> void:
 	action_box.add_child(K.label("分数：你 %d · 对手 %d" % [int(m.st.sides[0].score), int(m.st.sides[1].score)], 17, K.TEXT))
 	var nb := K.button("下一轮  →", "primary", 22)
 	nb.custom_minimum_size = Vector2(0, 52)
-	nb.pressed.connect(func(): next_round.emit())
+	nb.pressed.connect(func():
+		Tut.fire("next_round")
+		next_round.emit())
+	Tut.tag(nb, "b:next")
 	action_box.add_child(nb)
 	if auto_human:
 		await get_tree().create_timer(0.3).timeout

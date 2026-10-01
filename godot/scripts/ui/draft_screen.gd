@@ -1,6 +1,7 @@
 extends Control
 # 抽词界面：两袋各25词，先手先选。
 
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
@@ -78,11 +79,15 @@ func setup(match_obj, ai_idx: int = -1) -> void:
 	continue_btn.custom_minimum_size = Vector2(260, 52)
 	continue_btn.modulate.a = 0.0
 	continue_btn.disabled = true
-	continue_btn.pressed.connect(func(): finished.emit())
+	continue_btn.pressed.connect(func():
+		Tut.fire("draft_done")
+		finished.emit())
+	Tut.tag(continue_btn, "d:continue")
 	bottom.add_child(continue_btn)
 	v.add_child(bottom)
 	_begin()
 	_refresh_coach()
+	Tut.fire("screen:draft")
 
 func _bag_line(i: int) -> String:
 	var b: Dictionary = coach_info.per_bag[i]

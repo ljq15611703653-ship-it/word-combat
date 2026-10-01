@@ -2,6 +2,7 @@ extends Control
 # 只读的牌组一览：对手的牌组在调整与宣告阶段是公开的。
 
 const K = preload("res://scripts/ui/kit.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
 
 signal closed()
 
@@ -56,7 +57,7 @@ func _unit_block(u: Dictionary) -> Control:
 	var v := K.vbox(6)
 	p.add_child(v)
 	var head := K.hbox(10)
-	head.add_child(K.label(u.get("glyph", ""), 34, Color("c9b27a")))
+	head.add_child(Icon.make(str(u.get("glyph", "")), 36, Color("c9b27a")))
 	head.add_child(K.label(u.name, 22, K.TEXT))
 	head.add_child(K.chip("生命 %s" % (str(u.get("hp")) + "/" + str(u.max_hp) if u.has("hp") else str(u.max_hp)), Color("2c5c44"), 15))
 	if u.get("kw", "") != "":

@@ -2,6 +2,7 @@ extends Control
 # 随从卡：战斗与构筑共用。根是 Control，里面一个 frame 和一层特效层。
 
 const K = preload("res://scripts/ui/kit.gd")
+const Icon = preload("res://scripts/ui/icon.gd")
 
 signal clicked(card)
 signal hovered(card, on)
@@ -20,7 +21,7 @@ var hp_bar: ProgressBar
 var hp_label: Label
 var status_row: HBoxContainer
 var down_cover: Control
-var glyph_label: Label
+var glyph_label: Control
 var name_label: Label
 var kw_row: HBoxContainer
 var skill_box: VBoxContainer
@@ -96,7 +97,7 @@ func _build_contents() -> void:
 	var ps := K.style(_glyph_color(unit.get("glyph", "剑")), _glyph_color(unit.get("glyph", "剑")).lightened(0.3), 8, 1)
 	portrait.add_theme_stylebox_override("panel", ps)
 	var cc := CenterContainer.new()
-	glyph_label = K.label(unit.get("glyph", "?"), 62 if big else 38, Color(1, 1, 1, 0.88), HORIZONTAL_ALIGNMENT_CENTER)
+	glyph_label = Icon.make(str(unit.get("glyph", "?")), 66 if big else 40, Color(1, 1, 1, 0.9))
 	cc.add_child(glyph_label)
 	portrait.add_child(cc)
 	v.add_child(portrait)
