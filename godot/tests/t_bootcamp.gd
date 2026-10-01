@@ -14,7 +14,7 @@ func _init() -> void:
 	var from_id := int(args[0]) if args.size() > 0 else 1
 	var to_id := int(args[1]) if args.size() > 1 else 9999
 	var naive := args.size() > 2 and args[2] == "naive"
-	var levels: Array = L.load_levels()
+	var levels: Array = L.load_levels(args[3] if args.size() > 3 else "res://data/bootcamp.json")
 	var bad: Array = []
 	var cheap: Array = []
 	var total_t := 0

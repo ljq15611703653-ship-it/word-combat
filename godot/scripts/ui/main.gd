@@ -7,6 +7,8 @@ const Lex = preload("res://scripts/core/lexicon.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
 const D = preload("res://scripts/core/deck.gd")
 const RevealScreen = preload("res://scripts/ui/reveal_screen.gd")
+const AdventureMap = preload("res://scripts/ui/adventure_map.gd")
+const AdventureLevel = preload("res://scripts/ui/adventure_level.gd")
 const Match = preload("res://scripts/game/match.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
@@ -158,6 +160,7 @@ func _show_title() -> void:
 	t.start_game.connect(_new_game)
 	t.start_tutorial.connect(_start_tutorial)
 	t.start_first_match.connect(_start_first_match)
+	t.start_adventure.connect(_show_adventure_map)
 	t.watch_demo.connect(func():
 		auto = true
 		_new_game())
@@ -181,6 +184,21 @@ func _new_game(seed_val: int = -1) -> void:
 		_show_card_build()
 	else:
 		_show_build("initial", not driver_on)
+
+# ---------------------------------------------------------------- 冒险（长难句训练营）
+func _show_adventure_map() -> void:
+	var s := AdventureMap.new()
+	_set_screen(s)
+	s.setup()
+	s.back.connect(_show_title)
+	s.chosen.connect(_show_adventure_level)
+
+func _show_adventure_level(id: int) -> void:
+	var s := AdventureLevel.new()
+	_set_screen(s)
+	s.setup(id)
+	s.back.connect(_show_adventure_map)
+	s.next_level.connect(func(nid): _show_adventure_level(nid))
 
 # ---------------------------------------------------------------- 逐张构筑 / 亮相
 func _show_card_build() -> void:
@@ -669,6 +687,12 @@ func _run_demo(demo: String) -> void:
 			_tut_test()
 		"fmtest":
 			_tut_test(true)
+		"advtest":
+			await _adv_test()
+		"advmap":
+			_show_adventure_map()
+		"advlevel":
+			_show_adventure_level(int(OS.get_environment("ADV_LEVEL")) if OS.get_environment("ADV_LEVEL") != "" else 8)
 		"draft2":
 			m.start(true, 11, false)
 			m.begin_staged()
@@ -1126,3 +1150,48 @@ func _continue_adjust_demo() -> void:
 	m.begin_declare()
 	m.human = [true, false] if not auto else [false, false]
 	_show_battle()
+
+
+# 冒险自动测试：每隔几关抽一关，按标准答案真实地一张张拼，出招，检查通关记录
+func _adv_test() -> void:
+	var L = load("res://scripts/adventure/level_eval.gd")
+	var levels: Array = L.load_levels()
+	var ids: Array = [1, 8, 20, 40, 63, 88, 100]
+	var bad := 0
+	Settings.adv_cleared = []
+	for id in ids:
+		_show_adventure_level(int(id))
+		await get_tree().create_timer(0.6).timeout
+		var scr = null
+		for c in get_children():
+			if c is AdventureLevel:
+				scr = c
+		if scr == null:
+			print("  [冒险测试] 找不到关卡画面 ", id)
+			bad += 1
+			continue
+		for tok in L.tokens_from(scr.level.sol):
+			await get_tree().create_timer(0.05).timeout
+			if str(tok.t) == "W":
+				scr.composer.add_word(str(tok.v))
+			elif str(tok.t) == "N":
+				var role := "value"
+				for e in scr.composer.analysis.get("expect", []):
+					if str(e.t) == "N":
+						role = str(e.get("role", "value"))
+				scr.composer.add_number(int(tok.v), role)
+			else:
+				scr.composer.add_part(str(tok.v))
+		await get_tree().create_timer(0.3).timeout
+		var enabled: bool = not scr.submit_btn.disabled
+		scr._on_submit()
+		var t := 0.0
+		while not (int(id) in Settings.adv_cleared) and t < 25.0:
+			await get_tree().create_timer(0.25).timeout
+			t += 0.25
+		var ok: bool = int(id) in Settings.adv_cleared
+		print("  [冒险测试] 第 %d 关 %s（出招按钮可点=%s）" % [int(id), "通关" if ok else "没通关", enabled])
+		if not ok:
+			bad += 1
+	print("【冒险测试结束】", "全部通过" if bad == 0 else "有失败 %d" % bad)
+	get_tree().quit(0 if bad == 0 else 1)

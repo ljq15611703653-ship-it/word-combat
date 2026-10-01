@@ -10,6 +10,7 @@ signal start_game()
 signal watch_demo()
 signal start_tutorial()
 signal start_first_match()
+signal start_adventure()
 
 var rules_panel: Control
 
@@ -64,6 +65,10 @@ func _ready() -> void:
 	bt.custom_minimum_size = Vector2(0, 52)
 	bt.pressed.connect(func(): start_tutorial.emit())
 	v.add_child(bt)
+	var ba := K.button("冒险：长难句训练营（%d 关通关）" % Settings.adv_cleared.size(), "normal", 22)
+	ba.custom_minimum_size = Vector2(0, 52)
+	ba.pressed.connect(func(): start_adventure.emit())
+	v.add_child(ba)
 	var lv_row := K.hbox(8)
 	lv_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	var desc := K.label("", 15, K.MUTED, HORIZONTAL_ALIGNMENT_CENTER)

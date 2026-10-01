@@ -10,6 +10,7 @@ const D = preload("res://scripts/core/deck.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Ai = preload("res://scripts/ai/ai.gd")
 const Namer = preload("res://scripts/core/namer.gd")
+const Coach = preload("res://scripts/core/coach.gd")
 
 var rng := RandomNumberGenerator.new()
 var st: Dictionary = {}
@@ -104,6 +105,66 @@ func _begin_card() -> void:
 
 # 电脑拼第 k 张（测试里也用它代替人类）：用“还没用掉的词”配一副，取其中带技能的一张；点数不超预算
 func ai_make_card(side: int, k: int) -> Dictionary:
+	if staged:
+		var t: Dictionary = _ai_targeted_card(side, k)
+		if not t.is_empty():
+			return t
+	return _ai_template_card(side, k)
+
+# 已亮相的对手牌（逐张构筑中，对方当前正在拼的这张不算）
+func revealed_deck(side: int) -> Dictionary:
+	var d := D.clone(decks[side])
+	for i in d.units.size():
+		if i >= card_idx:
+			d.units[i].skills = []
+			d.units[i].kw = ""
+	return d
+
+# 针对对手已亮的牌：在“现有词 + 对手情报”里挑最合适的一条路线来拼这张
+func _ai_targeted_card(side: int, k: int) -> Dictionary:
+	var avail: Dictionary = Coach.free_words(pools[side], decks[side])
+	var prof: Dictionary = Coach.foe_profile(revealed_deck(1 - side))
+	var mine_tids := {}
+	var mine_roles := {}
+	for u in decks[side].units:
+		for sk in u.skills:
+			mine_tids[str(sk.get("template", ""))] = true
+			mine_roles[str(sk.get("kind_tag", ""))] = int(mine_roles.get(str(sk.get("kind_tag", "")), 0)) + 1
+	var cands: Array = []
+	for a in Coach.route_status(avail):
+		if int(a.n) != 0:
+			continue
+		var rel: Dictionary = Coach._relevance(a, prof)
+		var sc: float = float(a.w) + float(rel.bonus) * 1.6 + rng.randf() * 0.6
+		if mine_tids.has(str(a.tid)):
+			sc -= 1.2
+		if str(a.role) == "守" and int(mine_roles.get("def", 0)) + int(mine_roles.get("heal", 0)) >= 2:
+			sc -= 1.0
+		cands.append({"sc": sc, "a": a})
+	cands.sort_custom(func(x, y): return x.sc > y.sc)
+	for c in cands.slice(0, 6):
+		var sk: Dictionary = c.a.skill
+		var u := {"name": "", "glyph": D.GLYPHS[k % D.GLYPHS.size()], "max_hp": 10, "kw": "", "skills": [sk.duplicate(true)]}
+		# 关键词：有就带上（首挡/回击等是白送的强度）
+		for kw in ["首挡", "回击", "不屈", "回春", "同调"]:
+			var left := int(avail.get(kw, 0))
+			for w in G.count_words(sk.words):
+				if w == kw:
+					left -= 1
+			if left > 0 and rng.randf() < 0.7:
+				u.kw = kw
+				break
+		u["name"] = Namer.minion_name(u, rng)
+		var nd := D.clone(decks[side])
+		nd.units[k] = u
+		while int(D.budget_used(nd).total) > D.BUDGET and int(nd.units[k].max_hp) > 3:
+			nd.units[k].max_hp -= 1
+		D.rename_skills(nd)
+		if D.validate(nd, pools[side]).ok:
+			return nd.units[k]
+	return {}
+
+func _ai_template_card(side: int, k: int) -> Dictionary:
 	var left: Dictionary = pools[side].duplicate()
 	for w in D.used_words(decks[side]):
 		left[w] = int(left.get(w, 0)) - 1
@@ -253,6 +314,9 @@ func pick_bag(side: int, idx: int) -> void:
 
 func ai_pick_bag() -> void:
 	var idx := Ai.pick_bag(bags, pools[picker], personas[picker])
+	if staged and phase == "opening":
+		var plan: Dictionary = Coach.draft_plan(pools[picker], decks[picker], bags, revealed_deck(1 - picker))
+		idx = int(plan.pick)
 	pick_bag(picker, idx)
 
 func adjust_side() -> int:
@@ -392,6 +456,15 @@ func step_auto() -> bool:
 			for s in 2:
 				if human[s]:
 					return false
+			begin_round()
+		"build_card":
+			for s4 in 2:
+				if human[s4] and not card_ready[s4]:
+					return false
+			phase = "reveal"
+		"reveal":
+			after_reveal()
+		"ready":
 			begin_round()
 		"draft":
 			if human[picker]:

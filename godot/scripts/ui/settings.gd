@@ -7,6 +7,7 @@ static var muted := false
 static var coach := true        # 辅助轮（教练提示与自动组合）
 static var tutorial_done := false
 static var first_match_done := false
+static var adv_cleared: Array = []     # 冒险模式已通关的关卡 id
 static var pet := true            # 桌宠“小词”
 static var _loaded := false
 
@@ -28,6 +29,10 @@ static func load_all() -> void:
 		coach = bool(cf.get_value("game", "coach", true))
 		tutorial_done = bool(cf.get_value("game", "tutorial_done", false))
 		first_match_done = bool(cf.get_value("game", "first_match_done", false))
+		var raw := str(cf.get_value("adventure", "cleared", ""))
+		adv_cleared = []
+		for x in raw.split(",", false):
+			adv_cleared.append(int(x))
 		pet = bool(cf.get_value("game", "pet", true))
 
 static func save_all() -> void:
@@ -37,5 +42,6 @@ static func save_all() -> void:
 	cf.set_value("game", "coach", coach)
 	cf.set_value("game", "tutorial_done", tutorial_done)
 	cf.set_value("game", "first_match_done", first_match_done)
+	cf.set_value("adventure", "cleared", ",".join(adv_cleared.map(func(x): return str(x))))
 	cf.set_value("game", "pet", pet)
 	cf.save(PATH)

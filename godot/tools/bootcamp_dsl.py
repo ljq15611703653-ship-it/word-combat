@@ -35,7 +35,11 @@ def A(sentence, start, target=0, name="敌招", branch=0):
 def st(name, value=0):
     return {"name": name, "value": value}
 
-def lvl(id, ch, title, story, why, me, foe, goal, sol, extra="", ap=40, requires=None, tray_extra=None, steps=None):
+def Opp(name, intro, beaten, gloat, title=""):
+    """本关的对手角色：名字、称号、开场白、被你打败时说的话、你失败时说的话。"""
+    return {"name": name, "title": title, "intro": intro, "beaten": beaten, "gloat": gloat}
+
+def lvl(id, ch, title, story, why, me, foe, goal, sol, extra="", ap=40, requires=None, tray_extra=None, steps=None, opp=None, pet=None):
     solt = toks(sol)
     tray = {}
     for t in solt:
@@ -45,7 +49,8 @@ def lvl(id, ch, title, story, why, me, foe, goal, sol, extra="", ap=40, requires
         if isinstance(t, str):
             tray[t] = tray.get(t, 0) + 1
     LEVELS.append({"id": id, "chapter": ch, "title": title, "story": story, "why": why, "ap": ap,
-                   "me": me, "foe": foe, "goal": goal, "tray": tray, "sol": solt, "requires": requires or [], "steps": steps or []})
+                   "me": me, "foe": foe, "goal": goal, "tray": tray, "sol": solt, "requires": requires or [], "steps": steps or [],
+                   "opp": opp or {}, "pet": pet or {}})
 
 def kill(*who): return {"t": "kill", "who": list(who)}
 def kill_all(): return {"t": "kill_all"}
@@ -59,7 +64,7 @@ def team_hp_ge(n): return {"t": "my_hp_total_ge", "n": n}
 
 CH = {1: "第一章 · 一句话", 2: "第二章 · 连招", 3: "第三章 · 条件与循环", 4: "第四章 · 埋伏", 5: "第五章 · 控场", 6: "第六章 · 嵌套", 7: "第七章 · 终局"}
 
-def write(path):
+def write(path, only=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump({"chapters": CH, "levels": LEVELS}, f, ensure_ascii=False, indent=1)

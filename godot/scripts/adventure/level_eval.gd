@@ -13,16 +13,17 @@ const MAX_SIMS := 900
 
 static var cache: Dictionary = {}
 
-static func load_levels() -> Array:
-	if cache.has("levels"):
+static func load_levels(path: String = "res://data/bootcamp.json") -> Array:
+	if path == "res://data/bootcamp.json" and cache.has("levels"):
 		return cache.levels
-	var f := FileAccess.open("res://data/bootcamp.json", FileAccess.READ)
+	var f := FileAccess.open(path, FileAccess.READ)
 	var arr: Array = []
 	if f != null:
 		var p = JSON.parse_string(f.get_as_text())
 		if p is Dictionary:
 			arr = p.levels
-	cache["levels"] = arr
+	if path == "res://data/bootcamp.json":
+		cache["levels"] = arr
 	return arr
 
 # JSON 里的牌：字符串 = 词；整数 = 数字；"~xxx" = 连接牌
@@ -46,7 +47,7 @@ static func tray_of(level: Dictionary) -> Dictionary:
 # ---------------------------------------------------------------- 搭场面
 static func _deck_side(units: Array, glyphs: Array) -> Dictionary:
 	var d: Dictionary = D.new_deck()
-	for i in 5:
+	for i in D.COUNT:
 		if i < units.size():
 			var u: Dictionary = units[i]
 			d.units[i].name = str(u.get("name", "无名"))
@@ -84,10 +85,10 @@ static func build_state(level: Dictionary, player_skill: Dictionary) -> Dictiona
 	st.sides[0].ap = int(level.get("ap", 40))
 	st.sides[1].ap = 200
 	# 不存在的位置直接倒下
-	for i in range(me.size(), 5):
+	for i in range(me.size(), D.COUNT):
 		st.sides[0].units[i].hp = 0
 		st.sides[0].units[i].down_round = 99
-	for i in range(foe.size(), 5):
+	for i in range(foe.size(), D.COUNT):
 		st.sides[1].units[i].hp = 0
 		st.sides[1].units[i].down_round = 99
 	# 初始状态 / 初始血量

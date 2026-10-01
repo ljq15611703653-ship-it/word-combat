@@ -61,6 +61,12 @@ static func implemented() -> Array:
 			out.append(n)
 	return out
 
+# 应对/反制类的词在词袋里更常出现（权重倍数）：这些词一套要凑好几张，原来几乎凑不齐，所以反制很少出现。
+const COUNTER_BOOST := {
+	"打断": 5, "沉默": 5, "转移": 4, "来源": 4, "转为": 4, "即将受到伤害": 4, "受到伤害": 4, "每次": 4, "当": 4,
+	"延后": 3, "换位": 3, "移除": 3, "限时效果": 3, "减伤": 4, "护盾": 4, "牵连": 3, "该次伤害": 3, "技能": 4,
+}
+
 # 词袋：每袋25词，基础40% 进阶45% 奇术15%，同类内按权重；至少10个基础词（宁可不平衡，也不要平庸）。
 static func draw_bag(rng: RandomNumberGenerator, size: int = 25) -> Array:
 	load_all()
@@ -69,7 +75,7 @@ static func draw_bag(rng: RandomNumberGenerator, size: int = 25) -> Array:
 		var w: Dictionary = words[n]
 		if not w.impl:
 			continue
-		for i in int(w.weight):
+		for i in int(w.weight) * int(COUNTER_BOOST.get(n, 1)):
 			pools[w.rarity].append(n)
 	var bag: Array = []
 	var guard := 0
