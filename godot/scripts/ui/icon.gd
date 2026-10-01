@@ -8,7 +8,7 @@ const MAP := {
 	"剑": "sword", "盾": "shield", "咒": "spell", "弓": "bow", "魂": "wisp",
 	"斩": "slash", "轰": "burst", "爆": "burst", "愈": "cross", "养": "leaf", "御": "shield", "反": "mirror",
 	"换": "swap", "时": "clock", "吸": "drop", "分": "split", "散": "split", "化": "swirl", "转": "swirl",
-	"叠": "stack", "追": "arrow", "税": "coin", "遗": "ghost",
+	"空": "blank", "叠": "stack", "追": "arrow", "税": "coin", "遗": "ghost",
 }
 
 # 外观配件（appearance.json 里的 proc 名）→ 图标种类。卡面 2D 配件用它；放 res://assets/icons/<种类>.png 即可换图
@@ -59,6 +59,8 @@ func _draw() -> void:
 	var P := func(x: float, y: float) -> Vector2: return o + Vector2(x, y) * u
 	var dark := col.darkened(0.45)
 	match kind:
+		"blank":
+			draw_arc(P.call(50, 50), 34 * u, 0.0, TAU, 48, col, 5 * u)
 		"sword":
 			draw_colored_polygon(PackedVector2Array([P.call(50, 6), P.call(60, 22), P.call(56, 66), P.call(44, 66), P.call(40, 22)]), col)
 			draw_rect(Rect2(P.call(26, 66), Vector2(48, 9) * u), dark)

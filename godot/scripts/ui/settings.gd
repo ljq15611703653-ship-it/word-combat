@@ -6,6 +6,7 @@ static var level := 1      # 0 简单  1 普通  2 困难
 static var muted := false
 static var coach := true        # 辅助轮（教练提示与自动组合）
 static var tutorial_done := false
+static var first_match_done := false
 static var pet := true            # 桌宠“小词”
 static var _loaded := false
 
@@ -26,6 +27,7 @@ static func load_all() -> void:
 		muted = bool(cf.get_value("audio", "muted", false))
 		coach = bool(cf.get_value("game", "coach", true))
 		tutorial_done = bool(cf.get_value("game", "tutorial_done", false))
+		first_match_done = bool(cf.get_value("game", "first_match_done", false))
 		pet = bool(cf.get_value("game", "pet", true))
 
 static func save_all() -> void:
@@ -34,5 +36,6 @@ static func save_all() -> void:
 	cf.set_value("audio", "muted", muted)
 	cf.set_value("game", "coach", coach)
 	cf.set_value("game", "tutorial_done", tutorial_done)
+	cf.set_value("game", "first_match_done", first_match_done)
 	cf.set_value("game", "pet", pet)
 	cf.save(PATH)

@@ -240,7 +240,7 @@ func _name_of(uid: int) -> String:
 	var u := E._u(m.st, uid)
 	if u.is_empty():
 		return "?"
-	return "%s的%s" % ["你" if u.side == 0 else "对手", u.name]
+	return "%s的%s" % ["你" if u.side == 0 else "对手", u.name if str(u.name) != "" else "随从"]
 
 func _skills_of(u: Dictionary) -> Array:
 	var out: Array = []
@@ -530,6 +530,9 @@ func _select_skill(sid: int) -> void:
 	var u := E._u(m.st, host)
 	if _skill_reason(sk, u, m.st.sides[0].ap) != "":
 		return
+	if Tut.is_on() and Tut.allow_skill != "" and str(sk.name) != Tut.allow_skill:
+		Pet.chat("现在先点【%s】，别的技能等一下再用。" % Tut.allow_skill, "talk", 4.0)
+		return
 	sel_sid = sid
 	sel_choices = {}
 	picking = {}
@@ -568,6 +571,9 @@ func _on_card_clicked(card) -> void:
 	if not my_turn or busy or picking.is_empty():
 		return
 	if not card.selectable:
+		return
+	if Tut.is_on() and Tut.allow_uid >= 0 and int(card.uid) != Tut.allow_uid:
+		Pet.chat("不是这个，选金色圈里、小词指的那一个。", "talk", 4.0)
 		return
 	sel_choices[picking.key] = card.uid
 	_advance_picking()
@@ -834,6 +840,9 @@ func _tut_setup() -> void:
 		return Rect2()
 
 func _pass() -> void:
+	if Tut.is_on() and Tut.block_pass:
+		Pet.chat("还没轮到这一步，先照小词说的做。", "talk", 4.0)
+		return
 	Tut.fire("pass")
 	m.submit(0, {})
 	my_turn = false
@@ -892,7 +901,58 @@ func _resolve() -> void:
 	_update_hud()
 	timeline.set_playhead(-1.0)
 	busy = false
+	_coach_round(res.events)
 	_after_round()
+
+# 回合讲解：挑一个最影响战局的互动，用因果讲清楚，并让相关随从闪一下
+func _coach_round(events: Array) -> void:
+	if not Settings.coach or Tut.is_on():
+		return
+	var pick := {}
+	var best := 0
+	var dmg_after_block := {}
+	var blocked := {}
+	var downs: Array = []
+	for e in events:
+		var ty := str(e.type)
+		if ty == "block":
+			blocked[int(e.tgt)] = true
+		elif ty == "dmg" and int(e.amount) > 0 and blocked.has(int(e.tgt)) and not dmg_after_block.has(int(e.tgt)):
+			dmg_after_block[int(e.tgt)] = e
+			if best < 100:
+				best = 100
+				pick = {"text": "看，%s 的【首挡】只能挡住第一下；你的后续一击接着打了进去，造成 %d 点。这就是“多段攻击”克制首挡的原因。" % [_name_of(int(e.tgt)), int(e.amount)], "uids": [int(e.tgt)]}
+		elif ty == "down":
+			downs.append(e)
+		elif ty == "interrupt" and best < 90:
+			best = 90
+			pick = {"text": "打断成功！对手排在后面的技能被推迟，没能按计划发动。", "uids": []}
+		elif ty == "time_fail" and best < 70:
+			best = 70
+			pick = {"text": "你的时间类技能没起作用：%s。" % str(e.why), "uids": []}
+		elif ty == "fizzle" and best < 60:
+			best = 60
+			pick = {"text": "有个技能落空了：%s。" % str(e.why), "uids": [int(e.host)] if int(e.get("host", -1)) >= 0 else []}
+	for e2 in downs:
+		var pts := int(e2.score)
+		var who := int(e2.score_side)
+		var line := "%s倒下了，%s得到 %d 分（它的生命上限）。" % [_name_of(int(e2.tgt)), "你" if who == 0 else "对手", pts]
+		var trig := false
+		for e3 in events:
+			if str(e3.type) == "trigger" and int(e3.get("host", -1)) == int(e2.tgt):
+				trig = true
+		if trig:
+			line = "%s倒下了，%s得到 %d 分；但它倒下时触发了自己的埋伏，别忘了这一手。" % [_name_of(int(e2.tgt)), "你" if who == 0 else "对手", pts]
+		if best < 80:
+			best = 80
+			pick = {"text": line, "uids": [int(e2.tgt)]}
+	if pick.is_empty():
+		return
+	for uid in pick.uids:
+		var c = _card(int(uid))
+		if c != null:
+			c.flash(K.GOLD)
+	Pet.chat(str(pick.text), "talk", 9.0)
 
 func _animate(events: Array) -> void:
 	var by_t := {}
@@ -903,6 +963,11 @@ func _animate(events: Array) -> void:
 		by_t[t].append(e)
 	# 先显示已宣告的落点
 	_update_marks()
+	# 双方都没出手的空回合：不在空时间轴上等，直接结算（回合末的效果照常播放）
+	var anyone_acted := false
+	for e0 in events:
+		if str(e0.type) == "start":
+			anyone_acted = true
 	for t in range(0, 21):
 		timeline.set_playhead(float(t))
 		var evs: Array = by_t.get(t, [])
@@ -911,7 +976,8 @@ func _animate(events: Array) -> void:
 			if not (e.type in ["declare", "hp"]):
 				meaningful = true
 		if evs.is_empty():
-			await get_tree().create_timer(0.035 / speed).timeout
+			if anyone_acted:
+				await get_tree().create_timer(0.035 / speed).timeout
 			continue
 		for e in evs:
 			var pause := _play_event(e, t)
@@ -919,7 +985,7 @@ func _animate(events: Array) -> void:
 				await get_tree().create_timer(pause / speed).timeout
 		if meaningful:
 			await get_tree().create_timer(0.3 / speed).timeout
-	await get_tree().create_timer(0.3 / speed).timeout
+	await get_tree().create_timer((0.3 if anyone_acted else 0.1) / speed).timeout
 
 func _card(uid: int):
 	return cards.get(uid)

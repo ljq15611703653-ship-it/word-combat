@@ -20,7 +20,7 @@ static func _name(st: Dictionary, uid: int) -> String:
 	var u := E._u(st, uid)
 	if u.is_empty():
 		return "?"
-	return "你的" + u.name if u.side == 0 else "对手的" + u.name
+	return ("你的" if u.side == 0 else "对手的") + (str(u.name) if str(u.name) != "" else "随从")
 
 # 返回 {"cost": [..], "effects": [..], "fears": [..], "facts": [..]}
 static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: Array, enemy_declared: Array) -> Dictionary:

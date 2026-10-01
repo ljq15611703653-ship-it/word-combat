@@ -10,8 +10,15 @@ signal finished(completed: bool)
 
 static var active: Control = null
 static var vars: Dictionary = {}
+static var plan: Array = []              # 教学中正在拼的那句话（字符串=词，整数=数字）；非空时只许照着拼
+static var allow_undo := false
+static var allow_skill := ""             # 战斗引导：这一步只许点这个技能（""=不限）
+static var allow_uid := -1               # 只许点这个随从当目标（-1=不限）
+static var block_pass := false           # 这一步不许“完成宣告/不行动”
+static var lock_now := false           # 当前这步是“点下一步”：拼句台先别动
 static var providers: Dictionary = {}     # 名字 → Callable() -> Rect2（全局坐标；Rect2() 表示没有）
 
+var file := "res://data/tutorial.json"
 var steps: Array = []
 var idx := -1
 var dim: Array = []
@@ -32,12 +39,31 @@ static func fire(ev: String) -> void:
 	if active != null and is_instance_valid(active):
 		active.on_event(ev)
 
+# 拼句台每次动作前问一下：偏离教学路线就拒绝，并返回要对玩家说的话；"" 表示放行
+static func guard(kind: String, v, at: int) -> String:
+	if not is_on() or plan.is_empty():
+		return ""
+	if lock_now:
+		return "先点小词旁边的【下一步】，我们再接着拼。"
+	if kind == "undo":
+		return "" if allow_undo else "先别撤回，照着小词说的拼就好。"
+	if at >= plan.size():
+		return "这句话已经拼完啦，看看小词怎么说。"
+	var want = plan[at]
+	if kind == "N":
+		if want is int or want is float:
+			return "" if int(want) == int(v) else "这里填 %d。" % int(want)
+		return "现在要点的是【%s】，不是数字哦。" % str(want)
+	if str(want) == str(v):
+		return ""
+	return "现在点【%s】哦。" % str(want)
+
 static func is_on() -> bool:
 	return active != null and is_instance_valid(active)
 
 # ------------------------------------------------------------ 构建
 func start(from_id: String = "") -> void:
-	var f := FileAccess.open("res://data/tutorial.json", FileAccess.READ)
+	var f := FileAccess.open(file, FileAccess.READ)
 	steps = JSON.parse_string(f.get_as_text()).steps
 	active = self
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -89,6 +115,11 @@ func advance() -> void:
 	_enter()
 
 func _finish(ok: bool) -> void:
+	plan = []
+	allow_undo = false
+	allow_skill = ""
+	allow_uid = -1
+	block_pass = false
 	if Pet.inst != null and is_instance_valid(Pet.inst):
 		Pet.inst.tutorial_end()
 	finished.emit(ok)
@@ -98,6 +129,13 @@ func _finish(ok: bool) -> void:
 func _enter() -> void:
 	var s := cur()
 	var w = s.get("wait", "next")
+	if s.has("plan"):
+		plan = s.plan
+	allow_undo = w is String and w == "undo"
+	lock_now = w is String and w == "next"
+	allow_skill = str(s.get("allow_skill", ""))
+	allow_uid = int(s.get("allow_uid", -1))
+	block_pass = bool(s.get("block_pass", false))
 	var is_next: bool = w is String and w == "next"
 	var hidden: bool = bool(s.get("hide", false))
 	full_dim.visible = false

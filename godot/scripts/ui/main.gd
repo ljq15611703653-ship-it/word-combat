@@ -21,6 +21,7 @@ var m
 var screen: Control
 var battle_screen
 var tut_on := false
+var tut_full := true          # true=完整教学（稻草人）；false=第一局引导
 var tut_skip_adjust := false
 var tut_coach_backup := true
 var auto := false
@@ -155,6 +156,7 @@ func _show_title() -> void:
 	_set_screen(t)
 	t.start_game.connect(_new_game)
 	t.start_tutorial.connect(_start_tutorial)
+	t.start_first_match.connect(_start_first_match)
 	t.watch_demo.connect(func():
 		auto = true
 		_new_game())
@@ -206,7 +208,7 @@ func _show_build(mode: String, first_card: bool = false) -> void:
 
 func _begin_round() -> void:
 	m.begin_round()
-	if tut_on:
+	if tut_on and tut_full:
 		_tut_prepare_round()
 	if m.phase == "adjust_done":
 		# 第 1 轮：刚用开局选的词构筑完，直接开打
@@ -255,7 +257,7 @@ func _continue_adjust() -> void:
 				continue
 			_show_build("adjust")
 			return
-		if tut_on:
+		if tut_on and tut_full:
 			m.skip_adjust(s)
 		else:
 			m.ai_adjust()
@@ -292,6 +294,7 @@ func _start_tutorial() -> void:
 	tut_coach_backup = Settings.coach
 	Settings.coach = true
 	tut_on = true
+	tut_full = true
 	tut_skip_adjust = false
 	m = Match.new()
 	m.start(true, 20260, false, 0)
@@ -327,15 +330,86 @@ func _start_tutorial() -> void:
 				for slot in G.choice_slots(E.skill_of(mm.st, int(sk_ids[0]))):
 					ch[slot.key] = 0
 				mm.submit(side, {"side": side, "sid": int(sk_ids[0]), "choices": ch, "start": 6})
-	_show_build("initial")
+	_show_build("initial", not driver_on)
 	var tut := Tut.new()
 	add_child(tut)
 	tut.start()
 	tut.finished.connect(_on_tut_finished)
 
+# 第一局：固定的双方牌组 + 桌宠分步带打。第 1 轮教“重复的第二段突破首挡”，随后教改一个数字，再进入正常对局。
+func _start_first_match() -> void:
+	var R = load("res://scripts/core/recipes.gd")
+	var G = load("res://scripts/core/grammar.gd")
+	var D = load("res://scripts/core/deck.gd")
+	var E = load("res://scripts/core/engine.gd")
+	Settings.load_all()
+	tut_coach_backup = Settings.coach
+	Settings.coach = true
+	tut_on = true
+	tut_full = false
+	tut_skip_adjust = false
+	m = Match.new()
+	m.start(true, 5150, false, 0)
+	m.opening_total = 5
+	m.ai_epsilon = 0.0
+	m.fast_ai = true
+	var mine: Dictionary = D.new_deck()
+	var names := ["示范甲", "示范乙", "示范丙", "示范丁", "示范戊"]
+	for i in 5:
+		mine.units[i].name = names[i]
+		mine.units[i].max_hp = 12
+	var combo: Dictionary = R.build("atk1", {"n": 12, "rep": 1})
+	combo["name"] = "连环击"
+	var single: Dictionary = R.build("atk1", {"n": 12})
+	single["name"] = "单击"
+	mine.units[0].glyph = "剑"
+	mine.units[0].skills = [combo]
+	mine.units[1].glyph = "盾"
+	mine.units[1].skills = [single]
+	m.decks[0] = mine
+	var pw: Array = []
+	pw.append_array(combo.words)
+	pw.append_array(single.words)
+	pw.append_array(["双倍", "伤害", "造成"])
+	m.pools[0] = G.count_words(pw)
+	m.pools[1] = {}
+	var foe: Dictionary = D.new_deck()
+	var fn := ["守门人", "对手乙", "对手丙", "对手丁", "对手戊"]
+	for i in 5:
+		foe.units[i].name = fn[i]
+		foe.units[i].glyph = "盾"
+		foe.units[i].max_hp = 10
+	foe.units[0].kw = "首挡"
+	m.decks[1] = foe
+	m.personas[1] = "均衡"
+	m.st = E.make_state(m.decks, 0, {}, 4242)
+	m.scripted_ai = func(mm, side: int):
+		if int(mm.st.round) == 1 and mm.declared[side].is_empty():
+			mm.submit(side, {})
+	m.begin_round()
+	m.st.sides[0].ap = 60   # 引导：保证连环击付得起
+	m.begin_declare()
+	_show_battle()
+	var tut := Tut.new()
+	tut.file = "res://data/first_match.json"
+	add_child(tut)
+	tut.start()
+	tut.finished.connect(_on_first_match_finished)
+
+func _on_first_match_finished(completed: bool) -> void:
+	_tut_end()
+	if m != null:
+		m.scripted_ai = Callable()
+	if completed:
+		Settings.first_match_done = true
+		Settings.save_all()
+
 # 自动走完整个新手引导：每一步都按提示去做（真实点击/拖动），检查能否走到结尾
-func _tut_test() -> void:
-	_start_tutorial()
+func _tut_test(first: bool = false) -> void:
+	if first:
+		_start_first_match()
+	else:
+		_start_tutorial()
 	var ok := true
 	var last_id := ""
 	var same := 0
@@ -388,6 +462,20 @@ func _tut_test() -> void:
 				if wn.is_empty():
 					break
 				await _click(wn[0])
+			continue
+		if w is String and w == "n_edit":
+			var rn := get_tree().get_nodes_in_group("tut:c:rail")
+			if not rn.is_empty():
+				var cmp: Node = rn[0]
+				while cmp != null and not cmp.has_method("add_number"):
+					cmp = cmp.get_parent()
+				if cmp != null:
+					for ti in cmp.tokens.size():
+						if cmp.tokens[ti].t == "N":
+							cmp._on_tile_clicked(ti)
+							await get_tree().create_timer(0.2).timeout
+							cmp.add_number(15, "value")
+							break
 			continue
 		if w is String and w.begins_with("n:"):
 			var nn := get_tree().get_nodes_in_group("tut:c:number")
@@ -455,7 +543,7 @@ func _tut_test() -> void:
 			get_viewport().push_input(ev2)
 		else:
 			print("  [引导测试] 步骤 ", id, " 目标没有矩形：", tgt)
-	var done: bool = tut_on == false and Settings.tutorial_done
+	var done: bool = tut_on == false and (Settings.first_match_done if first else Settings.tutorial_done)
 	print("【新手引导测试结束】", "全部通过 共%d步" % steps_done if (ok and done) else "有失败 (ok=%s done=%s steps=%d)" % [ok, done, steps_done])
 	get_tree().quit(0 if (ok and done) else 1)
 
@@ -547,6 +635,8 @@ func _run_demo(demo: String) -> void:
 			_demo_minions3d()
 		"tuttest":
 			_tut_test()
+		"fmtest":
+			_tut_test(true)
 		"clicktest":
 			await _click_test()
 		"clicktest2":
@@ -624,6 +714,10 @@ func _run_demo(demo: String) -> void:
 				cp.add_word("伤害")
 				await get_tree().create_timer(0.1).timeout
 				cp.add_word("双倍")
+				await get_tree().create_timer(0.8).timeout
+				s.popup.work.name = "x"
+				s.popup._named = true
+				s.popup._on_commit()
 			elif demo == "cast":
 				var G4 = load("res://scripts/core/grammar.gd")
 				var S4 = load("res://scripts/compose/sentence.gd")

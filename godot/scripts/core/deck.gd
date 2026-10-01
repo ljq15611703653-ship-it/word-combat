@@ -14,7 +14,7 @@ const KEYWORDS := ["首挡", "不屈", "回击", "回春", "同调", "免疫狂�
 static func new_deck() -> Dictionary:
 	var units: Array = []
 	for i in 5:
-		units.append({"name": NAMES[i], "glyph": GLYPHS[i], "max_hp": 12, "kw": "", "skills": []})
+		units.append({"name": "", "glyph": GLYPHS[i], "max_hp": 12, "kw": "", "skills": []})
 	return {"units": units}
 
 static func clone(deck: Dictionary) -> Dictionary:

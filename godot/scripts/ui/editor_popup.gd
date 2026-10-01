@@ -126,7 +126,7 @@ func _build() -> void:
 	win.add_child(root)
 	# 标题栏
 	var head := K.hbox(12)
-	head.add_child(K.label("编辑【%s】" % work.name, 26, K.GOLD))
+	head.add_child(K.label(("编辑【%s】" % work.name) if str(work.name) != "" else "编辑这张卡", 26, K.GOLD))
 	head.add_child(K.label("改动将写入牌组" if mode == "initial" else "本次调整只能改这一张卡（消耗1次调整）", 14, K.MUTED))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -500,8 +500,14 @@ func _on_commit() -> void:
 		tier = 2
 	elif int(cur_skill.cost) >= 20:
 		tier = 1
+	var doubled: bool = "双倍" in cur_skill.words
+	if doubled:
+		tier = mini(3, tier + 1)
+	var popup := ""
+	if int(info.best.get("dmg", 0)) > 0:
+		popup = "%d 点伤害" % int(info.best.dmg) + ("（翻倍！）" if doubled else "")
 	Tut.fire("casting")
-	await stage.cast(tier, str(cur_skill.get("kind_tag", "atk")))
+	await stage.cast(tier, str(cur_skill.get("kind_tag", "atk")), popup, doubled)
 	if not is_inside_tree():
 		return
 	_install(cur_skill)

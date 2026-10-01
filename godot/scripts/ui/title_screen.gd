@@ -9,6 +9,7 @@ const Sfx = preload("res://scripts/ui/sfx.gd")
 signal start_game()
 signal watch_demo()
 signal start_tutorial()
+signal start_first_match()
 
 var rules_panel: Control
 
@@ -49,11 +50,16 @@ func _ready() -> void:
 	v.add_child(title)
 	v.add_child(K.label("拼　词　·　设　伏　·　见　招　拆　招", 26, K.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
 	v.add_child(K.spacer(24))
-	var b1 := K.button("开始对局", "primary", 30)
+	Settings.load_all()
+	var fm := not Settings.first_match_done
+	var b0 := K.button("第一局：桌宠带你打一场（约3分钟）" + ("  ← 第一次玩点这里" if fm else ""), "primary" if fm else "normal", 24)
+	b0.custom_minimum_size = Vector2(0, 56)
+	b0.pressed.connect(func(): start_first_match.emit())
+	v.add_child(b0)
+	var b1 := K.button("开始对局", "normal" if fm else "primary", 30)
 	b1.custom_minimum_size = Vector2(0, 68)
 	b1.pressed.connect(func(): start_game.emit())
 	v.add_child(b1)
-	Settings.load_all()
 	var bt := K.button("新手教学（从头教起，约10分钟）" + ("" if Settings.tutorial_done else "  ← 第一次玩点这里"), "primary" if not Settings.tutorial_done else "normal", 22)
 	bt.custom_minimum_size = Vector2(0, 52)
 	bt.pressed.connect(func(): start_tutorial.emit())
@@ -145,7 +151,7 @@ func _show_rules() -> void:
 	sc.add_child(t)
 	v.add_child(sc)
 	var lines := [
-		["目标", "双方各五张随从。每打倒一个敌人，得到它的生命上限那么多分；先到 100 分就赢（最多 10 轮，到时比分数）。倒下的随从休整一整轮后满血复出。全队同时倒下会一次性送给对手满额分数，还让你整整一轮无人可用，但不会直接结束比赛。"],
+		["目标", "双方各五张随从。每打倒一个敌人，得到它的生命上限那么多分；每轮全部结算后，若至少一方达到 100 分，分数较高者获胜；同分则继续。最多进行 10 轮，第 10 轮结束时分数较高者获胜，同分为平局。倒下的随从休整一整轮后满血复出。全队同时倒下会一次性送给对手满额分数，还让你整整一轮无人可用，但不会直接结束比赛。"],
 		["词就是资源", "技能不是固定的：你用抽到的词拼出来。每个词卡只能用在一个地方。开局各发 12 个基础词，然后轮流选 5 袋（每次公开两袋、各 25 张，挑剩的一袋归对手），选完再构筑。第 2 轮起每轮再选一袋，先手先选。"],
 		["构筑点数", "100 点在五张卡的生命和技能里填入的数字之间分配。数字越大效果越强，但生命就少了。"],
 		["操作费", "每次宣告技能要付行动点：5 点启动费 + 填入的数字 + 所用词卡的价格（词卡右下角的 ◆）。行动点每轮 +15，最多存 60。"],

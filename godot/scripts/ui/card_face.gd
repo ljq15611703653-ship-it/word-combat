@@ -102,15 +102,16 @@ func set_unit(u: Dictionary, sks: Array, animate: bool = true) -> void:
 	skills = sks
 	name_label.text = str(u.get("name", ""))
 	skill_label.text = str(sks[0].get("name", "")) if not sks.is_empty() else "（还没有技能）"
-	var col := _body_color(str(u.get("glyph", "剑")))
+	var gl: String = str(u.get("glyph", "剑")) if not sks.is_empty() else "空"
+	var col := _body_color(gl) if gl != "空" else Color("8a93a8")
 	# 身体（形象图标）
 	if body_icon == null:
-		body_icon = _body(str(u.get("glyph", "剑")), col)
+		body_icon = _body(gl, col)
 		layers.add_child(body_icon)
 	else:
 		layers.remove_child(body_icon)
 		body_icon.queue_free()
-		body_icon = _body(str(u.get("glyph", "剑")), col)
+		body_icon = _body(gl, col)
 		layers.add_child(body_icon)
 		layers.move_child(body_icon, 0)
 	# 配件

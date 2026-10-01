@@ -1,0 +1,171 @@
+{
+ "steps": [
+  {
+   "id": "fm_hi",
+   "title": "第一局",
+   "text": "欢迎！我是小词。这一局我一步一步带你打：每次只教一件事，你亲手点。\n别怕点错——点错了我会告诉你原因。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "fm_board",
+   "title": "看对手",
+   "text": "上面是对手的五张卡。看【守门人】：它带着【首挡】——能完全挡住它受到的第一次伤害。",
+   "target": "b:foe",
+   "wait": "next"
+  },
+  {
+   "id": "fm_think",
+   "title": "想一想",
+   "text": "只打一下，会被首挡吃掉。所以得连打两下：你的【连环击】会先后打两次（每次 12 点，间隔 2 秒），第二下就能打进去。",
+   "target": "",
+   "wait": "next",
+   "pos": "top"
+  },
+  {
+   "id": "fm_hand",
+   "title": "选技能",
+   "text": "点你的【连环击】。",
+   "target": "b:hand",
+   "wait": "select_skill",
+   "allow_skill": "连环击"
+  },
+  {
+   "id": "fm_target",
+   "title": "选目标",
+   "text": "它要打谁？点【守门人】（带金色圈的那张）。",
+   "target": "b:foe",
+   "wait": "target_picked",
+   "allow_uid": 10
+  },
+  {
+   "id": "fm_preview",
+   "title": "出招预判",
+   "text": "右下角的【出招预判】会提前告诉你这招预计怎样。看看它怎么说。",
+   "target": "b:preview",
+   "wait": "next"
+  },
+  {
+   "id": "fm_confirm",
+   "title": "宣告",
+   "text": "点【宣告 ✓】，把这个行动定下来。",
+   "target": "b:confirm",
+   "wait": "declared"
+  },
+  {
+   "id": "fm_finish",
+   "title": "完成宣告",
+   "text": "这轮就一个行动，点【完成宣告】，开始演出。",
+   "target": "b:finish_decl",
+   "wait": "pass"
+  },
+  {
+   "id": "w_r1",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "round_done",
+   "hide": true
+  },
+  {
+   "id": "fm_why",
+   "title": "为什么奏效",
+   "text": "看到了吗：第一下被【首挡】挡掉，第二下打了进去，守门人倒下了——你得到它的生命上限那么多分（10 分）。\n这就是组合：【重复】专克【首挡】。",
+   "target": "",
+   "wait": "next",
+   "pos": "top"
+  },
+  {
+   "id": "fm_next",
+   "title": "下一轮",
+   "text": "点【下一轮】。",
+   "target": "b:next",
+   "wait": "next_round"
+  },
+  {
+   "id": "w_d",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "screen:draft",
+   "hide": true
+  },
+  {
+   "id": "fm_draft",
+   "title": "抽词",
+   "text": "每轮先【抽词】：两袋词里挑一袋，剩下的给对手。你拿到的词会放进词库，以后拿来拼新技能。",
+   "target": "",
+   "wait": "next",
+   "pos": "top"
+  },
+  {
+   "id": "fm_draft_go",
+   "title": "收下",
+   "text": "点【收下并继续】。",
+   "target": "d:continue",
+   "wait": "draft_done"
+  },
+  {
+   "id": "w_a",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "screen:adjust",
+   "hide": true
+  },
+  {
+   "id": "fm_adj",
+   "title": "调整",
+   "text": "然后是【调整】：每轮可以改一张卡。我们来试一件小事：把【连环击】的数字改大。",
+   "target": "b:unit0",
+   "wait": "next"
+  },
+  {
+   "id": "fm_edit",
+   "title": "编辑",
+   "text": "点【示范甲】的【编辑】。",
+   "target": "b:edit0",
+   "wait": "editor_open"
+  },
+  {
+   "id": "fm_numtile",
+   "title": "改数字",
+   "text": "点句子轨里金属的数字牌【12】，把它改成 15，按回车。",
+   "target": "c:rail",
+   "wait": "n_edit",
+   "plan": []
+  },
+  {
+   "id": "fm_cost",
+   "title": "看费用",
+   "text": "看左边：伤害变大了，操作费也涨了——越强越贵，这是取舍。要是把词换掉（点词牌会拿下它和后面的牌），技能就完全不同了。",
+   "target": "e:preview",
+   "wait": "next"
+  },
+  {
+   "id": "fm_commit",
+   "title": "确定",
+   "text": "点【确定，拼好了】。",
+   "target": "e:commit",
+   "wait": "commit_pressed"
+  },
+  {
+   "id": "w_cm",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "committed",
+   "hide": true
+  },
+  {
+   "id": "fm_end",
+   "title": "接下来",
+   "text": "好了！之后的流程就是：抽词 → 构筑/调整 → 宣告 → 看演出。\n提示会越来越少，你自己判断；每轮结束我会讲一个最关键的互动。想从头系统学，去标题画面的【新手教学】。",
+   "target": "",
+   "wait": "next",
+   "pos": "center",
+   "button": "自己打下去"
+  }
+ ]
+}

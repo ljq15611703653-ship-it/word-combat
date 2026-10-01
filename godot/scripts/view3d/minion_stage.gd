@@ -127,7 +127,7 @@ func _pop() -> void:
 
 # ------------------------------------------------------------ 放技能（对着空气）
 # tier：0 普通 1 不错 2 强 3 超级厉害；tag：atk/heal/def/trap/ctl/buff
-func cast(tier: int, tag: String) -> void:
+func cast(tier: int, tag: String, popup: String = "", doubled: bool = false) -> void:
 	if minion == null:
 		cast_finished.emit()
 		return
@@ -148,10 +148,36 @@ func cast(tier: int, tag: String) -> void:
 			n.play({"tier": tier, "color": col})
 	else:
 		_code_fx(tier, tag, col)
-	_shake = 0.1 + 0.18 * tier
+	if doubled:
+		# 翻倍：第二圈冲击波紧跟着炸开，数字也放大
+		await get_tree().create_timer(0.25).timeout
+		_ring(Vector3(0, 0.02, 0), Color("ffd66b"), 0.06, 0.9 + 0.1 * tier, 0.45)
+		_flash(Color("ffd66b"), 2.5, 0.25)
+	if popup != "":
+		_popup_label(popup, col, doubled)
+	_shake = 0.1 + 0.18 * tier + (0.15 if doubled else 0.0)
 	var total := 0.9 + 0.35 * tier
 	await get_tree().create_timer(total).timeout
 	cast_finished.emit()
+
+func _popup_label(text: String, col: Color, big: bool) -> void:
+	var l := Label3D.new()
+	l.text = text
+	l.font_size = 120 if big else 80
+	l.pixel_size = 0.004
+	l.modulate = Color("ffd66b") if big else col.lightened(0.3)
+	l.outline_size = 24
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.position = Vector3(0, 1.0, 1.2)
+	world.add_child(l)
+	var t := l.create_tween().set_parallel(true)
+	t.tween_property(l, "position:y", 1.8, 1.2)
+	if big:
+		l.scale = Vector3(0.4, 0.4, 0.4)
+		t.tween_property(l, "scale", Vector3(1.3, 1.3, 1.3), 0.3).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	t.chain().tween_property(l, "modulate:a", 0.0, 0.4)
+	t.chain().tween_callback(l.queue_free)
 
 static func _asset(rel: String) -> PackedScene:
 	var path := "res://assets/" + rel

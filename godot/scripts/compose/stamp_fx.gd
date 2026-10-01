@@ -92,7 +92,7 @@ static func _impact(tile: Control, layer: Control, custom: PackedScene) -> void:
 		st.chain().tween_callback(sp.queue_free)
 
 # ------------------------------------------------------------ 组句：飞起来、咔咔拼合、变成一句人话
-static func combine(rail: Control, text: String, host: Control) -> void:
+static func combine(rail: Control, text: String, host: Control, toks: Array = []) -> void:
 	var tree := host.get_tree()
 	var vp := host.get_viewport_rect().size
 	var ov := Control.new()
@@ -115,12 +115,20 @@ static func combine(rail: Control, text: String, host: Control) -> void:
 	dt.tween_property(dim, "color:a", 0.62, 0.3)
 	# 1. 把句子轨里的每张牌复制一张，飞起来
 	var clones: Array = []
+	var ri := -1
 	for t in rail.get_children():
+		ri += 1
 		if not (t is Control) or not t.visible or t.size.x < 30 or t.get_child_count() == 0:
 			continue
-		if t is PanelContainer:
-			continue   # 空位 / 输入框
-		var c := _clone_of(t)
+		var c: Control
+		if not toks.is_empty():
+			if ri >= toks.size():
+				continue   # 末尾的空位
+			c = _clone_of_token(toks[ri])
+		else:
+			if t is PanelContainer:
+				continue   # 空位 / 输入框
+			c = _clone_of(t)
 		if c == null:
 			continue
 		ov.add_child(c)
@@ -227,6 +235,15 @@ static func _wait(tree: SceneTree, secs: float, skip: Array) -> void:
 	while t < secs and not skip[0]:
 		await tree.process_frame
 		t += tree.root.get_process_delta_time()
+
+static func _clone_of_token(tok: Dictionary) -> Control:
+	var txt := str(tok.v)
+	var col := Color("6b5a22") if tok.t == "N" else (Color("5a4a7a") if tok.t == "P" else Lex_cat("", txt))
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", K.style(col.darkened(0.15), col.lightened(0.25), 9, 2, 4))
+	p.add_child(K.label(txt, 24 if txt.length() <= 3 else 18, Color("fff6dc"), HORIZONTAL_ALIGNMENT_CENTER))
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return p
 
 static func _clone_of(t: Control) -> Control:
 	# 取牌上的文字，做成一张简化的牌（飞行时不需要完整的词卡）

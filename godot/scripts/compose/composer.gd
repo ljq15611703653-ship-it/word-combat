@@ -10,6 +10,7 @@ extends Control
 const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const G = preload("res://scripts/core/grammar.gd")
+const Pet = preload("res://scripts/ui/pet.gd")
 const S = preload("res://scripts/compose/sentence.gd")
 const H = preload("res://scripts/compose/hints.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
@@ -234,8 +235,16 @@ func clear_all() -> void:
 	editing_idx = -1
 	_after_change(false)
 
+func _guarded(kind: String, v) -> bool:
+	var msg: String = Tut.guard(kind, v, tokens.size())
+	if msg == "":
+		return false
+	_shake_rail()
+	Pet.chat(msg, "talk", 4.0)
+	return true
+
 func undo() -> void:
-	if tokens.is_empty():
+	if tokens.is_empty() or _guarded("undo", ""):
 		return
 	Sfx.play("click")
 	tokens.pop_back()
@@ -246,6 +255,8 @@ func undo() -> void:
 func add_word(w: String) -> void:
 	if fuzzy_mode:
 		_tray_add(w)
+		return
+	if _guarded("W", w):
 		return
 	if not _expects("W", w):
 		_shake_rail()
@@ -259,6 +270,8 @@ func add_word(w: String) -> void:
 	Tut.fire("w:" + w)
 
 func add_part(p: String) -> void:
+	if _guarded("P", p):
+		return
 	if not _expects("P", p):
 		_shake_rail()
 		return
@@ -266,6 +279,8 @@ func add_part(p: String) -> void:
 	_after_change(true)
 
 func add_number(v: int, role: String) -> bool:
+	if editing_idx < 0 and _guarded("N", v):
+		return false
 	var rg: Array = ROLE_RANGE.get(role, [0, 99])
 	if v < int(rg[0]) or v > int(rg[1]):
 		_shake_rail()
@@ -275,6 +290,7 @@ func add_number(v: int, role: String) -> bool:
 		var idx := editing_idx
 		editing_idx = -1
 		_after_change(false, idx)
+		Tut.fire("n_edit")
 		return true
 	tokens.append(S.Num(v))
 	_after_change(true)
@@ -376,6 +392,8 @@ func _on_tile_clicked(i: int) -> void:
 		editing_idx = i
 		Sfx.play("click")
 		_rebuild_rail(false)
+		return
+	if _guarded("undo", ""):
 		return
 	Sfx.play("click")
 	tokens = tokens.slice(0, i)
@@ -768,7 +786,7 @@ func _prefill_number(v: int) -> void:
 
 # ------------------------------------------------------------ 拼好了：所有词飞起来，组合成一句人话
 func play_combine(text: String) -> void:
-	await FX.combine(rail, text, self)
+	await FX.combine(rail, text, self, tokens.duplicate())
 
 # “现在能接”条：把当前能接的词、连接牌放大摆在最上面
 func _rebuild_strip() -> void:
@@ -834,6 +852,9 @@ func partial_skill() -> Dictionary:
 
 # ------------------------------------------------------------ 模糊匹配模式
 func toggle_fuzzy() -> void:
+	if Tut.is_on() and not Tut.plan.is_empty():
+		Pet.chat("这一步先不用模糊匹配，照着拼吧。", "talk", 4.0)
+		return
 	fuzzy_mode = not fuzzy_mode
 	Sfx.play("click")
 	fuzzy_btn.text = "模糊匹配模式：开" if fuzzy_mode else "模糊匹配模式：关"
@@ -994,6 +1015,8 @@ func _fuzzy_row(e: Dictionary, label: String, col: Color) -> Control:
 
 # 把某一句送回正式的拼句台（数字是示例值，自己点数字牌改）
 func adopt(toks: Array) -> void:
+	if _guarded("undo", ""):
+		return
 	toggle_fuzzy()
 	tokens = toks.duplicate(true)
 	editing_idx = -1
