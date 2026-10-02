@@ -11,6 +11,7 @@ signal watch_demo()
 signal start_tutorial()
 signal start_first_match()
 signal start_adventure()
+signal start_numcard()
 
 var rules_panel: Control
 
@@ -66,6 +67,11 @@ func _ready() -> void:
 	b1.custom_minimum_size = Vector2(0, 68)
 	b1.pressed.connect(func(): start_game.emit())
 	v.add_child(b1)
+	var bn := K.button("数字牌模式（新玩法 · 试玩）", "normal", 24)
+	bn.custom_minimum_size = Vector2(0, 56)
+	bn.tooltip_text = "数字是牌、数字就是次数；五个职业各有得分方式；轮流宣告。和上面的对局是两套规则。"
+	bn.pressed.connect(func(): start_numcard.emit())
+	v.add_child(bn)
 	var ba := K.button("冒险：长难句训练营（%d 关通关）" % Settings.adv_cleared.size(), "normal", 22)
 	ba.custom_minimum_size = Vector2(0, 52)
 	ba.pressed.connect(func(): start_adventure.emit())

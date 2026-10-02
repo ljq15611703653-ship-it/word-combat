@@ -21,6 +21,10 @@ const Tutorial = Tut
 const Pet = preload("res://scripts/ui/pet.gd")
 const Duel = preload("res://scripts/game/duel.gd")
 const DuelSetup = preload("res://scripts/ui/duel_setup.gd")
+const NcSetup = preload("res://scripts/numcard/ui/nc_setup.gd")
+const NcBattle = preload("res://scripts/numcard/ui/nc_battle.gd")
+const NcMatch = preload("res://scripts/numcard/nc_match.gd")
+const NcRules = preload("res://scripts/numcard/nc_rules.gd")
 
 var m
 var screen: Control
@@ -158,12 +162,15 @@ func _drive(s: Control) -> void:
 # ---------------------------------------------------------------- 标题
 func _show_title() -> void:
 	_tut_end()
+	if Pet.inst != null and is_instance_valid(Pet.inst):
+		Pet.inst.visible = Settings.pet
 	var t := TitleScreen.new()
 	_set_screen(t)
 	t.start_game.connect(_new_game)
 	t.start_tutorial.connect(_start_live_tutorial)
 	t.start_first_match.connect(func(): _new_duel(-1, true))
 	t.start_adventure.connect(_show_adventure_map)
+	t.start_numcard.connect(_show_numcard)
 	t.watch_demo.connect(func():
 		auto = true
 		_new_game())
@@ -190,6 +197,31 @@ func _new_game(seed_val: int = -1) -> void:
 		_show_card_build()
 	else:
 		_show_build("initial", not driver_on)
+
+# ---------------------------------------------------------------- 数字牌模式（新玩法，独立的一套代码）
+var nc_last_deck: Dictionary = {}
+var nc_last_foe := ""
+
+func _show_numcard() -> void:
+	_tut_end()
+	var s := NcSetup.new()
+	_set_screen(s)
+	s.back.connect(_show_title)
+	s.start_game.connect(func(deck, foe): _start_numcard(deck, foe))
+
+func _start_numcard(deck: Dictionary, foe: String) -> void:
+	nc_last_deck = deck
+	nc_last_foe = foe
+	var fc: String = foe if foe != "" else str(NcRules.CLASSES[randi() % NcRules.CLASSES.size()])
+	var p: Dictionary = NcRules.PRESETS[fc]
+	var fdeck := {"cls": fc, "words": (p.words as Dictionary).duplicate(), "kws": (p.kws as Array).duplicate(), "hp": [7, 7, 7]}
+	var nm := NcMatch.new()
+	nm.start(deck, fdeck, -1, true, false)
+	var b := NcBattle.new()
+	_set_screen(b)
+	b.begin(nm)
+	b.rematch.connect(func(): _start_numcard(nc_last_deck, nc_last_foe))
+	b.quit_to_title.connect(_show_title)
 
 # ---------------------------------------------------------------- 新规则：现场拼的对决
 var duel_guided := false
