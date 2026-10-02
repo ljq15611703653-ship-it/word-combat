@@ -17,6 +17,7 @@ func _init() -> void:
 	var steps := 0
 	var rounds_seen := 0
 	var composed := 0
+	var reused := false
 	var last := ""
 	while steps < 400:
 		steps += 1
@@ -51,6 +52,25 @@ func _init() -> void:
 					s._pass()
 					continue
 				var u: Dictionary = idle[0]
+				if composed == 0:
+					s._peek_duel(1)
+					s._peek_duel(0)
+				if m.last_sentence.has(int(u.uid)) and not reused:
+					reused = true
+					s._reuse_last(int(u.uid))
+					print("  沿用上一句：", s.sel_sid, " 员 ", u.name)
+					if s.sel_sid == -1:
+						print("  !! 沿用失败（可能冷却中）")
+					else:
+						var ra: Array = Ai.enumerate_actions(m.st, 0, m.public_declared(1), 4, m.declared[0])
+						for a in ra:
+							if not a.is_empty() and int(a.sid) == s.sel_sid:
+								s.sel_choices = a.choices
+								s.sel_start = int(a.start)
+								s._confirm()
+								composed += 1
+								break
+						continue
 				# 用电脑的挑句思路：直接拿一个能打的基础句
 				var sk := G.finalize(G.skill("测试", [G.dmg(G.T("choose", "enemy", {"n": 1}), G.N(8))]))
 				var r: Dictionary = m.stage_sentence(int(u.uid), sk)

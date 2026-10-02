@@ -421,7 +421,24 @@ func _compose_card(u: Dictionary, redo: bool) -> Control:
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 			_open_compose(uid))
 	Tut.tag(root, "b:compose")
+	if not redo and m.last_sentence.has(uid):
+		var last: Dictionary = m.last_sentence[uid]
+		var reuse := K.button("↻ 沿用：" + str(last.get("name", "上一句")), "normal", 14)
+		reuse.tooltip_text = str(last.get("text", ""))
+		reuse.pressed.connect(func(): _reuse_last(uid))
+		v.add_child(reuse)
 	return root
+
+func _reuse_last(uid: int) -> void:
+	if not my_turn or busy:
+		return
+	var r: Dictionary = m.stage_sentence(uid, m.last_sentence[uid])
+	if r.has("err"):
+		toast(str(r.err), K.RED)
+		return
+	_clear_selection()
+	_rebuild_hand()
+	_select_skill(int(r.sid))
 
 func _open_compose(uid: int) -> void:
 	if not my_turn or busy:
@@ -1466,10 +1483,46 @@ func _units_for_view(s: int) -> Array:
 	return out
 
 func _peek_enemy() -> void:
+	if m.has_method("public_info"):
+		_peek_duel(1)
+		return
 	_peek("对手的牌组（公开）", _units_for_view(1), "性格：" + str(m.personas[1]))
 
 func _peek_mine() -> void:
+	if m.has_method("public_info"):
+		_peek_duel(0)
+		return
 	_peek("我的牌组", _units_for_view(0), "")
+
+# 新规则下“牌组”只有三个随从的生命、关键词和持有的进阶词；怎么拼是对手每轮现场决定的，不公开
+func _peek_duel(side: int) -> void:
+	var info: Dictionary = m.public_info(side)
+	overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	var dim := ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.78)
+	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	overlay.add_child(dim)
+	var p := K.panel(Color("171b29"), K.GOLD_D, 18, 2, 18)
+	p.set_anchors_preset(Control.PRESET_CENTER)
+	p.custom_minimum_size = Vector2(760, 0)
+	p.position = Vector2(420, 190)
+	overlay.add_child(p)
+	var v := K.vbox(10)
+	p.add_child(v)
+	v.add_child(K.label(("对手" if side == 1 else "我方") + "公开信息", 28, K.GOLD))
+	v.add_child(K.label("流派：" + str(info.style) if side == 1 else "流派：—", 20, K.TEXT))
+	for u in info.units:
+		var kw: String = str(u.kw)
+		v.add_child(K.label("%s　生命上限 %d　关键词：%s" % [u.name, int(u.max_hp), kw if kw != "" else "无"], 19, K.TEXT))
+	var words: String = "、".join(info.words) if not info.words.is_empty() else "（还没有）"
+	v.add_child(K.wrap_label("持有的进阶词：" + words, 17, K.TEXT))
+	v.add_child(K.wrap_label("对手每轮怎么拼是现场决定的，要等它宣告了才看得到。", 15, K.MUTED))
+	var close := K.button("关闭", "primary", 20)
+	close.pressed.connect(func():
+		dim.queue_free()
+		p.queue_free()
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE)
+	v.add_child(close)
 
 func _peek(title: String, units: Array, extra: String) -> void:
 	var dv := DeckView.new()

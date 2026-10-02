@@ -42,6 +42,7 @@ var winner := -1                      # -1 进行中，0/1，-2 平局
 var log_lines: Array = []
 var personas: Array = ["", ""]        # 电脑的流派（决定偏好、估值口味、攒不攒行动点）
 var tutorial := false                 # 教程：电脑只做脚本动作，人类先手
+var last_sentence: Dictionary = {}    # 随从 uid → 它最近一次宣告的句子（界面“沿用上一句”用）
 var staged: Dictionary = {}           # 界面用：uid → 已拼好但还没宣告的句子 sid
 var opening_idx := 0                  # 兜子界面用的兼容字段
 var opening_total := OPEN_PICKS
@@ -270,6 +271,8 @@ func submit(side: int, act: Dictionary) -> String:
 	if err != "":
 		return err
 	declared[side].append(act.duplicate(true))
+	if side == 0:
+		last_sentence[E.host_of(st, sid)] = sk.duplicate(true)
 	staged.erase(E.host_of(st, sid))
 	var rec: Dictionary = used_log[side].get(int(st.round), {})
 	for w in sk.words:
@@ -364,6 +367,17 @@ func sync_draft_view() -> void:
 
 func public_deck(_side: int) -> Dictionary:
 	return {"units": []}
+
+# 对手公开的信息：流派、每个随从的生命上限和关键词、持有的进阶词（不含它怎么拼）
+func public_info(side: int) -> Dictionary:
+	var advs: Array = []
+	for w in pools[side]:
+		if not Lex.is_basic(w) and int(pools[side][w]) > 0:
+			advs.append("%s×%d" % [w, int(pools[side][w])] if int(pools[side][w]) > 1 else str(w))
+	var us: Array = []
+	for u in decks[side].units:
+		us.append({"name": u.name, "max_hp": int(u.max_hp), "kw": str(u.kw)})
+	return {"style": personas[side], "units": us, "words": advs}
 
 func remaining_bags() -> Array:
 	if phase == "opening":
