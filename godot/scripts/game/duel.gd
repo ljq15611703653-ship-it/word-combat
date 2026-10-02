@@ -582,7 +582,7 @@ func _mood(side: int) -> Dictionary:
 	return out
 
 # ---------------------------------------------------------------- 电脑：现场拼
-static var BLIND_EARLY := 0.0         # 盲拼时越早起手越好（后手看见了可以抢在前面把你打倒，你的招就落空）
+static var BLIND_EARLY := 1.2         # 盲拼时越早起手越好（后手看见了可以抢在前面把你打倒，你的招就落空）
 static var LOOKAHEAD := false         # 盲拼的先手也会“想对手会怎么应对”
 static var LOOK_TOP := 3              # 先手每个随从只对前几名候选做应对推演
 static var RESP_CAND := 5             # 推演对手应对时，对手每个随从比较几句候选
