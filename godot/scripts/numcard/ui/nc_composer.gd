@@ -620,7 +620,7 @@ func _refresh() -> void:
 	if bool(pr.get("complete", false)):
 		var cl: Array = pr.clauses
 		var cost := NE.action_cost(cl, int(cp["and"]))
-		var ms := NE.action_windup(cl)
+		var ms := NE.action_windup(cl, int(cp.wind))
 		var ap: int = int(M.res[0].ap)
 		var blood: int = maxi(0, cost - ap)
 		info_label.text = "花 %d 行动点（还剩 %d）· 最早第 %d 秒起效 · 用数字牌 %s" % [cost, ap, ms, str(NE.action_numbers(cl)) if not NE.action_numbers(cl).is_empty() else "无（全是 1）"]

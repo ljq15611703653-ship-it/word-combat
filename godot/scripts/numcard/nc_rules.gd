@@ -57,7 +57,9 @@ const FLOOR := {3: 2, 5: 3, 7: 4}     # 保底数字：第几轮开始时双方�
 const B_CLAUSES := 5
 const B_AND := 1
 const B_BONUS := 1
-const B_STKIND := true                # 易伤、灼烧、衰弱合起来只算一种效果
+const B_STKIND := true
+const B_WIND := 1                     # 并流每多一段起手晚几秒（别人 1）
+const B_LEN := 0                      # 并流整句全中时，超过两段的每一段再 +几分                # 易伤、灼烧、衰弱合起来只算一种效果
 const X_SLOTS := 1
 const X_SLOTS_UP := [0.25, 0.70]
 const Z_HEAL := false
@@ -108,11 +110,12 @@ static func talent_text(cls: String) -> String:
 
 # 这一方现在的职业上限（会随职业得分涨）
 static func caps(cls: String, p: float) -> Dictionary:
-	var out := {"clauses": CLAUSE_MAX, "and": AND_COST, "slots": 0, "blood": 0, "late": false}
+	var out := {"clauses": CLAUSE_MAX, "and": AND_COST, "slots": 0, "blood": 0, "late": false, "wind": 1}
 	match cls:
 		"并":
 			out.clauses = B_CLAUSES
 			out["and"] = B_AND
+			out["wind"] = B_WIND
 		"续":
 			var n := X_SLOTS
 			for t in X_SLOTS_UP:

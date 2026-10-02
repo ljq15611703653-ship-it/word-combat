@@ -34,7 +34,7 @@ BASE = dict(
     # 目标分
     t_chain=30, t_cont=40, t_pick=45, t_blood=50,
     # 并流
-    b_cap=5, b_cap_up="", b_and=1, b_bonus=1, b_mode="kinds", b_stkind=0,
+    b_cap=5, b_cap_up="", b_and=1, b_bonus=1, b_mode="kinds", b_stkind=0, b_wind=1, b_len=0,
     # 续流
     x_slots=1, x_slots_up="0.25,0.7", x_payoff=1,
     # 择流
@@ -112,12 +112,13 @@ def caps(G, s):
     sd = G["sides"][s]
     c = sd["cls"]
     p = prog(G["R"], s, c, cfg)
-    out = {"clauses": cfg["clause_max"], "and": cfg["and_cost"], "slots": 0, "blood": 0, "late": False}
+    out = {"clauses": cfg["clause_max"], "and": cfg["and_cost"], "slots": 0, "blood": 0, "late": False, "wind": 1}
     if c == cfg["off"]:
         return out
     if c == "并":
         out["clauses"] = cfg["b_cap"] + sum(1 for t in cfg["b_cap_up_l"] if p >= t)
         out["and"] = cfg["b_and"]
+        out["wind"] = cfg["b_wind"]
     elif c == "续":
         out["slots"] = cfg["x_slots"] + sum(1 for t in cfg["x_slots_up_l"] if p >= t)
     elif c == "择":
@@ -436,7 +437,9 @@ def resolve(R, acts_in, cfg, cls, rnd):
                 n = len(kinds)
             else:
                 n = len(landed)
-            R["M"][s]["chain"] += n + (cfg["b_bonus"] if len(landed) == len(a["cl"]) else 0)
+            allin = len(landed) == len(a["cl"])
+            bonus = (cfg["b_bonus"] + cfg["b_len"] * max(0, len(a["cl"]) - 2)) if allin else 0
+            R["M"][s]["chain"] += n + bonus
 
 
 # ---------------------------------------------------------------- 电脑
@@ -553,8 +556,9 @@ def act_cost(cls_list, cp):
     return 1 + sum(PRICE[w] for w in words) + (len(cls_list) - 1) * cp["and"], words
 
 
-def act_windup(cls_list, words):
-    return 1 + len(words) + (len(cls_list) - 1)
+def act_windup(cls_list, words, cp=None):
+    per = cp["wind"] if cp else 1
+    return 1 + len(words) + (len(cls_list) - 1) * per
 
 
 def is_def(cls_list):
@@ -591,7 +595,7 @@ def make_act(G, s, uid, cl_list, res, cp, start=None):
     cards = pick_cards(G, s, avail_idx, nums)
     if cards is None:
         return None
-    ms = act_windup(cl_list, words)
+    ms = act_windup(cl_list, words, cp)
     if ms > cfg["timeline"]:
         return None
     return {"side": s, "uid": uid, "start": ms if start is None else max(start, ms), "cl": cl_list, "cost": cost,

@@ -224,7 +224,7 @@ func build_action(s: int, uid: int, cls: Array, start: int) -> Dictionary:
 	var cards = pick_cards(s, nums)
 	if cards == null:
 		return {"err": "数字牌不够：这句要用 %s" % str(nums)}
-	var ms := NE.action_windup(cls)
+	var ms := NE.action_windup(cls, int(cp.wind))
 	if start < ms:
 		return {"err": "这句最早第 %d 秒才能起效" % ms}
 	if start > NR.TIMELINE:

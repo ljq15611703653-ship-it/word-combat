@@ -424,7 +424,8 @@ static func resolve(R: Dictionary, acts_in: Array, rnd: int) -> void:
 				if kname == "st" and not NR.B_STKIND:
 					kname = str(c5.st)
 				kinds[{"atk": "伤害", "heal": "恢复", "mit": "减伤", "st": "状态", "redirect": "转移", "delay": "延后", "remove": "移除"}.get(kname, kname)] = true
-		var pts: int = kinds.size() + (NR.B_BONUS if landed == (a5.cl as Array).size() else 0)
+		var allin: bool = landed == (a5.cl as Array).size()
+		var pts: int = kinds.size() + ((NR.B_BONUS + NR.B_LEN * maxi(0, (a5.cl as Array).size() - 2)) if allin else 0)
 		if pts > 0:
 			_credit(R, s, "chain", pts)
 			_ev(R, {"t": NR.TIMELINE + 1, "type": "chain", "ord": int(a5.ord), "uid": int(a5.uid), "kinds": kinds.keys(), "points": pts, "all": landed == (a5.cl as Array).size()})
@@ -486,8 +487,8 @@ static func action_cost(cls: Array, and_cost: int = NR.AND_COST) -> int:
 		cost += int(NR.WORDS[w].price)
 	return cost
 
-static func action_windup(cls: Array) -> int:
-	return 1 + action_words(cls).size() + (cls.size() - 1)
+static func action_windup(cls: Array, per_clause: int = 1) -> int:
+	return 1 + action_words(cls).size() + (cls.size() - 1) * per_clause
 
 static func is_def(cls: Array) -> bool:
 	for c in cls:

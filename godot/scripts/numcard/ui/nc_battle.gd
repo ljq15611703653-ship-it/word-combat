@@ -378,7 +378,7 @@ func _render_panel() -> void:
 			back.pressed.connect(func(): _open_composer(sel_uid))
 			action_box.add_child(back)
 		"timing":
-			var ms := NE.action_windup(pending)
+			var ms := NE.action_windup(pending, int(M.caps(0).wind))
 			action_box.add_child(K.label("第几秒起效？", 22, K.GOLD))
 			action_box.add_child(K.wrap_label(NT.action_text(M, pending), 15, K.TEXT))
 			action_box.add_child(K.wrap_label("这句最早第 %d 秒。越早越不容易被打断；对方的招落在哪一秒，看上面的时间轴。" % ms, 15, K.MUTED))
@@ -676,7 +676,7 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 		"cont_set":
 			return "    [color=#d89a2a]→ 挂上续：以后 %d 轮每轮同一秒再来一次[/color]" % int(ev.rounds)
 		"chain":
-			return "[color=#2fb8c8]%s 连段：兑现 %s，得 %d 分%s[/color]" % [MARK[mini(int(ev.ord), MARK.size() - 1)], "、".join(ev.kinds), int(ev.points), ("（整句全中 +%d）" % NR.B_BONUS) if bool(ev.all) else ""]
+			return "[color=#2fb8c8]%s 连段：兑现 %s，得 %d 分%s[/color]" % [MARK[mini(int(ev.ord), MARK.size() - 1)], "、".join(ev.kinds), int(ev.points), ("（整句全中 +%d）" % (int(ev.points) - (ev.kinds as Array).size())) if bool(ev.all) else ""]
 		"hit":
 			var parts: Dictionary = ev.parts
 			var ex: Array = []
@@ -889,4 +889,4 @@ func _auto_play() -> void:
 					return
 			_pass(sel_uid)
 		"timing":
-			_declare(NE.action_windup(pending))
+			_declare(NE.action_windup(pending, int(M.caps(0).wind)))

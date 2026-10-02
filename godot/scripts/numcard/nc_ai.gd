@@ -230,7 +230,7 @@ static func singles(M, s: int, uid: int, cp: Dictionary) -> Array:
 	return out
 
 static func _make(M, s: int, uid: int, cl_list: Array, start: int) -> Variant:
-	var ms := NE.action_windup(cl_list)
+	var ms := NE.action_windup(cl_list, int(M.caps(s).wind))
 	var st: int = ms if start < 0 else maxi(start, ms)
 	if st > NR.TIMELINE:
 		return null
