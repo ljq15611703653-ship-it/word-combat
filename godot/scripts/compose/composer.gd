@@ -31,6 +31,8 @@ const PART_HELP := {"低于": "左边比右边小", "不低于": "左边不比�
 var pool: Dictionary = {}
 var tokens: Array = []
 var avail: Dictionary = {}
+var compact := false                       # 窄空间（对局里的拼句窗口）：轨道/建议压缩，词架至少留出一块高度
+var cooling: Dictionary = {}               # 词 → 正在冷却的张数（每一张单独显示成一块黑牌，点不了）
 var analysis: Dictionary = {}
 var opts: Dictionary = {}
 var editing_idx := -1
@@ -112,7 +114,7 @@ func _build() -> void:
 	rs.content_margin_top = 10
 	rs.content_margin_bottom = 10
 	rail_box.add_theme_stylebox_override("panel", rs)
-	rail_box.custom_minimum_size = Vector2(0, 124)
+	rail_box.custom_minimum_size = Vector2(0, 84 if compact else 124)
 	rail = HFlowContainer.new()
 	rail.add_theme_constant_override("h_separation", 6)
 	rail.add_theme_constant_override("v_separation", 6)
@@ -148,7 +150,7 @@ func _build() -> void:
 	hint_panel = hp
 	var hv := K.vbox(2)
 	hp.add_child(hv)
-	hint_label = K.wrap_label("", 18, Color("f1e3b0"))
+	hint_label = K.wrap_label("", 15 if compact else 18, Color("f1e3b0"))
 	hv.add_child(hint_label)
 	status_label = K.label("", 14, K.MUTED)
 	hv.add_child(status_label)
@@ -177,6 +179,7 @@ func _build() -> void:
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rack_scroll = sc
+	sc.custom_minimum_size = Vector2(0, 250 if compact else 0)
 	var inner := K.vbox(6)
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(inner)
@@ -590,6 +593,8 @@ func _build_rack() -> void:
 		rack_flow.add_child(row)
 		for w in ws:
 			fl.add_child(_rack_card(w))
+			for k in int(cooling.get(w, 0)):
+				fl.add_child(_cooling_card(w))
 	# 免费的连接牌
 	var prow := K.hbox(8)
 	var plab := K.label("连接", 14, K.MUTED)
@@ -610,6 +615,24 @@ func _build_rack() -> void:
 		part_tiles[pname] = pt
 	prow.add_child(K.label("免费，不占你的词", 12, K.MUTED))
 	rack_flow.add_child(prow)
+
+# 冷却中的一张：整块变黑，写着“冷却”，点不了。用过一张就黑一张，没用过的照常能用
+func _cooling_card(w: String) -> Control:
+	var root := Control.new()
+	root.custom_minimum_size = RACK_CARD
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	root.tooltip_text = "【%s】上一轮用过，这一张本轮冷却，下一轮回来" % w
+	var card := K.word_card(w, 1, -1, RACK_CARD)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.modulate = Color(0.28, 0.28, 0.32, 1.0)
+	root.add_child(card)
+	var chip := K.chip("冷却", Color("5a3a3f"), 13)
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	chip.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	chip.grow_vertical = Control.GROW_DIRECTION_BOTH
+	root.add_child(chip)
+	return root
 
 func _rack_card(w: String) -> Control:
 	var root := Control.new()
@@ -656,6 +679,7 @@ func _update_rack() -> void:
 		var allowed: bool = w in have
 		var root: Control = rc.root
 		var hl: Panel = rc.hl
+		root.visible = not (left == 0 and int(cooling.get(w, 0)) > 0)   # 没有可用的了，只剩黑牌
 		hl.visible = allowed
 		root.modulate = Color.WHITE if allowed else (Color(1, 1, 1, 0.34) if left > 0 else Color(1, 1, 1, 0.16))
 		var badge: Control = rc.badge
@@ -742,7 +766,7 @@ func _refresh_suggestions() -> void:
 	if opts.complete and opts.words_have.is_empty() and opts.numbers.is_empty():
 		sugg_box.add_child(K.label("（这句话已经拼完了，没有别的词可以接）", 14, K.MUTED))
 		return
-	var list: Array = H.suggestions(tokens, avail, 3, _sugg_seed * 131 + tokens.size())
+	var list: Array = H.suggestions(tokens, avail, 2 if compact else 3, _sugg_seed * 131 + tokens.size())
 	if list.is_empty():
 		sugg_box.add_child(K.label("（用你现有的词，这样拼下去没有别的整句了）", 14, K.MUTED))
 		return

@@ -53,26 +53,21 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 	head.add_child(cancel)
 	v.add_child(head)
 	if not recs.is_empty():
-		var rbox := K.panel(Color("14261c"), K.GREEN.darkened(0.2), 10, 1)
-		var rv := K.vbox(4)
-		rbox.add_child(rv)
-		rv.add_child(K.label("手把手：电脑帮你算了几句，点一句就填进拼句台，你可以再改", 15, K.GREEN))
+		var rbox := K.hbox(8)
+		rbox.add_child(K.label("推荐（点一下填入）：", 15, K.GREEN))
 		for r in recs:
-			var line := K.hbox(8)
-			var txt := "【%s】行动点 %d · %s" % [str(r.name), int(r.cost), str(r.text)]
-			var info_t := "不拼这句：我方剩 %d 生命、对手剩 %d；拼这句：我方剩 %d、对手剩 %d。%s" % [int(r.my_before), int(r.foe_before), int(r.my_after), int(r.foe_after), str(r.note)]
-			var lb := K.wrap_label(txt + "\n" + info_t, 14, K.TEXT)
-			lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			line.add_child(lb)
-			var use := K.button("填入", "normal", 15)
+			var txt := "【%s】%d点 → 对手剩 %d" % [str(r.name), int(r.cost), int(r.foe_after)]
+			var info_t: String = "%s\n不拼这句：我方剩 %d、对手剩 %d；拼这句：我方剩 %d、对手剩 %d。%s"
+			var use := K.button(txt, "normal", 14)
+			use.tooltip_text = info_t % [str(r.text), int(r.my_before), int(r.foe_before), int(r.my_after), int(r.foe_after), str(r.note)]
 			var rr: Dictionary = r
 			use.pressed.connect(func():
 				picked_rec = rr
 				composer.setup(avail, S.tokens_of_skill(rr.sk.nodes)))
-			line.add_child(use)
-			rv.add_child(line)
+			rbox.add_child(use)
 		v.add_child(rbox)
 	composer = Composer.new()
+	composer.compact = true
 	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	composer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	composer.changed.connect(_on_changed)
@@ -88,6 +83,7 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 	Tut.tag(btn_ok, "k:confirm")
 	foot.add_child(btn_ok)
 	v.add_child(foot)
+	composer.cooling = cooling
 	composer.setup(avail, init_tokens)
 	_on_changed()
 

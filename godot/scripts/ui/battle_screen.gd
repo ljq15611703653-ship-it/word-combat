@@ -425,6 +425,15 @@ func _compose_card(u: Dictionary, redo: bool) -> Control:
 		var last: Dictionary = m.last_sentence[uid]
 		var reuse := K.button("沿用：" + str(last.get("name", "上一句")), "normal", 14)
 		reuse.tooltip_text = str(last.get("text", ""))
+		var miss: Dictionary = G.missing(last.get("words", []), m.avail_words(0))
+		if not miss.is_empty():
+			var cool: Dictionary = m.cooling_words(0)
+			var ws: Array = []
+			for w in miss:
+				ws.append("【%s】%s" % [w, "冷却中" if cool.has(w) else "不够"])
+			reuse.text = "沿用不了：" + "、".join(ws)
+			reuse.disabled = true
+			reuse.tooltip_text = "上一句要用的词现在用不了。" + str(last.get("text", ""))
 		reuse.pressed.connect(func(): _reuse_last(uid))
 		v.add_child(reuse)
 	return root
@@ -453,6 +462,12 @@ func _open_compose(uid: int) -> void:
 	if Settings.coach and Settings.coach_detail and m.has_method("recommend"):
 		recs = m.recommend(uid, 3)
 	pop.setup(str(u.name), m.avail_words(0), ap, m.cooling_words(0), [], recs)
+	var pet_was: bool = Pet.inst != null and is_instance_valid(Pet.inst) and Pet.inst.visible
+	if pet_was:
+		Pet.inst.visible = false           # 拼句窗口里不让桌宠气泡挡住词架
+	pop.tree_exited.connect(func():
+		if pet_was and Pet.inst != null and is_instance_valid(Pet.inst) and Settings.pet:
+			Pet.inst.visible = true)
 	pop.cancelled.connect(func(): pop.queue_free())
 	pop.composed.connect(func(sk):
 		var r: Dictionary = m.stage_sentence(uid, sk)
