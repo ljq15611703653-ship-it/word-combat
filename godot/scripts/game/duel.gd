@@ -41,6 +41,9 @@ var last_skills: Array = [{}, {}]     # 最近一轮每方宣告的句子文字�
 var winner := -1                      # -1 进行中，0/1，-2 平局
 var log_lines: Array = []
 var personas: Array = ["", ""]        # 电脑的流派（决定偏好、估值口味、攒不攒行动点）
+var staged: Dictionary = {}           # 界面用：uid → 已拼好但还没宣告的句子 sid
+var opening_idx := 0                  # 兜子界面用的兼容字段
+var opening_total := OPEN_PICKS
 var ai_epsilon := 0.0
 var fast_ai := true
 # 流派口味：role 倍率 / 路线名里含某字的倍率 / 估值里状态价值的权重 / 满足多大收益才肯花行动点（越大越爱攒）
@@ -145,6 +148,7 @@ func begin_round() -> void:
 	E.begin_round(st)
 	E.clear_round_skills(st)
 	declared = [[], []]
+	staged = {}
 	declare_done = [false, false]
 	var f := E.first_side(st)
 	declare_order = [f, 1 - f]
@@ -211,6 +215,80 @@ func submit_sentence(side: int, uid: int, skill: Dictionary, choices: Dictionary
 	stats.sentences += 1
 	return ""
 
+# 界面：把拼好的句子登记到随从身上（还没宣告）。返回 {"sid": n} 或 {"err": 文字}
+func stage_sentence(uid: int, skill: Dictionary) -> Dictionary:
+	var u := E._u(st, uid)
+	if u.is_empty() or int(u.side) != 0 or u.down_round != -1:
+		return {"err": "这个随从现在不能出手"}
+	for a in declared[0]:
+		if E.host_of(st, int(a.sid)) == uid:
+			return {"err": "这个随从本轮已经拼过一句了"}
+	var sk: Dictionary = G.finalize(skill.duplicate(true))
+	var probs := G.problems(sk)
+	if not probs.is_empty():
+		return {"err": "这句话不合法：" + str(probs[0])}
+	var miss := G.missing(sk.words, avail_words(0))
+	if not miss.is_empty():
+		var parts: Array = []
+		for w in miss:
+			parts.append("%s×%d" % [w, int(miss[w])])
+		return {"err": "词不够（或在冷却）：" + "、".join(parts)}
+	unstage(uid)
+	var sid := E.add_round_skill(st, uid, sk)
+	staged[uid] = sid
+	return {"sid": sid}
+
+func unstage(uid: int) -> void:
+	if staged.has(uid):
+		E.remove_round_skill(st, uid, int(staged[uid]))
+		staged.erase(uid)
+
+func is_staged(sid: int) -> bool:
+	for uid in staged:
+		if int(staged[uid]) == sid:
+			return true
+	return false
+
+# 界面宣告（和旧 Match.submit 同一个接口）：空 = 本方不再宣告
+func submit(side: int, act: Dictionary) -> String:
+	if act.is_empty():
+		for uid in staged.keys():
+			unstage(int(uid))
+		declare_done[side] = true
+		return ""
+	var sid := int(act.sid)
+	var sk: Dictionary = E.skill_of(st, sid)
+	var miss := G.missing(sk.words, avail_words(side))
+	if not miss.is_empty():
+		return "词不够（或在冷却）"
+	var err := E.can_declare(st, act, declared[side])
+	if err != "":
+		return err
+	declared[side].append(act.duplicate(true))
+	staged.erase(E.host_of(st, sid))
+	var rec: Dictionary = used_log[side].get(int(st.round), {})
+	for w in sk.words:
+		if not Lex.is_basic(w):
+			rec[w] = int(rec.get(w, 0)) + 1
+	used_log[side][int(st.round)] = rec
+	stats.sentences += 1
+	return ""
+
+func public_declared(side: int) -> Array:
+	return declared[side].duplicate(true)
+
+# 还有哪些存活的随从没出手
+func idle_units(side: int) -> Array:
+	var out: Array = []
+	for u in E.alive_units(st, side):
+		var has := false
+		for a in declared[side]:
+			if E.host_of(st, int(a.sid)) == int(u.uid):
+				has = true
+		if not has:
+			out.append(u)
+	return out
+
 func finish_declare(side: int) -> void:
 	declare_done[side] = true
 
@@ -249,6 +327,16 @@ func resolve() -> Dictionary:
 
 # ---------------------------------------------------------------- 兜子（战斗后）
 func pick_bag(side: int, idx: int) -> void:
+	if phase == "opening":
+		# 开局各选各的：你选完，电脑立刻也选一次
+		if open_done[side] >= OPEN_PICKS or idx < 0 or idx >= open_bags[side].size():
+			return
+		pick_open(side, idx)
+		if side == 0 and human[0] and not human[1]:
+			if open_done[1] < OPEN_PICKS:
+				ai_pick_open(1)
+		bag_taken = [idx, -3]
+		return
 	if phase != "draft" or bag_taken[side] != -1 or idx in bag_taken or idx < 0 or idx >= bags.size():
 		return
 	bag_taken[side] = idx
@@ -260,7 +348,24 @@ func pick_bag(side: int, idx: int) -> void:
 		return
 	phase = "equip"
 
+# 开局阶段，兜子界面要看到“你自己的 3 个兜子”：刷新兼容字段
+func sync_draft_view() -> void:
+	if phase == "opening":
+		bags = open_bags[0].duplicate(true)
+		bag_taken = [-1, -1]
+		picker = 0
+		opening_idx = open_done[0]
+		opening_total = OPEN_PICKS
+
+func public_deck(_side: int) -> Dictionary:
+	return {"units": []}
+
 func remaining_bags() -> Array:
+	if phase == "opening":
+		var all: Array = []
+		for i in bags.size():
+			all.append(i)
+		return all
 	var out: Array = []
 	for i in bags.size():
 		if not (i in bag_taken):
@@ -387,7 +492,9 @@ func _mood(side: int) -> Dictionary:
 	return out
 
 # ---------------------------------------------------------------- 电脑：现场拼
-func ai_declare(side: int) -> void:
+func ai_declare(side: int = -1) -> void:
+	if side == -1:
+		side = declare_side()
 	var enemy_list: Array = []
 	if side != declare_order[0]:
 		enemy_list = declared[1 - side].duplicate(true)

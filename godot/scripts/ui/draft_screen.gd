@@ -272,7 +272,10 @@ func _show_marks() -> void:
 func _done() -> void:
 	can_pick = false
 	_show_marks()
-	info_label.text = "你拿走了第 %d 袋，对手拿走了第 %d 袋。其余的兜子作废。" % [int(m.bag_taken[0]) + 1, int(m.bag_taken[1]) + 1]
+	if int(m.bag_taken[1]) < 0:
+		info_label.text = "你拿走了第 %d 袋。" % (int(m.bag_taken[0]) + 1)
+	else:
+		info_label.text = "你拿走了第 %d 袋，对手拿走了第 %d 袋。其余的兜子作废。" % [int(m.bag_taken[0]) + 1, int(m.bag_taken[1]) + 1]
 	_refresh_coach()
 	continue_btn.modulate.a = 1.0
 	continue_btn.disabled = false

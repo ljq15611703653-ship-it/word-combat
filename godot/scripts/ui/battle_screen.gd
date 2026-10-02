@@ -19,6 +19,7 @@ const FxPlayer = preload("res://scripts/fx/fx_player.gd")
 const Settings = preload("res://scripts/ui/settings.gd")
 const Table3D = preload("res://scripts/view3d/table3d.gd")
 const Highlight = preload("res://scripts/fx/highlight.gd")
+const DuelCompose = preload("res://scripts/ui/duel_compose.gd")
 
 signal next_round()
 signal quit_to_title()
@@ -354,8 +355,9 @@ func _rebuild_hand() -> void:
 	K.clear_children(hand_row)
 	var ap: int = E.available_ap(m.st, 0, m.declared[0]) if m.phase == "declare" else int(m.st.sides[0].ap)
 	var first_card := true
+	var live_compose: bool = m.has_method("stage_sentence")
 	for u in m.st.sides[0].units:
-		if u.skill_ids.is_empty():
+		if u.skill_ids.is_empty() and not live_compose:
 			continue
 		# 每个随从一组：上面是“谁”，下面是这个随从自己的技能
 		var owns_sel := false
@@ -381,6 +383,13 @@ func _rebuild_hand() -> void:
 				Tut.tag(hc, "b:hand")
 				first_card = false
 			Tut.tag(hc, "b:hand:" + str(sk.get("kind_tag", "atk")))
+		if live_compose and u.down_round == -1:
+			var declared_already := false
+			for d in m.declared[0]:
+				if E.host_of(m.st, int(d.sid)) == int(u.uid):
+					declared_already = true
+			if not declared_already:
+				row.add_child(_compose_card(u, u.skill_ids.size() > 0))
 		gv.add_child(row)
 		var uid: int = int(u.uid)
 		grp.mouse_entered.connect(func():
@@ -392,6 +401,47 @@ func _rebuild_hand() -> void:
 		hand_row.add_child(grp)
 	if hand_row.get_child_count() == 0:
 		hand_row.add_child(K.label("你还没有任何技能。", 20, K.MUTED))
+
+# 现场拼：每个还没出手的随从有一张“拼这一句”（已经拼了一句还没宣告的，可以重拼）
+func _compose_card(u: Dictionary, redo: bool) -> Control:
+	var root := PanelContainer.new()
+	root.custom_minimum_size = Vector2(176, 226 if not redo else 60)
+	root.add_theme_stylebox_override("panel", K.style(Color("1d2a22"), K.GREEN, 12, 2, 4))
+	var v := K.vbox(6)
+	root.add_child(v)
+	if redo:
+		v.add_child(K.label("✎ 重拼这一句", 16, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
+	else:
+		v.add_child(K.spacer(40))
+		v.add_child(K.label("✎", 52, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(K.label("给%s拼这一句" % u.name, 18, K.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(K.wrap_label("从零开始，基础词不限量", 13, K.MUTED))
+	var uid: int = int(u.uid)
+	root.gui_input.connect(func(ev):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			_open_compose(uid))
+	Tut.tag(root, "b:compose")
+	return root
+
+func _open_compose(uid: int) -> void:
+	if not my_turn or busy:
+		return
+	var u := E._u(m.st, uid)
+	var pop = DuelCompose.new()
+	pop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(pop)
+	var ap: int = E.available_ap(m.st, 0, m.declared[0])
+	pop.setup(str(u.name), m.avail_words(0), ap, m.cooling_words(0))
+	pop.cancelled.connect(func(): pop.queue_free())
+	pop.composed.connect(func(sk):
+		var r: Dictionary = m.stage_sentence(uid, sk)
+		if r.has("err"):
+			toast(str(r.err), K.RED)
+			return
+		pop.queue_free()
+		_clear_selection()
+		_rebuild_hand()
+		_select_skill(int(r.sid)))
 
 func _skill_reason(sk: Dictionary, u: Dictionary, ap: int) -> String:
 	for d in m.declared[0]:
@@ -894,7 +944,11 @@ func _confirm() -> void:
 	_rebuild_hand()
 	# 还有没有付得起的行动？没有就自动结束宣告
 	var Ai = load("res://scripts/ai/ai.gd")
-	if Ai.enumerate_actions(m.st, 0, m.public_declared(1), 1, m.declared[0]).size() <= 1:
+	if m.has_method("stage_sentence"):
+		if m.idle_units(0).is_empty() or E.available_ap(m.st, 0, m.declared[0]) < 8:
+			_pass()
+			return
+	elif Ai.enumerate_actions(m.st, 0, m.public_declared(1), 1, m.declared[0]).size() <= 1:
 		_pass()
 		return
 	_show_enemy_declared()

@@ -19,6 +19,8 @@ const BattleScreen = preload("res://scripts/ui/battle_screen.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const Tutorial = Tut
 const Pet = preload("res://scripts/ui/pet.gd")
+const Duel = preload("res://scripts/game/duel.gd")
+const DuelSetup = preload("res://scripts/ui/duel_setup.gd")
 
 var m
 var screen: Control
@@ -158,14 +160,17 @@ func _show_title() -> void:
 	var t := TitleScreen.new()
 	_set_screen(t)
 	t.start_game.connect(_new_game)
-	t.start_tutorial.connect(_start_tutorial)
-	t.start_first_match.connect(_start_first_match)
+	t.start_tutorial.connect(func(): _new_duel(-1, true))
+	t.start_first_match.connect(func(): _new_duel(-1, true))
 	t.start_adventure.connect(_show_adventure_map)
 	t.watch_demo.connect(func():
 		auto = true
 		_new_game())
 
 func _new_game(seed_val: int = -1) -> void:
+	if not auto and not driver_on:
+		_new_duel(seed_val, false)
+		return
 	m = Match.new()
 	m.start(not auto, seed_val, false)
 	if not auto and not driver_on:
@@ -184,6 +189,84 @@ func _new_game(seed_val: int = -1) -> void:
 		_show_card_build()
 	else:
 		_show_build("initial", not driver_on)
+
+# ---------------------------------------------------------------- 新规则：现场拼的对决
+var duel_guided := false
+
+func _new_duel(seed_val: int = -1, guided: bool = false) -> void:
+	_tut_end()
+	duel_guided = guided
+	m = Duel.new()
+	m.start(true, seed_val, false)
+	m.ai_epsilon = [0.45, 0.12, 0.0][Settings.level]
+	if guided:
+		Settings.first_match_done = true
+		Settings.save_all()
+	_duel_next()
+
+func _duel_next() -> void:
+	match m.phase:
+		"opening":
+			if int(m.open_done[0]) < Duel.OPEN_PICKS:
+				_show_duel_draft()
+			else:
+				m.step_auto()
+				_duel_next()
+		"hp":
+			if not m.hp_done[1]:
+				m.ai_set_hp(1)
+			var hp := DuelSetup.new()
+			_set_screen(hp)
+			hp.setup(m, "hp")
+			hp.finished.connect(_duel_next)
+		"draft":
+			_show_duel_draft()
+		"equip":
+			m.ai_equip(1)
+			if m.keyword_stock(0).is_empty():
+				m.equip(0, ["", "", ""])
+				m.finish_equip()
+				_duel_next()
+			else:
+				var eq := DuelSetup.new()
+				_set_screen(eq)
+				eq.setup(m, "equip")
+				eq.finished.connect(func():
+					m.finish_equip()
+					_duel_next())
+		"declare":
+			_show_duel_battle()
+		_:
+			_show_title()
+
+func _show_duel_draft() -> void:
+	m.sync_draft_view()
+	var d := DraftScreen.new()
+	_set_screen(d)
+	d.picked.connect(func(i):
+		m.pick_bag(0, i)
+		d.on_human_pick(i))
+	d.finished.connect(_duel_next)
+	d.setup(m)
+	if duel_guided:
+		if m.phase == "opening":
+			Pet.chat("每个兜子里是几个进阶词。开局你和对手各自挑两次，不用抢。基础词人人无限，不在兜子里。", "talk", 9.0)
+		else:
+			Pet.chat("每轮战斗后摆 5 个兜子，上一轮先手的先挑。拿到的进阶词是永久的，但用过一次，下一轮要冷却。", "talk", 9.0)
+
+func _show_duel_battle() -> void:
+	var b := BattleScreen.new()
+	_set_screen(b)
+	battle_screen = b
+	b.begin(m)
+	b.next_round.connect(_duel_next)
+	b.quit_to_title.connect(_show_title)
+	b.rematch.connect(func(): _new_duel(-1, duel_guided))
+	if duel_guided:
+		if int(m.st.round) == 1:
+			Pet.chat("这一局没有预拼的卡：看完对手的宣告，给每个随从点“拼这一句”，现场拼。不会拼就用拼句台里的建议（辅助轮）。", "talk", 12.0)
+		elif int(m.st.round) == 2:
+			Pet.chat("上一轮用过的进阶词这轮在冷却，换点别的拼。基础词永远能用。", "talk", 8.0)
 
 # ---------------------------------------------------------------- 冒险（长难句训练营）
 func _show_adventure_map() -> void:
