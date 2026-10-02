@@ -485,9 +485,11 @@ func _round_banner(r: int) -> void:
 	var lab := K.label("第 %d 轮" % r, 54, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	lab.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	lab.add_theme_constant_override("outline_size", 10)
-	lab.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
-	lab.position = Vector2(400, 150)
-	lab.size = Vector2(800, 80)
+	lab.anchor_right = 1.0
+	lab.offset_left = 0
+	lab.offset_right = 0
+	lab.offset_top = 150
+	lab.offset_bottom = 230
 	lab.modulate.a = 0.0
 	add_child(lab)
 	var tw := lab.create_tween()

@@ -177,7 +177,7 @@ func _build() -> void:
 	var bottom := K.hbox(10)
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var logp := K.panel(Color("141826"), K.EDGE, 10, 1)
-	logp.custom_minimum_size = Vector2(330, 0)
+	logp.custom_minimum_size = Vector2(280, 0)
 	log_box = RichTextLabel.new()
 	log_box.bbcode_enabled = true
 	log_box.scroll_following = true
@@ -193,7 +193,7 @@ func _build() -> void:
 	hand_sc.add_child(hand_row)
 	bottom.add_child(hand_sc)
 	var ap := K.panel(K.PANEL, K.GOLD_D, 12, 2, 6)
-	ap.custom_minimum_size = Vector2(470, 0)
+	ap.custom_minimum_size = Vector2(400, 0)
 	var asc := ScrollContainer.new()
 	asc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	action_box = K.vbox(6)
@@ -218,8 +218,11 @@ func _build() -> void:
 	toast_label = K.label("", 40, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	toast_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	toast_label.add_theme_constant_override("outline_size", 8)
-	toast_label.position = Vector2(300, 196)
-	toast_label.size = Vector2(1000, 60)
+	toast_label.anchor_right = 1.0
+	toast_label.offset_left = 0
+	toast_label.offset_right = 0
+	toast_label.offset_top = 196
+	toast_label.offset_bottom = 256
 	fx = FxPlayer.new()
 	add_child(fx)
 	fx.setup(self, fx_layer, table if use_3d else null, score_label)
@@ -1471,9 +1474,10 @@ func _show_game_over() -> void:
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 	var p := K.panel(Color("171b29"), K.GOLD, 20, 3, 20)
-	p.set_anchors_preset(Control.PRESET_CENTER)
 	p.custom_minimum_size = Vector2(620, 380)
-	p.position = Vector2(490, 260)
+	p.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	p.grow_vertical = Control.GROW_DIRECTION_BOTH
 	overlay.add_child(p)
 	var v := K.vbox(14)
 	p.add_child(v)
@@ -1539,9 +1543,10 @@ func _peek_duel(side: int) -> void:
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 	var p := K.panel(Color("171b29"), K.GOLD_D, 18, 2, 18)
-	p.set_anchors_preset(Control.PRESET_CENTER)
 	p.custom_minimum_size = Vector2(760, 0)
-	p.position = Vector2(420, 190)
+	p.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	p.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	p.grow_vertical = Control.GROW_DIRECTION_BOTH
 	overlay.add_child(p)
 	var v := K.vbox(10)
 	p.add_child(v)

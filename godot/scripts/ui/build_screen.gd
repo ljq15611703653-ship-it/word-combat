@@ -292,7 +292,9 @@ func _show_suggestion(idx: int, nd: Dictionary, persona: String) -> void:
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var win := K.panel(Color("171b29"), K.GREEN, 16, 2, 16)
 	win.custom_minimum_size = Vector2(760, 0)
-	win.position = Vector2(420, 220)
+	win.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	win.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	win.grow_vertical = Control.GROW_DIRECTION_BOTH
 	var v := K.vbox(8)
 	win.add_child(v)
 	v.add_child(K.label("自动调整建议（%s）" % persona, 24, K.GOLD))

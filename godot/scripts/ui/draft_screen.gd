@@ -194,9 +194,10 @@ func _show_detail(i: int) -> void:
 			detail_layer.queue_free())
 	detail_layer.add_child(dim)
 	var win := K.panel(Color("170d11"), K.GOLD_D, 16, 2, 14)
-	win.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	win.custom_minimum_size = Vector2(900, 460)
-	win.position = Vector2(350, 220)
+	win.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	win.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	win.grow_vertical = Control.GROW_DIRECTION_BOTH
 	detail_layer.add_child(win)
 	var v := K.vbox(10)
 	win.add_child(v)
