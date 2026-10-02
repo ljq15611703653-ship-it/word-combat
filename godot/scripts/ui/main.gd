@@ -810,7 +810,7 @@ func _run_demo(demo: String) -> void:
 			elif demo == "editor3":
 				var G3 = load("res://scripts/core/grammar.gd")
 				var S3 = load("res://scripts/compose/sentence.gd")
-				var nodes3: Array = [G3.watch("pending_dmg", G3.T("choose", "ally", {"n": 4}), G3.redirect(G3.T("source", "ref"), 25), {"freq": "every"}),
+				var nodes3: Array = [G3.watch("pending_dmg", G3.T("choose", "ally", {"n": 3}), G3.redirect(G3.T("source", "ref"), 25), {"freq": "every"}),
 					G3.dmg(G3.T("choose", "enemy"), G3.N(14), {"dbl": 1})]
 				cp.setup(s.popup.avail_for_slot(), S3.tokens_of_skill(nodes3))
 				s.popup._on_composed()

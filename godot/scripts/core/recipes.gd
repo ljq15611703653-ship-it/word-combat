@@ -12,7 +12,7 @@ const ALLY_PICKS := [
 ]
 const OBSERVE := [["self", "自身"], ["all", "全队"]]
 
-# “全部/全队”已取消：现在是“选择 一个 一个 一个 一个 …”选满 4 个（场上不够就选能选的）
+# “全部/全队”已取消：现在是“选择 一个 一个 一个 …”选满 3 个（场上不够就选能选的）
 static func all4(side: String) -> Dictionary:
 	return G.T("choose", side, {"n": G.MAX_PICK})
 
@@ -38,7 +38,7 @@ static func catalog() -> Array:
 			]},
 		{"id": "atkA", "family": "攻", "title": "范围打击", "glyph": "轰", "blurb": "对全部（或逐个）敌人造成同样的伤害。",
 			"params": [
-				{"key": "scope", "label": "范围", "kind": "enum", "options": [["all", "选满 4 个"]], "default": "all"},
+				{"key": "scope", "label": "范围", "kind": "enum", "options": [["all", "选满 3 个"]], "default": "all"},
 				{"key": "n", "label": "伤害", "kind": "int", "min": 1, "max": 60, "default": 12},
 				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
 				{"key": "rep", "label": "重复次数", "kind": "int", "min": 0, "max": 3, "default": 0},
@@ -116,7 +116,7 @@ static func catalog() -> Array:
 		{"id": "engine", "family": "反", "title": "治疗引爆", "glyph": "爆", "blurb": "给全队治疗；每次实际恢复，按恢复量对敌人造成伤害。",
 			"params": [
 				{"key": "n", "label": "治疗", "kind": "int", "min": 1, "max": 60, "default": 10},
-				{"key": "to", "label": "伤害对象", "kind": "enum", "options": [["all", "选满 4 个敌人"], ["lowest", "敌方最低生命"]], "default": "all"},
+				{"key": "to", "label": "伤害对象", "kind": "enum", "options": [["all", "选满 3 个敌人"], ["lowest", "敌方最低生命"]], "default": "all"},
 			]},
 		{"id": "tax", "family": "反", "title": "见招收税", "glyph": "税", "blurb": "敌人每发动一个技能，就对施法者造成伤害。",
 			"params": [

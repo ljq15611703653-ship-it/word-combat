@@ -55,6 +55,31 @@ static func set_deck(st: Dictionary, s: int, deck: Dictionary, fresh: bool = fal
 			st.lib[sid] = copy
 			u.skill_ids.append(sid)
 
+# ---- 现场拼的句子：只活一轮的临时技能（登记在随从身上，用完就清）
+static func add_round_skill(st: Dictionary, uid: int, skill: Dictionary) -> int:
+	st.sid_ctr += 1
+	var sid: int = st.sid_ctr
+	var copy: Dictionary = skill.duplicate(true)
+	copy["sid"] = sid
+	st.lib[sid] = copy
+	var u := _u(st, uid)
+	if not u.is_empty():
+		u.skill_ids.append(sid)
+	return sid
+
+static func remove_round_skill(st: Dictionary, uid: int, sid: int) -> void:
+	var u := _u(st, uid)
+	if not u.is_empty():
+		u.skill_ids.erase(sid)
+	st.lib.erase(sid)
+
+static func clear_round_skills(st: Dictionary) -> void:
+	for s in 2:
+		for u in st.sides[s].units:
+			for sid in u.skill_ids:
+				st.lib.erase(sid)
+			u.skill_ids = []
+
 static func clone_state(st: Dictionary) -> Dictionary:
 	var c := st.duplicate(false)
 	c.sides = []

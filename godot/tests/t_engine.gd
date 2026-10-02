@@ -112,8 +112,8 @@ func _init() -> void:
 	check(E.can_declare(stx, actx, []) != "", "两个目标选了同一个人：不允许")
 	actx.choices = {"t1": 10, "t1#1": 11}
 	check(E.can_declare(stx, actx, []) == "", "两个目标选了不同的人：允许 (%s)" % E.can_declare(stx, actx, []))
-	var four := S("打四个", [G.dmg(G.T("choose","enemy",{"n":4}), G.N(5))])
-	check(four.price >= 6, "选四个：多出的三个“一个”加 6 点价格 (价格 %d)" % int(four.price))
+	var four := S("打三个", [G.dmg(G.T("choose","enemy",{"n":3}), G.N(5))])
+	check(four.price >= 4, "选三个：多出的两个“一个”加 4 点价格 (价格 %d)" % int(four.price))
 	print("— 数值：加上 / 减去 / 括号 / 人数")
 	var sumv: Dictionary = G.OP("sum", G.N(4), G.N(6))
 	check(E._value({}, sumv, {}) == 10, "加上：4+6=10")
@@ -160,12 +160,18 @@ func _init() -> void:
 	st4.sides[0].units[0].stacks["衰弱"] = 2
 	st4 = play(deck([hit10]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st4)
 	check(hps(st4,1)[0] == 100 - int(ceil(10.0 / (1.0 + E.stack_k(3)))), "衰弱 3 级：出手的 10 伤害 ÷(1+k(3)) (剩 %d)" % hps(st4,1)[0])
-	var hit4 := S("打四个", [G.dmg(G.T("choose","enemy",{"n":4}), G.N(10))])
+	var hit4 := S("打三个", [G.dmg(G.T("choose","enemy",{"n":3}), G.N(10))])
 	var st4b: Dictionary = E.make_state([deck([hit4]), deck([], BIG)], 0)
 	st4b.sides[0].units[0].stacks["蓄力"] = 2
-	st4b = play(deck([hit4]), deck([], BIG), {"t1": 10, "t1#1": 11, "t1#2": 12, "t1#3": 13}, {}, 3, 3, 200, 1, st4b)
+	st4b = play(deck([hit4]), deck([], BIG), {"t1": 10, "t1#1": 11, "t1#2": 12}, {}, 3, 3, 200, 1, st4b)
 	var amp4: int = 100 - int(round(10.0 * (1.0 + E.stack_k(3))))
-	check(hps(st4b,1) == [amp4,amp4,amp4,amp4,100], "蓄力 3 级 + 群攻：四个目标都吃到放大（同一次出手），等级只用一次 (%s)" % str(hps(st4b,1)))
+	check(hps(st4b,1) == [amp4,amp4,amp4,100,100], "蓄力 3 级 + 群攻：三个目标都吃到放大（同一次出手），等级只用一次 (%s)" % str(hps(st4b,1)))
+	var splitsk := S("分流", [G.split("dmg", 20, [{"target": G.T("choose","enemy"), "part": 10, "delay": 0}, {"target": G.T("choose","enemy"), "part": 10, "delay": 0}], 0)])
+	var stsp: Dictionary = E.make_state([deck([splitsk]), deck([], BIG)], 0)
+	stsp.sides[0].units[0].stacks["蓄力"] = 2
+	stsp = play(deck([splitsk]), deck([], BIG), {"s1_0": 10, "s1_1": 11}, {}, 3, 3, 100, 1, stsp)
+	var amp_sp: int = 100 - int(round(10.0 * (1.0 + E.stack_k(3))))
+	check(hps(stsp,1) == [amp_sp, amp_sp, 100, 100, 100], "分流 + 蓄力 3 级：总数 20 拆成 10+10，两份各自被放大 (%s)" % str(hps(stsp,1)))
 	var st5: Dictionary = E.make_state([deck([]), deck([], BIG)], 0)
 	st5.sides[1].units[0].stacks["灼烧"] = 3
 	st5 = play(deck([]), deck([], BIG), {}, {}, 3, 3, 100, 1, st5)
@@ -220,8 +226,8 @@ func _init() -> void:
 	print("— 回敬")
 	var refl := S("回敬", [G.watch("damaged", G.T("all","ally"), G.dmg(G.T("source","ref"), G.REF("event_damage")), {"freq":"every"})])
 	check(not G.problems(refl).is_empty(), "玩家拼不出“全部”：全队观察要写成选择 一个×N")
-	var refl4 := S("回敬4", [G.watch("damaged", G.T("choose","ally",{"n":4}), G.dmg(G.T("source","ref"), G.REF("event_damage")), {"freq":"every"})])
-	check(G.problems(refl4).is_empty(), "回敬（选择4个友方）合法 " + str(G.problems(refl4)))
+	var refl4 := S("回敬4", [G.watch("damaged", G.T("choose","ally",{"n":3}), G.dmg(G.T("source","ref"), G.REF("event_damage")), {"freq":"every"})])
+	check(G.problems(refl4).is_empty(), "回敬（选择3个友方）合法 " + str(G.problems(refl4)))
 	st = play(deck([S("全10",[G.dmg(G.T("all","enemy"), G.N(10))])]), deck([refl], [30,30,30,30,30]), {}, {}, 3, 1)
 	check(hps(st,0)[0] == 0, "5人各受10，来源被回敬50倒下 (%d)" % hps(st,0)[0])
 	var refl2 := S("双倍回敬", [G.watch("damaged", G.T("self","self"), G.dmg(G.T("source","ref"), G.REF("event_damage"), {"dbl":1}), {"freq":"every"})])

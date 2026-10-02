@@ -21,7 +21,7 @@ const EVENT_TEXT := {
 	"enemy_down": "有敌方倒下", "round_end": "本轮结束",
 }
 const NO_OBSERVE := ["ally_down", "enemy_down", "round_end"]
-const MAX_PICK := 4        # “选择 一个 一个 …”最多选几个目标
+const MAX_PICK := 3        # “选择 一个 一个 …”最多选几个目标
 const MAX_TERMS := 6       # 一个数值式里最多几项（加上/减去连起来）
 const NUM_CN := {1: "一", 2: "两", 3: "三", 4: "四"}
 const REF_WORD := {
