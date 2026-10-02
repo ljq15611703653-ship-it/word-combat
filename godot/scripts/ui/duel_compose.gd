@@ -10,6 +10,7 @@ const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
 const S = preload("res://scripts/compose/sentence.gd")
+const Intent = preload("res://scripts/compose/intent.gd")
 
 signal composed(skill)
 signal cancelled()
@@ -18,6 +19,9 @@ var composer
 var info: Label
 var btn_ok: Button
 var cur_skill: Dictionary = {}
+var intent_box: HBoxContainer
+var intent_edit: LineEdit
+var _avail: Dictionary = {}
 var picked_rec: Dictionary = {}          # 手把手模式：点了哪条推荐（目标、时间用它预填）
 var _unit_name := ""
 
@@ -45,6 +49,16 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 		for w in cooling:
 			parts.append(str(w))
 		head.add_child(K.chip("冷却中（上一轮用过）：" + "、".join(parts), Color("5a3a3f"), 14))
+	head.add_child(K.label("我想干什么：", 15, K.GOLD))
+	intent_edit = LineEdit.new()
+	intent_edit.placeholder_text = "用自己的话说，比如：" + "、".join(Intent.EXAMPLES.slice(0, 3))
+	intent_edit.custom_minimum_size = Vector2(300, 34)
+	intent_edit.add_theme_font_size_override("font_size", 16)
+	intent_edit.text_submitted.connect(func(_t): _find_intent())
+	head.add_child(intent_edit)
+	var ibtn := K.button("找句子", "primary", 15)
+	ibtn.pressed.connect(_find_intent)
+	head.add_child(ibtn)
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
@@ -66,6 +80,9 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 				composer.setup(avail, S.tokens_of_skill(rr.sk.nodes)))
 			rbox.add_child(use)
 		v.add_child(rbox)
+	_avail = avail
+	intent_box = K.hbox(8)
+	v.add_child(intent_box)
 	composer = Composer.new()
 	composer.compact = true
 	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -111,3 +128,31 @@ func _ok() -> void:
 	Sfx.play("stamp")
 	Tut.fire("compose_confirm")
 	composed.emit(cur_skill)
+
+# 按玩家说的话找几条现成的句子；词够的点一下填入，词不够的灰着并写出还缺什么
+func _find_intent() -> void:
+	K.clear_children(intent_box)
+	var text: String = intent_edit.text.strip_edges()
+	if text == "":
+		return
+	var list: Array = Intent.find(text, _avail, 3)
+	if list.is_empty():
+		intent_box.add_child(K.label("没听懂。试试这样说：" + "；".join(Intent.EXAMPLES), 14, K.MUTED))
+		return
+	for it in list:
+		var label_t: String = "【%s】" % str(it.name)
+		if bool(it.ok):
+			label_t += " 填入"
+		else:
+			var parts: Array = []
+			for w in it.missing:
+				parts.append(str(w))
+			label_t += " 还缺：" + "、".join(parts)
+		var b := K.button(label_t, "normal" if bool(it.ok) else "ghost", 14)
+		b.tooltip_text = str(it.desc) + "\n" + str(it.skill.get("text", ""))
+		b.disabled = not bool(it.ok)
+		var sk: Dictionary = it.skill
+		b.pressed.connect(func():
+			picked_rec = {}
+			composer.setup(_avail, S.tokens_of_skill(sk.nodes)))
+		intent_box.add_child(b)

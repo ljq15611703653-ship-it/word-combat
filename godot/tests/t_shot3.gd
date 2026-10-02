@@ -40,6 +40,11 @@ func _init() -> void:
 			for c in s.get_children():
 				if c.has_method("setup") and c.get("composer") != null:
 					c.composer.rack_scroll.scroll_vertical = 900
+			for c in s.get_children():
+				if c.get("intent_edit") != null:
+					c.intent_edit.text = "我想打全部敌人"
+					c._find_intent()
+					c.composer.rack_scroll.scroll_vertical = 0
 			await create_timer(0.4).timeout
 			root.get_viewport().get_texture().get_image().save_png(out + "_compose.png")
 			print("saved", root.size)

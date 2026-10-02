@@ -179,7 +179,7 @@ func _build() -> void:
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	rack_scroll = sc
-	sc.custom_minimum_size = Vector2(0, 250 if compact else 0)
+	sc.custom_minimum_size = Vector2(0, 200 if compact else 0)
 	var inner := K.vbox(6)
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(inner)
