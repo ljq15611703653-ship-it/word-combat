@@ -420,7 +420,10 @@ static func resolve(R: Dictionary, acts_in: Array, rnd: int) -> void:
 			if R.eff.has(_ekey(int(a5.ord), ci)):
 				landed += 1
 				var c5: Dictionary = a5.cl[ci]
-				kinds[str(c5.st) if str(c5.k) == "st" else str(c5.k)] = true
+				var kname: String = str(c5.k)
+				if kname == "st" and not NR.B_STKIND:
+					kname = str(c5.st)
+				kinds[{"atk": "伤害", "heal": "恢复", "mit": "减伤", "st": "状态", "redirect": "转移", "delay": "延后", "remove": "移除"}.get(kname, kname)] = true
 		var pts: int = kinds.size() + (NR.B_BONUS if landed == (a5.cl as Array).size() else 0)
 		if pts > 0:
 			_credit(R, s, "chain", pts)

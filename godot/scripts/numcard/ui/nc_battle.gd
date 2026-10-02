@@ -666,7 +666,8 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 				return "第 %d 秒 [color=#d89a2a]%s 的续自动再来一次[/color]" % [int(ev.t), nm.call(int(ev.uid))]
 			return "第 %d 秒 %s %s出手" % [int(ev.t), MARK[mini(int(ev.ord), MARK.size() - 1)], nm.call(int(ev.uid))]
 		"blood":
-			return "[color=#e0606e]开打前 %s 用 %d 点生命付了 %s 的行动点[/color]" % [nm.call(int(ev.uid)), int(ev.amount), MARK[mini(int(ev.ord), MARK.size() - 1)]]
+			var gd := int(int(ev.amount) * NR.Y_GUARD)
+			return "[color=#e0606e]开打前 %s 用 %d 点生命付了 %s 的行动点%s[/color]" % [nm.call(int(ev.uid)), int(ev.amount), MARK[mini(int(ev.ord), MARK.size() - 1)], ("（血契护体：本轮多 %d 点减伤）" % gd) if gd > 0 else ""]
 		"lock":
 			var ns: Array = []
 			for x in ev.tgts:
