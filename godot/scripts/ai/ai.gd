@@ -16,7 +16,7 @@ const PERSONAS := {
 		["atk1", [{"dbl": 2, "rep": 1}, {"dbl": 1, "rep": 1}, {"dbl": 1}, {"rep": 1}, {}], 16],
 		["heal", [{"tgt": "self"}], 10],
 		["copy", [{}], 12],
-		["status", [{"st": "易伤"}, {"st": "狂振", "allyside": true, "tgt": "choose"}], 0],
+		["status", [{"st": "蓄力"}, {"st": "易伤"}], 0],
 		["mit", [{"tgt": "self"}], 20],
 		["split", [{}], 18],
 	],
@@ -27,10 +27,10 @@ const PERSONAS := {
 		["convert", [{"obs": "all", "freq": "every"}, {"obs": "self", "freq": "every"}], 0],
 		["mit", [{"tgt": "all"}, {"tgt": "self"}], 20],
 		["heal", [{"tgt": "all"}, {"tgt": "self"}], 10],
-		["shield", [{"tgt": "self"}], 15],
+		["status", [{"st": "铁壁"}], 0],
 	],
 	"控场": [
-		["status", [{"st": "沉默"}], 0],
+		["status", [{"st": "衰弱"}, {"st": "灼烧"}], 0],
 		["atk1", [{"dbl": 1}, {}], 14],
 		["status", [{"st": "易伤"}], 0],
 		["time", [{"op": "delay", "sec": 6}], 0],
@@ -144,7 +144,7 @@ static func build_deck(pool: Dictionary, persona: String, rng: RandomNumberGener
 # 让没有技能的卡也能“跑”起来：用剩下的词给它配一个便宜的自保/攻击技能
 static func _fill_empty_units(deck: Dictionary, pool: Dictionary) -> void:
 	var fallbacks := [
-		["heal", {"tgt": "self", "n": 6}], ["mit", {"tgt": "self", "n": 10}], ["shield", {"tgt": "self", "n": 8}],
+		["heal", {"tgt": "self", "n": 6}], ["mit", {"tgt": "self", "n": 10}], ["status", {"st": "铁壁"}],
 		["atk1", {"n": 6}], ["tax", {"n": 6}],
 	]
 	for i in D.COUNT:
@@ -328,7 +328,11 @@ static func pick_bag(bags: Array, pool: Dictionary, persona: String) -> int:
 				pref = 1.8
 			s += base * need_factor * pref * minf(float(cnt[w]), 2.0)
 		scores.append(s)
-	return 0 if scores[0] >= scores[1] else 1
+	var best_i := 0
+	for i in scores.size():
+		if scores[i] > scores[best_i]:
+			best_i = i
+	return best_i
 
 # ------------------------------------------------------------ 战斗决策
 static func _starts(ms: int, enemy_list: Array) -> Array:
@@ -372,6 +376,18 @@ static func _slot_options(st: Dictionary, side: int, slot: Dictionary, all_decla
 			out.append(units[units.size() - 1].uid)
 		if units.size() > 2:
 			out.append(units[units.size() / 2].uid)
+	# 己方：优先给“有进攻技能的随从”（蓄力要由它自己打出去才用得上；铁壁也该给会挨打的主力）
+	if slot.spec.get("side", "enemy") == "ally":
+		var atkers: Array = []
+		for u in units:
+			for sid in u.skill_ids:
+				if str(E.skill_of(st, sid).get("kind_tag", "")) == "atk" and not (u.uid in atkers):
+					atkers.append(u.uid)
+		var rest: Array = []
+		for uid in out:
+			if not (uid in atkers):
+				rest.append(uid)
+		out = atkers + rest
 	# 敌方：持有技能的随从更有价值
 	if slot.spec.get("side", "enemy") == "enemy":
 		for u in units:
@@ -470,7 +486,34 @@ static func _power(st: Dictionary, s: int) -> float:
 			p += float(u.hp) + 6.0
 			if not u.skill_ids.is_empty():
 				p += 2.0
+			p += _stack_value(st, u)
 	return p
+
+# 叠层状态的价值：层数是长期投资，所以按“再过几轮会长到多大”来估（指数曲线，前期几乎看不出价值，后期很大）
+static var STACK_LOOKAHEAD := 3
+static var STACK_WEIGHT := 0.45
+
+static func _stack_value(st: Dictionary, u: Dictionary) -> float:
+	var v := 0.0
+	var base: float = float(u.hp) + 6.0
+	for name in u.get("stacks", {}):
+		var n: int = int(u.stacks[name])
+		if n <= 0:
+			continue
+		var k: float = E.stack_k(mini(n + STACK_LOOKAHEAD, E.STACK_MAX))
+		var frac: float = k / (1.0 + k)
+		match str(name):
+			"易伤": v -= base * frac * STACK_WEIGHT
+			"灼烧": v -= pow(2.0, float(mini(n + 1, 8))) * STACK_WEIGHT
+			"衰弱": v -= 10.0 * frac * STACK_WEIGHT
+			"铁壁": v += base * frac * STACK_WEIGHT
+			"蓄力":
+				var atk_n := 0
+				for sid in u.skill_ids:
+					if str(E.skill_of(st, sid).get("kind_tag", "")) == "atk":
+						atk_n += 1
+				v += 14.0 * minf(k, 6.0) * STACK_WEIGHT * 0.5 * (1.0 if atk_n > 0 else 0.15)
+	return v
 
 static func _sim(st: Dictionary, acts: Array) -> Dictionary:
 	var c := E.clone_state(st)

@@ -80,12 +80,12 @@ func rand_node(depth: int, ctx: String, allow_prev: bool = false, simple_only: b
 			var tgt := rand_target(in_watch)
 			if st == "牵连":
 				link = G.T("other", "ally")
-			return G.status(st, tgt, pick([0, 0, 4, 10]), rng.randi_range(1, 20), link)
+			return G.status(st, tgt, 0, 0, {})
 		"remove":
 			return G.remove(pick(["限时效果", "状态"]), rand_target(in_watch))
 		"time":
-			var op: String = pick(["interrupt", "delay", "advance"])
-			return G.time_op(op, "ally" if op == "advance" else "enemy", rng.randi_range(5, 40) if op == "interrupt" else rng.randi_range(1, 10))
+			var op: String = pick(["delay", "advance"])
+			return G.time_op(op, "ally" if op == "advance" else "enemy", rng.randi_range(1, 10))
 		"swap":
 			return G.swap(G.T("choose", "ally"))
 		"split":
@@ -96,7 +96,7 @@ func rand_node(depth: int, ctx: String, allow_prev: bool = false, simple_only: b
 				{"target": rand_target(in_watch), "part": total - a, "delay": 0}])
 		"chain":
 			var first := G.dmg(rand_target(in_watch), rand_value(ctx)) if rng.randf() < 0.6 else G.heal(rand_target(in_watch), rand_value(ctx))
-			var then: Dictionary = pick([G.heal(rand_target(in_watch), G.REF("prev")), G.dmg(rand_target(in_watch), G.REF("prev"), {"dbl": 1}), G.status(pick(G.STATUSES), rand_target(in_watch), 0, 5)])
+			var then: Dictionary = pick([G.heal(rand_target(in_watch), G.REF("prev")), G.dmg(rand_target(in_watch), G.REF("prev"), {"dbl": 1}), G.status(pick(G.STATUSES), rand_target(in_watch), 0, 0)])
 			return G.chain(first, then)
 		"copy":
 			return G.copy_to(G.dmg(rand_target(in_watch), rand_value(ctx)), rand_target(in_watch))
@@ -137,9 +137,9 @@ func rand_skill() -> Dictionary:
 
 func rand_deck() -> Dictionary:
 	var d := D.new_deck()
-	for i in 5:
+	for i in D.COUNT:
 		d.units[i].max_hp = rng.randi_range(5, 25)
-		d.units[i].kw = pick(["", "", "首挡", "不屈", "回击", "回春", "同调", "免疫狂振"])
+		d.units[i].kw = pick(["", "", "首挡", "不屈", "回击", "回春", "同调", "免疫易伤"])
 		for k in rng.randi_range(0, 2):
 			d.units[i].skills.append(rand_skill())
 	D.rename_skills(d)

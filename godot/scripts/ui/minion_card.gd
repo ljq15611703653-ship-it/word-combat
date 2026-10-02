@@ -3,11 +3,12 @@ extends Control
 
 const K = preload("res://scripts/ui/kit.gd")
 const Icon = preload("res://scripts/ui/icon.gd")
+const E = preload("res://scripts/core/engine.gd")
 
 signal clicked(card)
 signal hovered(card, on)
 
-const STATUS_COL := {"狂振": Color("c4483f"), "易伤": Color("d4832f"), "沉默": Color("6f7689"), "护盾": Color("4a8fd4"), "牵连": Color("8b5cc4"), "升华": Color("d0a73a")}
+const STATUS_COL := {"狂振": Color("c4483f"), "易伤": Color("d4832f"), "沉默": Color("6f7689"), "护盾": Color("4a8fd4"), "牵连": Color("8b5cc4"), "升华": Color("d0a73a"), "灼烧": Color("e0522a"), "衰弱": Color("7a6f8a"), "蓄力": Color("ffd21f"), "铁壁": Color("4a8fd4")}
 const GLYPH_HUE := {"剑": 0.0, "盾": 0.58, "咒": 0.76, "弓": 0.33, "魂": 0.92}
 
 var uid := -1
@@ -159,9 +160,11 @@ func refresh(u: Dictionary, sk: Array) -> void:
 	_color_hp()
 	# 状态
 	K.clear_children(status_row)
-	for s in u.get("statuses", []):
+	for s in E.display_statuses(u):
 		var txt: String = s.name
-		if s.name == "护盾":
+		if int(s.stacks) > 0:
+			txt += " ×%d" % int(s.stacks)
+		elif s.name == "护盾":
 			txt += " %d" % int(s.value)
 		status_row.add_child(K.chip(txt, STATUS_COL.get(s.name, K.MUTED), 12))
 	K.clear_children(kw_row)

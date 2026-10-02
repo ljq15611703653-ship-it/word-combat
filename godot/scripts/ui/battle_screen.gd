@@ -399,6 +399,9 @@ func _skill_reason(sk: Dictionary, u: Dictionary, ap: int) -> String:
 			return "本轮已宣告"
 	if u.down_round != -1:
 		return "持有者修整中"
+	if int(m.st.rules.get("cooldown", 0)) > 0 and G.is_advanced_skill(sk):
+		if int(m.st.round) - int(m.st.cd.get(u.uid, -99)) <= int(m.st.rules.cooldown):
+			return "冷却中（含进阶词，用完隔 %d 轮）" % int(m.st.rules.cooldown)
 	if E._silenced_for(u, int(sk.cost)):
 		return "被沉默（持续期间无法发动技能）"
 	var cheapest: int = int(sk.cost)
@@ -977,8 +980,6 @@ func _coach_round(events: Array) -> void:
 	for e4 in events:
 		if str(e4.type) == "down":
 			down_by_t[int(e4.t)] = int(down_by_t.get(int(e4.t), 0)) + 1
-		elif str(e4.type) == "interrupt":
-			Highlight.play("perfect_counter", {"kind": "interrupt", "side": int(e4.side)}, self)
 	for tt in down_by_t:
 		if int(down_by_t[tt]) >= 2:
 			Highlight.play("multi_kill", {"count": int(down_by_t[tt])}, self)
@@ -1072,6 +1073,34 @@ func _play_event(e: Dictionary, t: int) -> float:
 				c4.float_text(str(e.status), Color("e0b85c"), 26)
 				c4.flash(K.GOLD)
 			_log("　%s 获得【%s】" % [_uname(int(e.tgt)), str(e.status)])
+			return 0.3
+		"stack":
+			var cs = _card(int(e.tgt))
+			if cs != null:
+				cs.float_text("%s ×%d" % [str(e.status), int(e.stacks)], Color("ffd21f") if str(e.status) in ["蓄力", "铁壁"] else Color("ff7a6a"), 26)
+				cs.flash(K.GOLD)
+			_log("　%s 的【%s】叠到 %d 层" % [_uname(int(e.tgt)), str(e.status), int(e.stacks)])
+			return 0.35
+		"stack_capped":
+			var csc = _card(int(e.tgt))
+			if csc != null:
+				csc.float_text("本轮已叠过", K.MUTED, 20)
+			return 0.15
+		"stack_spent":
+			var cx = _card(int(e.tgt))
+			if cx != null:
+				cx.float_text("蓄力 ×%d 爆发!" % int(e.stacks), Color("ffd21f"), 32)
+				cx.flash(K.GOLD)
+			toast("蓄力爆发！%d 层一次放出" % int(e.stacks), K.GOLD)
+			Highlight.play("stack_burst", {"stacks": int(e.stacks)}, self)
+			_log("　%s 用掉 %d 层蓄力" % [_uname(int(e.tgt)), int(e.stacks)])
+			return 0.5
+		"burn":
+			var cb = _card(int(e.tgt))
+			if cb != null:
+				cb.float_text("灼烧 -%d" % int(e.amount), Color("ff5a2a"), 26)
+				cb.flash(Color("ff5a2a"))
+			_log("　%s 被灼烧（%d 层）：%d 点" % [_uname(int(e.tgt)), int(e.stacks), int(e.amount)])
 			return 0.3
 		"block":
 			var c5 = _card(int(e.tgt))

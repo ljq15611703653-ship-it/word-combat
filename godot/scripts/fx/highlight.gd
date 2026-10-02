@@ -4,7 +4,7 @@ extends RefCounted
 #   level_clear     冒险通关一关          ctx: {id, hints_used, boss(bool)}
 #   boss_defeated   冒险章节 boss 被击败   ctx: {id, chapter}
 #   multi_kill      一轮里同一秒击倒 >= 2 个   ctx: {count, side}
-#   perfect_counter 完美反制（打断成功 / 转移或改道反杀 / 转伤为疗保命）  ctx: {kind, side}
+#   stack_burst     蓄力爆发（一次用掉多层）  ctx: {stacks, targets}
 #   reversal        翻盘（分数落后时一轮反超）   ctx: {swing, side}
 #   rare_word       抽到稀有词（奇术类）    ctx: {word}
 # 素材约定：放 res://assets/fx/highlight_<kind>.tscn（场景根节点实现 play(ctx: Dictionary)，演完自己 queue_free），

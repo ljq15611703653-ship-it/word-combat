@@ -1,4 +1,5 @@
 extends Node3D
+const E = preload("res://scripts/core/engine.gd")
 # 桌上的一个随从：模型 + 头顶的名字/生命/状态 + 点选碰撞体 + 全套代码动画。
 # 对外接口与 2D 的 minion_card.gd 一致（battle_screen 可以无差别使用）。
 
@@ -127,7 +128,7 @@ func refresh(u: Dictionary, sk: Array) -> void:
 	unit = u
 	skills = sk
 	MB.apply_attachments(model, u, sk)
-	MB.apply_status_fx(model, u.get("statuses", []))
+	MB.apply_status_fx(model, E.display_statuses(u))
 	name_label.text = "%s" % u.get("name", "?")
 	var maxhp := int(u.get("max_hp", 1))
 	var hp := int(u.get("hp", maxhp))
@@ -137,8 +138,8 @@ func refresh(u: Dictionary, sk: Array) -> void:
 		shown_hp = hp
 	_set_hp_visual(float(hp), maxhp)
 	var parts: Array = []
-	for s in u.get("statuses", []):
-		parts.append(str(s.name) + (" %d" % int(s.value) if s.name == "护盾" else ""))
+	for s in E.display_statuses(u):
+		parts.append(str(s.name) + (("×%d" % int(s.stacks)) if int(s.stacks) > 0 else (" %d" % int(s.value) if s.name == "护盾" else "")))
 	if str(u.get("kw", "")) != "":
 		parts.append("◆" + str(u.kw) + ("(已用)" if u.get("kw_spent", false) else ""))
 	status_label.text = "  ".join(parts)

@@ -252,7 +252,8 @@ static func word_card(word: String, count: int = 1, used: int = -1, size: Vector
 		root.modulate = Color(1, 1, 1, 0.4)
 	# 数量角标（放在容器之外，不参与排版）
 	if count > 1 or used >= 0:
-		var txt: String = ("%d/%d" % [used, count]) if used >= 0 else ("×%d" % count)
+		var cstr: String = "∞" if count >= 50 else str(count)      # 基础词无限供应
+		var txt: String = ("%d/%s" % [used, cstr]) if used >= 0 else ("×%s" % cstr)
 		var bcol := Color("3a4263")
 		if used >= 0:
 			bcol = Color("7a3a36") if used > count else (Color("2c5c44") if used < count else Color("4a4f66"))
@@ -272,7 +273,7 @@ static func word_card(word: String, count: int = 1, used: int = -1, size: Vector
 # 小词条（用于“所需词”条）：有货绿，缺货红
 static func word_tag(word: String, ok: bool, n: int = 1) -> Control:
 	var col := Color("2b5a43") if ok else Color("7d3430")
-	var t := chip(word + (("×%d" % n) if n > 1 else ""), col, 14)
+	var t := chip(word + (("×%d" % n) if (n > 1 and n < 50) else ("（无限）" if n >= 50 else "")), col, 14)
 	var info: Dictionary = Lex.get_word(word)
 	t.tooltip_text = "%s〔%s〕%s" % [word, info.get("cat", ""), info.get("desc", "")]
 	return t

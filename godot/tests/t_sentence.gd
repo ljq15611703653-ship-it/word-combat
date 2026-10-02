@@ -126,7 +126,7 @@ func rnode(depth := 0, ctx := "") -> Dictionary:
 		if rng.randf() < 0.3: n["dbl"] = 1
 	elif r < 0.45:
 		var st: String = pick(G.STATUSES)
-		n = G.status(st, rt(), pick([0, 5]), rng.randi_range(5, 30) if st == "护盾" else 0, rt() if st == "牵连" else {})
+		n = G.status(st, rt(), 0, 0, {})
 		if rng.randf() < 0.2: n["dbl"] = 1
 	elif r < 0.5:
 		n = G.remove(pick(["限时效果", "状态"]), rt())

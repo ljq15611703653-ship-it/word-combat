@@ -9,7 +9,7 @@ const BUDGET := 100     # 四张卡：生命 + 数字 共 100 点
 const COUNT := 4        # 每方随从数
 const MAX_SKILLS := 1      # 一个随从一招（招里可以用“并”连多个效果）
 const GLYPHS := ["剑", "盾", "咒", "弓"]
-const KEYWORDS := ["首挡", "不屈", "回击", "回春", "同调", "免疫狂振", "免疫牵连", "免疫升华"]
+const KEYWORDS := ["首挡", "不屈", "回击", "回春", "同调", "免疫易伤", "免疫灼烧", "免疫衰弱"]
 
 static func new_deck() -> Dictionary:
 	var units: Array = []

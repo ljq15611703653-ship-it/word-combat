@@ -81,18 +81,11 @@ static func catalog() -> Array:
 				{"key": "n", "label": "投入", "kind": "int", "min": 1, "max": 60, "default": 20},
 				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
 			]},
-		{"id": "shield", "family": "守", "title": "护盾", "glyph": "盾", "blurb": "施加护盾，吸收所填数值的伤害。",
+		{"id": "status", "family": "控", "title": "叠层状态", "glyph": "咒", "blurb": "每次叠一层（每轮每个目标最多两次），层数跨轮保留、倒下清零，效果指数增长：易伤、灼烧、衰弱给敌人，蓄力、铁壁给自己。",
 			"params": [
-				{"key": "tgt", "label": "目标", "kind": "enum", "options": ALLY_PICKS, "default": "self"},
-				{"key": "n", "label": "吸收", "kind": "int", "min": 1, "max": 60, "default": 15},
-				{"key": "dbl", "label": "双倍次数", "kind": "int", "min": 0, "max": 3, "default": 0},
-			]},
-		{"id": "status", "family": "控", "title": "施加状态", "glyph": "咒", "blurb": "给目标施加狂振、易伤、沉默、牵连或升华。",
-			"params": [
-				{"key": "st", "label": "状态", "kind": "enum", "options": [["狂振", "狂振"], ["易伤", "易伤"], ["沉默", "沉默"], ["牵连", "牵连"], ["升华", "升华"]], "default": "易伤"},
-				{"key": "tgt", "label": "目标", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
-				{"key": "allyside", "label": "施加给己方", "kind": "bool", "default": false},
-				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
+				{"key": "st", "label": "状态", "kind": "enum", "options": [["易伤", "易伤"], ["灼烧", "灼烧"], ["衰弱", "衰弱"], ["蓄力", "蓄力"], ["铁壁", "铁壁"]], "default": "易伤"},
+				{"key": "tgt", "label": "目标（敌方状态用）", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
+				{"key": "dbl", "label": "双倍次数（一次多叠几层）", "kind": "int", "min": 0, "max": 2, "default": 0},
 			]},
 		{"id": "redirect", "family": "反", "title": "改道", "glyph": "转", "blurb": "当被保护者即将受伤，把这次伤害转移给别人。",
 			"params": [
@@ -190,21 +183,14 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			nodes = [G.heal(tspec(p.tgt, "ally"), G.N(int(p.n)), {"alt": int(p.alt), "dbl": int(p.dbl)})]
 		"mit":
 			nodes = [G.mit(tspec(p.tgt, "ally"), p.mode, int(p.n), int(p.dur))]
-		"shield":
-			var shield := G.status("护盾", tspec(p.tgt, "ally"), 0, int(p.n))
-			if int(p.dbl) > 0:
-				shield["dbl"] = int(p.dbl)
-			nodes = [shield]
 		"status":
-			var side: String = "ally" if p.allyside else "enemy"
-			var link := {}
-			var tnode: Dictionary = G.T(p.tgt, side)
-			if p.st == "牵连":
-				link = G.T("other", "ally")
-				tnode = G.T("choose", "ally")
-			var stn := G.status(p.st, tnode, int(p.dur), 0, link)
+			var ally_side: bool = str(G.STATUS_SIDE.get(p.st, "enemy")) == "ally"
+			var tnode: Dictionary = G.T("choose", "ally") if ally_side else tspec(p.tgt, "enemy")
+			var stn := G.status(p.st, tnode, 0, 0, {})
+			if int(p.dbl) > 0:
+				stn["dbl"] = int(p.dbl)
 			nodes = [stn]
-			title = "施加" + p.st
+			title = "叠" + p.st
 		"redirect":
 			var to: Dictionary
 			match p.to:

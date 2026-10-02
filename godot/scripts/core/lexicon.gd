@@ -61,76 +61,69 @@ static func implemented() -> Array:
 			out.append(n)
 	return out
 
-# 应对/反制类的词在词袋里更常出现（权重倍数）：这些词一套要凑好几张，原来几乎凑不齐，所以反制很少出现。
-const COUNTER_BOOST := {
-	"沉默": 5, "转移": 4, "来源": 4, "转为": 4, "即将受到伤害": 4, "受到伤害": 4, "每次": 4, "当": 4,
-	"延后": 3, "换位": 3, "移除": 3, "限时效果": 3, "减伤": 4, "护盾": 4, "牵连": 3, "该次伤害": 3, "技能": 4,
-}
+# 基础词（语法胶水）无限供应：每个基础词给 BASIC_SUPPLY 张，等于想用几次用几次，只付价格。
+# 进阶词和奇术词只能从词兜子里拿，拿到的词永久留在词库里（一次只能装在一处）。
+const BASIC_SUPPLY := 99
+static var BAG_SIZE := 6              # 每个词兜子里的进阶词个数
+static var BAGS_PER_ROUND := 5        # 每轮战斗结束后摆出的兜子数
+static var RARE_SHARE := 0.15         # 兜子里每个位置是奇术词的概率
 
-# 词袋：每袋25词，基础40% 进阶45% 奇术15%，同类内按权重；至少10个基础词（宁可不平衡，也不要平庸）。
-static func draw_bag(rng: RandomNumberGenerator, size: int = 25) -> Array:
+static func is_basic(name: String) -> bool:
 	load_all()
-	var pools := {"基础": [], "进阶": [], "奇术": []}
+	return words.has(name) and str(words[name].rarity) == "基础"
+
+static func basic_supply() -> Dictionary:
+	load_all()
+	var out := {}
+	for n in order:
+		var w: Dictionary = words[n]
+		if w.impl and w.rarity == "基础":
+			out[n] = BASIC_SUPPLY
+	return out
+
+# 兜了：只含进阶词和奇术词（基础词不用抢）；同一个兜子里词不重复
+static func draw_bag(rng: RandomNumberGenerator, size: int = -1) -> Array:
+	load_all()
+	if size < 0:
+		size = BAG_SIZE
+	var adv: Array = []
+	var rare: Array = []
 	for n in order:
 		var w: Dictionary = words[n]
 		if not w.impl:
 			continue
-		for i in int(w.weight) * int(COUNTER_BOOST.get(n, 1)):
-			pools[w.rarity].append(n)
+		if w.rarity == "进阶":
+			for i in int(w.weight):
+				adv.append(n)
+		elif w.rarity == "奇术":
+			for i in int(w.weight):
+				rare.append(n)
 	var bag: Array = []
 	var guard := 0
-	while true:
-		bag.clear()
-		for i in size:
-			var r := rng.randf()
-			var key := "基础" if r < 0.40 else ("进阶" if r < 0.85 else "奇术")
-			var pool: Array = pools[key]
-			bag.append(pool[rng.randi() % pool.size()])
-		var basics := 0
-		for n in bag:
-			if words[n].rarity == "基础":
-				basics += 1
+	while bag.size() < size and guard < 200:
 		guard += 1
-		if basics >= size * 2 / 5 or guard > 50:
-			break
-	# 保底：每袋都有“造成 伤害”，不至于整袋拼不出任何攻击
-	for core in ["造成", "伤害"]:
-		if not (core in bag):
-			var idx := rng.randi() % bag.size()
-			while bag[idx] in ["造成", "伤害"]:
-				idx = rng.randi() % bag.size()
-			bag[idx] = core
+		var src: Array = rare if rng.randf() < RARE_SHARE else adv
+		var pick: String = src[rng.randi() % src.size()]
+		if not (pick in bag):
+			bag.append(pick)
 	bag.sort_custom(func(a, b): return words[a].id < words[b].id)
 	return bag
 
-# 开局12词：一套完整基础攻击句 + 一套应对句（自身治疗/自身减伤/受伤时转移给来源），其余基础词随机。
-const OPENING_COUNT := 26      # 开局发的基础词（含一套基础攻击句 + 一套应对句）
-
-static func opening_words(rng: RandomNumberGenerator) -> Array:
-	load_all()
-	var attacks := [
-		["造成", "伤害", "选择", "一个", "敌方", "随从"],
-		["造成", "伤害", "最前", "敌方", "随从"],
-		["造成", "伤害", "最低生命", "敌方", "随从"],
-		["造成", "伤害", "随机", "敌方", "随从"],
-	]
-	var responses := [
-		["恢复", "生命", "自身"],
-		["减伤", "自身"],
-		["当", "即将受到伤害", "自身", "转移", "来源"],
-	]
+static func draw_bags(rng: RandomNumberGenerator, n: int = -1) -> Array:
+	if n < 0:
+		n = BAGS_PER_ROUND
 	var out: Array = []
-	var a1 := rng.randi() % attacks.size()
-	var a2 := (a1 + 1 + rng.randi() % (attacks.size() - 1)) % attacks.size()
-	out.append_array(attacks[a1])
-	out.append_array(attacks[a2])        # 两套不同的攻击句：第一张卡就能拼得有分量
-	out.append_array(responses[rng.randi() % responses.size()])
-	var basics: Array = []
-	for n in order:
-		var w: Dictionary = words[n]
-		if w.impl and w.rarity == "基础":
-			for i in int(w.weight):
-				basics.append(n)
-	while out.size() < OPENING_COUNT:
-		out.append(basics[rng.randi() % basics.size()])
+	for i in n:
+		out.append(draw_bag(rng))
+	return out
+
+# 兼容旧调用：开局的“词库”就是全部基础词（无限）
+const OPENING_COUNT := 0
+
+static func opening_words(_rng: RandomNumberGenerator) -> Array:
+	var out: Array = []
+	var sup := basic_supply()
+	for n in sup:
+		for i in int(sup[n]):
+			out.append(n)
 	return out

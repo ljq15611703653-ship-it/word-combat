@@ -664,7 +664,7 @@ func _update_rack() -> void:
 			for c in badge.find_children("*", "Label", true, false):
 				lab = c
 		if lab != null:
-			lab.text = "×%d" % left
+			lab.text = "∞" if left >= 50 else ("×%d" % left)
 		badge.visible = int(pool.get(w, 0)) > 1 or left == 0
 	for pname in part_tiles:
 		var pt: Control = part_tiles[pname]

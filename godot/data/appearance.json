@@ -15,9 +15,9 @@
     {"when": {"kw": "回击"}, "slot": "shoulder_r", "asset": "models/attachments/thorns.glb", "proc": "thorns", "color": "#d8d0b8", "priority": 9},
     {"when": {"kw": "回春"}, "slot": "shoulder_l", "asset": "models/attachments/vines.glb", "proc": "vines", "color": "#4fae5c", "priority": 9},
     {"when": {"kw": "同调"}, "slot": "chest", "asset": "models/attachments/twin_ring.glb", "proc": "twin_ring", "color": "#6fd0e0", "priority": 8},
-    {"when": {"kw": "免疫狂振"}, "slot": "chest", "asset": "models/attachments/amulet.glb", "proc": "amulet", "color": "#d84a3c", "priority": 7},
-    {"when": {"kw": "免疫牵连"}, "slot": "chest", "asset": "models/attachments/amulet.glb", "proc": "amulet", "color": "#8c5cd8", "priority": 7},
-    {"when": {"kw": "免疫升华"}, "slot": "chest", "asset": "models/attachments/amulet.glb", "proc": "amulet", "color": "#e0b84a", "priority": 7},
+    {"when": {"kw": "免疫易伤"}, "slot": "chest", "asset": "models/attachments/amulet.glb", "proc": "amulet", "color": "#d84a3c", "priority": 7},
+    {"when": {"kw": "免疫灼烧"}, "slot": "chest", "asset": "models/attachments/amulet.glb", "proc": "amulet", "color": "#8c5cd8", "priority": 7},
+    {"when": {"kw": "免疫衰弱"}, "slot": "chest", "asset": "models/attachments/amulet.glb", "proc": "amulet", "color": "#e0b84a", "priority": 7},
 
     {"when": {"word": "双倍"}, "slot": "aura", "asset": "models/attachments/ring_double.glb", "proc": "ring_double", "color": "#f0c850", "priority": 6},
     {"when": {"word": "重复"}, "slot": "ghost", "asset": "models/attachments/afterimage.glb", "proc": "afterimage", "color": "#9ab0ff", "priority": 6},
@@ -43,6 +43,10 @@
     "沉默": {"proc": "aura_lock", "color": "#8a90a0"},
     "护盾": {"proc": "aura_shield", "color": "#5aa0f0"},
     "牵连": {"proc": "aura_link", "color": "#a070e0"},
-    "升华": {"proc": "aura_gold", "color": "#f0c850"}
+    "升华": {"proc": "aura_gold", "color": "#f0c850"},
+    "灼烧": {"proc": "aura_fire", "color": "#ff5a2a"},
+    "衰弱": {"proc": "aura_lock", "color": "#7a6f8a"},
+    "蓄力": {"proc": "aura_gold", "color": "#ffd21f"},
+    "铁壁": {"proc": "aura_shield", "color": "#5aa0f0"}
   }
 }

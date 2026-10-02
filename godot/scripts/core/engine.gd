@@ -7,7 +7,7 @@ const G = preload("res://scripts/core/grammar.gd")
 
 const TICKS := 20          # 0..19 为时间轴，20 为回合结束阶段
 const STRIDE := 21         # 每轮占的绝对时间刻数
-const DEFAULT_RULES := {"win_score": 80, "max_rounds": 10, "ap_gain": 45, "ap_cap": 180, "start_ap": 45}
+const DEFAULT_RULES := {"win_score": 150, "max_rounds": 12, "ap_gain": 45, "ap_cap": 180, "start_ap": 45, "cooldown": 0}
 
 # ================================================================ 状态创建
 # deck: {units:[{name,max_hp,kw,skills:[skill…]}×5]}
@@ -15,7 +15,7 @@ static func make_state(decks: Array, first: int = 0, rules: Dictionary = {}, see
 	var st := {
 		"round": 0, "first": first, "sides": [], "effects": [], "next_eid": 1, "lib": {}, "seed": seed_val,
 		"winner": -1, "rules": DEFAULT_RULES.duplicate(), "events": [], "acts": [], "items": [], "ledger": {},
-		"guard": 0, "root_ctr": 0, "used": {}, "cur_t": 0, "abs_now": 0, "sid_ctr": 0, "log": [], "round_taken": {},
+		"guard": 0, "root_ctr": 0, "used": {}, "cur_t": 0, "abs_now": 0, "sid_ctr": 0, "log": [], "round_taken": {}, "cd": {},
 	}
 	for k in rules:
 		st.rules[k] = rules[k]
@@ -33,7 +33,7 @@ static func set_deck(st: Dictionary, s: int, deck: Dictionary, fresh: bool = fal
 		var u: Dictionary
 		if fresh:
 			u = {"uid": s * 10 + i, "side": s, "name": d.name, "max_hp": int(d.max_hp), "hp": int(d.max_hp), "down_round": -1,
-				"statuses": [], "kw": d.get("kw", ""), "kw_spent": false, "bonus": 0, "skill_ids": [], "glyph": d.get("glyph", "")}
+				"statuses": [], "stacks": {}, "stack_round": {}, "kw": d.get("kw", ""), "kw_spent": false, "bonus": 0, "skill_ids": [], "glyph": d.get("glyph", "")}
 			side.units.append(u)
 		else:
 			u = _u(st, s * 10 + i)
@@ -67,6 +67,7 @@ static func clone_state(st: Dictionary) -> Dictionary:
 	for e in st.effects:
 		c.effects.append(e.duplicate(false))
 	c.round_taken = st.round_taken.duplicate()
+	c.cd = st.cd.duplicate()
 	c.events = []
 	c.items = []
 	c.acts = []
@@ -104,7 +105,34 @@ static func position_of(st: Dictionary, uid: int) -> int:
 			return i
 	return -1
 
+# ---- 叠层状态：层数跨轮保留，倒下清零；效果随层数指数增长
+static var STACK_BASE := 2.0       # 每多一层，效果大约翻 STACK_BASE 倍
+static var STACK_UNIT := 4.0       # 曲线的“起步慢”程度：k(n) = (BASE^n - 1) / UNIT
+static var STACK_MAX := 8
+static var STACK_PER_ROUND := 2   # 同一个单位同一种状态每轮最多叠几次
+
+static func stacks_of(u: Dictionary, name: String) -> int:
+	return int(u.get("stacks", {}).get(name, 0))
+
+static func stack_k(n: int) -> float:
+	if n <= 0:
+		return 0.0
+	return (pow(STACK_BASE, float(n)) - 1.0) / STACK_UNIT
+
+# 给界面显示用：旧式状态 + 叠层状态（带层数）
+static func display_statuses(u: Dictionary) -> Array:
+	var out: Array = []
+	for s in u.get("statuses", []):
+		out.append({"name": s.name, "value": int(s.get("value", 0)), "stacks": 0})
+	for name in G.STACK_STATUSES:
+		var n: int = stacks_of(u, name)
+		if n > 0:
+			out.append({"name": name, "value": 0, "stacks": n})
+	return out
+
 static func has_status(u: Dictionary, name: String) -> bool:
+	if stacks_of(u, name) > 0:
+		return true
 	for s in u.statuses:
 		if s.name == name:
 			return true
@@ -135,7 +163,7 @@ static func begin_round(st: Dictionary) -> Array:
 	st.used = {}
 	st.round_taken = {}
 	var revived: Array = []
-	# 每一轮都是干净的：监听、减伤、状态、护盾、已存的升华增量都不跨轮
+	# 每一轮都是干净的：监听、减伤、旧式状态都不跨轮；只有“叠层状态”的层数会留到下一轮
 	st.effects = []
 	for s in 2:
 		var side: Dictionary = st.sides[s]
@@ -147,6 +175,8 @@ static func begin_round(st: Dictionary) -> Array:
 				u.down_round = -1
 				u.hp = u.max_hp
 				u.statuses = []
+				u.stacks = {}
+				u.stack_round = {}
 				u.bonus = 0
 				revived.append(u.uid)
 	return revived
@@ -193,6 +223,10 @@ static func can_declare(st: Dictionary, act: Dictionary, declared: Array = []) -
 	var host := _u(st, host_of(st, act.sid))
 	if not _alive(host):
 		return "持有者已倒下"
+	if int(st.rules.get("cooldown", 0)) > 0 and G.is_advanced_skill(sk):
+		var last_cast: int = int(st.cd.get(host.uid, -99))
+		if int(st.round) - last_cast <= int(st.rules.cooldown):
+			return "冷却中：含进阶词的技能用过之后要隔 %d 轮" % int(st.rules.cooldown)
 	var cost := action_cost(st, act)
 	if _silenced_for(host, cost):
 		return "持有者被沉默（持续期间无法发动技能）"
@@ -271,6 +305,7 @@ static func run_round(st: Dictionary, acts: Array) -> Dictionary:
 			var rec := {"side": a.side, "active": true, "sid": a.sid, "choices": a.get("choices", {}), "start": int(a.start), "host": host_of(st, a.sid),
 				"paid": cost, "cancelled": false, "idx": st.acts.size()}
 			st.acts.append(rec)
+			st.cd[rec.host] = int(st.round)
 			paid_by[a.side].append(a)
 			_log(st, int(a.start), "declare", {"side": a.side, "sid": a.sid, "start": int(a.start), "cost": cost})
 	# 行动点在全部校验完之后统一扣除（校验时已按累计算过）
@@ -657,7 +692,7 @@ static func _exec(st: Dictionary, node: Dictionary, ctx: Dictionary) -> void:
 					var ls := _targets(st, node.link, ctx, "l%d" % node.id)
 					if not ls.is_empty():
 						link = ls[0]
-				_emit(st, {"kind": "status", "src": ctx.host, "tgt": uid, "status": node.status, "dur": int(node.dur), "value": val, "link": link,
+				_emit(st, {"kind": "status", "src": ctx.host, "tgt": uid, "status": node.status, "dur": int(node.dur), "value": val, "link": link, "dbl": int(node.get("dbl", 0)),
 					"root": int(ctx.get("root", _new_root(st)))})
 		"remove":
 			if node.what == "状态":
@@ -778,6 +813,8 @@ static func _exec_effect(st: Dictionary, node: Dictionary, ctx: Dictionary) -> v
 	var amt := _apply_mods(node, _value(st, node.value, ctx))
 	for uid in targets:
 		var e := {"kind": node.kind, "src": ctx.host, "tgt": uid, "amount": amt, "root": int(ctx.get("root", _new_root(st)))}
+		if int(ctx.get("act", -1)) >= 0:
+			e["ck"] = "%d:%d:%d" % [int(st.round), int(ctx.act), int(node.id)]      # 同一次出手里同一个效果的标识（蓄力放大用）
 		if ctx.has("on_actual"):
 			e["on_actual"] = ctx.on_actual
 		if ctx.has("on_copy"):
@@ -994,8 +1031,27 @@ static func _apply_damage(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 			amount = (amount * 5 + 3) / 4
 		if has_status(tgt, "狂振"):
 			amount = (amount * 5 + 3) / 4
-		if has_status(tgt, "易伤"):
-			amount = (amount * 3 + 1) / 2
+		# 叠层状态：蓄力（打出去时用掉全部层数）、衰弱（出手变弱）、易伤、铁壁（受到的伤害变化）
+		if not src.is_empty():
+			var kc: int = stacks_of(src, "蓄力")
+			var ch: Dictionary = src.get("charge", {})
+			if kc > 0:
+				var mult: float = 1.0 + stack_k(kc)
+				amount = int(round(float(amount) * mult))
+				src.stacks["蓄力"] = 0
+				src["charge"] = {"ck": str(e.get("ck", "")), "mult": mult}      # 同一次出手里这个效果的其余目标/重复也吃到放大
+				_log(st, t, "stack_spent", {"tgt": src.uid, "status": "蓄力", "stacks": kc})
+			elif not ch.is_empty() and str(ch.ck) != "" and str(ch.ck) == str(e.get("ck", "")):
+				amount = int(round(float(amount) * float(ch.mult)))
+			var kwk: int = stacks_of(src, "衰弱")
+			if kwk > 0:
+				amount = int(ceil(float(amount) / (1.0 + stack_k(kwk))))
+		var kv: int = stacks_of(tgt, "易伤")
+		if kv > 0:
+			amount = int(round(float(amount) * (1.0 + stack_k(kv))))
+		var kb: int = stacks_of(tgt, "铁壁")
+		if kb > 0:
+			amount = int(ceil(float(amount) / (1.0 + stack_k(kb))))
 		# 牵连：先平分，再各自减伤
 		for s in tgt.statuses:
 			if s.name == "牵连" and s.link >= 0 and not e.get("no_link", false):
@@ -1103,6 +1159,9 @@ static func _apply_status(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 	if tgt.kw == "免疫" + name:
 		_log(st, t, "immune", {"tgt": tgt.uid, "status": name})
 		return
+	if name in G.STACK_STATUSES:
+		_apply_stack(st, e, tgt, t)
+		return
 	var until: int = st.round * STRIDE
 	if int(e.get("dur", 0)) > 0:
 		until = mini(st.abs_now + int(e.dur), until)
@@ -1121,6 +1180,21 @@ static func _apply_status(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 				_apply(st, {"kind": "status", "src": e.src, "tgt": u.uid, "status": name, "dur": int(e.get("dur", 0)), "value": entry.value,
 					"link": -1, "root": e.root, "echo": true})
 				break
+
+# 叠层状态：每个单位每轮每种状态最多叠两次（“双倍”可以一次叠 2 的 n 次方层），上限 STACK_MAX
+static func _apply_stack(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int) -> void:
+	var name: String = e.status
+	var add: int = 1 << clampi(int(e.get("dbl", 0)), 0, 3)
+	var key_r: String = "%s@%d" % [name, int(st.round)]
+	var done_n: int = int(tgt.stack_round.get(key_r, 0))
+	if done_n >= STACK_PER_ROUND:
+		_log(st, t, "stack_capped", {"tgt": tgt.uid, "status": name})
+		return
+	tgt.stack_round[key_r] = done_n + 1
+	var n: int = mini(STACK_MAX, int(tgt.stacks.get(name, 0)) + add)
+	tgt.stacks[name] = n
+	_log(st, t, "stack", {"tgt": tgt.uid, "status": name, "stacks": n, "src": int(e.src)})
+	_fire(st, "status_applied", {"subject": tgt.uid, "src": e.src, "recipient": tgt.uid, "amount": 0, "root": e.root}, false)
 
 # 接续 / 复制：读取实际数值后继续
 static func _after_actual(st: Dictionary, e: Dictionary, actual: int, tgt: Dictionary, overflow: int = 0) -> void:
@@ -1157,6 +1231,8 @@ static func _settle(st: Dictionary, t: int) -> void:
 	for u in downs:
 		u.down_round = st.round
 		u.statuses = []
+		u.stacks = {}
+		u.stack_round = {}
 		st.sides[1 - u.side].score += int(u.max_hp)
 		_log(st, t, "down", {"tgt": u.uid, "score_side": 1 - u.side, "score": int(u.max_hp)})
 	for u in downs:
@@ -1179,6 +1255,14 @@ static func _end_phase(st: Dictionary) -> void:
 	for eff in st.effects.duplicate():
 		if eff.type == "watch" and eff.event == "round_end" and _active(st, eff) and not eff.spent:
 			_fire(st, "round_end", {"subject": eff.host, "src": eff.host, "recipient": eff.host, "amount": 0, "root": _new_root(st)}, false)
+	# 灼烧：回合结束时对每个带层的单位造成 2^(层数-1) 点伤害（前期很轻，叠到后期很痛）
+	for sd in 2:
+		for bu in st.sides[sd].units:
+			var kb2: int = stacks_of(bu, "灼烧")
+			if kb2 > 0 and bu.down_round == -1:
+				var dmg_b: int = 1 << (kb2 - 1)
+				_log(st, st.cur_t, "burn", {"tgt": bu.uid, "stacks": kb2, "amount": dmg_b})
+				_apply(st, {"kind": "dmg", "src": -1, "tgt": bu.uid, "amount": dmg_b, "root": _new_root(st), "no_link": true})
 	# 处理此阶段排入的项目
 	var guard := 0
 	while guard < 50:

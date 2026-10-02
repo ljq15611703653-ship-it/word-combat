@@ -400,7 +400,7 @@ func _durs(i: int) -> Array:
 			out.append({"i": i + 2, "dur": k})
 	return out
 
-# ---- 状态：目标 施加 状态 [数字] [双倍] [牵连对象] [持续 秒]
+# ---- 状态（叠层）：目标 施加 状态 [双倍]
 func _status(j: int, c: Dictionary, t: Dictionary) -> Array:
 	var out: Array = []
 	if not _w(j, "施加"):
@@ -408,28 +408,11 @@ func _status(j: int, c: Dictionary, t: Dictionary) -> Array:
 	for st in G.STATUSES:
 		if not _w(j + 1, st):
 			continue
-		var vals: Array = [{"i": j + 2, "n": 0}]
-		if st == "护盾" or st == "沉默":
-			vals = []
-			if st == "护盾":
-				var k := _num(j + 2, "value")
-				if k >= 0:
-					vals.append({"i": j + 3, "n": k})
-			else:
-				vals.append({"i": j + 2, "n": 0})
-		for vl in vals:
-			for d in _count_words(vl.i, "双倍", 3):
-				var links: Array = [{"i": d.i, "link": {}}]
-				if st == "牵连":
-					links = []
-					for lt in p_target(d.i, c):
-						links.append({"i": lt.i, "link": lt.v})
-				for lk in links:
-					for du in _durs(lk.i):
-						var node: Dictionary = G.status(st, t, int(du.dur), int(vl.n), lk.link)
-						if int(d.n) > 0:
-							node["dbl"] = int(d.n)
-						out.append({"i": du.i, "v": node})
+		for d in _count_words(j + 2, "双倍", 3):
+			var node: Dictionary = G.status(st, t, 0, 0, {})
+			if int(d.n) > 0:
+				node["dbl"] = int(d.n)
+			out.append({"i": d.i, "v": node})
 	return out
 
 # ---- 时间术：延后/提前 阵营 技能 数字 [双倍]（“打断”已取消）
@@ -676,8 +659,6 @@ static func node_tokens(node: Dictionary) -> Array:
 		"status":
 			out.append_array(target_tokens(node.target))
 			out.append_array([W("施加"), W(node.status)])
-			if node.status == "护盾":
-				out.append(Num(int(node.value.n)))
 			out.append_array(_rep("双倍", int(node.get("dbl", 0))))
 			if node.has("link"):
 				out.append_array(target_tokens(node.link))

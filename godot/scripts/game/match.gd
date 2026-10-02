@@ -14,6 +14,7 @@ const Coach = preload("res://scripts/core/coach.gd")
 const R = preload("res://scripts/core/recipes.gd")
 
 var rng := RandomNumberGenerator.new()
+static var AI_HP := 14          # 电脑拼每张卡时给的生命（其余预算给技能数字）；调平衡用
 var st: Dictionary = {}
 var decks: Array = []
 var pools: Array = [{}, {}]
@@ -23,6 +24,7 @@ var phase := "init"      # build draft adjust declare over
 var bags: Array = []
 var picker := 0
 var bag_choice := -1
+var bag_taken: Array = [-1, -1]     # 双方各拿走了第几个兜子
 var adjust_steps: Array = []   # 依次轮到的一方
 var adjust_idx := 0
 var declared: Array = [[], []]      # 每方本轮已宣告的行动（按宣告顺序）
@@ -54,8 +56,7 @@ func start(human0: bool = true, seed_val: int = -1, human1: bool = false, openin
 	human = [human0, human1]
 	pools = [{}, {}]
 	for s in 2:
-		for w in Lex.opening_words(rng):
-			pools[s][w] = int(pools[s].get(w, 0)) + 1
+		pools[s] = Lex.basic_supply()
 		personas[s] = Ai.pick_persona(rng)
 	decks = [D.new_deck(), D.new_deck()]
 	st = E.make_state(decks, 0, {}, rng.randi() & 0x7fffffff)
@@ -64,7 +65,7 @@ func start(human0: bool = true, seed_val: int = -1, human1: bool = false, openin
 	rounds_played = 0
 	opening_idx = 0
 	opening_total = openings
-	say("对局开始。双方各得 %d 个基础词，先轮流选 %d 轮词袋，再构筑。" % [Lex.OPENING_COUNT, opening_total])
+	say("对局开始。基础词随便用；进阶词要从兜子里拿，先后各选一兜。")
 	if opening_total > 0:
 		_next_opening()
 	else:
@@ -73,9 +74,10 @@ func start(human0: bool = true, seed_val: int = -1, human1: bool = false, openin
 # 开局选词：每次两袋，先挑的一方交替
 func _next_opening() -> void:
 	phase = "opening"
-	bags = [Lex.draw_bag(rng), Lex.draw_bag(rng)]
+	bags = Lex.draw_bags(rng)
 	picker = (int(st.first) + opening_idx) % 2
 	bag_choice = -1
+	bag_taken = [-1, -1]
 
 func _finish_opening() -> void:
 	phase = "build"
@@ -92,7 +94,7 @@ func begin_staged() -> void:
 	card_idx = 0
 	for s2 in 2:
 		for u in decks[s2].units:
-			u.max_hp = 8      # 没拼的卡先按 8 点生命占位，拼到它时再自己调
+			u.max_hp = AI_HP      # 没拼的卡先按默认生命占位，拼到它时再自己调
 		E.set_deck(st, s2, decks[s2], false)
 	_begin_card()
 
@@ -150,7 +152,7 @@ func _ai_targeted_card(side: int, k: int) -> Dictionary:
 		cands.append({"sc": sc, "a": a})
 	cands.sort_custom(func(x, y): return x.sc > y.sc)
 	# 给后面还没拼的卡留预算：每张卡的数字大致不超过“剩余数字预算 ÷ 剩余张数”
-	var hp_floor: int = 8 * D.COUNT
+	var hp_floor: int = AI_HP * D.COUNT
 	var nums_used := 0
 	for u0 in decks[side].units:
 		for sk0 in u0.skills:
@@ -158,7 +160,7 @@ func _ai_targeted_card(side: int, k: int) -> Dictionary:
 	var share: int = maxi(5, (D.BUDGET - hp_floor - nums_used) / maxi(1, D.COUNT - k))
 	for c in cands.slice(0, 8):
 		var sk: Dictionary = _shrink_skill(c.a, share)
-		var u := {"name": "", "glyph": D.GLYPHS[k % D.GLYPHS.size()], "max_hp": 10, "kw": "", "skills": [sk.duplicate(true)]}
+		var u := {"name": "", "glyph": D.GLYPHS[k % D.GLYPHS.size()], "max_hp": AI_HP, "kw": "", "skills": [sk.duplicate(true)]}
 		# 关键词：有就带上（首挡/回击等是白送的强度）
 		for kw in ["首挡", "回击", "不屈", "回春", "同调"]:
 			var left := int(avail.get(kw, 0))
@@ -219,7 +221,7 @@ func _ai_template_card(side: int, k: int) -> Dictionary:
 		var u: Dictionary = full.units[pick].duplicate(true)
 		u["name"] = Namer.minion_name(u, rng)
 		var nd := D.clone(decks[side])
-		u["max_hp"] = mini(int(u.max_hp), 10)
+		u["max_hp"] = mini(int(u.max_hp), AI_HP)
 		nd.units[k] = u
 		while int(D.budget_used(nd).total) > D.BUDGET and int(nd.units[k].max_hp) > 3:
 			nd.units[k].max_hp -= 1
@@ -303,7 +305,7 @@ func ready_for_round() -> bool:
 func begin_round() -> Array:
 	var revived := E.begin_round(st)
 	rounds_played = st.round
-	picker = E.first_side(st)
+	picker = 1 - E.first_side(st)      # 上一轮的先手先挑兜子（先手本来就吃亏）
 	bag_choice = -1
 	say("—— 第 %d 轮 ——  先手：%s" % [st.round, "你" if human[picker] else "对手"])
 	if int(st.round) == 1 and opening_total > 0 and not round1_draft:
@@ -311,18 +313,23 @@ func begin_round() -> Array:
 		bags = []
 		phase = "adjust_done"
 		return revived
-	bags = [Lex.draw_bag(rng), Lex.draw_bag(rng)]
+	bags = Lex.draw_bags(rng)
+	bag_taken = [-1, -1]
 	phase = "draft"
 	return revived
 
 func pick_bag(side: int, idx: int) -> void:
+	if bag_taken[side] != -1 or idx in bag_taken:
+		return
+	bag_taken[side] = idx
 	bag_choice = idx
 	for w in bags[idx]:
 		pools[side][w] = int(pools[side].get(w, 0)) + 1
-	for w in bags[1 - idx]:
-		pools[1 - side][w] = int(pools[1 - side].get(w, 0)) + 1
+	say("%s 拿走了第 %d 个兜子：%s。" % ["你" if human[side] else "对手", idx + 1, "、".join(bags[idx])])
+	if bag_taken[1 - side] == -1:
+		picker = 1 - side          # 轮到另一方，从剩下的兜子里拿一个
+		return
 	if phase == "opening":
-		say("开局选词 %d/%d：%s 选择了%s袋。" % [opening_idx + 1, opening_total, "你" if human[side] else "对手", "左" if idx == 0 else "右"])
 		opening_idx += 1
 		if staged:
 			card_idx += 1
@@ -333,17 +340,27 @@ func pick_bag(side: int, idx: int) -> void:
 		else:
 			_finish_opening()
 		return
-	say("%s 选择了%s袋。" % ["你" if human[side] else "对手", "左" if idx == 0 else "右"])
 	var f := E.first_side(st)
 	adjust_steps = [f, 1 - f, f, 1 - f, f, 1 - f]
 	adjust_idx = 0
 	phase = "adjust"
 
+func remaining_bags() -> Array:
+	var out: Array = []
+	for i in bags.size():
+		if not (i in bag_taken):
+			out.append(i)
+	return out
+
 func ai_pick_bag() -> void:
-	var idx := Ai.pick_bag(bags, pools[picker], personas[picker])
+	var rem: Array = remaining_bags()
+	var sub: Array = []
+	for i in rem:
+		sub.append(bags[i])
+	var idx: int = int(rem[Ai.pick_bag(sub, pools[picker], personas[picker])])
 	if staged and phase == "opening":
-		var plan: Dictionary = Coach.draft_plan(pools[picker], decks[picker], bags, revealed_deck(1 - picker))
-		idx = int(plan.pick)
+		var plan: Dictionary = Coach.draft_plan(pools[picker], decks[picker], sub, revealed_deck(1 - picker))
+		idx = int(rem[int(plan.pick)])
 	pick_bag(picker, idx)
 
 func adjust_side() -> int:
@@ -437,8 +454,10 @@ func _skill_cat(sk: Dictionary) -> String:
 	var p: Dictionary = sk.get("params", {})
 	if t == "time":
 		return str(p.get("op", "time"))
-	if t == "status" and str(p.get("st", "")) == "沉默":
-		return "silence"
+	if t == "status" and str(p.get("st", "")) in ["衰弱", "灼烧", "易伤"]:
+		return "debuff"
+	if t == "status" and str(p.get("st", "")) == "铁壁":
+		return "shield"
 	return t
 
 func _act_cat(a: Dictionary) -> String:

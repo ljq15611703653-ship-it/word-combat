@@ -15,6 +15,13 @@ static func plan(kind: String) -> Array:
 		for b in base:
 			b[2] = hp
 		return base
+	if kind == "C":
+		return [
+			["reflect", {"obs": "all", "mult": 1, "freq": "every"}, 18, "首挡"],
+			["status", {"st": "铁壁"}, 18, "不屈"],
+			["redirect", {"obs": "all", "to": "source", "n": 14, "freq": "every"}, 18, "回击"],
+			["atk1", {"tgt": "lowest", "n": 14}, 18, "回春"],
+		]
 	if kind == "B":
 		return [
 			["reflect", {"obs": "all", "mult": 1, "freq": "every"}, 15, "首挡"],
@@ -97,6 +104,13 @@ func _init() -> void:
 	var pol := str(args[2]) if args.size() > 2 else "forced"
 	var kind := str(args[3]) if args.size() > 3 else "A"
 	var apx := float(args[4]) if args.size() > 4 else 1.0
+	var cdov := int(args[5]) if args.size() > 5 else -1
+	for ai in range(6, args.size()):
+		var kv := str(args[ai]).split("=")
+		if kv.size() == 2 and kv[0] == "per":
+			E.STACK_PER_ROUND = int(kv[1])
+		elif kv.size() == 2 and kv[0] == "unit":
+			E.STACK_UNIT = float(kv[1])
 	var res := {"win": 0, "lose": 0, "draw": 0}
 	var by_seat := [[0, 0], [0, 0]]
 	var score_me := 0
@@ -109,6 +123,8 @@ func _init() -> void:
 			m.forced = pol == "forced"
 			m.kind = kind
 			m.start(false, s0 + g, false, 0)
+			if cdov >= 0:
+				m.st.rules.cooldown = cdov
 			if apx != 1.0:
 				m.st.rules.ap_gain = int(15 * apx)
 				m.st.rules.ap_cap = int(60 * apx)

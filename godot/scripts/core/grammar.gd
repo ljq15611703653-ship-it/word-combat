@@ -40,11 +40,18 @@ const REF_TEXT := {
 const OP_WORD := {"max": "较高者", "min": "较低者", "sum": "加上", "sub": "减去", "diff": "差值"}
 const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "加上", "sub": "减去", "diff": "差值"}
 const INFIX_OPS := ["sum", "sub"]      # 中缀：A 加上 B 减去 C，从左到右算（减不到 0 以下）
-const STATUSES := ["狂振", "牵连", "升华", "护盾", "易伤", "沉默"]
+# 叠层状态：每次施加叠一层（每轮每个单位最多叠两次），层数跨轮保留，倒下清零；效果随层数指数增长（前期慢，后期爆炸）
+# 己方用：蓄力、铁壁；敌方用：易伤、灼烧、衰弱（语法上谁都可以施加给谁）
+const STACK_STATUSES := ["易伤", "灼烧", "衰弱", "蓄力", "铁壁"]
+const STATUSES := ["易伤", "灼烧", "衰弱", "蓄力", "铁壁"]
 const STATUS_DESC := {
-	"狂振": "造成与受到的伤害各+25%", "牵连": "与另一名友方平分受到的伤害", "升华": "受到的治疗不回血，转为下次造成伤害的增量",
-	"护盾": "吸收所填数值的伤害", "易伤": "受到的伤害+50%", "沉默": "让持有者在持续期间无法发动技能",
+	"易伤": "每层让受到的伤害大幅增加（层数越多涨得越快）",
+	"灼烧": "每轮结束时受到伤害，第 n 层是 2 的 n-1 次方点",
+	"衰弱": "每层让造成的伤害大幅降低",
+	"蓄力": "下一次造成伤害时一次用掉所有层数，伤害大幅放大",
+	"铁壁": "每层让受到的伤害大幅降低",
 }
+const STATUS_SIDE := {"易伤": "enemy", "灼烧": "enemy", "衰弱": "enemy", "蓄力": "ally", "铁壁": "ally"}
 
 # ---------------------------------------------------------------- 目标式
 static func T(pick: String, side: String = "enemy", extra: Dictionary = {}) -> Dictionary:
@@ -447,6 +454,14 @@ static func _words_core(node: Dictionary) -> Array:
 			w.append_array(words_of(node.a))
 			w.append_array(words_of(node.b))
 	return w
+
+# 技能里有没有进阶/奇术词（有的话，这个技能用完要冷却）
+static func is_advanced_skill(sk: Dictionary) -> bool:
+	Lex.load_all()
+	for w in sk.get("words", []):
+		if Lex.words.has(w) and str(Lex.words[w].rarity) != "基础":
+			return true
+	return false
 
 # 技能的全部词（含“并”）
 static func skill_words(sk: Dictionary) -> Array:
@@ -857,16 +872,10 @@ static func _node_text_core(node: Dictionary) -> String:
 			var s: String = "使%s受到的伤害%s" % [target_text(node.target), ("每次减少 %s 点" % ("某某" if int(node.value.n) < 0 else str(int(node.value.n) / 2))) if node.get("mode", "") == "fixed" else ("降低 %s" % ("某某" if int(node.value.n) < 0 else "%d%%" % pct_of(int(node.value.n))))]
 			return s + mods_clause(node, "效果") + _dur_text(int(node.get("dur", 0)))
 		"status":
-			var s2: String = "给%s施加【%s】" % [target_text(node.target), node.status]
-			if node.status == "护盾":
-				s2 += "，可吸收 %s 点伤害%s" % ["某某" if int(node.value.n) < 0 else str(int(node.value.n)), mods_clause(node, "吸收量")]
-			elif node.status == "沉默":
-				s2 += "，使其无法发动技能"
-			elif STATUS_DESC.has(node.status) and node.status != "牵连":
+			var s2: String = "给%s叠 %s 层【%s】" % [target_text(node.target), "1" if int(node.get("dbl", 0)) == 0 else str(1 << int(node.dbl)), node.status]
+			if STATUS_DESC.has(node.status):
 				s2 += "（%s）" % STATUS_DESC[node.status]
-			if node.status == "牵连" and node.has("link"):
-				s2 = "给%s施加【牵连】：与%s平分受到的伤害" % [target_text(node.target), target_text(node.link)]
-			return s2 + _dur_text(int(node.get("dur", 0)))
+			return _after_text(node) + s2
 		"remove":
 			return "移除%s身上的%s" % [target_text(node.target), node.what]
 		"watch":
@@ -945,5 +954,9 @@ static func _node_tag(n: Dictionary) -> String:
 		"mit": return "def"
 		"watch": return "trap"
 		"time", "remove", "swap": return "ctl"
-		"status": return "buff"
+		"status":
+			match str(n.get("status", "")):
+				"铁壁": return "def"
+				"蓄力": return "buff"
+				_: return "ctl"
 	return "atk"

@@ -129,7 +129,7 @@ func load_skill(sk: Dictionary, avail_words: Dictionary, pts_other: int) -> void
 # 每种效果的“核心词”：手上有这些词才排在前面（其余放到“缺词”分组，避免一上来看到一大堆用不了的东西）
 const CORE_WORDS := {
 	"dmg": [["造成", "伤害"], ["减少", "当前生命"]], "heal": [["恢复", "生命"], ["增加", "当前生命"]], "mit": [["减伤"]],
-	"status": [["施加"]], "remove": [["移除"]], "watch": [["当"]], "time": [["打断", "技能"], ["延后", "技能"], ["提前", "技能"]],
+	"status": [["施加"]], "remove": [["移除"]], "watch": [["当"]], "time": [["延后", "技能"], ["提前", "技能"]],
 	"swap": [["换位"]], "split": [["分流"]], "chain": [["接续"]], "copy": [["复制"]], "if": [["若"]], "choose": [["择一"]], "until": [["直到"]],
 }
 
@@ -166,7 +166,7 @@ func _new_node(kind: String) -> Dictionary:
 		"status": return G.status("易伤", G.T("choose", "enemy"))
 		"remove": return G.remove("限时效果", G.T("choose", "enemy"))
 		"watch": return G.watch("damaged", G.T("self", "self"), G.dmg(G.T("source", "ref"), G.REF("event_damage")), {"freq": "every"})
-		"time": return G.time_op("interrupt", "enemy", 30)
+		"time": return G.time_op("delay", "enemy", 4)
 		"swap": return G.swap(G.T("choose", "ally"))
 		"split": return G.split("dmg", 20, [{"target": G.T("choose", "enemy"), "part": 12, "delay": 0}, {"target": G.T("lowest", "enemy"), "part": 8, "delay": 0}])
 		"chain": return G.chain(G.dmg(G.T("choose", "enemy"), G.N(10)), G.heal(G.T("self", "self"), G.REF("prev")))
@@ -314,25 +314,12 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 		"status":
 			v.add_child(_row("状态", _enum(G.STATUSES, G.STATUSES.find(node.status), func(i):
 				node["status"] = G.STATUSES[i]
-				if node.status == "牵连" and not node.has("link"):
-					node["link"] = G.T("other", "ally")
-				elif node.status != "牵连":
-					node.erase("link")
 				chg.call())))
 			v.add_child(_row("目标", _target(node.target, in_watch, chg)))
-			if node.status == "牵连":
-				v.add_child(_row("牵连对象", _target(node.get("link", G.T("other", "ally")), in_watch, chg)))
 			var r4 := K.hbox(12)
-			r4.add_child(_row("持续(秒,0=本轮)", _spin(int(node.dur), 0, 20, func(x):
-				node["dur"] = x
+			r4.add_child(_row("双倍（一次多叠几层）", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
+				node["dbl"] = x
 				chg.call())))
-			if node.status == "护盾" or node.status == "沉默":
-				r4.add_child(_row("吸收" if node.status == "护盾" else "力度", _spin(int(node.value.n), 1, 80, func(x):
-					node.value["n"] = x
-					chg.call())))
-				r4.add_child(_row("双倍", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
-					node["dbl"] = x
-					chg.call())))
 			v.add_child(r4)
 		"remove":
 			v.add_child(_row("移除", _enum(["限时效果", "状态"], 0 if node.what == "限时效果" else 1, func(i):
@@ -387,24 +374,18 @@ func _node_card(node: Dictionary, ctx: String, nested: bool, on_change: Callable
 				node["dbl"] = x
 				chg.call())))
 		"time":
-			v.add_child(_row("方式", _enum(["打断", "延后", "提前"], ["interrupt", "delay", "advance"].find(node.op), func(i):
-				node["op"] = ["interrupt", "delay", "advance"][i]
+			v.add_child(_row("方式", _enum(["延后", "提前"], ["delay", "advance"].find(node.op), func(i):
+				node["op"] = ["delay", "advance"][i]
 				node["side"] = "ally" if node.op == "advance" else "enemy"
-				if node.op == "interrupt":
-					node.value["n"] = maxi(int(node.value.n), 20)
-				elif int(node.value.n) < 1 or int(node.value.n) > 19:
+				if int(node.value.n) < 1 or int(node.value.n) > 19:
 					node.value["n"] = 3
 				chg.call())))
 			v.add_child(_row("对象", _enum(["对方技能", "己方技能"], 0 if node.side == "enemy" else 1, func(i):
 				node["side"] = "enemy" if i == 0 else "ally"
 				chg.call())))
-			v.add_child(_row("打断力度" if node.op == "interrupt" else "秒数", _spin(int(node.value.n), 1, 80 if node.op == "interrupt" else 19, func(x):
+			v.add_child(_row("秒数", _spin(int(node.value.n), 1, 19, func(x):
 				node.value["n"] = x
 				chg.call())))
-			if node.op == "interrupt":
-				v.add_child(_row("双倍", _spin(int(node.get("dbl", 0)), 0, 3, func(x):
-					node["dbl"] = x
-					chg.call())))
 			v.add_child(_row("延后(秒)", _spin(int(node.get("delay", 0)), 0, 19, func(x):
 				node["delay"] = x
 				chg.call())))

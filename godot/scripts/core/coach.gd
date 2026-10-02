@@ -22,8 +22,8 @@ const ROUTES := [
 	["汲取", "drain", {}, "攻", 1.5, "打人并按伤害回血"],
 	["治疗·全队", "heal", {"tgt": "all"}, "守", 1.2, "给全队回血"],
 	["减伤·全队", "mit", {"tgt": "all", "mode": "pct"}, "守", 1.4, "全队受伤降低一截"],
-	["护盾·全队", "shield", {"tgt": "all"}, "守", 1.4, "给全队套护盾吸收伤害"],
-	["护盾·全队·双倍", "shield", {"tgt": "all", "dbl": 1}, "守", 2.2, "全队双倍护盾，扛范围大招"],
+	["铁壁", "status", {"st": "铁壁"}, "守", 2.6, "给自己叠铁壁：层数越多，受到的伤害降得越多（前期慢，后期很硬）"],
+	["蓄力", "status", {"st": "蓄力"}, "攻", 2.8, "给自己叠蓄力：忍着，叠够了一次打出去，伤害指数放大"],
 	["改道·全队→来源", "redirect", {"obs": "all", "to": "source", "freq": "every"}, "反", 2.4, "把打向我方的伤害转给出招的人，大招反噬"],
 	["改道·全队·双倍", "redirect", {"obs": "all", "to": "source", "freq": "every", "dbl": 1}, "反", 3.2, "双倍上限的全队改道"],
 	["转伤为疗·全队", "convert", {"obs": "all", "freq": "every"}, "反", 2.4, "把对方的伤害变成我方的治疗"],
@@ -33,7 +33,9 @@ const ROUTES := [
 	["遗志", "burst", {}, "反", 1.6, "倒下时对全场造成伤害"],
 	["治疗引爆", "engine", {}, "反", 2.4, "每次回血都转成对敌伤害"],
 	["延后", "time", {"op": "delay"}, "控", 1.2, "把对方的技能往后推"],
-	["沉默", "status", {"st": "沉默", "tgt": "choose"}, "控", 2.4, "让对方施法者出不了招"],
+	["易伤", "status", {"st": "易伤", "tgt": "choose"}, "控", 2.8, "给对方叠易伤：层数越多，它越怕疼"],
+	["灼烧", "status", {"st": "灼烧", "tgt": "choose"}, "控", 3.0, "给对方叠灼烧：每轮结束掉血，越叠越痛"],
+	["衰弱", "status", {"st": "衰弱", "tgt": "choose"}, "控", 2.8, "给对方叠衰弱：它的伤害越来越低"],
 	["驱散", "remove", {"what": "限时效果"}, "控", 1.5, "拆掉对方布下的监听或减伤"],
 ]
 
@@ -207,7 +209,7 @@ static func foe_profile(foe: Dictionary) -> Dictionary:
 		for sk in u.get("skills", []):
 			var t := str(sk.get("kind_tag", "atk"))
 			tags[t] = int(tags.get(t, 0)) + 1
-			if "沉默" in sk.words or "打断" in sk.words:
+			if "衰弱" in sk.words or "灼烧" in sk.words:
 				tags["ctl"] = int(tags.get("ctl", 0)) + 1
 			if t == "atk":
 				if "全部" in sk.words:
@@ -228,15 +230,15 @@ static func _relevance(a: Dictionary, prof: Dictionary) -> Dictionary:
 	if "首挡" in prof.kws and int(params.get("rep", 0)) > 0:
 		cand.append({"bonus": 2.2, "note": "对手有带【首挡】的卡：多段攻击的第二下能打进去，首挡只能挡第一下"})
 	if (int(tags.get("heal", 0)) > 0 or int(tags.get("def", 0)) > 0) and role == "控":
-		cand.append({"bonus": 1.6, "note": "对手会治疗/上护盾：沉默能让它之后出不了招"})
+		cand.append({"bonus": 1.6, "note": "对手会治疗/叠铁壁：灼烧和衰弱能慢慢磨掉它"})
 	if int(tags.get("heal", 0)) > 0 and tid in ["tax", "burst"]:
 		cand.append({"bonus": 1.4, "note": "对手会回血：治疗惩罚/爆发伤害能压过它的治疗"})
 	if int(tags.get("trap", 0)) > 0 and tid == "remove":
 		cand.append({"bonus": 1.6, "note": "对手布了埋伏：驱散能提前拆掉它"})
 	if int(prof.get("aoe", 0)) > 0 and role in ["守", "反"]:
-		cand.append({"bonus": 2.0, "note": "对手有全场攻击：全队减伤、护盾、转移、回敬能一次挡住或还回去"})
+		cand.append({"bonus": 2.0, "note": "对手有全场攻击：全队减伤、铁壁、转移、回敬能一次挡住或还回去"})
 	if int(prof.get("big", 0)) > 0 and (role in ["守", "反", "控"]):
-		cand.append({"bonus": 1.7, "note": "对手有大招：减伤、护盾、改道、转为治疗、延后都能化解"})
+		cand.append({"bonus": 1.7, "note": "对手有大招：减伤、铁壁、改道、转为治疗、延后都能化解"})
 	if int(tags.get("atk", 0)) >= 2 and role in ["守", "反"]:
 		cand.append({"bonus": 1.3, "note": "对手进攻型卡很多：减伤、改道、反噬都能克制它"})
 	if not prof.low.is_empty() and tid in ["atk1", "chase"]:

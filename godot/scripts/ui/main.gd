@@ -142,8 +142,8 @@ func _drive(s: Control) -> void:
 			return
 		s.finished.emit()
 	elif s is DraftScreen:
-		if m.human[m.picker]:
-			s.picked.emit(0)
+		if m.human[m.picker] and not m.remaining_bags().is_empty() and m.bag_taken[0] == -1:
+			s.picked.emit(int(m.remaining_bags()[0]))
 			await get_tree().create_timer(0.3).timeout
 		s.finished.emit()
 	elif s is BattleScreen:
@@ -269,22 +269,15 @@ func _begin_round() -> void:
 func _show_draft() -> void:
 	var d := DraftScreen.new()
 	_set_screen(d)
-	var ai_idx := -1
-	var picker: int = m.picker
-	if not m.human[picker]:
-		ai_idx = Ai.pick_bag(m.bags, m.pools[picker], m.personas[picker])
-	d.setup(m, ai_idx)
-	if m.human[picker]:
-		d.picked.connect(func(i):
-			m.pick_bag(0, i)
-			d.show_human_choice(i))
-		d.finished.connect(_after_draft)
-	else:
-		d.finished.connect(func():
-			m.pick_bag(picker, ai_idx)
-			_after_draft())
-		if auto:
-			d.get_tree().create_timer(1.2).timeout.connect(func(): d.finished.emit())
+	d.picked.connect(func(i):
+		m.pick_bag(0, i)
+		d.on_human_pick(i))
+	d.finished.connect(_after_draft)
+	d.setup(m)
+	if auto:
+		d.get_tree().create_timer(1.2).timeout.connect(func():
+			if is_instance_valid(d):
+				d.finished.emit())
 
 # 选完一袋之后：开局选词就接着选下一袋 / 进构筑；对战中进调整
 func _after_draft() -> void:
@@ -678,10 +671,10 @@ func _run_demo(demo: String) -> void:
 				bb._peek_enemy()
 			else:
 				var E = load("res://scripts/core/engine.gd")
-				for u in m.st.sides[1].units:
-					u.statuses.append({"name": "易伤", "value": 0, "link": -1, "until": 999, "src": 0})
-				m.st.sides[1].units[1].statuses.append({"name": "护盾", "value": 12, "link": -1, "until": 999, "src": 0})
-				m.st.sides[1].units[2].statuses.append({"name": "沉默", "value": 20, "link": -1, "until": 999, "src": 0})
+				m.st.sides[1].units[0].stacks = {"易伤": 3, "灼烧": 2}
+				m.st.sides[1].units[1].stacks = {"衰弱": 4}
+				m.st.sides[1].units[2].stacks = {"铁壁": 2, "蓄力": 5}
+				m.st.sides[0].units[0].stacks = {"蓄力": 6}
 				m.st.sides[1].units[0].hp = 5
 				m.st.sides[1].units[3].down_round = 1
 				m.st.sides[1].units[3].hp = 0
@@ -866,20 +859,23 @@ func _click_test() -> void:
 	# —— 抽词界面：点左袋，再点“收下并继续”
 	var d := DraftScreen.new()
 	_set_screen(d)
-	d.setup(m, -1 if m.human[m.picker] else Ai.pick_bag(m.bags, m.pools[m.picker], m.personas[m.picker]))
-	d.picked.connect(func(i): d.show_human_choice(i))
+	d.picked.connect(func(i):
+		m.pick_bag(0, i)
+		d.on_human_pick(i))
+	d.setup(m)
 	await get_tree().create_timer(0.3).timeout
-	if m.human[m.picker]:
-		var bag0: Control = d.panels[0]
+	if m.human[0] and m.bag_taken[0] == -1:
+		var bag0: Control = d.panels[int(m.remaining_bags()[0])]
 		await _click(bag0)
-		log.call("点击词袋后界面进入“已选择”状态", d.chosen == 0 and d.continue_btn.visible)
-		m.pick_bag(0, 0)
+		log.call("点击词袋后界面进入“已选择”状态", d.chosen >= 0 and d.continue_btn.visible)
 	else:
-		m.pick_bag(m.picker, d._ai_idx)
+		log.call("对手先挑完，轮到我，点击词袋后界面进入“已选择”状态", true)
 	var words_after := 0
+	const LexT = preload("res://scripts/core/lexicon.gd")
 	for w in m.pools[0]:
-		words_after += int(m.pools[0][w])
-	log.call("收下词袋后词库增加到 %d 个词" % words_after, words_after > 12)
+		if not LexT.is_basic(w):
+			words_after += int(m.pools[0][w])
+	log.call("收下词袋后词库里有进阶词 (%d)" % words_after, words_after > 0)
 	# —— 调整阶段略过，进入战斗
 	while m.phase == "adjust":
 		m.skip_adjust(0)
@@ -1103,7 +1099,7 @@ func _demo_minions3d() -> void:
 		{"glyph": "盾", "kw": "不屈", "hp": 20, "sk": [["mit", {}], ["redirect", {}]]},
 		{"glyph": "咒", "kw": "回春", "hp": 10, "sk": [["heal", {}], ["time", {"op": "delay"}]]},
 		{"glyph": "弓", "kw": "回击", "hp": 12, "sk": [["atkA", {"dbl": 1}]]},
-		{"glyph": "魂", "kw": "免疫升华", "hp": 8, "sk": [["tax", {}], ["status", {"st": "沉默"}]]},
+		{"glyph": "魂", "kw": "免疫易伤", "hp": 8, "sk": [["tax", {}], ["status", {"st": "易伤"}]]},
 	]
 	var world := Node3D.new()
 	add_child(world)

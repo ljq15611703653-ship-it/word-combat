@@ -63,7 +63,7 @@ static func skill_name(sk: Dictionary, rng: RandomNumberGenerator) -> String:
 		noun = _pick(TRAP, rng)
 	elif f.has("time"):
 		noun = _pick(TIME, rng)
-	elif f.has("st_沉默"):
+	elif f.has("st_衰弱"):
 		noun = _pick(SILENCE, rng)
 	elif f.has("remove"):
 		noun = _pick(CLEANSE, rng)
@@ -75,7 +75,7 @@ static func skill_name(sk: Dictionary, rng: RandomNumberGenerator) -> String:
 		noun = _pick(ATK_AOE if f.has("aoe") else ATK_SINGLE, rng)
 	elif f.has("status"):
 		noun = _pick(STATUS, rng)
-	elif f.has("mit") or f.has("st_护盾"):
+	elif f.has("mit") or f.has("st_铁壁"):
 		noun = _pick(DEF, rng)
 	elif f.has("heal"):
 		noun = _pick(HEAL, rng)
