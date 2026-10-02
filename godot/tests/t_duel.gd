@@ -16,6 +16,7 @@ func _init() -> void:
 	if ov.has("unit"): E.STACK_UNIT = ov.unit
 	if ov.has("base"): E.STACK_BASE = ov.base
 	if ov.has("blind"): Duel.BLIND_SECOND = true
+	if ov.has("look"): Duel.LOOKAHEAD = int(ov.look) == 1
 	if ov.has("fap"): Duel.FIRST_AP = int(ov.fap)
 	if ov.has("cand"): Duel.CAND_MAX = int(ov.cand)
 	if ov.has("starts"): Duel.START_PICKS = int(ov.starts)

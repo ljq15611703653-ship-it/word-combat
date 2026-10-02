@@ -573,7 +573,7 @@ func _mood(side: int) -> Dictionary:
 	return out
 
 # ---------------------------------------------------------------- 电脑：现场拼
-static var LOOKAHEAD := true          # 盲拼的先手也会“想对手会怎么应对”
+static var LOOKAHEAD := false         # 盲拼的先手也会“想对手会怎么应对”
 static var LOOK_TOP := 3              # 先手每个随从只对前几名候选做应对推演
 static var RESP_CAND := 5             # 推演对手应对时，对手每个随从比较几句候选
 static var RESP_PICKS := 2
