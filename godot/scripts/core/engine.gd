@@ -7,7 +7,7 @@ const G = preload("res://scripts/core/grammar.gd")
 
 const TICKS := 20          # 0..19 为时间轴，20 为回合结束阶段
 const STRIDE := 21         # 每轮占的绝对时间刻数
-const DEFAULT_RULES := {"win_score": 80, "max_rounds": 10, "ap_gain": 15, "ap_cap": 60, "start_ap": 15}
+const DEFAULT_RULES := {"win_score": 80, "max_rounds": 10, "ap_gain": 45, "ap_cap": 180, "start_ap": 45}
 
 # ================================================================ 状态创建
 # deck: {units:[{name,max_hp,kw,skills:[skill…]}×5]}

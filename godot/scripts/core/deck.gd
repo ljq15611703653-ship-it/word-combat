@@ -5,7 +5,7 @@ extends RefCounted
 const G = preload("res://scripts/core/grammar.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 
-const BUDGET := 80      # 四张卡：生命 + 数字 共 80 点
+const BUDGET := 100     # 四张卡：生命 + 数字 共 100 点
 const COUNT := 4        # 每方随从数
 const MAX_SKILLS := 1      # 一个随从一招（招里可以用“并”连多个效果）
 const GLYPHS := ["剑", "盾", "咒", "弓"]

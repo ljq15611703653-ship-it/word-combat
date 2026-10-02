@@ -282,7 +282,7 @@ func _init() -> void:
 	print("— AP")
 	st = E.make_state([deck([]), deck([])], 0)
 	for i in 6: E.begin_round(st)
-	check(st.sides[0].ap == 60, "行动点封顶60")
+	check(st.sides[0].ap == int(st.rules.ap_cap), "行动点封顶（%d）" % int(st.rules.ap_cap))
 	var bigcost := S("贵", [G.dmg(G.T("all","enemy"), G.N(40), {"dbl":1})])
 	check(bigcost.windup == int(bigcost.cost / 10), "起手=费用/10 (费用%d)" % bigcost.cost)
 	print("结果：", total - fails, "/", total, " 通过")

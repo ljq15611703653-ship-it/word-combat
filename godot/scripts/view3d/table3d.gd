@@ -183,7 +183,7 @@ func _build_ap_stack(s: int) -> void:
 # 行动点筹码：每 5 点一枚，满 60 点 12 枚
 func set_ap(s: int, value: int, animate: bool = true) -> void:
 	var stack: Node3D = ap_stacks[s]
-	var chips: int = clampi(int(ceil(float(value) / 5.0)), 0, 12)
+	var chips: int = clampi(int(ceil(float(value) / 15.0)), 0, 12)      # 每 15 点一枚筹码，最多 12 枚（对应上限 180）
 	var have := stack.get_child_count()
 	while have < chips:
 		var col: Color = K.GOLD if s == 0 else Color("d88a82")
