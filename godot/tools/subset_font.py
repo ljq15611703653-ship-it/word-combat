@@ -22,6 +22,10 @@ for hi in range(0xB0, 0xD8):
 chars |= set("０１２３４５６７８９，。！？：；、（）【】《》“”‘’…—·～＋－×÷↑↓←→")
 
 font = TTFont(SRC)
+if "fvar" in font:
+    # 可变字体换成固定字重（Regular）：部分浏览器/显卡对可变字体的字形图集处理不稳，会渲染成实心方块
+    from fontTools.varLib import instancer
+    font = instancer.instantiateVariableFont(font, {"wght": 400})
 cmap = font.getBestCmap()
 missing = sorted(c for c in chars if ord(c) not in cmap)
 if missing:
