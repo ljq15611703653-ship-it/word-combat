@@ -456,6 +456,8 @@ func _on_first_match_finished(completed: bool) -> void:
 
 # 自动走完整个新手引导：每一步都按提示去做（真实点击/拖动），检查能否走到结尾
 func _tut_test(first: bool = false) -> void:
+	var _old_tut: bool = Settings.tutorial_done
+	var _old_fm: bool = Settings.first_match_done
 	if first:
 		_start_first_match()
 	else:
@@ -595,6 +597,9 @@ func _tut_test(first: bool = false) -> void:
 			print("  [引导测试] 步骤 ", id, " 目标没有矩形：", tgt)
 	var done: bool = tut_on == false and (Settings.first_match_done if first else Settings.tutorial_done)
 	print("【新手引导测试结束】", "全部通过 共%d步" % steps_done if (ok and done) else "有失败 (ok=%s done=%s steps=%d)" % [ok, done, steps_done])
+	Settings.tutorial_done = _old_tut
+	Settings.first_match_done = _old_fm
+	Settings.save_all()
 	get_tree().quit(0 if (ok and done) else 1)
 
 func _tut_prepare_round() -> void:
@@ -804,14 +809,14 @@ func _run_demo(demo: String) -> void:
 			elif demo == "cast":
 				var G4 = load("res://scripts/core/grammar.gd")
 				var S4 = load("res://scripts/compose/sentence.gd")
-				cp.setup(s.popup.avail_for_slot(), S4.tokens_of_skill([G4.dmg(G4.T("all", "enemy"), G4.N(14), {"dbl": 2, "rep": 1})]))
+				cp.setup(s.popup.avail_for_slot(), S4.tokens_of_skill([G4.dmg(G4.T("choose", "enemy", {"n": 3}), G4.N(14), {"dbl": 2, "rep": 1})]))
 				s.popup._on_composed()
 				await get_tree().create_timer(0.5).timeout
 				s.popup.stage.cast(3, "atk")
 			elif demo == "editor3":
 				var G3 = load("res://scripts/core/grammar.gd")
 				var S3 = load("res://scripts/compose/sentence.gd")
-				var nodes3: Array = [G3.watch("pending_dmg", G3.T("all", "ally"), G3.redirect(G3.T("source", "ref"), 25), {"freq": "every"}),
+				var nodes3: Array = [G3.watch("pending_dmg", G3.T("choose", "ally", {"n": 4}), G3.redirect(G3.T("source", "ref"), 25), {"freq": "every"}),
 					G3.dmg(G3.T("choose", "enemy"), G3.N(14), {"dbl": 1})]
 				cp.setup(s.popup.avail_for_slot(), S3.tokens_of_skill(nodes3))
 				s.popup._on_composed()
@@ -1168,6 +1173,7 @@ func _adv_test() -> void:
 	if not (playable[playable.size() - 1] in ids):
 		ids.append(playable[playable.size() - 1])
 	var bad := 0
+	var _old_adv: Array = Settings.adv_cleared.duplicate()
 	Settings.adv_cleared = []
 	for id in ids:
 		_show_adventure_level(int(id))
@@ -1203,6 +1209,8 @@ func _adv_test() -> void:
 		print("  [冒险测试] 第 %d 关 %s（出招按钮可点=%s）" % [int(id), "通关" if ok else "没通关", enabled])
 		if not ok:
 			bad += 1
+	Settings.adv_cleared = _old_adv
+	Settings.save_all()
 	print("【冒险测试结束】", "全部通过" if bad == 0 else "有失败 %d" % bad)
 	get_tree().quit(0 if bad == 0 else 1)
 

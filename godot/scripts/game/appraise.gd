@@ -144,7 +144,7 @@ static func appraise(sk: Dictionary, my_deck: Dictionary, unit_idx: int, unit: D
 				break
 	# ---- 它怕什么（结构 + 公开信息）
 	out.weak.append("起手要 %d 秒：这期间施法者倒下，这招就落空。" % int(out.windup))
-	out.weak.append("它可能被【打断】取消、或让施法者被【沉默】；这类反制不看费用。")
+	out.weak.append("施法者可能被【沉默】；它也可能被【延后】推到更晚。")
 	if int(best.get("dmg", 0)) > 0:
 		out.weak.append("对手的减伤、护盾、改道会削弱它。")
 		for fu in ctx.get("foe", D.new_deck()).units:

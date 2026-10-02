@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+<rect x="3" y="3" width="250" height="250" rx="30" fill="#18152e" stroke="#e7bf70" stroke-width="6"/>
+<rect x="12" y="12" width="232" height="232" rx="22" fill="#342955" stroke="#bdb1e6" stroke-width="3"/>
+<rect x="21" y="21" width="214" height="214" rx="16" fill="#2a2247" stroke="#e7bf70" stroke-width="1"/>
+<polyline points="55,32 201,32" fill="none" stroke="#fff0ad" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<polygon points="30.0,21.0 32.121320343559645,27.878679656440358 39.0,30.0 32.121320343559645,32.121320343559645 30.0,39.0 27.878679656440358,32.121320343559645 21.0,30.0 27.878679656440358,27.878679656440358" fill="#fff0ad" stroke="none" stroke-width="0" stroke-linejoin="round"/>
+<polygon points="30.0,217.0 32.121320343559645,223.87867965644037 39.0,226.0 32.121320343559645,228.12132034355963 30.0,235.0 27.878679656440358,228.12132034355963 21.0,226.0 27.878679656440358,223.87867965644037" fill="#fff0ad" stroke="none" stroke-width="0" stroke-linejoin="round"/>
+<polygon points="226.0,21.0 228.12132034355963,27.878679656440358 235.0,30.0 228.12132034355963,32.121320343559645 226.0,39.0 223.87867965644037,32.121320343559645 217.0,30.0 223.87867965644037,27.878679656440358" fill="#fff0ad" stroke="none" stroke-width="0" stroke-linejoin="round"/>
+<polygon points="226.0,217.0 228.12132034355963,223.87867965644037 235.0,226.0 228.12132034355963,228.12132034355963 226.0,235.0 223.87867965644037,228.12132034355963 217.0,226.0 223.87867965644037,223.87867965644037" fill="#fff0ad" stroke="none" stroke-width="0" stroke-linejoin="round"/>
+</svg>

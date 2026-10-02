@@ -1,0 +1,162 @@
+{
+	"bag": {
+		"aabb": {
+			"max": [
+				0.3701,
+				0.663,
+				0.3749
+			],
+			"min": [
+				-0.3701,
+				0.035,
+				-0.3701
+			]
+		},
+		"bytes": 324700,
+		"collision_nodes": 0,
+		"intentional_seated_offset": false,
+		"legacy_aabb": {
+			"max": [
+				0.3701,
+				0.663,
+				0.3765
+			],
+			"min": [
+				-0.3701,
+				0.035,
+				-0.3701
+			]
+		},
+		"mesh_nodes": 34,
+		"seated_position_valid": null,
+		"within_legacy_envelope": true
+	},
+	"chip_foe": {
+		"aabb": {
+			"max": [
+				0.05,
+				0.0086,
+				0.05
+			],
+			"min": [
+				-0.05,
+				-0.006,
+				-0.05
+			]
+		},
+		"bytes": 69844,
+		"collision_nodes": 0,
+		"intentional_seated_offset": false,
+		"legacy_aabb": {
+			"max": [
+				0.05,
+				0.0087,
+				0.05
+			],
+			"min": [
+				-0.05,
+				-0.006,
+				-0.05
+			]
+		},
+		"mesh_nodes": 11,
+		"seated_position_valid": null,
+		"within_legacy_envelope": true
+	},
+	"chip_mine": {
+		"aabb": {
+			"max": [
+				0.05,
+				0.0094,
+				0.05
+			],
+			"min": [
+				-0.05,
+				-0.006,
+				-0.05
+			]
+		},
+		"bytes": 71028,
+		"collision_nodes": 0,
+		"intentional_seated_offset": false,
+		"legacy_aabb": {
+			"max": [
+				0.05,
+				0.0095,
+				0.05
+			],
+			"min": [
+				-0.05,
+				-0.006,
+				-0.05
+			]
+		},
+		"mesh_nodes": 15,
+		"seated_position_valid": null,
+		"within_legacy_envelope": true
+	},
+	"opponent": {
+		"aabb": {
+			"max": [
+				0.363,
+				0.42,
+				0.0149
+			],
+			"min": [
+				-0.363,
+				-0.73,
+				-0.6759
+			]
+		},
+		"bytes": 242068,
+		"collision_nodes": 0,
+		"intentional_seated_offset": true,
+		"legacy_aabb": {
+			"max": [
+				0.1802,
+				0.6126,
+				0.1564
+			],
+			"min": [
+				-0.1802,
+				0.0136,
+				-0.204
+			]
+		},
+		"mesh_nodes": 48,
+		"seated_position_valid": true,
+		"within_legacy_envelope": false
+	},
+	"table": {
+		"aabb": {
+			"max": [
+				1.3505,
+				0.034,
+				0.9005
+			],
+			"min": [
+				-1.3505,
+				-0.815,
+				-0.9005
+			]
+		},
+		"bytes": 4284564,
+		"collision_nodes": 0,
+		"intentional_seated_offset": false,
+		"legacy_aabb": {
+			"max": [
+				1.3505,
+				0.035,
+				0.9005
+			],
+			"min": [
+				-1.3505,
+				-0.815,
+				-0.9005
+			]
+		},
+		"mesh_nodes": 274,
+		"seated_position_valid": null,
+		"within_legacy_envelope": true
+	}
+}

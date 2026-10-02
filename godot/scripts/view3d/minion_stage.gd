@@ -146,6 +146,10 @@ func cast(tier: int, tag: String, popup: String = "", doubled: bool = false) -> 
 		world.add_child(n)
 		if n.has_method("play"):
 			n.play({"tier": tier, "color": col})
+		# 外部特效场景不会自己删除：演完一会儿后清掉，免得反复试放越积越多
+		get_tree().create_timer(2.5 + 0.5 * tier).timeout.connect(func():
+			if is_instance_valid(n):
+				n.queue_free())
 	else:
 		_code_fx(tier, tag, col)
 	if doubled:

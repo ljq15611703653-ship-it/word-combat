@@ -9,6 +9,7 @@ const G = preload("res://scripts/core/grammar.gd")
 const S = preload("res://scripts/compose/sentence.gd")
 
 # 这些词是“可有可无的修饰”：随机补全时降低权重，免得每句都带一堆
+const Lex = preload("res://scripts/core/lexicon.gd")
 const OPTIONAL_WORDS := ["双倍", "一半", "重复", "间隔", "同时", "每次", "持续", "并", "否则", "之后"]
 const OPTIONAL_KEYS := ["dbl", "half", "rep", "rep_gap", "sync", "delay", "gap", "dur"]
 
@@ -90,7 +91,14 @@ static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator
 					continue
 				tok = forced
 			cands.append(tok)
-			weights.append(0.12 if (e.t == "W" and e.v in OPTIONAL_WORDS) else 1.0)
+			var wgt := 1.0
+			if e.t == "W" and e.v in OPTIONAL_WORDS:
+				wgt = 0.12
+			elif e.t == "W" and e.v in ["加上", "减去", "较高者", "较低者", "差值"]:
+				wgt = 0.03        # 运算词不拿来随机补全（太绕）
+			elif e.t == "W" and Lex.words.has(e.v) and str(Lex.words[e.v].cat) == "引用":
+				wgt = 0.15        # 引用类的词也少一点，优先给直接填数字的写法
+			weights.append(wgt)
 		if cands.is_empty():
 			if res.complete and good(res.skills[0]):
 				return {"ok": true, "tokens": toks, "added": added, "skills": res.skills}

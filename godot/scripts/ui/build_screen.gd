@@ -71,6 +71,7 @@ func _build() -> void:
 	K.clear_children(self)
 	var bg := ColorRect.new()
 	bg.color = K.BG
+	bg.add_child(K.glow())
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var root := MarginContainer.new()
@@ -199,7 +200,7 @@ func refresh() -> void:
 	var sub: Label = find_child("sub", true, false)
 	if sub != null:
 		if mode == "initial":
-			sub.text = "①点「编辑」  ②选招式、调数值（绿=有词，红=缺词）  ③装入技能槽并确认。点数 = 生命 + 技能数字，共 100；至少装一个技能。每张卡一个技能。"
+			sub.text = "①点「编辑」  ②选招式、调数值（绿=有词，红=缺词）  ③装入技能槽并确认。点数 = 生命 + 技能数字，共 80；至少装一个技能。每张卡一个技能。"
 		else:
 			sub.text = "你还有 %d 次调整，对手 %d 次。每次只能改一张卡。" % [m.adjust_left(0), m.adjust_left(1)]
 	_refresh_coach(deck)

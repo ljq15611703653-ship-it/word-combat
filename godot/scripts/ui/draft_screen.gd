@@ -35,6 +35,7 @@ func setup(match_obj, ai_idx: int = -1) -> void:
 	K.clear_children(self)
 	var bg := ColorRect.new()
 	bg.color = K.BG
+	bg.add_child(K.glow())
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var root := MarginContainer.new()

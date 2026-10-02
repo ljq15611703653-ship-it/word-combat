@@ -48,9 +48,9 @@ func _build() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
 	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color("1a3a2e")
+	e.background_color = Color("120a0d")
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	e.ambient_light_color = Color("9aa0c8")
+	e.ambient_light_color = Color("c8a0a8")
 	e.ambient_light_energy = 0.7
 	env.environment = e
 	world.add_child(env)
@@ -68,7 +68,7 @@ func _build() -> void:
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(3, 3)
 	felt.mesh = pm
-	felt.material_override = Proc.mat(Color("1f5a40"), 0.95)
+	felt.material_override = Proc.mat(Color("2a0d14"), 0.95)
 	felt.position = Vector3(0, -0.02, 0)
 	world.add_child(felt)
 	cam = Camera3D.new()
@@ -122,7 +122,7 @@ func _build_bag() -> void:
 		sack.position = Vector3(0, BAG_R * 0.86, 0)
 		sack.scale = Vector3(1.0, 0.86, 1.0)
 		bag_root.add_child(sack)
-		var neck := Proc.cyl(0.17, 0.2, 0.16, Proc.mat(Color("a98050"), 0.9), Vector3(0, BAG_R * 1.74 + 0.02, 0))
+		var neck := Proc.cyl(0.17, 0.2, 0.16, Proc.mat(Color("b89030"), 0.9), Vector3(0, BAG_R * 1.74 + 0.02, 0))
 		bag_root.add_child(neck)
 		var rope := MeshInstance3D.new()
 		var tm := TorusMesh.new()
@@ -137,7 +137,7 @@ func _build_bag() -> void:
 		rm.inner_radius = 0.22
 		rm.outer_radius = 0.26
 		rim.mesh = rm
-		rim.material_override = Proc.mat(Color("8a6a40"), 0.8)
+		rim.material_override = Proc.mat(Color("d8a820"), 0.6)
 		rim.position = Vector3(0, BAG_R * 1.74 + 0.1, 0)
 		bag_root.add_child(rim)
 	# 物理容器：地板 + 一圈墙（看不见），牌被关在袋子里滚

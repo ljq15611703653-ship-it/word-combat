@@ -1,0 +1,104 @@
+{
+	"afterimage": {
+		"bytes": 57144,
+		"collision_nodes": 0,
+		"mesh_nodes": 3,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/afterimage.png"
+	},
+	"amulet": {
+		"bytes": 65176,
+		"collision_nodes": 0,
+		"mesh_nodes": 5,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/amulet.png"
+	},
+	"book": {
+		"bytes": 62596,
+		"collision_nodes": 0,
+		"mesh_nodes": 6,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/book.png"
+	},
+	"buckler": {
+		"bytes": 85092,
+		"collision_nodes": 0,
+		"mesh_nodes": 10,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/buckler.png"
+	},
+	"cape": {
+		"bytes": 74508,
+		"collision_nodes": 0,
+		"mesh_nodes": 9,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/cape.png"
+	},
+	"chains": {
+		"bytes": 66572,
+		"collision_nodes": 0,
+		"mesh_nodes": 11,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/chains.png"
+	},
+	"halo": {
+		"bytes": 52980,
+		"collision_nodes": 0,
+		"mesh_nodes": 4,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/halo.png"
+	},
+	"hourglass": {
+		"bytes": 37144,
+		"collision_nodes": 0,
+		"mesh_nodes": 7,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/hourglass.png"
+	},
+	"mask": {
+		"bytes": 35292,
+		"collision_nodes": 0,
+		"mesh_nodes": 5,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/mask.png"
+	},
+	"mirror": {
+		"bytes": 79884,
+		"collision_nodes": 0,
+		"mesh_nodes": 6,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/mirror.png"
+	},
+	"ring_double": {
+		"bytes": 60856,
+		"collision_nodes": 0,
+		"mesh_nodes": 10,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/ring_double.png"
+	},
+	"shield": {
+		"bytes": 85076,
+		"collision_nodes": 0,
+		"mesh_nodes": 10,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/shield.png"
+	},
+	"sword": {
+		"bytes": 52760,
+		"collision_nodes": 0,
+		"mesh_nodes": 6,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/sword.png"
+	},
+	"thorns": {
+		"bytes": 68808,
+		"collision_nodes": 0,
+		"mesh_nodes": 7,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/thorns.png"
+	},
+	"twin_ring": {
+		"bytes": 53380,
+		"collision_nodes": 0,
+		"mesh_nodes": 3,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/twin_ring.png"
+	},
+	"vines": {
+		"bytes": 40284,
+		"collision_nodes": 0,
+		"mesh_nodes": 8,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/vines.png"
+	},
+	"wand": {
+		"bytes": 61836,
+		"collision_nodes": 0,
+		"mesh_nodes": 4,
+		"preview": "D:/work/word-combat/art/handoff_2026-10-01/previews/attachments/wand.png"
+	}
+}

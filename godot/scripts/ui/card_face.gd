@@ -29,6 +29,10 @@ var _fx: Control
 var _aura: Control
 var _ghost: Control
 var _built := false
+var frame_tex: TextureRect
+var glint: TextureRect
+var _glint_frames: Array = []
+var _glint_t := 0.0
 
 func _ready() -> void:
 	_build()
@@ -43,33 +47,80 @@ func _build() -> void:
 	var frame := PanelContainer.new()
 	frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	frame.add_theme_stylebox_override("panel", K.style(Color("1d2233"), K.GOLD_D, 14, 3, 8))
+	frame.add_theme_stylebox_override("panel", K.style(Color("140b10"), Color("7a1620"), 14, 3, 8))
 	add_child(frame)
 	# 画像区
 	var art := Panel.new()
-	art.position = Vector2(8, 28)
-	art.size = Vector2(SIZE.x - 16, 148)
+	art.position = Vector2(12, 16)
+	art.size = Vector2(SIZE.x - 24, 132)
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	art.add_theme_stylebox_override("panel", K.style(Color("2a3150"), Color("3b4562"), 10, 1))
+	art.add_theme_stylebox_override("panel", K.style(Color("1b0e14"), Color("3a141c"), 10, 1))
 	add_child(art)
 	layers = Control.new()
 	layers.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layers.size = SIZE
+	layers.position = Vector2(0, -26)
 	add_child(layers)
+	# 卡框素材（暗红金属框 + 亮黄点睛）盖在最上面；放 assets/ui/cards/card_front_*.png 就用，没有就只剩上面的底板
+	frame_tex = TextureRect.new()
+	frame_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	frame_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	frame_tex.stretch_mode = TextureRect.STRETCH_SCALE
+	frame_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame_tex.texture = _frame_for(0)
+	add_child(frame_tex)
+	glint = TextureRect.new()
+	glint.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	glint.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	glint.stretch_mode = TextureRect.STRETCH_SCALE
+	glint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var gm := CanvasItemMaterial.new()
+	gm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	glint.material = gm
+	glint.modulate = Color(1, 1, 1, 0.0)
+	add_child(glint)
 	name_label = K.label("", 16, K.TEXT, HORIZONTAL_ALIGNMENT_CENTER)
-	name_label.position = Vector2(6, 4)
-	name_label.size = Vector2(SIZE.x - 12, 22)
+	name_label.position = Vector2(10, 152)
+	name_label.size = Vector2(SIZE.x - 20, 20)
 	name_label.clip_text = true
 	add_child(name_label)
-	skill_label = K.label("", 13, Color("e0b85c"), HORIZONTAL_ALIGNMENT_CENTER)
-	skill_label.position = Vector2(6, 178)
-	skill_label.size = Vector2(SIZE.x - 12, 20)
+	skill_label = K.label("", 12, Color("ffd21f"), HORIZONTAL_ALIGNMENT_CENTER)
+	skill_label.position = Vector2(10, 172)
+	skill_label.size = Vector2(SIZE.x - 20, 18)
 	skill_label.clip_text = true
 	add_child(skill_label)
 	_fx = Control.new()
 	_fx.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fx.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(_fx)
+
+# 卡框：按技能强弱换档（普通 / 稀有 / 秘术），素材在 res://assets/ui/cards/
+static func _frame_for(tier: int) -> Texture2D:
+	var names := ["card_front_common_512x768", "card_front_rare_512x768", "card_front_arcane_512x768"]
+	var path := "res://assets/ui/cards/%s.png" % names[clampi(tier, 0, 2)]
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
+func _process(delta: float) -> void:
+	if glint == null or not is_visible_in_tree():
+		return
+	_glint_t += delta
+	if _glint_frames.is_empty():
+		for i in 12:
+			var gp := "res://assets/ui/cards/glint/border_glint_%02d.png" % i
+			if ResourceLoader.exists(gp):
+				_glint_frames.append(load(gp))
+		if _glint_frames.is_empty():
+			set_process(false)
+			return
+	# 每 ~3.2 秒扫一次，其余时间不显示
+	var cyc := fmod(_glint_t, 3.2)
+	if cyc < 0.9:
+		glint.texture = _glint_frames[int(cyc / 0.9 * 11.99)]
+		glint.modulate = Color(1, 1, 1, 0.85)
+	else:
+		glint.modulate = Color(1, 1, 1, 0.0)
 
 # 素材优先：res://assets/cards/<名字>.png
 static func _tex(name: String) -> Texture2D:
@@ -88,6 +139,8 @@ func _icon(proc: String, px: float, col: Color) -> Control:
 		tr.custom_minimum_size = Vector2(px, px)
 		tr.size = Vector2(px, px)
 		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if proc == "amulet":
+			tr.self_modulate = col.lerp(Color.WHITE, 0.35)      # 三种免疫共用一张吊坠：靠颜色区分
 		return tr
 	return Icon.make_proc(proc, px, col)
 
@@ -103,6 +156,12 @@ func set_unit(u: Dictionary, sks: Array, animate: bool = true) -> void:
 	name_label.text = str(u.get("name", ""))
 	skill_label.text = str(sks[0].get("name", "")) if not sks.is_empty() else "（还没有技能）"
 	var gl: String = str(u.get("glyph", "剑")) if not sks.is_empty() else "空"
+	var tier := 0
+	if not sks.is_empty():
+		var cst := int(sks[0].get("cost", 0))
+		tier = 2 if cst >= 40 else (1 if cst >= 22 else 0)
+	if frame_tex != null:
+		frame_tex.texture = _frame_for(tier)
 	var col := _body_color(gl) if gl != "空" else Color("8a93a8")
 	# 身体（形象图标）
 	if body_icon == null:
@@ -155,6 +214,18 @@ func _body(glyph: String, col: Color) -> Control:
 func _make_attachment(slot: String, proc: String, col: Color) -> Control:
 	var sp: Array = SLOT_POS.get(slot, [Vector2(78, 100), 32])
 	var px: float = float(sp[1])
+	if slot == "aura" and _tex(proc) != null:
+		var ringp := _icon(proc, 128, col)
+		ringp.size = Vector2(128, 128)
+		ringp.position = Vector2(SIZE.x * 0.5 - 64, 40)
+		ringp.modulate = Color(1, 1, 1, 0.85)
+		return ringp
+	if slot == "ghost" and _tex(proc) != null:
+		var gh := _icon(proc, 96, col)
+		gh.size = Vector2(96, 96)
+		gh.position = Vector2(SIZE.x * 0.5 - 48 + 16, 70 - 6)
+		gh.modulate = Color(1, 1, 1, 0.55)
+		return gh
 	if slot == "aura":
 		var ring := Icon.make_proc(proc, 128, Color(col.r, col.g, col.b, 0.55))
 		ring.size = Vector2(128, 128)

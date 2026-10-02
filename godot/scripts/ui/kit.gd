@@ -4,18 +4,21 @@ extends RefCounted
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 
-const BG := Color("10121a")
-const PANEL := Color("1b2030")
-const PANEL2 := Color("242b40")
-const EDGE := Color("3b4562")
-const GOLD := Color("e0b85c")
-const GOLD_D := Color("8d7032")
-const TEXT := Color("ece8da")
-const MUTED := Color("9aa2b8")
-const RED := Color("e0605a")
+# 整套游戏的调调：墨黑 / 红宝石暗红 / 亮黄点睛（亮黄只用在重点：可点击、高光、金属细边）
+const BG := Color("0b0709")
+const PANEL := Color("170d11")
+const PANEL2 := Color("24131a")
+const EDGE := Color("5a1c27")
+const GOLD := Color("ffd21f")
+const GOLD_D := Color("9c7a14")
+const TEXT := Color("f2e8dc")
+const MUTED := Color("ad9aa0")
+const RED := Color("e8434d")
 const GREEN := Color("62c483")
 const BLUE := Color("5fa0e0")
-const PURPLE := Color("a279d6")
+const PURPLE := Color("c0405e")
+const RUBY := Color("a3121f")
+const RUBY_D := Color("5b0a14")
 
 static func style(bg: Color, border: Color = Color(0, 0, 0, 0), radius: int = 10, bw: int = 0, shadow: int = 0) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -33,10 +36,88 @@ static func style(bg: Color, border: Color = Color(0, 0, 0, 0), radius: int = 10
 	s.content_margin_bottom = 8
 	return s
 
+static var _gem_cache := {}
+static var use_gem := true
+
+# 微微凸起的宝石/漆面质感：上亮下暗的渐变 + 左上高光边 + 右下暗边 + 一道淡淡的斜向反光。按颜色缓存。
+static func gem_style(bg: Color, border: Color, radius: int = 12, bw: int = 1, gloss: float = 0.22) -> StyleBox:
+	if not use_gem:
+		return style(bg, border, radius, bw, 0)
+	var key := "%s|%s|%d|%d|%.2f" % [bg.to_html(), border.to_html(), radius, bw, gloss]
+	if _gem_cache.has(key):
+		return _gem_cache[key]
+	var n := 64
+	var img := Image.create(n, n, false, Image.FORMAT_RGBA8)
+	var r := float(radius)
+	var edge_w := float(maxi(1, bw))
+	for y in n:
+		for x in n:
+			# 圆角矩形的有号距离（<0 在里面）
+			var px := absf(float(x) + 0.5 - n * 0.5) - (n * 0.5 - r)
+			var py := absf(float(y) + 0.5 - n * 0.5) - (n * 0.5 - r)
+			var d: float = Vector2(maxf(px, 0.0), maxf(py, 0.0)).length() + minf(maxf(px, py), 0.0) - r
+			if d > 0.5:
+				continue
+			var aa := clampf(0.5 - d, 0.0, 1.0)
+			var t := float(y) / float(n - 1)
+			var col := bg.lightened(gloss * (1.0 - t) * 0.9).darkened(0.22 * t)
+			# 斜向淡反光（左上到右下的一道亮带）
+			var diag := absf(float(x) / n + float(y) / n - 0.55)
+			if diag < 0.18:
+				col = col.lightened((0.18 - diag) * 0.7 * gloss * 3.0)
+			var inside := -d
+			if inside < edge_w:
+				col = border
+			elif inside < edge_w + 1.5:
+				# 内侧：左上亮、右下暗的倒角
+				var lit := (1.0 - float(x) / n) * 0.5 + (1.0 - float(y) / n) * 0.5
+				col = col.lightened(0.28 * lit).darkened(0.18 * (1.0 - lit))
+			col.a = bg.a * aa
+			img.set_pixel(x, y, col)
+	var sb := StyleBoxTexture.new()
+	sb.texture = ImageTexture.create_from_image(img)
+	var m := radius + bw + 1
+	sb.texture_margin_left = m
+	sb.texture_margin_right = m
+	sb.texture_margin_top = m
+	sb.texture_margin_bottom = m
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	_gem_cache[key] = sb
+	return sb
+
 static func panel(bg: Color = PANEL, border: Color = EDGE, radius: int = 12, bw: int = 1, shadow: int = 0) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", style(bg, border, radius, bw, shadow))
+	p.add_theme_stylebox_override("panel", gem_style(bg, border, radius, maxi(1, bw), 0.16))
 	return p
+
+static var _glow_tex: Texture2D = null
+
+# 全屏背景上的一团暗红宝石光晕（屏幕上方偏亮，四周渐隐到墨黑），亮黄不参与
+static func glow(strength: float = 0.42) -> TextureRect:
+	if _glow_tex == null:
+		var w := 128
+		var h := 72
+		var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+		for y in h:
+			for x in w:
+				var dx := (float(x) / (w - 1) - 0.5) * 1.9
+				var dy := (float(y) / (h - 1) - 0.18) * 1.5
+				var d := sqrt(dx * dx + dy * dy)
+				var a := clampf(1.0 - d, 0.0, 1.0)
+				a = a * a
+				img.set_pixel(x, y, Color(0.64, 0.07, 0.12, a))
+		_glow_tex = ImageTexture.create_from_image(img)
+	var t := TextureRect.new()
+	t.texture = _glow_tex
+	t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	t.stretch_mode = TextureRect.STRETCH_SCALE
+	t.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	t.modulate = Color(1, 1, 1, strength)
+	return t
 
 static func label(text: String, size: int = 18, color: Color = TEXT, align: int = HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
@@ -61,18 +142,19 @@ static func button(text: String, kind: String = "normal", size: int = 18) -> But
 	var edge := EDGE
 	var fg := TEXT
 	if kind == "primary":
-		base = GOLD
-		edge = Color("fff0c0")
-		fg = Color("20180a")
+		base = RUBY
+		edge = GOLD
+		fg = Color("fff4d6")
 	elif kind == "danger":
-		base = Color("8a3a36")
+		base = Color("8a1a24")
 		edge = RED
 	elif kind == "ghost":
 		base = Color(1, 1, 1, 0.04)
-	b.add_theme_stylebox_override("normal", style(base, edge, 10, 1, 4))
-	b.add_theme_stylebox_override("hover", style(base.lightened(0.14), edge.lightened(0.2), 10, 2, 6))
-	b.add_theme_stylebox_override("pressed", style(base.darkened(0.15), edge, 10, 1, 2))
-	b.add_theme_stylebox_override("disabled", style(base.darkened(0.4), Color(0.3, 0.3, 0.35), 10, 1, 0))
+	var gl := 0.32 if kind == "primary" else 0.14
+	b.add_theme_stylebox_override("normal", gem_style(base, edge, 10, 2 if kind == "primary" else 1, gl))
+	b.add_theme_stylebox_override("hover", gem_style(base.lightened(0.14), edge.lightened(0.2), 10, 2, gl + 0.08))
+	b.add_theme_stylebox_override("pressed", gem_style(base.darkened(0.15), edge, 10, 1, gl * 0.5))
+	b.add_theme_stylebox_override("disabled", gem_style(base.darkened(0.45), Color(0.3, 0.22, 0.25), 10, 1, 0.04))
 	b.add_theme_color_override("font_color", fg)
 	b.add_theme_color_override("font_hover_color", fg)
 	b.add_theme_color_override("font_pressed_color", fg)

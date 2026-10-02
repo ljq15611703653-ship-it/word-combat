@@ -106,7 +106,7 @@ func _build() -> void:
 	v.add_child(head)
 	# 句子轨
 	rail_box = PanelContainer.new()
-	var rs := K.style(Color("17382c"), Color("2f6b50"), 12, 2, 6)
+	var rs := K.gem_style(Color("2a0d14"), Color("a3121f"), 12, 2, 0.2)
 	rs.content_margin_left = 12
 	rs.content_margin_right = 12
 	rs.content_margin_top = 10
@@ -121,7 +121,7 @@ func _build() -> void:
 	v.add_child(rail_box)
 	# 模糊匹配的托盘：词随便扔，不用按语法顺序
 	tray_box = PanelContainer.new()
-	var ts := K.style(Color("2a2438"), Color("7a58a8"), 12, 2, 6)
+	var ts := K.gem_style(Color("1e1018"), Color("7a2a3a"), 12, 2, 0.14)
 	ts.content_margin_left = 12
 	ts.content_margin_right = 12
 	ts.content_margin_top = 10
@@ -144,7 +144,7 @@ func _build() -> void:
 	fuzzy_box.add_child(fuzzy_msg)
 	v.add_child(fuzzy_box)
 	# 人话提示
-	var hp := K.panel(Color("2a2616"), Color("8d7032"), 10, 1)
+	var hp := K.panel(Color("1c1210"), Color("7a5a14"), 10, 1)
 	hint_panel = hp
 	var hv := K.vbox(2)
 	hp.add_child(hv)
@@ -181,7 +181,7 @@ func _build() -> void:
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	sc.add_child(inner)
 	# 最上面：“现在能接”的词，放大，永远一眼看到
-	strip_panel = K.panel(Color("2a2616"), Color("8d7032"), 10, 2)
+	strip_panel = K.panel(Color("1c1210"), Color("9c7a14"), 10, 2)
 	var sv := K.vbox(4)
 	strip_panel.add_child(sv)
 	strip_title = K.label("现在能接 ▶", 15, Color("ffd66b"))
@@ -427,7 +427,7 @@ func _num_plate(v: int, eff: Dictionary = {}) -> Control:
 	var p := PanelContainer.new()
 	p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.add_theme_stylebox_override("panel", K.style(Color("6b5a22"), Color("e0b85c"), 9, 3, 4))
+	p.add_theme_stylebox_override("panel", K.gem_style(Color("6b2a14"), Color("ffd21f"), 9, 3, 0.3))
 	var c := CenterContainer.new()
 	var vb := K.vbox(0)
 	var shown: int = v   # 数字牌上永远是你填的数；双倍写在后面单独的一句里
@@ -447,7 +447,7 @@ func _part_plate(text: String, placed: bool) -> Control:
 	var p := PanelContainer.new()
 	p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	p.add_theme_stylebox_override("panel", K.style(Color("3a4056"), Color("9aa2b8"), 9, 2, 3))
+	p.add_theme_stylebox_override("panel", K.gem_style(Color("2e1a22"), Color("a88a92"), 9, 2, 0.18))
 	var c := CenterContainer.new()
 	var vb := K.vbox(0)
 	vb.add_child(K.label(text, 22 if text.length() <= 2 else 18, Color("ece8da"), HORIZONTAL_ALIGNMENT_CENTER))
@@ -493,7 +493,7 @@ func _ghost_tile() -> Control:
 func _number_entry(role: String, prefill: int) -> Control:
 	var root := PanelContainer.new()
 	root.custom_minimum_size = Vector2(150, TILE.y)
-	root.add_theme_stylebox_override("panel", K.style(Color("3a3118"), Color("e0b85c"), 9, 2, 3))
+	root.add_theme_stylebox_override("panel", K.gem_style(Color("3a1c14"), Color("ffd21f"), 9, 2, 0.22))
 	var vb := K.vbox(3)
 	root.add_child(vb)
 	vb.add_child(K.label(str(ROLE_TEXT.get(role, "填一个数")), 13, Color("f0d890")))
@@ -732,7 +732,7 @@ func _refresh_suggestions() -> void:
 		sugg_box.add_child(_suggestion_row(sg))
 
 func _suggestion_row(sg: Dictionary) -> Control:
-	var p := K.panel(Color("1d2436"), Color("39507a"), 9, 1)
+	var p := K.panel(Color("1d1318"), Color("5a1c27"), 9, 1)
 	var hb := K.hbox(8)
 	p.add_child(hb)
 	var tag := K.chip(str(sg.school), Color("39507a"), 13)
@@ -972,7 +972,7 @@ func _show_fuzzy(res: Dictionary) -> void:
 		fuzzy_box.add_child(sc)
 
 func _fuzzy_row(e: Dictionary, label: String, col: Color) -> Control:
-	var p := K.panel(Color("1d2236"), col, 9, 2)
+	var p := K.panel(Color("1d1318"), col, 9, 2)
 	var vb := K.vbox(4)
 	p.add_child(vb)
 	var top := K.hbox(8)
