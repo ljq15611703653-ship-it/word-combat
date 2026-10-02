@@ -954,9 +954,19 @@ func _coach_round(events: Array) -> void:
 				pick = {"text": "看，%s 的【首挡】只能挡住第一下；你的后续一击接着打了进去，造成 %d 点。这就是“多段攻击”克制首挡的原因。" % [_name_of(int(e.tgt)), int(e.amount)], "uids": [int(e.tgt)]}
 		elif ty == "down":
 			downs.append(e)
-		elif ty == "interrupt" and best < 90:
-			best = 90
-			pick = {"text": "打断成功！对手排在后面的技能被推迟，没能按计划发动。", "uids": []}
+		elif ty == "stack_spent" and best < 95:
+			best = 95
+			pick = {"text": "蓄力爆发！%s 把攒了 %d 级的蓄力一次放出：这一次出手的所有目标都吃到了放大。忍得越久，爆得越狠。" % [_name_of(int(e.tgt)), int(e.stacks)], "uids": [int(e.tgt)]}
+		elif ty == "stack" and bool(e.get("recast", false)) and best < 75:
+			best = 75
+			pick = {"text": "续放：%s 身上的【%s】本来就在，这一次再放，等级 +1，倒计时刷新到这次的末尾。" % [_name_of(int(e.tgt)), str(e.status)], "uids": [int(e.tgt)]}
+		elif ty == "stack" and best < 72 and not Settings.stack_taught:
+			best = 72
+			Settings.stack_taught = true
+			pick = {"text": "留意：%s 得到了【%s】1 级。叠层状态是会自己成长的：每过一轮自动 +1 级，撑得越久越厉害；用【持久】可以让它撑更久。" % [_name_of(int(e.tgt)), str(e.status)], "uids": [int(e.tgt)]}
+		elif ty == "burn" and int(e.amount) >= 8 and best < 74:
+			best = 74
+			pick = {"text": "%s 被灼烧烧掉 %d 点：这是 %d 级的灼烧，等级每轮自动涨，越往后越痛。" % [_name_of(int(e.tgt)), int(e.amount), int(e.stacks)], "uids": [int(e.tgt)]}
 		elif ty == "time_fail" and best < 70:
 			best = 70
 			pick = {"text": "你的时间类技能没起作用：%s。" % str(e.why), "uids": []}

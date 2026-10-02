@@ -81,11 +81,12 @@ static func catalog() -> Array:
 				{"key": "n", "label": "投入", "kind": "int", "min": 1, "max": 60, "default": 20},
 				{"key": "dur", "label": "持续(秒,0=本轮)", "kind": "int", "min": 0, "max": 20, "default": 0},
 			]},
-		{"id": "status", "family": "控", "title": "叠层状态", "glyph": "咒", "blurb": "每次叠一层（每轮每个目标最多两次），层数跨轮保留、倒下清零，效果指数增长：易伤、灼烧、衰弱给敌人，蓄力、铁壁给自己。",
+		{"id": "status", "family": "控", "title": "叠层状态", "glyph": "咒", "blurb": "给目标一个会自己长大的状态：1 级起步，每过一轮 +1 级，效果指数增长；持久让它撑得更久，续放再 +1 级。易伤、灼烧、衰弱给敌人，蓄力、铁壁给自己。",
 			"params": [
 				{"key": "st", "label": "状态", "kind": "enum", "options": [["易伤", "易伤"], ["灼烧", "灼烧"], ["衰弱", "衰弱"], ["蓄力", "蓄力"], ["铁壁", "铁壁"]], "default": "易伤"},
 				{"key": "tgt", "label": "目标（敌方状态用）", "kind": "enum", "options": ENEMY_PICKS, "default": "choose"},
-				{"key": "dbl", "label": "双倍次数（一次多叠几层）", "kind": "int", "min": 0, "max": 2, "default": 0},
+				{"key": "dbl", "label": "双倍次数（一次加几级）", "kind": "int", "min": 0, "max": 2, "default": 0},
+				{"key": "ext", "label": "持久次数（持续 1/2/4/8 轮）", "kind": "int", "min": 0, "max": 3, "default": 0},
 			]},
 		{"id": "redirect", "family": "反", "title": "改道", "glyph": "转", "blurb": "当被保护者即将受伤，把这次伤害转移给别人。",
 			"params": [
@@ -189,8 +190,10 @@ static func build(tid: String, pin: Dictionary) -> Dictionary:
 			var stn := G.status(p.st, tnode, 0, 0, {})
 			if int(p.dbl) > 0:
 				stn["dbl"] = int(p.dbl)
+			if int(p.ext) > 0:
+				stn["ext"] = int(p.ext)
 			nodes = [stn]
-			title = "叠" + p.st
+			title = ("叠" if int(p.ext) == 0 else "持久") + p.st
 		"redirect":
 			var to: Dictionary
 			match p.to:

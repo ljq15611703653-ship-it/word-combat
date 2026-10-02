@@ -107,9 +107,7 @@ func _init() -> void:
 	var cdov := int(args[5]) if args.size() > 5 else -1
 	for ai in range(6, args.size()):
 		var kv := str(args[ai]).split("=")
-		if kv.size() == 2 and kv[0] == "per":
-			E.STACK_PER_ROUND = int(kv[1])
-		elif kv.size() == 2 and kv[0] == "unit":
+		if kv.size() == 2 and kv[0] == "unit":
 			E.STACK_UNIT = float(kv[1])
 	var res := {"win": 0, "lose": 0, "draw": 0}
 	var by_seat := [[0, 0], [0, 0]]

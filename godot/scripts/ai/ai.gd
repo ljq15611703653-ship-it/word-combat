@@ -16,7 +16,7 @@ const PERSONAS := {
 		["atk1", [{"dbl": 2, "rep": 1}, {"dbl": 1, "rep": 1}, {"dbl": 1}, {"rep": 1}, {}], 16],
 		["heal", [{"tgt": "self"}], 10],
 		["copy", [{}], 12],
-		["status", [{"st": "蓄力"}, {"st": "易伤"}], 0],
+		["status", [{"st": "蓄力", "ext": 1}, {"st": "蓄力"}, {"st": "易伤", "ext": 1}, {"st": "易伤"}], 0],
 		["mit", [{"tgt": "self"}], 20],
 		["split", [{}], 18],
 	],
@@ -27,10 +27,10 @@ const PERSONAS := {
 		["convert", [{"obs": "all", "freq": "every"}, {"obs": "self", "freq": "every"}], 0],
 		["mit", [{"tgt": "all"}, {"tgt": "self"}], 20],
 		["heal", [{"tgt": "all"}, {"tgt": "self"}], 10],
-		["status", [{"st": "铁壁"}], 0],
+		["status", [{"st": "铁壁", "ext": 1}, {"st": "铁壁"}], 0],
 	],
 	"控场": [
-		["status", [{"st": "衰弱"}, {"st": "灼烧"}], 0],
+		["status", [{"st": "灼烧", "ext": 1}, {"st": "衰弱", "ext": 1}, {"st": "灼烧"}, {"st": "衰弱"}], 0],
 		["atk1", [{"dbl": 1}, {}], 14],
 		["status", [{"st": "易伤"}], 0],
 		["time", [{"op": "delay", "sec": 6}], 0],
@@ -500,11 +500,14 @@ static func _stack_value(st: Dictionary, u: Dictionary) -> float:
 		var n: int = int(u.stacks[name])
 		if n <= 0:
 			continue
-		var k: float = E.stack_k(mini(n + STACK_LOOKAHEAD, E.STACK_MAX))
+		# 还能撑几轮就还能再长几级：按“再过几轮（最多 STACK_LOOKAHEAD 轮）会长到几级”来估
+		var left: int = int(u.get("stack_end", {}).get(name, 999999)) - int(st.round)
+		var grow: int = clampi(left, 0, STACK_LOOKAHEAD)
+		var k: float = E.stack_k(mini(n + grow, E.STACK_MAX))
 		var frac: float = k / (1.0 + k)
 		match str(name):
 			"易伤": v -= base * frac * STACK_WEIGHT
-			"灼烧": v -= pow(2.0, float(mini(n + 1, 8))) * STACK_WEIGHT
+			"灼烧": v -= ceil(k * E.BURN_SCALE) * float(maxi(1, grow + 1)) * STACK_WEIGHT
 			"衰弱": v -= 10.0 * frac * STACK_WEIGHT
 			"铁壁": v += base * frac * STACK_WEIGHT
 			"蓄力":

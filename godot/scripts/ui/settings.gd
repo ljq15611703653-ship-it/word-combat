@@ -7,7 +7,9 @@ static var muted := false
 static var coach := true        # 辅助轮（教练提示与自动组合）
 static var tutorial_done := false
 static var first_match_done := false
+static var stack_taught := false          # 小词是否已经讲过“叠层状态会成长”
 static var adv_cleared: Array = []     # 冒险模式已通关的关卡 id
+const ADV_VERSION := 2                   # 课程版本：换了新课程（关卡编号变了）就清掉旧的通关记录
 static var pet := true            # 桌宠“小词”
 static var _loaded := false
 
@@ -31,8 +33,9 @@ static func load_all() -> void:
 		first_match_done = bool(cf.get_value("game", "first_match_done", false))
 		var raw := str(cf.get_value("adventure", "cleared", ""))
 		adv_cleared = []
-		for x in raw.split(",", false):
-			adv_cleared.append(int(x))
+		if int(cf.get_value("adventure", "version", 1)) == ADV_VERSION:
+			for x in raw.split(",", false):
+				adv_cleared.append(int(x))
 		pet = bool(cf.get_value("game", "pet", true))
 
 static func save_all() -> void:
@@ -43,5 +46,6 @@ static func save_all() -> void:
 	cf.set_value("game", "tutorial_done", tutorial_done)
 	cf.set_value("game", "first_match_done", first_match_done)
 	cf.set_value("adventure", "cleared", ",".join(adv_cleared.map(func(x): return str(x))))
+	cf.set_value("adventure", "version", ADV_VERSION)
 	cf.set_value("game", "pet", pet)
 	cf.save(PATH)

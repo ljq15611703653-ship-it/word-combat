@@ -400,7 +400,7 @@ func _durs(i: int) -> Array:
 			out.append({"i": i + 2, "dur": k})
 	return out
 
-# ---- 状态（叠层）：目标 施加 状态 [双倍]
+# ---- 状态（叠层）：目标 施加 状态 [双倍] [持久]
 func _status(j: int, c: Dictionary, t: Dictionary) -> Array:
 	var out: Array = []
 	if not _w(j, "施加"):
@@ -409,10 +409,13 @@ func _status(j: int, c: Dictionary, t: Dictionary) -> Array:
 		if not _w(j + 1, st):
 			continue
 		for d in _count_words(j + 2, "双倍", 3):
-			var node: Dictionary = G.status(st, t, 0, 0, {})
-			if int(d.n) > 0:
-				node["dbl"] = int(d.n)
-			out.append({"i": d.i, "v": node})
+			for x in _count_words(d.i, "持久", 3):
+				var node: Dictionary = G.status(st, t, 0, 0, {})
+				if int(d.n) > 0:
+					node["dbl"] = int(d.n)
+				if int(x.n) > 0:
+					node["ext"] = int(x.n)
+				out.append({"i": x.i, "v": node})
 	return out
 
 # ---- 时间术：延后/提前 阵营 技能 数字 [双倍]（“打断”已取消）
@@ -660,6 +663,7 @@ static func node_tokens(node: Dictionary) -> Array:
 			out.append_array(target_tokens(node.target))
 			out.append_array([W("施加"), W(node.status)])
 			out.append_array(_rep("双倍", int(node.get("dbl", 0))))
+			out.append_array(_rep("持久", int(node.get("ext", 0))))
 			if node.has("link"):
 				out.append_array(target_tokens(node.link))
 			if int(node.dur) > 0:

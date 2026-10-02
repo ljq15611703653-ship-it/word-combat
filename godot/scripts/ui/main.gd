@@ -672,6 +672,7 @@ func _run_demo(demo: String) -> void:
 			else:
 				var E = load("res://scripts/core/engine.gd")
 				m.st.sides[1].units[0].stacks = {"易伤": 3, "灼烧": 2}
+				m.st.sides[1].units[0].stack_end = {"易伤": 3, "灼烧": 2}
 				m.st.sides[1].units[1].stacks = {"衰弱": 4}
 				m.st.sides[1].units[2].stacks = {"铁壁": 2, "蓄力": 5}
 				m.st.sides[0].units[0].stacks = {"蓄力": 6}

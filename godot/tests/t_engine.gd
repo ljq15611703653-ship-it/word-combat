@@ -57,6 +57,7 @@ func S(name: String, nodes: Array) -> Dictionary:
 	return sk
 
 func _init() -> void:
+	E.DEFAULT_COOLDOWN = 0      # 大部分测试不关心冷却；冷却单独测
 	Lex.load_all()
 	var st: Dictionary
 	print("— 单体/选择目标 + 重复 + 双倍")
@@ -139,52 +140,76 @@ func _init() -> void:
 	st = play(deck([S("沉默弱", [G.status("沉默", G.T("choose","enemy"), 0, 10)])]), deck([S("全10",[G.dmg(G.T("all","enemy"), G.N(10))])]), {"t1": 10}, {}, 1, 3)
 	check(hps(st,0)[0] == 20, "沉默不看费用：数字再小，对方的技能也照样落空 (hp=%d)" % hps(st,0)[0])
 
-	print("— 叠层状态：指数曲线 / 跨轮 / 每轮一次 / 倒下清零")
+	print("— 叠层状态：等级随时间成长 / 持久 / 续放")
+	var BIG := [100,100,100,100,100]
 	var hit10 := S("打10", [G.dmg(G.T("choose","enemy"), G.N(10))])
-	var st1: Dictionary = E.make_state([deck([hit10]), deck([], [100,100,100,100,100])], 0)
-	st1.sides[0].units[0].stacks["蓄力"] = 3
-	st1 = play(deck([hit10]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 1, st1)
-	check(hps(st1,1)[0] == 100 - int(round(10.0 * (1.0 + E.stack_k(3)))) and E.stacks_of(st1.sides[0].units[0], "蓄力") == 0, "蓄力 3 层：下一击 10×(1+k(3))，并用掉全部层数 (剩 %d)" % hps(st1,1)[0])
-	var st2: Dictionary = E.make_state([deck([hit10]), deck([], [100,100,100,100,100])], 0)
-	st2.sides[1].units[0].stacks["易伤"] = 5
-	st2 = play(deck([hit10]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 1, st2)
-	check(hps(st2,1)[0] == 100 - int(round(10.0 * (1.0 + E.stack_k(5)))), "易伤 5 层：10 伤害 ×(1+k(5)) (剩 %d)" % hps(st2,1)[0])
-	var st3: Dictionary = E.make_state([deck([hit10]), deck([], [100,100,100,100,100])], 0)
-	st3.sides[1].units[0].stacks["铁壁"] = 3
-	st3 = play(deck([hit10]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 1, st3)
-	check(hps(st3,1)[0] == 100 - int(ceil(10.0 / (1.0 + E.stack_k(3)))), "铁壁 3 层：10 伤害 ÷(1+k(3)) (剩 %d)" % hps(st3,1)[0])
-	var st4: Dictionary = E.make_state([deck([hit10]), deck([], [100,100,100,100,100])], 0)
-	st4.sides[0].units[0].stacks["衰弱"] = 3
-	st4 = play(deck([hit10]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 1, st4)
-	check(hps(st4,1)[0] == 100 - int(ceil(10.0 / (1.0 + E.stack_k(3)))), "衰弱 3 层：出手的 10 伤害 ÷(1+k(3)) (剩 %d)" % hps(st4,1)[0])
+	# 注意：play() 开头会开新的一轮，已有状态在开轮时先自动 +1 级，所以下面直接设的等级都比目标少 1
+	var st1: Dictionary = E.make_state([deck([hit10]), deck([], BIG)], 0)
+	st1.sides[0].units[0].stacks["蓄力"] = 2
+	st1 = play(deck([hit10]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st1)
+	check(hps(st1,1)[0] == 100 - int(round(10.0 * (1.0 + E.stack_k(3)))) and E.stacks_of(st1.sides[0].units[0], "蓄力") == 0, "蓄力 3 级：下一击 10×(1+k(3))，并用掉全部等级 (剩 %d)" % hps(st1,1)[0])
+	var st2: Dictionary = E.make_state([deck([hit10]), deck([], BIG)], 0)
+	st2.sides[1].units[0].stacks["易伤"] = 4
+	st2 = play(deck([hit10]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st2)
+	check(hps(st2,1)[0] == 100 - int(round(10.0 * (1.0 + E.stack_k(5)))), "易伤 5 级：10 伤害 ×(1+k(5)) (剩 %d)" % hps(st2,1)[0])
+	var st3: Dictionary = E.make_state([deck([hit10]), deck([], BIG)], 0)
+	st3.sides[1].units[0].stacks["铁壁"] = 2
+	st3 = play(deck([hit10]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st3)
+	check(hps(st3,1)[0] == 100 - int(ceil(10.0 / (1.0 + E.stack_k(3)))), "铁壁 3 级：10 伤害 ÷(1+k(3)) (剩 %d)" % hps(st3,1)[0])
+	var st4: Dictionary = E.make_state([deck([hit10]), deck([], BIG)], 0)
+	st4.sides[0].units[0].stacks["衰弱"] = 2
+	st4 = play(deck([hit10]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st4)
+	check(hps(st4,1)[0] == 100 - int(ceil(10.0 / (1.0 + E.stack_k(3)))), "衰弱 3 级：出手的 10 伤害 ÷(1+k(3)) (剩 %d)" % hps(st4,1)[0])
 	var hit4 := S("打四个", [G.dmg(G.T("choose","enemy",{"n":4}), G.N(10))])
-	var st4b: Dictionary = E.make_state([deck([hit4]), deck([], [100,100,100,100,100])], 0)
-	st4b.sides[0].units[0].stacks["蓄力"] = 3
-	st4b = play(deck([hit4]), deck([], [100,100,100,100,100]), {"t1": 10, "t1#1": 11, "t1#2": 12, "t1#3": 13}, {}, 3, 3, 200, 1, st4b)
+	var st4b: Dictionary = E.make_state([deck([hit4]), deck([], BIG)], 0)
+	st4b.sides[0].units[0].stacks["蓄力"] = 2
+	st4b = play(deck([hit4]), deck([], BIG), {"t1": 10, "t1#1": 11, "t1#2": 12, "t1#3": 13}, {}, 3, 3, 200, 1, st4b)
 	var amp4: int = 100 - int(round(10.0 * (1.0 + E.stack_k(3))))
-	check(hps(st4b,1) == [amp4,amp4,amp4,amp4,100], "蓄力 3 层 + 群攻：四个目标都吃到放大（同一次出手），层数只用一次 (%s)" % str(hps(st4b,1)))
-	var st5: Dictionary = E.make_state([deck([]), deck([], [100,100,100,100,100])], 0)
-	st5.sides[1].units[0].stacks["灼烧"] = 4
-	st5 = play(deck([]), deck([], [100,100,100,100,100]), {}, {}, 3, 3, 100, 1, st5)
-	check(hps(st5,1)[0] == 92 and E.stacks_of(st5.sides[1].units[0], "灼烧") == 4, "灼烧 4 层：回合结束受 8 点，层数不变 (剩 %d)" % hps(st5,1)[0])
-	var apply2 := S("叠三次", [G.status("易伤", G.T("choose","enemy")), G.status("易伤", G.T("choose","enemy")), G.status("易伤", G.T("choose","enemy"))])
-	var st6: Dictionary = play(deck([apply2]), deck([], [100,100,100,100,100]), {"t1": 10, "t2": 10, "t3": 10}, {}, 3, 3, 100, 1)
-	check(E.stacks_of(st6.sides[1].units[0], "易伤") == 2, "同一轮对同一目标叠三次：只算两层（每轮最多叠两次）(%d)" % E.stacks_of(st6.sides[1].units[0], "易伤"))
-	var apply1 := S("叠一次", [G.status("易伤", G.T("choose","enemy"))])
-	var st7i: Dictionary = E.make_state([deck([apply1]), deck([], [100,100,100,100,100])], 0, {"cooldown": 0})
-	var st7: Dictionary = play(deck([apply1]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 3, st7i)
-	var st7ci: Dictionary = E.make_state([deck([apply1]), deck([], [100,100,100,100,100])], 0, {"cooldown": 1})
-	var st7c: Dictionary = play(deck([apply1]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 3, st7ci)
-	check(E.stacks_of(st7c.sides[1].units[0], "易伤") == 2, "冷却 1 轮：含进阶词的技能连续 3 轮只能放第 1、3 轮，叠 2 层 (%d)" % E.stacks_of(st7c.sides[1].units[0], "易伤"))
-	check(E.stacks_of(st7.sides[1].units[0], "易伤") == 3, "跨轮保留：连续 3 轮每轮叠一层 = 3 层 (%d)" % E.stacks_of(st7.sides[1].units[0], "易伤"))
-	var dbl1 := S("双倍叠", [G.status("易伤", G.T("choose","enemy"), 0, 0, {})])
+	check(hps(st4b,1) == [amp4,amp4,amp4,amp4,100], "蓄力 3 级 + 群攻：四个目标都吃到放大（同一次出手），等级只用一次 (%s)" % str(hps(st4b,1)))
+	var st5: Dictionary = E.make_state([deck([]), deck([], BIG)], 0)
+	st5.sides[1].units[0].stacks["灼烧"] = 3
+	st5 = play(deck([]), deck([], BIG), {}, {}, 3, 3, 100, 1, st5)
+	var burn4: int = int(ceil(E.stack_k(4) * E.BURN_SCALE))
+	check(hps(st5,1)[0] == 100 - burn4 and E.stacks_of(st5.sides[1].units[0], "灼烧") == 4, "灼烧 4 级：回合结束受 ceil(k(4)×系数)=%d 点，等级不变 (剩 %d)" % [burn4, hps(st5,1)[0]])
+	# 施放、成长、到期
+	var cast1 := S("叠易伤", [G.status("易伤", G.T("choose","enemy"))])
+	var st6: Dictionary = play(deck([cast1]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1)
+	check(E.stacks_of(st6.sides[1].units[0], "易伤") == 1, "刚施放是 1 级 (%d)" % E.stacks_of(st6.sides[1].units[0], "易伤"))
+	E.begin_round(st6)
+	check(E.stacks_of(st6.sides[1].units[0], "易伤") == 0, "持续只有 1 轮：下一轮开始就消失 (%d)" % E.stacks_of(st6.sides[1].units[0], "易伤"))
+	var cast_ext := S("叠易伤持久", [G.status("易伤", G.T("choose","enemy"))])
+	cast_ext.nodes[0]["ext"] = 2
+	cast_ext = G.finalize(cast_ext)
+	var st7: Dictionary = play(deck([cast_ext]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1)
+	var lv_trace: Array = [E.stacks_of(st7.sides[1].units[0], "易伤")]
+	for i in 5:
+		E.begin_round(st7)
+		lv_trace.append(E.stacks_of(st7.sides[1].units[0], "易伤"))
+	check(lv_trace == [1, 2, 3, 4, 0, 0], "持久×2 = 持续 4 轮：1、2、3、4 级，然后消失 (%s)" % str(lv_trace))
+	# 续放：再放一次 +1 级并刷新到这次的末尾
+	var cast3 := S("叠易伤3轮", [G.status("易伤", G.T("choose","enemy"))])
+	cast3.nodes[0]["ext"] = 1
+	cast3 = G.finalize(cast3)
+	var st8i: Dictionary = E.make_state([deck([cast3]), deck([], BIG)], 0)
+	var st8: Dictionary = play(deck([cast3]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st8i)
+	# 第 1 轮：1 级，撑到第 2 轮；第 2 轮开始自动 2 级，再放一次 → 3 级，刷新到第 3 轮；
+	st8 = play(deck([cast3]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1, st8)
+	check(E.stacks_of(st8.sides[1].units[0], "易伤") == 3, "第 2 轮开始自动 +1 = 2 级，续放 +1 = 3 级 (%d)" % E.stacks_of(st8.sides[1].units[0], "易伤"))
+	E.begin_round(st8)
+	check(E.stacks_of(st8.sides[1].units[0], "易伤") == 4, "续放把倒计时刷新到第 3 轮：第 3 轮开始还在，自动 +1 = 4 级 (%d)" % E.stacks_of(st8.sides[1].units[0], "易伤"))
+	var twice := S("同轮连放", [G.status("易伤", G.T("choose","enemy")), G.status("易伤", G.T("choose","enemy")), G.status("易伤", G.T("choose","enemy"))])
+	var st9: Dictionary = play(deck([twice]), deck([], BIG), {"t1": 10, "t2": 10, "t3": 10}, {}, 3, 3, 100, 1)
+	check(E.stacks_of(st9.sides[1].units[0], "易伤") == 1, "同一轮连放三次：第一次 1 级，之后只刷新倒计时、不再加级 (%d)" % E.stacks_of(st9.sides[1].units[0], "易伤"))
+	var dbl1 := S("双倍叠", [G.status("易伤", G.T("choose","enemy"))])
 	dbl1.nodes[0]["dbl"] = 2
-	var st8: Dictionary = play(deck([dbl1]), deck([], [100,100,100,100,100]), {"t1": 10}, {}, 3, 3, 100, 1)
-	check(E.stacks_of(st8.sides[1].units[0], "易伤") == 4, "双倍×2：一次叠 4 层 (%d)" % E.stacks_of(st8.sides[1].units[0], "易伤"))
-	var st9: Dictionary = E.make_state([deck([S("大打", [G.dmg(G.T("choose","enemy"), G.N(200))])]), deck([], [20,20,20,20,20])], 0)
-	st9.sides[1].units[0].stacks["易伤"] = 6
-	st9 = play(deck([S("大打", [G.dmg(G.T("choose","enemy"), G.N(200))])]), deck([], [20,20,20,20,20]), {"t1": 10}, {}, 3, 3, 400, 1, st9)
-	check(E.stacks_of(st9.sides[1].units[0], "易伤") == 0, "被打倒：层数清零")
+	dbl1 = G.finalize(dbl1)
+	var st10: Dictionary = play(deck([dbl1]), deck([], BIG), {"t1": 10}, {}, 3, 3, 100, 1)
+	check(E.stacks_of(st10.sides[1].units[0], "易伤") == 4, "双倍×2：一次加 4 级 (%d)" % E.stacks_of(st10.sides[1].units[0], "易伤"))
+	var bigk := S("大打", [G.dmg(G.T("choose","enemy"), G.N(200))])
+	var st11: Dictionary = E.make_state([deck([bigk]), deck([], [20,20,20,20,20])], 0)
+	st11.sides[1].units[0].stacks["易伤"] = 5
+	st11 = play(deck([bigk]), deck([], [20,20,20,20,20]), {"t1": 10}, {}, 3, 3, 400, 1, st11)
+	check(E.stacks_of(st11.sides[1].units[0], "易伤") == 0, "被打倒：等级清零")
 	print("— 首挡 / 不屈 / 回击")
 	st = play(deck([S("打30",[G.dmg(G.T("choose","enemy"), G.N(30))])]), deck([], [20,20,20,20,20], ["首挡","","","",""]), {"t1": 10}, {}, 4)
 	check(hps(st,1)[0] == 20, "首挡把第一个伤害包归零")

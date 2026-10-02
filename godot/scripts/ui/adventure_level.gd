@@ -207,6 +207,11 @@ func _info_bar() -> Control:
 		if t != "":
 			gl.add_child(K.label("· " + t, 14, K.TEXT))
 	v.add_child(gl)
+	var rn: int = int(level.get("rounds", 1))
+	if rn > 1:
+		var cr: Array = level.get("cast_rounds", [])
+		var cast_txt := "每一轮你都会自动重复出这一句" if cr.is_empty() else ("你只在第 %s 轮出手" % "、".join(cr.map(func(x): return str(int(x)))))
+		v.add_child(K.label("这一关共 %d 轮 · %s；状态会在轮与轮之间成长。" % [rn, cast_txt], 14, K.GOLD))
 	row.add_child(p)
 	var op: Dictionary = level.get("opp", {})
 	var q := K.panel(Color("2a1a1d"), K.RED.darkened(0.3), 12, 2, 8)
@@ -302,6 +307,9 @@ func _explain(tok: Dictionary) -> String:
 	if str(tok.t) == "P":
 		return "接一张连接牌【%s】：它决定两边怎么比较。" % str(tok.v)
 	var w := str(tok.v)
+	var notes: Dictionary = level.get("notes", {})
+	if notes.has(w):
+		return "点【%s】。%s" % [w, str(notes[w])]
 	var cat := str(Lex.words[w].cat) if Lex.words.has(w) else ""
 	return "点【%s】。%s" % [w, CAT_TEACH.get(cat, "")]
 
@@ -455,10 +463,39 @@ func _play_events(events: Array) -> void:
 			"mit":
 				_flash(int(e.tgt), K.BLUE, "减伤")
 				await get_tree().create_timer(0.25).timeout
+			"round_mark":
+				await _round_banner(int(e.round))
+			"stack":
+				_flash(int(e.tgt), Color("ffd21f") if str(e.status) in ["蓄力", "铁壁"] else Color("ff7a6a"), "%s Lv%d%s" % [str(e.status), int(e.stacks), "（续放）" if bool(e.get("recast", false)) else ""])
+				await get_tree().create_timer(0.35).timeout
+			"stack_spent":
+				_flash(int(e.tgt), Color("ffd21f"), "蓄力 %d 级爆发！" % int(e.stacks))
+				Sfx.play("hit")
+				await get_tree().create_timer(0.5).timeout
+			"burn":
+				var bb: Dictionary = unit_boxes.get(int(e.tgt), {})
+				_flash(int(e.tgt), Color("ff5a2a"), "灼烧 -%d" % int(e.amount))
+				await get_tree().create_timer(0.3).timeout
 			"interrupt":
 				Pet.chat("打断成功！", "excited", 3.0)
 				await get_tree().create_timer(0.3).timeout
 	await get_tree().create_timer(0.4).timeout
+
+func _round_banner(r: int) -> void:
+	var lab := K.label("第 %d 轮" % r, 54, K.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	lab.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	lab.add_theme_constant_override("outline_size", 10)
+	lab.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	lab.position = Vector2(400, 150)
+	lab.size = Vector2(800, 80)
+	lab.modulate.a = 0.0
+	add_child(lab)
+	var tw := lab.create_tween()
+	tw.tween_property(lab, "modulate:a", 1.0, 0.2)
+	tw.tween_interval(0.6)
+	tw.tween_property(lab, "modulate:a", 0.0, 0.25)
+	tw.tween_callback(lab.queue_free)
+	await get_tree().create_timer(1.0).timeout
 
 func _show_result(res: Dictionary, tokens: Array) -> void:
 	busy = false

@@ -163,7 +163,7 @@ func refresh(u: Dictionary, sk: Array) -> void:
 	for s in E.display_statuses(u):
 		var txt: String = s.name
 		if int(s.stacks) > 0:
-			txt += " ×%d" % int(s.stacks)
+			txt += " Lv%d%s" % [int(s.stacks), ("·剩%d轮" % int(s.left)) if int(s.left) < 90 else ""]
 		elif s.name == "护盾":
 			txt += " %d" % int(s.value)
 		status_row.add_child(K.chip(txt, STATUS_COL.get(s.name, K.MUTED), 12))

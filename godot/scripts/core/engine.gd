@@ -7,7 +7,8 @@ const G = preload("res://scripts/core/grammar.gd")
 
 const TICKS := 20          # 0..19 为时间轴，20 为回合结束阶段
 const STRIDE := 21         # 每轮占的绝对时间刻数
-const DEFAULT_RULES := {"win_score": 150, "max_rounds": 12, "ap_gain": 45, "ap_cap": 180, "start_ap": 45, "cooldown": 0}
+const DEFAULT_RULES := {"win_score": 150, "max_rounds": 12, "ap_gain": 45, "ap_cap": 180, "start_ap": 45}
+static var DEFAULT_COOLDOWN := 1     # 含进阶词的技能用完后要隔几轮才能再用（测试里可以改成 0）
 
 # ================================================================ 状态创建
 # deck: {units:[{name,max_hp,kw,skills:[skill…]}×5]}
@@ -17,6 +18,7 @@ static func make_state(decks: Array, first: int = 0, rules: Dictionary = {}, see
 		"winner": -1, "rules": DEFAULT_RULES.duplicate(), "events": [], "acts": [], "items": [], "ledger": {},
 		"guard": 0, "root_ctr": 0, "used": {}, "cur_t": 0, "abs_now": 0, "sid_ctr": 0, "log": [], "round_taken": {}, "cd": {},
 	}
+	st.rules["cooldown"] = DEFAULT_COOLDOWN
 	for k in rules:
 		st.rules[k] = rules[k]
 	for s in 2:
@@ -33,7 +35,7 @@ static func set_deck(st: Dictionary, s: int, deck: Dictionary, fresh: bool = fal
 		var u: Dictionary
 		if fresh:
 			u = {"uid": s * 10 + i, "side": s, "name": d.name, "max_hp": int(d.max_hp), "hp": int(d.max_hp), "down_round": -1,
-				"statuses": [], "stacks": {}, "stack_round": {}, "kw": d.get("kw", ""), "kw_spent": false, "bonus": 0, "skill_ids": [], "glyph": d.get("glyph", "")}
+				"statuses": [], "stacks": {}, "stack_end": {}, "stack_bump": {}, "kw": d.get("kw", ""), "kw_spent": false, "bonus": 0, "skill_ids": [], "glyph": d.get("glyph", "")}
 			side.units.append(u)
 		else:
 			u = _u(st, s * 10 + i)
@@ -106,10 +108,10 @@ static func position_of(st: Dictionary, uid: int) -> int:
 	return -1
 
 # ---- 叠层状态：层数跨轮保留，倒下清零；效果随层数指数增长
-static var STACK_BASE := 2.0       # 每多一层，效果大约翻 STACK_BASE 倍
-static var STACK_UNIT := 4.0       # 曲线的“起步慢”程度：k(n) = (BASE^n - 1) / UNIT
+static var STACK_BASE := 1.5       # 每多一层，效果大约翻 STACK_BASE 倍
+static var STACK_UNIT := 3.0       # 曲线的“起步慢”程度：k(n) = (BASE^n - 1) / UNIT
 static var STACK_MAX := 8
-static var STACK_PER_ROUND := 2   # 同一个单位同一种状态每轮最多叠几次
+static var BURN_SCALE := 8.0         # 灼烧每轮伤害 = ceil(k(等级) × BURN_SCALE)
 
 static func stacks_of(u: Dictionary, name: String) -> int:
 	return int(u.get("stacks", {}).get(name, 0))
@@ -127,7 +129,8 @@ static func display_statuses(u: Dictionary) -> Array:
 	for name in G.STACK_STATUSES:
 		var n: int = stacks_of(u, name)
 		if n > 0:
-			out.append({"name": name, "value": 0, "stacks": n})
+			var end_r: int = int(u.get("stack_end", {}).get(name, 999999))
+			out.append({"name": name, "value": 0, "stacks": n, "end": end_r, "left": (end_r - int(u.get("rnd", 0)) + 1) if end_r < 999999 else 99})
 	return out
 
 static func has_status(u: Dictionary, name: String) -> bool:
@@ -171,15 +174,33 @@ static func begin_round(st: Dictionary) -> Array:
 		for u in side.units:
 			u.statuses = []
 			u.bonus = 0
+			u["rnd"] = int(st.round)       # 记下现在是第几轮（界面算“还剩几轮”用）
 			if u.down_round != -1 and st.round >= u.down_round + 2:
 				u.down_round = -1
 				u.hp = u.max_hp
 				u.statuses = []
 				u.stacks = {}
-				u.stack_round = {}
+				u.stack_end = {}
+				u.stack_bump = {}
 				u.bonus = 0
 				revived.append(u.uid)
+			elif u.down_round == -1:
+				_grow_stacks(st, u)
 	return revived
+
+# 叠层状态每过一轮自动长一级；倒计时走完整个状态一起消失
+static func _grow_stacks(st: Dictionary, u: Dictionary) -> void:
+	for name in u.stacks.keys():
+		var lv: int = int(u.stacks[name])
+		if lv <= 0:
+			u.stacks.erase(name)
+			continue
+		var end_r: int = int(u.stack_end.get(name, 999999))
+		if int(st.round) > end_r:
+			u.stacks.erase(name)
+			u.stack_end.erase(name)
+			continue
+		u.stacks[name] = mini(STACK_MAX, lv + 1)
 
 static func first_side(st: Dictionary) -> int:
 	return (int(st.first) + (st.round - 1)) % 2
@@ -692,7 +713,7 @@ static func _exec(st: Dictionary, node: Dictionary, ctx: Dictionary) -> void:
 					var ls := _targets(st, node.link, ctx, "l%d" % node.id)
 					if not ls.is_empty():
 						link = ls[0]
-				_emit(st, {"kind": "status", "src": ctx.host, "tgt": uid, "status": node.status, "dur": int(node.dur), "value": val, "link": link, "dbl": int(node.get("dbl", 0)),
+				_emit(st, {"kind": "status", "src": ctx.host, "tgt": uid, "status": node.status, "dur": int(node.dur), "value": val, "link": link, "dbl": int(node.get("dbl", 0)), "ext": int(node.get("ext", 0)),
 					"root": int(ctx.get("root", _new_root(st)))})
 		"remove":
 			if node.what == "状态":
@@ -1185,15 +1206,21 @@ static func _apply_status(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int
 static func _apply_stack(st: Dictionary, e: Dictionary, tgt: Dictionary, t: int) -> void:
 	var name: String = e.status
 	var add: int = 1 << clampi(int(e.get("dbl", 0)), 0, 3)
-	var key_r: String = "%s@%d" % [name, int(st.round)]
-	var done_n: int = int(tgt.stack_round.get(key_r, 0))
-	if done_n >= STACK_PER_ROUND:
+	var dur: int = 1 << clampi(int(e.get("ext", 0)), 0, 3)           # 持续几轮：每个“持久”让它翻倍
+	var end_new: int = int(st.round) + dur - 1                        # 含本轮
+	var lv: int = int(tgt.stacks.get(name, 0))
+	var bump_key: String = "%s@%d" % [name, int(st.round)]
+	var recast: bool = lv > 0
+	if recast and bool(tgt.stack_bump.get(bump_key, false)):
+		# 同一轮里第二次施放：只刷新倒计时，不再加级（防止一轮里连放四张直接起飞）
+		tgt.stack_end[name] = maxi(int(tgt.stack_end.get(name, 0)), end_new)
 		_log(st, t, "stack_capped", {"tgt": tgt.uid, "status": name})
 		return
-	tgt.stack_round[key_r] = done_n + 1
-	var n: int = mini(STACK_MAX, int(tgt.stacks.get(name, 0)) + add)
+	tgt.stack_bump[bump_key] = true
+	var n: int = mini(STACK_MAX, lv + add)
 	tgt.stacks[name] = n
-	_log(st, t, "stack", {"tgt": tgt.uid, "status": name, "stacks": n, "src": int(e.src)})
+	tgt.stack_end[name] = maxi(int(tgt.stack_end.get(name, 0)), end_new) if recast else end_new
+	_log(st, t, "stack", {"tgt": tgt.uid, "status": name, "stacks": n, "src": int(e.src), "recast": recast, "until": int(tgt.stack_end[name])})
 	_fire(st, "status_applied", {"subject": tgt.uid, "src": e.src, "recipient": tgt.uid, "amount": 0, "root": e.root}, false)
 
 # 接续 / 复制：读取实际数值后继续
@@ -1232,7 +1259,8 @@ static func _settle(st: Dictionary, t: int) -> void:
 		u.down_round = st.round
 		u.statuses = []
 		u.stacks = {}
-		u.stack_round = {}
+		u.stack_end = {}
+		u.stack_bump = {}
 		st.sides[1 - u.side].score += int(u.max_hp)
 		_log(st, t, "down", {"tgt": u.uid, "score_side": 1 - u.side, "score": int(u.max_hp)})
 	for u in downs:
@@ -1260,7 +1288,7 @@ static func _end_phase(st: Dictionary) -> void:
 		for bu in st.sides[sd].units:
 			var kb2: int = stacks_of(bu, "灼烧")
 			if kb2 > 0 and bu.down_round == -1:
-				var dmg_b: int = 1 << (kb2 - 1)
+				var dmg_b: int = maxi(1, int(ceil(stack_k(kb2) * BURN_SCALE)))
 				_log(st, st.cur_t, "burn", {"tgt": bu.uid, "stacks": kb2, "amount": dmg_b})
 				_apply(st, {"kind": "dmg", "src": -1, "tgt": bu.uid, "amount": dmg_b, "root": _new_root(st), "no_link": true})
 	# 处理此阶段排入的项目

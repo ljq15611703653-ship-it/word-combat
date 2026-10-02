@@ -685,6 +685,24 @@ func _context_help() -> String:
 		lines.append("若有：数字是“至少有几个存活的随从”（1~5）。想覆盖五个随从，要拼五个【若有】，每个只管一次判断。")
 	if "并" in ws:
 		lines.append("并：把几个效果连成同一个技能（最多 6 个）；想让后一段晚一点，在它前面加【之后】和秒数。")
+	var n_one := 0
+	for w in ws:
+		if w == "一个":
+			n_one += 1
+	if n_one >= 1 and "选择" in ws:
+		lines.append("选几个目标：每个【一个】选一个不同的目标。放 2 个就选 2 个，放满对面（或我方）的人数就是全体——游戏里没有“全部”，一个 × 3（× 4）就是它。每多放一个，词价多 2 点。")
+	var stat_words: Array = []
+	for sn in G.STACK_STATUSES:
+		if sn in ws:
+			stat_words.append(sn)
+	if not stat_words.is_empty():
+		lines.append("叠层状态：施加后是 1 级，之后每过一轮自动 +1 级，效果按指数曲线涨（前期轻、后期猛）。不放【持久】只撑本轮；每放一个【持久】持续轮数翻倍（1→2→4→8）。状态还在时再放一次：等级 +1，倒计时刷新到这次的末尾。双倍：一次加 2、4 级。")
+		for sn2 in stat_words:
+			lines.append("【%s】：%s" % [sn2, str(G.STATUS_DESC.get(sn2, ""))])
+	if "蓄力" in ws:
+		lines.append("蓄力放大的是这个随从“下一次出手”的整句话：所有目标和重复都吃到放大，所以配【一个 × 3】就是一刀灭队。必须由有蓄力的那个随从自己出手；打出去就用完。")
+	if "加上" in ws or "减去" in ws:
+		lines.append("运算从左往右算：A 加上 B 减去 C。想先算后面的，用括号圈起来。结果不会小于 0。")
 	return "\n".join(lines)
 
 func _refresh_hint() -> void:

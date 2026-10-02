@@ -41,7 +41,7 @@ func setup() -> void:
 	for lv0 in levels:
 		if L.is_playable(lv0):
 			playable_n += 1
-	head.add_child(K.label("通关 %d / 可玩 %d（共 %d 关，其余待改写）" % [Settings.adv_cleared.size(), playable_n, levels.size()], 18, K.MUTED))
+	head.add_child(K.label("通关 %d / %d" % [Settings.adv_cleared.size(), playable_n], 18, K.MUTED))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
@@ -49,7 +49,7 @@ func setup() -> void:
 	bk.pressed.connect(func(): back.emit())
 	head.add_child(bk)
 	v.add_child(head)
-	v.add_child(K.wrap_label("每一关，对手摆出了阵势：你只有手里这几张词，要拼出一句“长难句”来破局。小词会手把手教你。顺序解锁。", 16, K.MUTED))
+	v.add_child(K.wrap_label("每一关教一个特殊效果怎么用：对手摆出阵势，你手里只有这几张词，拼出一句话破局。小词会手把手教你，顺序解锁。", 16, K.MUTED))
 	var sc := ScrollContainer.new()
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

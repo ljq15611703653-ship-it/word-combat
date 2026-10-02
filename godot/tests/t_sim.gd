@@ -17,7 +17,7 @@ func _init() -> void:
 	if ov.has("unit"): E.STACK_UNIT = ov.unit
 	if ov.has("base"): E.STACK_BASE = ov.base
 	if ov.has("smax"): E.STACK_MAX = int(ov.smax)
-	if ov.has("per"): E.STACK_PER_ROUND = int(ov.per)
+	if ov.has("burn"): E.BURN_SCALE = ov.burn
 	if ov.has("bagsize"): Lx.BAG_SIZE = int(ov.bagsize)
 	if ov.has("bags"): Lx.BAGS_PER_ROUND = int(ov.bags)
 	if ov.has("rare"): Lx.RARE_SHARE = ov.rare

@@ -13,16 +13,17 @@ class M extends "res://scripts/game/match.gd":
 	var hits := 0
 	var spent_best := 0
 	var mainhp := 16
+	var extp := 1
 	var otherhp := 14
 	func _ai_build_card(side: int, k: int) -> void:
 		if side != mine:
 			super._ai_build_card(side, k)
 			return
 		var plan := [
-			["status", {"st": "蓄力"}, otherhp, ""],      # 0：给主力叠蓄力
+			["status", {"st": "蓄力", "ext": extp}, otherhp, ""],      # 0：给主力叠蓄力
 			["atkA", {"n": 22}, mainhp, "首挡"],   # 1：主力（群攻大招：选满 4 个敌人）
-			["status", {"st": "铁壁"}, otherhp, ""],      # 2：给主力叠铁壁
-			["status", {"st": "蓄力"}, otherhp, ""],      # 3：另一张蓄力，和 0 轮流放（冷却 1 轮）
+			["status", {"st": "铁壁", "ext": extp}, otherhp, ""],      # 2：给主力叠铁壁
+			["status", {"st": "蓄力", "ext": extp}, otherhp, ""],      # 3：另一张蓄力，和 0 轮流放（冷却 1 轮）
 		]
 		var pl: Array = plan[k]
 		var sk: Dictionary = R.build(str(pl[0]), pl[1])
@@ -102,7 +103,7 @@ func _init() -> void:
 	if ov.has("unit"): E.STACK_UNIT = ov.unit
 	if ov.has("base"): E.STACK_BASE = ov.base
 	if ov.has("smax"): E.STACK_MAX = int(ov.smax)
-	if ov.has("per"): E.STACK_PER_ROUND = int(ov.per)
+	if ov.has("burn"): E.BURN_SCALE = ov.burn
 	if ov.has("hp"): load("res://scripts/game/match.gd").AI_HP = int(ov.hp)
 	var win := 0
 	var lose := 0
@@ -120,6 +121,7 @@ func _init() -> void:
 			m.mine = seat
 			m.thr = thr
 			m.mainhp = int(ov.get("mainhp", 16))
+			m.extp = int(ov.get("ext", 1))
 			m.otherhp = int(ov.get("otherhp", 14))
 			m.start(false, s0 + g, false, 0)
 			if ov.has("win"): m.st.rules.win_score = int(ov.win)

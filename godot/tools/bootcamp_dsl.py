@@ -13,16 +13,19 @@ def toks(s):
             out.append(t)
     return out
 
-def M(name, glyph, hp, kw="", hp_now=None, statuses=None, skill=None):
+def M(name, glyph, hp, kw="", hp_now=None, statuses=None, skill=None, stacks=None, act=None):
     d = {"name": name, "glyph": glyph, "hp": hp}
+    if stacks: d["stacks"] = stacks       # 初始叠层状态：{"易伤": 3} 或 {"易伤": [3, 到第几轮]}
+    if act: d["act"] = act                # 己方随从每轮自动宣告的行动（用 A(...) 写）
     if kw: d["kw"] = kw
     if hp_now is not None: d["hp_now"] = hp_now
     if statuses: d["statuses"] = statuses
     if skill: d["skill"] = toks(skill)
     return d
 
-def F(name, hp, kw="", glyph="盾", hp_now=None, statuses=None, act=None):
+def F(name, hp, kw="", glyph="盾", hp_now=None, statuses=None, act=None, stacks=None):
     d = {"name": name, "glyph": glyph, "hp": hp}
+    if stacks: d["stacks"] = stacks
     if kw: d["kw"] = kw
     if hp_now is not None: d["hp_now"] = hp_now
     if statuses: d["statuses"] = statuses
@@ -39,7 +42,7 @@ def Opp(name, intro, beaten, gloat, title=""):
     """本关的对手角色：名字、称号、开场白、被你打败时说的话、你失败时说的话。"""
     return {"name": name, "title": title, "intro": intro, "beaten": beaten, "gloat": gloat}
 
-def lvl(id, ch, title, story, why, me, foe, goal, sol, extra="", ap=40, requires=None, tray_extra=None, steps=None, opp=None, pet=None):
+def lvl(id, ch, title, story, why, me, foe, goal, sol, extra="", ap=40, requires=None, tray_extra=None, steps=None, opp=None, pet=None, rounds=1, cast_rounds=None, notes=None, naive=None):
     solt = toks(sol)
     tray = {}
     for t in solt:
@@ -50,7 +53,7 @@ def lvl(id, ch, title, story, why, me, foe, goal, sol, extra="", ap=40, requires
             tray[t] = tray.get(t, 0) + 1
     LEVELS.append({"id": id, "chapter": ch, "title": title, "story": story, "why": why, "ap": ap,
                    "me": me, "foe": foe, "goal": goal, "tray": tray, "sol": solt, "requires": requires or [], "steps": steps or [],
-                   "opp": opp or {}, "pet": pet or {}})
+                   "opp": opp or {}, "pet": pet or {}, "rounds": rounds, "cast_rounds": cast_rounds or [], "notes": notes or {}, "naive": naive or []})
 
 def kill(*who): return {"t": "kill", "who": list(who)}
 def kill_all(): return {"t": "kill_all"}
@@ -60,9 +63,11 @@ def foe_hp_le(who, n): return {"t": "foe_hp_le", "who": who, "n": n}
 def foe_hp_ge(who, n): return {"t": "foe_hp_ge", "who": who, "n": n}
 def all_alive(): return {"t": "all_alive"}
 def score_ge(n): return {"t": "score_ge", "n": n}
+def foe_stack_ge(who, name, n): return {"t": "foe_stack_ge", "who": who, "name": name, "n": n}
+def my_stack_ge(who, name, n): return {"t": "my_stack_ge", "who": who, "name": name, "n": n}
 def team_hp_ge(n): return {"t": "my_hp_total_ge", "n": n}
 
-CH = {1: "第一章 · 一句话", 2: "第二章 · 连招", 3: "第三章 · 条件与循环", 4: "第四章 · 埋伏", 5: "第五章 · 控场", 6: "第六章 · 嵌套", 7: "第七章 · 终局"}
+CH = {1: "第一章 · 一个、两个、全部", 2: "第二章 · 放大与连击", 3: "第三章 · 会成长的状态", 4: "第四章 · 埋伏与反应", 5: "第五章 · 综合战"}
 
 def write(path, only=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)

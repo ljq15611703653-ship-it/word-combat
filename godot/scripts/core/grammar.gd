@@ -40,16 +40,20 @@ const REF_TEXT := {
 const OP_WORD := {"max": "较高者", "min": "较低者", "sum": "加上", "sub": "减去", "diff": "差值"}
 const OP_TEXT := {"max": "较高者", "min": "较低者", "sum": "加上", "sub": "减去", "diff": "差值"}
 const INFIX_OPS := ["sum", "sub"]      # 中缀：A 加上 B 减去 C，从左到右算（减不到 0 以下）
-# 叠层状态：每次施加叠一层（每轮每个单位最多叠两次），层数跨轮保留，倒下清零；效果随层数指数增长（前期慢，后期爆炸）
+# 叠层状态（会成长的持续状态）：
+#   · 施加后是 1 级，之后每过一轮自动 +1 级（上限 8）；效果按指数曲线随等级增长（前期很轻，后期很猛）
+#   · 持续轮数默认 1 轮（只撑本轮）；每加一个“持久”，持续轮数翻倍：1、2、4、8 轮
+#   · 状态还在的时候再施放一次：等级 +1（“双倍”一次加 2 的 n 次方级），倒计时刷新（取更晚的）
+#   · 同一轮里对同一个单位同一种状态，只有第一次施放加级；倒计时走完、倒下、被移除，整个状态一起消失
 # 己方用：蓄力、铁壁；敌方用：易伤、灼烧、衰弱（语法上谁都可以施加给谁）
 const STACK_STATUSES := ["易伤", "灼烧", "衰弱", "蓄力", "铁壁"]
 const STATUSES := ["易伤", "灼烧", "衰弱", "蓄力", "铁壁"]
 const STATUS_DESC := {
-	"易伤": "每层让受到的伤害大幅增加（层数越多涨得越快）",
-	"灼烧": "每轮结束时受到伤害，第 n 层是 2 的 n-1 次方点",
-	"衰弱": "每层让造成的伤害大幅降低",
-	"蓄力": "下一次造成伤害时一次用掉所有层数，伤害大幅放大",
-	"铁壁": "每层让受到的伤害大幅降低",
+	"易伤": "等级越高，受到的伤害越多",
+	"灼烧": "每轮结束时受到伤害，等级越高越痛",
+	"衰弱": "等级越高，造成的伤害越低",
+	"蓄力": "等级越高，下一次出手的伤害越大（打出去时用掉全部等级）",
+	"铁壁": "等级越高，受到的伤害越少",
 }
 const STATUS_SIDE := {"易伤": "enemy", "灼烧": "enemy", "衰弱": "enemy", "蓄力": "ally", "铁壁": "ally"}
 
@@ -373,6 +377,7 @@ static func _words_core(node: Dictionary) -> Array:
 			w.append(node.status)
 			w.append_array(target_words(node.target))
 			w.append_array(_rep("双倍", int(node.get("dbl", 0))))
+			w.append_array(_rep("持久", int(node.get("ext", 0))))
 			if node.has("link"):
 				w.append_array(target_words(node.link))
 			if int(node.dur) > 0:
@@ -872,9 +877,11 @@ static func _node_text_core(node: Dictionary) -> String:
 			var s: String = "使%s受到的伤害%s" % [target_text(node.target), ("每次减少 %s 点" % ("某某" if int(node.value.n) < 0 else str(int(node.value.n) / 2))) if node.get("mode", "") == "fixed" else ("降低 %s" % ("某某" if int(node.value.n) < 0 else "%d%%" % pct_of(int(node.value.n))))]
 			return s + mods_clause(node, "效果") + _dur_text(int(node.get("dur", 0)))
 		"status":
-			var s2: String = "给%s叠 %s 层【%s】" % [target_text(node.target), "1" if int(node.get("dbl", 0)) == 0 else str(1 << int(node.dbl)), node.status]
+			var lvs: int = 1 << int(node.get("dbl", 0))
+			var rounds: int = 1 << int(node.get("ext", 0))
+			var s2: String = "给%s施加【%s】（%s；%s）" % [target_text(node.target), node.status, ("加 %d 级" % lvs) if lvs > 1 else "加 1 级", ("持续 %d 轮" % rounds) if rounds > 1 else "只撑本轮"]
 			if STATUS_DESC.has(node.status):
-				s2 += "（%s）" % STATUS_DESC[node.status]
+				s2 += "：" + STATUS_DESC[node.status] + "；之后每过一轮自动 +1 级"
 			return _after_text(node) + s2
 		"remove":
 			return "移除%s身上的%s" % [target_text(node.target), node.what]

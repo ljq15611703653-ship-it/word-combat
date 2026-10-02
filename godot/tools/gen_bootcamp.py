@@ -7,7 +7,7 @@ import bootcamp_dsl as D
 args = sys.argv[1:]
 only = args[args.index("--only") + 1] if "--only" in args else None
 out = args[args.index("--out") + 1] if "--out" in args else os.path.join(os.path.dirname(__file__), "..", "data", "bootcamp.json")
-mods = ["bootcamp_ch1", "bootcamp_ch2", "bootcamp_ch3", "bootcamp_ch4", "bootcamp_ch5", "bootcamp_ch6", "bootcamp_ch7"]
+mods = ["bootcamp_course"]      # 新课程（旧的 7 章在 tools/old_bootcamp/，已停用）
 for m in mods:
     if only and m != "bootcamp_" + only:
         continue

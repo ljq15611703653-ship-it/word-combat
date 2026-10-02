@@ -16,6 +16,25 @@ const KW_NOTE := {
 	"免疫易伤": "对【易伤】免疫", "免疫灼烧": "对【灼烧】免疫", "免疫衰弱": "对【衰弱】免疫",
 }
 
+# 叠层状态的一行说明：几级、撑几轮、撑满能长到几级、到时候效果有多大
+static func _stack_line(st: Dictionary, c: Dictionary, uid: int, e: Dictionary) -> String:
+	var name := str(e.status)
+	var tu := E._u(c, uid)
+	var end_r: int = int(tu.get("stack_end", {}).get(name, int(st.round)))
+	var rounds_left: int = maxi(1, end_r - int(c.round) + 1)
+	var lv: int = int(e.stacks)
+	var top: int = mini(E.STACK_MAX, lv + rounds_left - 1)
+	var k: float = E.stack_k(top)
+	var eff := ""
+	match name:
+		"易伤": eff = "撑满时受到的伤害 ×%.1f" % (1.0 + k)
+		"铁壁": eff = "撑满时受到的伤害 ÷%.1f" % (1.0 + k)
+		"衰弱": eff = "撑满时造成的伤害 ÷%.1f" % (1.0 + k)
+		"蓄力": eff = "撑满时下一次出手的伤害 ×%.1f（打出去就用完）" % (1.0 + k)
+		"灼烧": eff = "撑满时每轮结束掉 %d 点" % maxi(1, int(ceil(k * E.BURN_SCALE)))
+	var verb := "续放，等级 +1" if bool(e.get("recast", false)) else "获得"
+	return "%s：%s【%s】（现在 %d 级，撑到第 %d 轮，每过一轮自动 +1 级；%s）" % [_name(st, uid), verb, name, lv, end_r, eff]
+
 static func _name(st: Dictionary, uid: int) -> String:
 	var u := E._u(st, uid)
 	if u.is_empty():
@@ -44,6 +63,7 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 	var blocks := {}
 	var stat := {}
 	var shields := {}
+	var stk := {}
 	var other := false
 	for e in c.events:
 		match e.type:
@@ -61,6 +81,10 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 				if not stat.has(int(e.tgt)):
 					stat[int(e.tgt)] = []
 				stat[int(e.tgt)].append(str(e.status))
+			"stack":
+				if not stk.has(int(e.tgt)):
+					stk[int(e.tgt)] = []
+				stk[int(e.tgt)].append(e)
 			"watch_install", "time", "redirect", "swap", "mit":
 				other = true
 	for uid in dmg:
@@ -81,6 +105,12 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 		out.effects.append("%s：恢复 %d 点（生命 %d → %d）" % [_name(st, uid), int(heal[uid]), int(E._u(st, uid).hp), int(E._u(c, uid).hp)])
 	for uid in stat:
 		out.effects.append("%s：获得【%s】" % [_name(st, uid), "】【".join(stat[uid])])
+	for uid in stk:
+		for se in stk[uid]:
+			out.effects.append(_stack_line(st, c, int(uid), se))
+		stat[uid] = stat.get(uid, [])
+		for se2 in stk[uid]:
+			stat[uid].append(str(se2.status))
 	var data := {"kills": [], "score": 0, "dmg": 0, "heal": 0, "status": [], "cost": cost, "ap_left": ap_left}
 	for uid in dmg:
 		if int(E._u(st, uid).side) != side:
@@ -121,9 +151,10 @@ static func analyze(st: Dictionary, side: int, act: Dictionary, declared_mine: A
 			continue
 		if KW_NOTE.has(t.kw) and not t.kw_spent:
 			out.fears.append("目标 %s %s。" % [_name(st, uid), KW_NOTE[t.kw]])
-		for s in t.statuses:
-			if s.name == "护盾":
-				out.fears.append("目标 %s 有护盾，会先吸收 %d 点伤害。" % [_name(st, uid), int(s.value)])
+		for sn in G.STACK_STATUSES:
+			var tl: int = E.stacks_of(t, sn)
+			if tl > 0 and sn in ["铁壁", "蓄力"]:
+				out.fears.append("目标 %s 身上有【%s】%d 级，%s。" % [_name(st, uid), sn, tl, "会让它更扛打" if sn == "铁壁" else "它正在蓄力，小心它下一击"])
 	# ---------- 3. 对手已宣告的行动：只摆事实
 	if not enemy_declared.is_empty():
 		for a in enemy_declared:
@@ -160,6 +191,7 @@ static func intent_of(st: Dictionary, act: Dictionary) -> Dictionary:
 			"heal": by[uid].heal += int(e.amount)
 			"status": by[uid].status.append(str(e.status))
 			"mit": by[uid].status.append("减伤")
+			"stack": by[uid].status.append("%s %d级" % [str(e.status), int(e.stacks)])
 	for uid in by:
 		var h: Dictionary = by[uid]
 		if h.dmg > 0 or h.heal > 0 or not h.status.is_empty():

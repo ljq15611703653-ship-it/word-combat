@@ -96,7 +96,7 @@ static func build_state(level: Dictionary, player_skill: Dictionary) -> Dictiona
 			if r2.complete:
 				theirs.units[i].skills = [G.finalize(G.skill(str(foe[i].act.get("name", "敌招")), r2.skills[0]))]
 				foe_acts.append(i)
-	var st := E.make_state([mine, theirs], 0, {"start_ap": int(level.get("ap", 40))}, 4242)
+	var st := E.make_state([mine, theirs], 0, {"start_ap": int(level.get("ap", 40)), "cooldown": 0}, 4242)
 	E.begin_round(st)
 	st.sides[0].ap = int(level.get("ap", 40))
 	st.sides[1].ap = 200
@@ -114,13 +114,99 @@ static func build_state(level: Dictionary, player_skill: Dictionary) -> Dictiona
 			fu.hp = int(foe[i].hp_now)
 		for s in foe[i].get("statuses", []):
 			fu.statuses.append({"name": str(s.name), "value": int(s.get("value", 0)), "link": -1, "until": 999, "src": 0})
+		_preset_stacks(fu, foe[i])
 	for i in me.size():
 		var mu: Dictionary = st.sides[0].units[i]
 		if me[i].has("hp_now"):
 			mu.hp = int(me[i].hp_now)
 		for s2 in me[i].get("statuses", []):
 			mu.statuses.append({"name": str(s2.name), "value": int(s2.get("value", 0)), "link": -1, "until": 999, "src": 0})
+		_preset_stacks(mu, me[i])
 	return {"st": st, "foe_acts": foe_acts}
+
+# 初始的叠层状态：{"stacks": {"易伤": 3}} 或 {"易伤": [3, 到第几轮]}
+static func _preset_stacks(u: Dictionary, spec: Dictionary) -> void:
+	var sp: Dictionary = spec.get("stacks", {})
+	for name in sp:
+		var v = sp[name]
+		var lv: int = int(v[0]) if v is Array else int(v)
+		var end_r: int = int(v[1]) if (v is Array and v.size() > 1) else 99
+		u.stacks[str(name)] = lv
+		u.stack_end[str(name)] = end_r
+
+# 己方随从的“自动行动”（me[i].act，每轮自动宣告，比如一直在给主力叠蓄力）
+static func ally_actions(level: Dictionary, st: Dictionary) -> Array:
+	var out: Array = []
+	for i in level.me.size():
+		var f: Dictionary = level.me[i]
+		if i == 0 or not f.has("act"):
+			continue
+		var u := E._u(st, i)
+		if u.is_empty() or u.skill_ids.is_empty():
+			continue
+		var sid: int = int(u.skill_ids[0])
+		var sk := E.skill_of(st, sid)
+		var ch := {}
+		for slot in G.choice_slots(sk):
+			if slot.kind == "target":
+				var cands := E.slot_candidates(st, 0, slot)
+				var want: int = int(f.act.get("target", 0))
+				var pk: int = _pick_distinct(ch, slot, cands, want)
+				if pk != -1:
+					ch[slot.key] = pk
+			elif slot.kind == "branch":
+				ch[slot.key] = int(f.act.get("branch", 0))
+		var act := {"side": 0, "sid": sid, "choices": ch, "start": maxi(int(f.act.get("start", 3)), E.min_start(st, {"side": 0, "sid": sid, "choices": ch, "start": 0}))}
+		out.append({"unit": i, "act": act})
+	return out
+
+# 把一个候选方案（起效时间 + 目标）从头到尾模拟一遍（可能不止一轮）
+static func _run_sim(level: Dictionary, st: Dictionary, sid: int, start: int, ch: Dictionary, foe_list: Array, ally_list: Array) -> Dictionary:
+	var c := E.clone_state(st)
+	var rounds: int = int(level.get("rounds", 1))
+	var cast_rounds: Array = level.get("cast_rounds", [])
+	var events: Array = []
+	for r in range(1, rounds + 1):
+		if r > 1:
+			E.begin_round(c)
+			c.sides[0].ap = int(level.get("ap", 40))
+			c.sides[1].ap = 200
+		var acts: Array = []
+		var casts_now: bool = cast_rounds.is_empty()
+		for cr in cast_rounds:
+			if int(cr) == r:
+				casts_now = true
+		if casts_now:
+			var mine := {"side": 0, "sid": sid, "choices": ch, "start": start}
+			if E.can_declare(c, mine) != "":
+				return {"ok": false}
+			acts.append(mine)
+		for al in ally_list:
+			acts.append(al.act)
+		for fa in foe_list:
+			acts.append(fa.act)
+		E.run_round(c, acts)
+		if rounds > 1:
+			events.append({"type": "round_mark", "round": r})
+		events.append_array(c.events)
+	return {"ok": true, "state": c, "events": events}
+
+# 为一个目标槽挑人：优先 want；同一组“选择 一个 一个 …”里已经选过的不再选
+static func _pick_distinct(ch: Dictionary, slot: Dictionary, cands: Array, want: int) -> int:
+	var base: String = str(slot.key).split("#")[0]
+	var used: Array = []
+	for k in ch:
+		if str(k).split("#")[0] == base:
+			used.append(int(ch[k]))
+	var pool: Array = []
+	for cd in cands:
+		if not (int(cd) in used):
+			pool.append(int(cd))
+	if pool.is_empty():
+		return -1
+	if want in pool:
+		return want
+	return int(pool[0])
 
 # 敌方已宣告的行动（可以在界面上展示）
 static func foe_actions(level: Dictionary, st: Dictionary) -> Array:
@@ -140,13 +226,9 @@ static func foe_actions(level: Dictionary, st: Dictionary) -> Array:
 			if slot.kind == "target":
 				var cands := E.slot_candidates(st, 1, slot)
 				var want: int = int(f.act.get("target", 0))
-				var pick: int = -1
-				for cd in cands:
-					if int(cd) == want:
-						pick = int(cd)
-				if pick == -1 and not cands.is_empty():
-					pick = int(cands[0])
-				ch[slot.key] = pick
+				var pk: int = _pick_distinct(ch, slot, cands, want)
+				if pk != -1:
+					ch[slot.key] = pk
 			elif slot.kind == "branch":
 				ch[slot.key] = int(f.act.get("branch", 0))
 			else:
@@ -205,6 +287,12 @@ static func goal_ok(level: Dictionary, c: Dictionary) -> Dictionary:
 					tot += maxi(0, int(c.sides[0].units[i].hp))
 				ok = tot >= int(g.n)
 				txt = "你全队剩余生命合计至少 %d" % int(g.n)
+			"foe_stack_ge":
+				ok = int(c.sides[1].units[int(g.who)].stacks.get(str(g.name), 0)) >= int(g.n)
+				txt = "%s 身上的【%s】至少 %d 级" % [str(level.foe[int(g.who)].name), str(g.name), int(g.n)]
+			"my_stack_ge":
+				ok = int(c.sides[0].units[int(g.who)].stacks.get(str(g.name), 0)) >= int(g.n)
+				txt = "%s 身上的【%s】至少 %d 级" % [str(level.me[int(g.who)].name), str(g.name), int(g.n)]
 			"no_foe_acts":
 				ok = true
 				txt = ""
@@ -284,6 +372,7 @@ static func evaluate(level: Dictionary, tokens: Array) -> Dictionary:
 		out.reason = "这句话现在找不到可以作用的对象。"
 		return out
 	var foe_list: Array = foe_actions(level, st)
+	var ally_list: Array = ally_actions(level, st)
 	var best: Dictionary = {}
 	var best_score := -1.0
 	var sims := 0
@@ -293,13 +382,10 @@ static func evaluate(level: Dictionary, tokens: Array) -> Dictionary:
 			if sims >= MAX_SIMS:
 				break
 			sims += 1
-			var c := E.clone_state(st)
-			var acts: Array = [{"side": 0, "sid": sid, "choices": ch, "start": start}]
-			for fa in foe_list:
-				acts.append(fa.act)
-			if E.can_declare(c, acts[0]) != "":
+			var sim := _run_sim(level, st, sid, start, ch, foe_list, ally_list)
+			if not bool(sim.ok):
 				continue
-			E.run_round(c, acts)
+			var c: Dictionary = sim.state
 			var g := goal_ok(level, c)
 			var sc := 0.0
 			for it in g.items:
@@ -314,13 +400,13 @@ static func evaluate(level: Dictionary, tokens: Array) -> Dictionary:
 				out.win = true
 				out.start = start
 				out.picks = ch
-				out.events = c.events
+				out.events = sim.events
 				out.goal_items = g.items
 				out.result_state = c
 				return out
 			if sc > best_score:
 				best_score = sc
-				best = {"start": start, "picks": ch, "events": c.events, "goal_items": g.items, "result_state": c}
+				best = {"start": start, "picks": ch, "events": sim.events, "goal_items": g.items, "result_state": c}
 	if not best.is_empty():
 		out.start = best.start
 		out.picks = best.picks

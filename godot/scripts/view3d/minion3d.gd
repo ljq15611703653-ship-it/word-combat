@@ -139,7 +139,7 @@ func refresh(u: Dictionary, sk: Array) -> void:
 	_set_hp_visual(float(hp), maxhp)
 	var parts: Array = []
 	for s in E.display_statuses(u):
-		parts.append(str(s.name) + (("×%d" % int(s.stacks)) if int(s.stacks) > 0 else (" %d" % int(s.value) if s.name == "护盾" else "")))
+		parts.append(str(s.name) + (("Lv%d%s" % [int(s.stacks), ("·剩%d轮" % int(s.left)) if int(s.left) < 90 else ""]) if int(s.stacks) > 0 else (" %d" % int(s.value) if s.name == "护盾" else "")))
 	if str(u.get("kw", "")) != "":
 		parts.append("◆" + str(u.kw) + ("(已用)" if u.get("kw_spent", false) else ""))
 	status_label.text = "  ".join(parts)

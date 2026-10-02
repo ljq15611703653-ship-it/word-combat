@@ -128,6 +128,8 @@ func rnode(depth := 0, ctx := "") -> Dictionary:
 		var st: String = pick(G.STATUSES)
 		n = G.status(st, rt(), 0, 0, {})
 		if rng.randf() < 0.2: n["dbl"] = 1
+		if rng.randf() < 0.35:
+			n["ext"] = rng.randi_range(1, 3)
 	elif r < 0.5:
 		n = G.remove(pick(["限时效果", "状态"]), rt())
 	elif r < 0.56:
