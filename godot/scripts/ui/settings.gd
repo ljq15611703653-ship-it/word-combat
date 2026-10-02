@@ -5,6 +5,7 @@ const PATH := "user://settings.cfg"
 static var level := 1      # 0 简单  1 普通  2 困难
 static var muted := false
 static var coach := true        # 辅助轮（教练提示与自动组合）
+static var coach_detail := false  # 辅助轮的第二档“手把手”：大量信息、推荐句子一键用
 static var tutorial_done := false
 static var first_match_done := false
 static var stack_taught := false          # 小词是否已经讲过“叠层状态会成长”
@@ -29,6 +30,7 @@ static func load_all() -> void:
 		level = clampi(int(cf.get_value("game", "level", 1)), 0, 2)
 		muted = bool(cf.get_value("audio", "muted", false))
 		coach = bool(cf.get_value("game", "coach", true))
+		coach_detail = bool(cf.get_value("game", "coach_detail", false))
 		tutorial_done = bool(cf.get_value("game", "tutorial_done", false))
 		first_match_done = bool(cf.get_value("game", "first_match_done", false))
 		var raw := str(cf.get_value("adventure", "cleared", ""))
@@ -43,6 +45,7 @@ static func save_all() -> void:
 	cf.set_value("game", "level", level)
 	cf.set_value("audio", "muted", muted)
 	cf.set_value("game", "coach", coach)
+	cf.set_value("game", "coach_detail", coach_detail)
 	cf.set_value("game", "tutorial_done", tutorial_done)
 	cf.set_value("game", "first_match_done", first_match_done)
 	cf.set_value("adventure", "cleared", ",".join(adv_cleared.map(func(x): return str(x))))

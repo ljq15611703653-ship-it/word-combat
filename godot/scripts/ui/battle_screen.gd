@@ -449,17 +449,27 @@ func _open_compose(uid: int) -> void:
 	pop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(pop)
 	var ap: int = E.available_ap(m.st, 0, m.declared[0])
-	pop.setup(str(u.name), m.avail_words(0), ap, m.cooling_words(0))
+	var recs: Array = []
+	if Settings.coach and Settings.coach_detail and m.has_method("recommend"):
+		recs = m.recommend(uid, 3)
+	pop.setup(str(u.name), m.avail_words(0), ap, m.cooling_words(0), [], recs)
 	pop.cancelled.connect(func(): pop.queue_free())
 	pop.composed.connect(func(sk):
 		var r: Dictionary = m.stage_sentence(uid, sk)
 		if r.has("err"):
 			toast(str(r.err), K.RED)
 			return
+		var rec: Dictionary = pop.picked_rec
 		pop.queue_free()
 		_clear_selection()
 		_rebuild_hand()
-		_select_skill(int(r.sid)))
+		_select_skill(int(r.sid))
+		# 手把手：用了推荐句子且没改动，就把电脑推荐的目标和时间一起预填
+		if not rec.is_empty() and str(rec.sk.get("text", "")) == str(sk.get("text", "")):
+			sel_choices = rec.act.choices.duplicate(true)
+			sel_start = int(rec.act.start)
+			_advance_picking()
+			_render_action_panel())
 
 func _skill_reason(sk: Dictionary, u: Dictionary, ap: int) -> String:
 	for d in m.declared[0]:
@@ -573,6 +583,8 @@ func _show_enemy_declared() -> void:
 		col.add_child(chip)
 		for a in foe_acts:
 			col.add_child(K.wrap_label(_describe_act(a).replace("\n", "   "), 14, K.TEXT))
+		if Settings.coach and Settings.coach_detail:
+			col.add_child(K.wrap_label("手把手提示：被点名要挨打的随从可以拼【减伤】或【改道/回敬】（起手时间要不晚于对手出招的那一秒）；也可以抢在它出手之前先打倒它。不会拼就点【拼这一句】里的推荐。", 14, K.GREEN))
 		banner.add_child(box)
 	elif m.declare_order[0] == 0:
 		var box2 := K.panel(Color("1f2a3a"), K.BLUE, 8, 1)

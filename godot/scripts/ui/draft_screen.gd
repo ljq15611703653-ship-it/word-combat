@@ -154,6 +154,22 @@ func _bag_panel(i: int) -> Control:
 	for w in sorted:
 		flow.add_child(K.word_card(w, 1, -1, Vector2(80, 100)))
 	v.add_child(flow)
+	if Settings.coach and Settings.coach_detail:
+		var lines: Array = []
+		var base_av: Dictionary = m.avail_words(0) if m.has_method("avail_words") else Coach.free_words(m.pools[0], m.decks[0])
+		var after_av: Dictionary = base_av.duplicate()
+		for w in bag:
+			after_av[w] = int(after_av.get(w, 0)) + 1
+		var rb: Array = Coach.route_status(base_av)
+		var ra: Array = Coach.route_status(after_av)
+		for k in rb.size():
+			if int(rb[k].n) > 0 and int(ra[k].n) == 0:
+				lines.append("✔ 拿了就能拼：%s（%s）" % [str(ra[k].name), str(ra[k].role)])
+			elif int(ra[k].n) < int(rb[k].n) and int(ra[k].n) <= 2:
+				lines.append("◦ 再差一点：%s，还缺 %s" % [str(ra[k].name), str(Coach._missing_text(ra[k].missing))])
+		if lines.is_empty():
+			lines.append("这袋暂时拼不出现成的路线，但可能配合以后的词。")
+		v.add_child(K.wrap_label("\n".join(lines.slice(0, 5)), 13, K.GREEN))
 	var more := K.button("查看词义", "ghost", 14)
 	more.custom_minimum_size = Vector2(0, 28)
 	more.pressed.connect(func(): _show_detail(i))

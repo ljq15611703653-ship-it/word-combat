@@ -388,6 +388,45 @@ func sync_draft_view() -> void:
 		opening_idx = open_done[0]
 		opening_total = OPEN_PICKS
 
+# 手把手辅助轮：给我方一个随从推荐几句（用电脑同一套估值）。返回 [{sk, act, name, text, cost, foe_loss, my_loss, note}]
+func recommend(uid: int, n: int = 3) -> Array:
+	var u := E._u(st, uid)
+	if u.is_empty():
+		return []
+	var enemy_list: Array = []
+	var blind: bool = declare_order[0] == 0
+	if not blind:
+		enemy_list = declared[1].duplicate(true)
+	var ap_left: int = E.available_ap(st, 0, declared[0])
+	var scan := _scan_unit(0, u, enemy_list, declared[0], avail_words(0), ap_left, _mood(0), 8, 2)
+	var before := _hp_sums(Ai._sim(st, enemy_list + declared[0]))
+	var out: Array = []
+	var seen := {}
+	for c in scan.list:
+		var key := str(c.sk.get("template", "")) + "|" + str(int(c.sk.cost))
+		if seen.has(key):
+			continue
+		seen[key] = true
+		var sid := E.add_round_skill(st, uid, c.sk)       # 扫描时登记的句子已经撤掉，这里重新登记再推演
+		var act2: Dictionary = c.act.duplicate(true)
+		act2.sid = sid
+		var after := _hp_sums(Ai._sim(st, enemy_list + declared[0] + [act2]))
+		E.remove_round_skill(st, uid, sid)
+		var foe_loss: int = int(before[1]) - int(after[1])
+		var my_loss: int = int(before[0]) - int(after[0])
+		out.append({"sk": c.sk, "act": c.act, "name": str(c.sk.get("name", "")), "text": str(c.sk.get("text", "")), "cost": int(c.sk.cost), "foe_loss": foe_loss, "my_loss": my_loss, "foe_after": int(after[1]), "my_after": int(after[0]), "foe_before": int(before[1]), "my_before": int(before[0]),
+			"note": "（对手还没出招，按它不动估算）" if blind else ""})
+		if out.size() >= n:
+			break
+	return out
+
+func _hp_sums(c: Dictionary) -> Array:
+	var r := [0, 0]
+	for s2 in 2:
+		for x in c.sides[s2].units:
+			r[s2] += int(x.hp) if int(x.down_round) == -1 else 0
+	return r
+
 func public_deck(_side: int) -> Dictionary:
 	return {"units": []}
 
@@ -534,6 +573,11 @@ func _mood(side: int) -> Dictionary:
 	return out
 
 # ---------------------------------------------------------------- 电脑：现场拼
+static var LOOKAHEAD := true          # 盲拼的先手也会“想对手会怎么应对”
+static var LOOK_TOP := 3              # 先手每个随从只对前几名候选做应对推演
+static var RESP_CAND := 5             # 推演对手应对时，对手每个随从比较几句候选
+static var RESP_PICKS := 2
+
 func ai_declare(side: int = -1) -> void:
 	if side == -1:
 		side = declare_side()
@@ -541,35 +585,46 @@ func ai_declare(side: int = -1) -> void:
 		_scripted_foe(side)
 		return
 	var enemy_list: Array = []
-	if side != declare_order[0] and not BLIND_SECOND:
+	var blind: bool = side == declare_order[0] or BLIND_SECOND
+	if not blind:
 		enemy_list = declared[1 - side].duplicate(true)
 	var avail := avail_words(side)
 	var order: Array = E.alive_units(st, side)
 	order.sort_custom(func(a, b): return int(a.hp) > int(b.hp))
 	var mood := _mood(side)
+	var stl: Dictionary = STYLE[personas[side]]
 	for u in order:
 		var ap_left: int = E.available_ap(st, side, declared[side])
 		if ap_left < 8:
 			break
-		var stl: Dictionary = STYLE[personas[side]]
-		var base_acts: Array = enemy_list + declared[side]
-		var base_v := _eval(base_acts, side)
+		var scan := _scan_unit(side, u, enemy_list, declared[side], avail, ap_left, mood, CAND_MAX, START_PICKS)
+		var base_v: float = scan.base
 		var best: Dictionary = {}
 		var best_v := base_v + 0.6
-		for sk in _candidates(side, avail, ap_left, mood):
-			var sid := E.add_round_skill(st, int(u.uid), sk)
-			var tried := 0
-			for a in Ai.enumerate_actions(st, side, enemy_list, START_PICKS, declared[side]):
-				if a.is_empty() or int(a.sid) != sid:
-					continue
-				tried += 1
-				var v := _eval(base_acts + [a], side) + rng.randf() * 1.2
+		if blind and LOOKAHEAD and not scan.list.is_empty():
+			# 先手：不知道对手会怎么应对，就推演一下——前几名候选各让对手“看到后”应对一次，按应对之后的局面打分
+			var resp0 := _respond(1 - side, declared[side])
+			base_v = _eval(declared[side] + resp0.acts, side)
+			_cleanup_resp(resp0)
+			best_v = base_v + 0.6
+			var top: Array = scan.list.slice(0, LOOK_TOP)
+			for c in top:
+				var sid := E.add_round_skill(st, int(u.uid), c.sk)
+				var act: Dictionary = c.act.duplicate(true)
+				act.sid = sid
+				var mine: Array = declared[side] + [act]
+				var resp := _respond(1 - side, mine)
+				var v := _eval(mine + resp.acts, side) + rng.randf() * 0.6
+				_cleanup_resp(resp)
+				E.remove_round_skill(st, int(u.uid), sid)
 				if v > best_v:
 					best_v = v
-					best = {"skill": sk, "act": a, "uid": int(u.uid)}
-				if tried >= START_PICKS:
-					break
-			E.remove_round_skill(st, int(u.uid), sid)
+					best = {"skill": c.sk, "act": c.act, "uid": int(u.uid)}
+		else:
+			for c in scan.list:
+				if float(c.v) > best_v:
+					best_v = float(c.v)
+					best = {"skill": c.sk, "act": c.act, "uid": int(u.uid)}
 		if best.is_empty():
 			continue
 		# 取舍：这一句赚得不够多，就把行动点攒着，留给后面更大的句子
@@ -582,6 +637,60 @@ func ai_declare(side: int = -1) -> void:
 		if err == "":
 			avail = avail_words(side)
 	declare_done[side] = true
+
+# 一个随从所有候选句的打分（按分数从高到低），以及什么都不做的基准分
+func _scan_unit(side: int, u: Dictionary, enemy_list: Array, mine_decl: Array, avail: Dictionary, ap_left: int, mood: Dictionary, cand_max: int, picks: int) -> Dictionary:
+	var base_acts: Array = enemy_list + mine_decl
+	var out := {"base": _eval(base_acts, side), "list": []}
+	var saved := CAND_MAX
+	CAND_MAX = cand_max
+	var cands := _candidates(side, avail, ap_left, mood)
+	CAND_MAX = saved
+	for sk in cands:
+		var sid := E.add_round_skill(st, int(u.uid), sk)
+		var tried := 0
+		for a in Ai.enumerate_actions(st, side, enemy_list, picks, mine_decl):
+			if a.is_empty() or int(a.sid) != sid:
+				continue
+			tried += 1
+			out.list.append({"sk": sk, "act": a, "v": _eval(base_acts + [a], side) + rng.randf() * 1.2})
+			if tried >= picks:
+				break
+		E.remove_round_skill(st, int(u.uid), sid)
+	out.list.sort_custom(func(x, y): return float(x.v) > float(y.v))
+	return out
+
+# 假设对手（resp_side）看到了 first_acts，它会怎么应对：返回 {acts, sids:[[uid,sid]]}，用完要 _cleanup_resp
+func _respond(resp_side: int, first_acts: Array) -> Dictionary:
+	var res := {"acts": [], "sids": []}
+	var avail := avail_words(resp_side)
+	var order: Array = E.alive_units(st, resp_side)
+	order.sort_custom(func(a, b): return int(a.hp) > int(b.hp))
+	var mood := _mood(resp_side)
+	var stl: Dictionary = STYLE[personas[resp_side]]
+	for u in order:
+		var ap_left: int = E.available_ap(st, resp_side, res.acts)
+		if ap_left < 8:
+			break
+		var scan := _scan_unit(resp_side, u, first_acts, res.acts, avail, ap_left, mood, RESP_CAND, RESP_PICKS)
+		if scan.list.is_empty():
+			continue
+		var c: Dictionary = scan.list[0]
+		if float(c.v) - float(scan.base) < 0.6 + float(stl.hold) * _hold_scale(resp_side, ap_left):
+			continue
+		var sid := E.add_round_skill(st, int(u.uid), c.sk)
+		var act: Dictionary = c.act.duplicate(true)
+		act.sid = sid
+		res.acts.append(act)
+		res.sids.append([int(u.uid), sid])
+		for w in c.sk.words:
+			if avail.has(w):
+				avail[w] = int(avail[w]) - 1
+	return res
+
+func _cleanup_resp(r: Dictionary) -> void:
+	for pair in r.sids:
+		E.remove_round_skill(st, int(pair[0]), int(pair[1]))
 
 # 候选句：按路线挑出“词够的”，数字放大几档（受行动点限制），再按权重抽出若干
 # 教程里的对手：第 1 轮站着不动；之后每轮用一个随从打你的第一个随从，让你练“见招拆招”

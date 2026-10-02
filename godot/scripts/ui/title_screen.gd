@@ -98,12 +98,21 @@ func _ready() -> void:
 		Settings.save_all()
 		snd.text = "音效：关" if Settings.muted else "音效：开")
 	lv_row.add_child(snd)
-	var cbtn := K.button("辅助轮：开" if Settings.coach else "辅助轮：关", "ghost", 16)
-	cbtn.tooltip_text = "抽词/构筑时给出路线提示，并提供“自动组合”“换一批”。纯新手建议打开。"
+	var coach_text := func() -> String:
+		return "辅助轮：关" if not Settings.coach else ("辅助轮：手把手" if Settings.coach_detail else "辅助轮：正常")
+	var cbtn := K.button(coach_text.call(), "ghost", 16)
+	cbtn.tooltip_text = "正常：给路线提示和拼句建议。手把手：每袋词会告诉你能拼出什么，每个随从会给出推荐句子（一键用），并说明对手的招该怎么应对。纯新手选手把手。"
 	cbtn.pressed.connect(func():
-		Settings.coach = not Settings.coach
+		if not Settings.coach:
+			Settings.coach = true
+			Settings.coach_detail = false
+		elif not Settings.coach_detail:
+			Settings.coach_detail = true
+		else:
+			Settings.coach = false
+			Settings.coach_detail = false
 		Settings.save_all()
-		cbtn.text = "辅助轮：开" if Settings.coach else "辅助轮：关")
+		cbtn.text = coach_text.call())
 	lv_row.add_child(cbtn)
 	var pbtn := K.button("桌宠：开" if Settings.pet else "桌宠：关", "ghost", 16)
 	pbtn.tooltip_text = "小词会在你拼技能、准备出招时评价这一招（新手引导里它总会出现）。"

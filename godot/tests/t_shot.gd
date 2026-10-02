@@ -8,6 +8,9 @@ func _init() -> void:
 	var main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 	await create_timer(0.5).timeout
+	const Settings = preload("res://scripts/ui/settings.gd")
+	Settings.coach = true
+	Settings.coach_detail = true
 	main._new_duel(3, true)
 	var last := ""
 	var n := 0

@@ -9,6 +9,7 @@ const Namer = preload("res://scripts/core/namer.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Tut = preload("res://scripts/tutorial/tutorial.gd")
+const S = preload("res://scripts/compose/sentence.gd")
 
 signal composed(skill)
 signal cancelled()
@@ -17,9 +18,10 @@ var composer
 var info: Label
 var btn_ok: Button
 var cur_skill: Dictionary = {}
+var picked_rec: Dictionary = {}          # 手把手模式：点了哪条推荐（目标、时间用它预填）
 var _unit_name := ""
 
-func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, init_tokens: Array = []) -> void:
+func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, init_tokens: Array = [], recs: Array = []) -> void:
 	_unit_name = unit_name
 	K.clear_children(self)
 	var dim := ColorRect.new()
@@ -50,6 +52,26 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 	cancel.pressed.connect(func(): cancelled.emit())
 	head.add_child(cancel)
 	v.add_child(head)
+	if not recs.is_empty():
+		var rbox := K.panel(Color("14261c"), K.GREEN.darkened(0.2), 10, 1)
+		var rv := K.vbox(4)
+		rbox.add_child(rv)
+		rv.add_child(K.label("手把手：电脑帮你算了几句，点一句就填进拼句台，你可以再改", 15, K.GREEN))
+		for r in recs:
+			var line := K.hbox(8)
+			var txt := "【%s】行动点 %d · %s" % [str(r.name), int(r.cost), str(r.text)]
+			var info_t := "不拼这句：我方剩 %d 生命、对手剩 %d；拼这句：我方剩 %d、对手剩 %d。%s" % [int(r.my_before), int(r.foe_before), int(r.my_after), int(r.foe_after), str(r.note)]
+			var lb := K.wrap_label(txt + "\n" + info_t, 14, K.TEXT)
+			lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			line.add_child(lb)
+			var use := K.button("填入", "normal", 15)
+			var rr: Dictionary = r
+			use.pressed.connect(func():
+				picked_rec = rr
+				composer.setup(avail, S.tokens_of_skill(rr.sk.nodes)))
+			line.add_child(use)
+			rv.add_child(line)
+		v.add_child(rbox)
 	composer = Composer.new()
 	composer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	composer.size_flags_vertical = Control.SIZE_EXPAND_FILL
