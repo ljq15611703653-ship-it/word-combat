@@ -426,6 +426,7 @@ func _compose_card(u: Dictionary, redo: bool) -> Control:
 func _open_compose(uid: int) -> void:
 	if not my_turn or busy:
 		return
+	Tut.fire("compose_open")
 	var u := E._u(m.st, uid)
 	var pop = DuelCompose.new()
 	pop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

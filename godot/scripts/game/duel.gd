@@ -41,6 +41,7 @@ var last_skills: Array = [{}, {}]     # 最近一轮每方宣告的句子文字�
 var winner := -1                      # -1 进行中，0/1，-2 平局
 var log_lines: Array = []
 var personas: Array = ["", ""]        # 电脑的流派（决定偏好、估值口味、攒不攒行动点）
+var tutorial := false                 # 教程：电脑只做脚本动作，人类先手
 var staged: Dictionary = {}           # 界面用：uid → 已拼好但还没宣告的句子 sid
 var opening_idx := 0                  # 兜子界面用的兼容字段
 var opening_total := OPEN_PICKS
@@ -65,6 +66,9 @@ const STYLE_PREFER := {
 	"守反": ["转移", "来源", "回敬", "转为"], "控场": ["持久", "灼烧", "衰弱", "易伤", "延后"], "连锁": ["恢复生命", "每次", "倒下"],
 }
 
+static var BLIND_SECOND := false      # 实验：后手也看不到对方宣告（只用来量座位优势从哪来）
+static var FIRST_AP := 0              # 先手每轮多得的行动点（补偿它要盲拼）
+var first0 := 0
 static var CAND_MAX := 10             # 电脑每个随从最多比较几句候选
 static var START_PICKS := 4           # 电脑每句最多试几个目标/起效时间
 var stats := {"sentences": 0, "ap_spent": 0, "empty_units": 0, "cd_block": 0}
@@ -79,7 +83,8 @@ func start(human0: bool = false, seed_val: int = -1, human1: bool = false) -> vo
 	personas = [STYLE_ORDER[rng.randi() % STYLE_ORDER.size()], STYLE_ORDER[rng.randi() % STYLE_ORDER.size()]]
 	pools = [Lex.basic_supply(), Lex.basic_supply()]
 	decks = [_new_deck(), _new_deck()]
-	st = E.make_state(decks, 0, {}, rng.randi() & 0x7fffffff)
+	first0 = 0 if tutorial else rng.randi() % 2
+	st = E.make_state(decks, first0, {"first_ap": FIRST_AP}, rng.randi() & 0x7fffffff)
 	winner = -1
 	log_lines = []
 	used_log = [{}, {}]
@@ -495,8 +500,11 @@ func _mood(side: int) -> Dictionary:
 func ai_declare(side: int = -1) -> void:
 	if side == -1:
 		side = declare_side()
+	if tutorial:
+		_scripted_foe(side)
+		return
 	var enemy_list: Array = []
-	if side != declare_order[0]:
+	if side != declare_order[0] and not BLIND_SECOND:
 		enemy_list = declared[1 - side].duplicate(true)
 	var avail := avail_words(side)
 	var order: Array = E.alive_units(st, side)
@@ -539,6 +547,16 @@ func ai_declare(side: int = -1) -> void:
 	declare_done[side] = true
 
 # 候选句：按路线挑出“词够的”，数字放大几档（受行动点限制），再按权重抽出若干
+# 教程里的对手：第 1 轮站着不动；之后每轮用一个随从打你的第一个随从，让你练“见招拆招”
+func _scripted_foe(side: int) -> void:
+	if int(st.round) >= 2:
+		var mine: Array = E.alive_units(st, 1 - side)
+		var me_u: Array = E.alive_units(st, side)
+		if not mine.is_empty() and not me_u.is_empty():
+			var sk: Dictionary = G.finalize(G.skill("木头一击", [G.dmg(G.T("choose", "enemy", {"n": 1}), G.N(14))]))
+			submit_sentence(side, int(me_u[0].uid), sk, {"t1": int(mine[0].uid)}, 2)
+	declare_done[side] = true
+
 func _candidates(side: int, avail: Dictionary, ap_left: int, mood: Dictionary = {}) -> Array:
 	var rs: Array = Coach.route_status(avail)
 	var pool_c: Array = []

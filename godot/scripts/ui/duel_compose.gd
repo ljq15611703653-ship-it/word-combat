@@ -8,6 +8,7 @@ const Composer = preload("res://scripts/compose/composer.gd")
 const Namer = preload("res://scripts/core/namer.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
 
 signal composed(skill)
 signal cancelled()
@@ -62,6 +63,7 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 	btn_ok.custom_minimum_size = Vector2(300, 52)
 	btn_ok.disabled = true
 	btn_ok.pressed.connect(_ok)
+	Tut.tag(btn_ok, "k:confirm")
 	foot.add_child(btn_ok)
 	v.add_child(foot)
 	composer.setup(avail, init_tokens)
@@ -89,4 +91,5 @@ func _ok() -> void:
 	if cur_skill.is_empty():
 		return
 	Sfx.play("stamp")
+	Tut.fire("compose_confirm")
 	composed.emit(cur_skill)

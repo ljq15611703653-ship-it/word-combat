@@ -7,7 +7,7 @@ const G = preload("res://scripts/core/grammar.gd")
 
 const TICKS := 20          # 0..19 为时间轴，20 为回合结束阶段
 const STRIDE := 21         # 每轮占的绝对时间刻数
-const DEFAULT_RULES := {"win_score": 150, "max_rounds": 12, "ap_gain": 45, "ap_cap": 180, "start_ap": 45}
+const DEFAULT_RULES := {"win_score": 150, "max_rounds": 12, "ap_gain": 45, "first_ap": 0, "ap_cap": 180, "start_ap": 45}
 static var DEFAULT_COOLDOWN := 1     # 含进阶词的技能用完后要隔几轮才能再用（测试里可以改成 0）
 
 # ================================================================ 状态创建
@@ -195,7 +195,7 @@ static func begin_round(st: Dictionary) -> Array:
 	st.effects = []
 	for s in 2:
 		var side: Dictionary = st.sides[s]
-		side.ap = mini(int(side.ap) + int(st.rules.ap_gain), int(st.rules.ap_cap))
+		side.ap = mini(int(side.ap) + int(st.rules.ap_gain) + (int(st.rules.get("first_ap", 0)) if s == first_side(st) else 0), int(st.rules.ap_cap))
 		for u in side.units:
 			u.statuses = []
 			u.bonus = 0

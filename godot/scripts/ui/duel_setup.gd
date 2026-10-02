@@ -8,6 +8,7 @@ const K = preload("res://scripts/ui/kit.gd")
 const Lex = preload("res://scripts/core/lexicon.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
 const Pet = preload("res://scripts/ui/pet.gd")
+const Tut = preload("res://scripts/tutorial/tutorial.gd")
 
 signal finished()
 
@@ -38,6 +39,7 @@ func setup(match_obj, which: String) -> void:
 	center.add_child(v)
 	if mode == "hp":
 		_build_hp(v)
+		Tut.fire("screen:hp")
 	else:
 		_build_equip(v)
 
@@ -49,6 +51,8 @@ func _build_hp(v: VBoxContainer) -> void:
 	hp_labels = []
 	for i in 3:
 		var row := K.panel(K.PANEL, K.EDGE, 14, 2)
+		if i == 0:
+			Tut.tag(row, "h:rows")
 		var h := K.hbox(14)
 		row.add_child(h)
 		h.add_child(K.label(str(m.decks[0].units[i].name), 26, K.TEXT))
@@ -75,11 +79,13 @@ func _build_hp(v: VBoxContainer) -> void:
 	v.add_child(err_label)
 	ok_btn = K.button("就这样分，开战  →", "primary", 24)
 	ok_btn.custom_minimum_size = Vector2(0, 58)
+	Tut.tag(ok_btn, "h:ok")
 	ok_btn.pressed.connect(func():
 		var e: String = m.set_hp(0, hps)
 		if e != "":
 			err_label.text = e
 			return
+		Tut.fire("hp_done")
 		finished.emit())
 	v.add_child(ok_btn)
 	_refresh_hp()

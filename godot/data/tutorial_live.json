@@ -1,0 +1,395 @@
+{
+ "steps": [
+  {
+   "id": "hi",
+   "title": "欢迎",
+   "text": "欢迎来到《词战》！我是小词。这个游戏的特别之处：你的招式是用词语现场拼成的一句话。\n我会从零带你打一局，每次只教一件事，大约 5 分钟。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "goal",
+   "title": "怎么才算赢",
+   "text": "你和对手各有 3 个随从。打倒对方的随从就得分（得到它的生命上限那么多分），先到 150 分，或者 12 轮后分数更高的人获胜。\n每个随从每轮可以说一句话——这句话就是它的招式。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "bags",
+   "title": "词兜子",
+   "text": "招式要用词拼。基础词（造成、伤害、选择……）人人无限；进阶词、奇术词要从兜子里拿，拿到就永久属于你。\n开局你们各自挑两次兜子，不用抢。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "pick1",
+   "title": "挑第一个兜子",
+   "text": "点一个兜子收下。不知道选哪个就点带【小词推荐】的。",
+   "target": "d:rec",
+   "wait": "draft_picked"
+  },
+  {
+   "id": "cont1",
+   "title": "收下",
+   "text": "点【收下并继续】。",
+   "target": "d:continue",
+   "wait": "draft_done"
+  },
+  {
+   "id": "w_pick2",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "screen:draft",
+   "hide": true
+  },
+  {
+   "id": "pick2",
+   "title": "再挑一次",
+   "text": "再挑一个兜子。",
+   "target": "d:rec",
+   "wait": "draft_picked"
+  },
+  {
+   "id": "cont2",
+   "title": "收下",
+   "text": "继续。",
+   "target": "d:continue",
+   "wait": "draft_done"
+  },
+  {
+   "id": "w_hp",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "screen:hp",
+   "hide": true
+  },
+  {
+   "id": "hp",
+   "title": "分配生命",
+   "text": "三个随从共用 66 点生命，每个至少 10，分完就不能改了。多给谁，谁就更难被打倒；但生命上限也是对手打倒它时得的分数。\n先照默认分，点【- / +】可以试试。",
+   "target": "h:rows",
+   "wait": "next"
+  },
+  {
+   "id": "hp_go",
+   "title": "开战",
+   "text": "点【就这样分，开战】。",
+   "target": "h:ok",
+   "wait": "hp_done"
+  },
+  {
+   "id": "w_b1",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "screen:battle",
+   "hide": true
+  },
+  {
+   "id": "table",
+   "title": "战场",
+   "text": "上面是对手的 3 个随从，下面是你的。这一局的对手是个木头人，只会站着，放心练。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "tl",
+   "title": "时间轴",
+   "text": "每轮有 20 秒的时间轴。双方宣告的招式会按“起手时间”排在轴上，一起结算：小招快，大招慢。",
+   "target": "b:timeline",
+   "wait": "next"
+  },
+  {
+   "id": "open",
+   "title": "给随从拼一句",
+   "text": "没有预先做好的卡，你每轮给每个随从现场拼一句话。\n点【小剑】下面的【拼这一句】。",
+   "target": "b:compose",
+   "wait": "compose_open"
+  },
+  {
+   "id": "c_rail",
+   "title": "拼句台",
+   "text": "这是拼句台。你点的词会一个一个烙在上面这条【句子轨】里，连成一句话。\n我们拼：对一个敌人造成 8 点伤害。",
+   "target": "c:rail",
+   "wait": "next",
+   "plan": [
+    "选择",
+    "一个",
+    "敌方",
+    "随从",
+    "造成",
+    8,
+    "伤害"
+   ]
+  },
+  {
+   "id": "c_w1",
+   "title": "第一个词",
+   "text": "下面发亮的是【现在能接】的词。先点【选择】。",
+   "target": "c:next",
+   "wait": "w:选择"
+  },
+  {
+   "id": "c_w2",
+   "title": "接着拼",
+   "text": "依次点【一个】【敌方】【随从】——意思是“选一个敌方随从”。",
+   "target": "c:next",
+   "wait": "w:随从"
+  },
+  {
+   "id": "c_hint",
+   "title": "人话提示",
+   "text": "这里会把你到目前为止拼的话翻译成人话。“某某”是还没定的地方。不会拼时，这里和下面的三个建议就是辅助轮。",
+   "target": "c:hint",
+   "wait": "next"
+  },
+  {
+   "id": "c_dmg",
+   "title": "动作",
+   "text": "点【造成】。",
+   "target": "c:next",
+   "wait": "w:造成"
+  },
+  {
+   "id": "c_num",
+   "title": "数字",
+   "text": "数字是你自己填的，越大越强，也越花行动点。填 8。",
+   "target": "c:number",
+   "wait": "n:8"
+  },
+  {
+   "id": "c_end",
+   "title": "收尾",
+   "text": "最后点【伤害】。",
+   "target": "c:next",
+   "wait": "w:伤害"
+  },
+  {
+   "id": "c_ok",
+   "title": "拼好了",
+   "text": "句子完整了，下面会显示这句的行动点花费和起手秒数。点【就这一句】。",
+   "target": "k:confirm",
+   "wait": "compose_confirm"
+  },
+  {
+   "id": "tgt",
+   "title": "选目标",
+   "text": "“选择”要你亲自点。点对手的一个随从。",
+   "target": "b:foe",
+   "wait": "target_picked"
+  },
+  {
+   "id": "start",
+   "title": "起手时间",
+   "text": "这条滑块决定招式在时间轴的哪一秒发动。先用默认的就行。",
+   "target": "",
+   "wait": "next",
+   "pos": "top"
+  },
+  {
+   "id": "conf",
+   "title": "宣告",
+   "text": "点【宣告这个行动】。",
+   "target": "b:confirm",
+   "wait": "declared"
+  },
+  {
+   "id": "fin",
+   "title": "结束宣告",
+   "text": "另外两个随从这一轮不拼，攒行动点（每轮 +45，最多攒 180）。点【本轮不行动】。",
+   "target": "b:finish_decl",
+   "wait": "pass"
+  },
+  {
+   "id": "w_r1",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "round_done",
+   "hide": true
+  },
+  {
+   "id": "r1",
+   "title": "结算完了",
+   "text": "你打了一下。对手每次被打倒才会给你分，木头人只有 20 点生命，慢慢来。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "nx",
+   "title": "下一轮",
+   "text": "点【下一轮】。",
+   "target": "b:next",
+   "wait": "next_round"
+  },
+  {
+   "id": "w_d2",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "screen:draft",
+   "hide": true
+  },
+  {
+   "id": "d2",
+   "title": "每轮挑兜子",
+   "text": "每轮战斗之后摆出 5 个兜子，上一轮先手的先挑一个，另一方再挑一个，其余作废。\n注意：本轮用过的进阶词，下一轮要冷却一轮；基础词不受影响。",
+   "target": "d:rec",
+   "wait": "next"
+  },
+  {
+   "id": "d2_pick",
+   "title": "挑一个",
+   "text": "点【小词推荐】的兜子。",
+   "target": "d:rec",
+   "wait": "draft_picked"
+  },
+  {
+   "id": "d2_go",
+   "title": "继续",
+   "text": "继续。",
+   "target": "d:continue",
+   "wait": "draft_done"
+  },
+  {
+   "id": "w_b2",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "foe_declared",
+   "hide": true
+  },
+  {
+   "id": "r2_foe",
+   "title": "对手出招了",
+   "text": "这一轮对手是先手：它先说完，你才开始拼。所以你能看到它的全部宣告——这就是后手的优势。\n它要打你的【小剑】。看上面的红色条。",
+   "target": "b:foeacts",
+   "wait": "next"
+  },
+  {
+   "id": "r2_open",
+   "title": "拼一句防守",
+   "text": "我们拼一句防御：给小剑减伤。点【小剑】的【拼这一句】。",
+   "target": "b:compose",
+   "wait": "compose_open"
+  },
+  {
+   "id": "r2_rail",
+   "title": "减伤",
+   "text": "这次拼：选择一个友方随从，让他受到的伤害降低 20。",
+   "target": "c:rail",
+   "wait": "next",
+   "plan": [
+    "选择",
+    "一个",
+    "友方",
+    "随从",
+    "减伤",
+    20
+   ]
+  },
+  {
+   "id": "r2_w1",
+   "title": "拼",
+   "text": "点【选择】【一个】【友方】【随从】。",
+   "target": "c:next",
+   "wait": "w:随从"
+  },
+  {
+   "id": "r2_w2",
+   "title": "减伤",
+   "text": "点【减伤】，数字填 20。",
+   "target": "c:next",
+   "wait": "w:减伤"
+  },
+  {
+   "id": "r2_num",
+   "title": "数字",
+   "text": "填 20。",
+   "target": "c:number",
+   "wait": "n:20"
+  },
+  {
+   "id": "r2_ok",
+   "title": "就这一句",
+   "text": "点【就这一句】。",
+   "target": "k:confirm",
+   "wait": "compose_confirm"
+  },
+  {
+   "id": "r2_tgt",
+   "title": "选目标",
+   "text": "减伤要保护谁？点被打的【小剑】（你下面一排最左边）。",
+   "target": "b:mine0",
+   "wait": "target_picked"
+  },
+  {
+   "id": "r2_start",
+   "title": "时间",
+   "text": "减伤要在对手出招之前生效。对手在第 2 秒打，所以你的发动时间要在它前面或同一秒更早。把滑块放到 1，看看右边的预判。",
+   "target": "b:start",
+   "wait": "next"
+  },
+  {
+   "id": "r2_conf",
+   "title": "宣告",
+   "text": "点【宣告这个行动】。",
+   "target": "b:confirm",
+   "wait": "declared"
+  },
+  {
+   "id": "r2_fin",
+   "title": "结束",
+   "text": "点【本轮不行动】结束宣告。",
+   "target": "b:finish_decl",
+   "wait": "pass"
+  },
+  {
+   "id": "w_r2",
+   "title": "",
+   "text": "",
+   "target": "",
+   "wait": "round_done",
+   "hide": true
+  },
+  {
+   "id": "r2_res",
+   "title": "看结果",
+   "text": "你的减伤把大部分伤害挡掉了。这就是见招拆招：先看对手出什么，再现场拼你的应对。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "wrap1",
+   "title": "你已经学会了",
+   "text": "① 开局挑兜子、分生命；② 每轮给随从现场拼一句；③ 看到对手宣告后再应对；④ 每轮挑兜子拿新词，用过的进阶词下一轮冷却。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "wrap2",
+   "title": "小技巧",
+   "text": "• 拼不出来就看拼句台里的“接下来可能变成”建议和提示。\n• 关键词（首挡、不屈……）也是词库里的词，每个随从装一个，挑完兜子后可以换。\n• 状态（易伤、灼烧、蓄力……）每过一轮自己变强，配【持久】更猛。\n• 想练拼句，试试标题的【冒险：长难句训练营】。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  },
+  {
+   "id": "end",
+   "title": "去打电脑吧",
+   "text": "点【下一轮】继续，或者退出后在标题点【开始对局】，和真正会取舍、会针对的电脑打一场。",
+   "target": "",
+   "wait": "next",
+   "pos": "center"
+  }
+ ]
+}

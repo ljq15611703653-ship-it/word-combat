@@ -15,6 +15,8 @@ func _init() -> void:
 			ov[kv[0]] = float(kv[1])
 	if ov.has("unit"): E.STACK_UNIT = ov.unit
 	if ov.has("base"): E.STACK_BASE = ov.base
+	if ov.has("blind"): Duel.BLIND_SECOND = true
+	if ov.has("fap"): Duel.FIRST_AP = int(ov.fap)
 	if ov.has("cand"): Duel.CAND_MAX = int(ov.cand)
 	if ov.has("starts"): Duel.START_PICKS = int(ov.starts)
 	var wins := [0, 0, 0]
@@ -29,6 +31,7 @@ func _init() -> void:
 	var decided := 0
 	var empty := 0
 	var tally := {}
+	var f1win := 0
 	var held := 0
 	var stack_games := 0
 	for g in n:
@@ -53,6 +56,8 @@ func _init() -> void:
 		if g_stack:
 			stack_games += 1
 		var w: int = d.winner
+		if w == d.first0:
+			f1win += 1
 		held += int(d.stats.get("held", 0))
 		for sd in 2:
 			var pn: String = d.personas[sd]
@@ -82,5 +87,6 @@ func _init() -> void:
 	var parts: Array = []
 	for k in keys:
 		parts.append("%s %d/%d（%.0f%%）" % [k, tally[k][1], tally[k][0], 100.0 * tally[k][1] / maxf(1.0, tally[k][0])])
+	print("首轮先手方胜 %d/%d" % [f1win, n])
 	print("流派胜率：" + "  ".join(parts) + "；攒行动点 %.1f 次/局" % (float(held) / n))
 	quit()

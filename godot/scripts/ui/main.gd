@@ -160,7 +160,7 @@ func _show_title() -> void:
 	var t := TitleScreen.new()
 	_set_screen(t)
 	t.start_game.connect(_new_game)
-	t.start_tutorial.connect(func(): _new_duel(-1, true))
+	t.start_tutorial.connect(_start_live_tutorial)
 	t.start_first_match.connect(func(): _new_duel(-1, true))
 	t.start_adventure.connect(_show_adventure_map)
 	t.watch_demo.connect(func():
@@ -204,6 +204,25 @@ func _new_duel(seed_val: int = -1, guided: bool = false) -> void:
 		Settings.save_all()
 	_duel_next()
 
+func _start_live_tutorial() -> void:
+	_tut_end()
+	Settings.load_all()
+	tut_coach_backup = Settings.coach
+	Settings.coach = true
+	tut_on = true
+	tut_full = false
+	duel_guided = false
+	m = Duel.new()
+	m.tutorial = true
+	m.start(true, 777, false)
+	m.ai_epsilon = 0.0
+	_duel_next()
+	var tut := Tut.new()
+	tut.file = "res://data/tutorial_live.json"
+	add_child(tut)
+	tut.start()
+	tut.finished.connect(_on_tut_finished)
+
 func _duel_next() -> void:
 	match m.phase:
 		"opening":
@@ -223,7 +242,7 @@ func _duel_next() -> void:
 			_show_duel_draft()
 		"equip":
 			m.ai_equip(1)
-			if m.keyword_stock(0).is_empty():
+			if m.keyword_stock(0).is_empty() or m.tutorial:
 				m.equip(0, ["", "", ""])
 				m.finish_equip()
 				_duel_next()
