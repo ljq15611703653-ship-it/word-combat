@@ -21,6 +21,7 @@ const Fuzzy = preload("res://scripts/compose/fuzzy.gd")
 signal changed()
 signal hint_ready()
 
+const Glue = preload("res://scripts/compose/glue.gd")
 const TILE := Vector2(76, 98)
 const RACK_CARD := Vector2(80, 96)
 const CAT_ORDER := ["动作", "对象", "范围", "结构", "触发", "时间", "引用", "状态"]
@@ -355,9 +356,15 @@ func _rebuild_rail(stamp_last: bool, stamp_idx: int = -1) -> void:
 			tile = _number_entry(_role_for_edit(i), int(tok.v))
 		else:
 			tile = _tile_for(tok, i)
+		var g: String = Glue.before(tokens, i)
+		if g != "":
+			rail.add_child(_glue_label(g))
 		rail.add_child(tile)
 		if (stamp_last and i == tokens.size() - 1) or i == stamp_idx:
 			last_tile = tile
+	var tl: String = Glue.tail(tokens, bool(analysis.get("complete", false)))
+	if tl != "":
+		rail.add_child(_glue_label(tl))
 	# 下一张的空位
 	var ghost := _ghost_tile()
 	rail.add_child(ghost)
@@ -365,6 +372,17 @@ func _rebuild_rail(stamp_last: bool, stamp_idx: int = -1) -> void:
 		_stamp(last_tile)
 	if _num_edit != null and is_instance_valid(_num_edit):
 		_num_edit.call_deferred("grab_focus")
+
+# 人话连接字：灰色小字夹在词牌之间，点不了
+func _glue_label(text: String) -> Control:
+	var l := Label.new()
+	l.text = text.strip_edges() if text.strip_edges() != "" else text
+	l.add_theme_font_size_override("font_size", 20)
+	l.add_theme_color_override("font_color", Color("b9a68a"))
+	l.custom_minimum_size = Vector2(0, TILE.y)
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
 
 func _role_for_edit(i: int) -> String:
 	# 编辑已有数字：沿用它当初的角色；不知道就按“数值”

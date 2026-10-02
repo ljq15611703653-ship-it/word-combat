@@ -42,8 +42,7 @@ func _init() -> void:
 					c.composer.rack_scroll.scroll_vertical = 900
 			for c in s.get_children():
 				if c.get("intent_edit") != null:
-					c.intent_edit.text = "我想打全部敌人"
-					c._find_intent()
+					c.composer.setup(c._avail, [{"t":"W","v":"选择"},{"t":"W","v":"一个"},{"t":"W","v":"一个"},{"t":"W","v":"敌方"},{"t":"W","v":"随从"},{"t":"W","v":"造成"},{"t":"N","v":8},{"t":"W","v":"伤害"}])
 					c.composer.rack_scroll.scroll_vertical = 0
 			await create_timer(0.4).timeout
 			root.get_viewport().get_texture().get_image().save_png(out + "_compose.png")
