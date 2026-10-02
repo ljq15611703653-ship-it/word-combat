@@ -2,7 +2,8 @@ extends RefCounted
 # 拼词时的三类提示（都只依赖“当前拼了哪些牌”和“词库里还有什么词”）：
 #   1. options：下一张牌能接什么（词库里有的高亮，没有的单独列出）
 #   2. suggestions：按当前拼法，接下来可能的 3 种“流派”整句
-#   3. human_hint：到目前为止这句话的“人话版”，还不确定的地方用“某某”
+#   3. human_hint：到目前为止这句话的“人话版”，还不确定的地方用“某某”（human 版里没填的数字写“（几）”）
+#   4. preview_after：先看后拼——接上某一张之后整句会读成什么（拼句台悬停在词上时显示）
 # 做法：不停问解析器“下一步能接什么”，随机往下接，直到成句（随机游走），把得到的整句拿来展示或合并。
 
 const G = preload("res://scripts/core/grammar.gd")
@@ -55,7 +56,8 @@ static func options(tokens: Array, avail: Dictionary) -> Dictionary:
 
 # ------------------------------------------------------------ 随机游走补全
 # first：强制的下一张牌（可空）。返回 {ok, tokens, added:[新增的牌]}
-static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator, first: Dictionary = {}, max_extra: int = 36) -> Dictionary:
+# strict=false（只给“先看后拼”的预览用）：不挑句子像不像样，只要合语法就收——比如“给敌人回血”也照样读给你听
+static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator, first: Dictionary = {}, max_extra: int = 36, strict: bool = true) -> Dictionary:
 	var toks: Array = tokens.duplicate()
 	var avail := avail_in.duplicate()
 	var added: Array = []
@@ -69,7 +71,7 @@ static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator
 				if not (e0.t == "W" and e0.v in OPTIONAL_WORDS):
 					only_opt = false
 			var stop_p := (0.88 if only_opt else 0.5) + 0.03 * added.size()
-			if (rng.randf() < stop_p or res.expect.is_empty()) and good(res.skills[0]):
+			if (rng.randf() < stop_p or res.expect.is_empty()) and (not strict or good(res.skills[0])):
 				return {"ok": true, "tokens": toks, "added": added, "skills": res.skills}
 		var cands: Array = []
 		var weights: Array = []
@@ -100,7 +102,7 @@ static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator
 				wgt = 0.15        # 引用类的词也少一点，优先给直接填数字的写法
 			weights.append(wgt)
 		if cands.is_empty():
-			if res.complete and good(res.skills[0]):
+			if res.complete and (not strict or good(res.skills[0])):
 				return {"ok": true, "tokens": toks, "added": added, "skills": res.skills}
 			return {"ok": false, "tokens": toks, "added": added}
 		forced = {}
@@ -120,7 +122,7 @@ static func walk(tokens: Array, avail_in: Dictionary, rng: RandomNumberGenerator
 		if chosen.t == "W":
 			avail[chosen.v] = int(avail.get(chosen.v, 0)) - 1
 	var fin := S.analyze(toks)
-	return {"ok": fin.complete and good(fin.skills[0]), "tokens": toks, "added": added, "skills": fin.skills}
+	return {"ok": fin.complete and (not strict or good(fin.skills[0])), "tokens": toks, "added": added, "skills": fin.skills}
 
 # ------------------------------------------------------------ 2. 三种流派的整句
 # 返回 [{tokens, added, text, school}]，每条的 added 是“还没拼的部分”
@@ -178,7 +180,7 @@ static func _school(nodes: Array) -> String:
 	return "其他"
 
 # ------------------------------------------------------------ 3. “到目前为止”的人话
-static func human_hint(tokens: Array, avail: Dictionary, seed_val: int = 5, samples: int = 10) -> Dictionary:
+static func human_hint(tokens: Array, avail: Dictionary, seed_val: int = 5, samples: int = 10, strict: bool = true) -> Dictionary:
 	if tokens.is_empty():
 		return {"text": "某某", "ok": true, "known": 0}
 	var rng := RandomNumberGenerator.new()
@@ -186,11 +188,13 @@ static func human_hint(tokens: Array, avail: Dictionary, seed_val: int = 5, samp
 	var res := S.analyze(tokens)
 	if res.complete:
 		# 已经是完整的一句话：就按真实的树显示，不再和“可能的补全”合并（否则双倍、重复这类可选修饰会被当成“不确定”而丢掉）
-		return {"text": G.describe(G.skill("x", res.skills[0])), "ok": true, "merged": res.skills[0], "samples": 1}
+		var full := G.describe(G.skill("x", res.skills[0]))
+		return {"text": full, "ok": true, "merged": res.skills[0], "samples": 1, "human": humanize(full), "complete": true}
 	var trees: Array = []
 	var opt_first: Array = []
 	for e in res.expect:
-		if e.t == "W" and int(avail.get(e.v, 0)) > 0:
+		# 加上/减去 是接在数字后面的“可有可无”：不拿来强行分岔，否则刚填的数字永远显示成“（多少）”
+		if e.t == "W" and int(avail.get(e.v, 0)) > 0 and not (e.v in ["加上", "减去"]):
 			opt_first.append(S.W(e.v))
 	var tries := 0
 	while trees.size() < samples and tries < samples * 3:
@@ -198,15 +202,66 @@ static func human_hint(tokens: Array, avail: Dictionary, seed_val: int = 5, samp
 		var first: Dictionary = {}
 		if not opt_first.is_empty() and rng.randf() < 0.7:
 			first = opt_first[rng.randi() % opt_first.size()]
-		var w := walk(tokens, avail, rng, first)
+		var w := walk(tokens, avail, rng, first, 36, strict)
 		if w.ok and not w.skills.is_empty():
 			trees.append(w.skills[0])
 	if trees.is_empty():
 		return {"text": "", "ok": false}
 	var merged: Array = _merge_list(trees)
-	return {"text": G.describe(G.skill("x", merged)), "ok": true, "merged": merged, "samples": trees.size()}
+	# human：给玩家看的那一版——没填的数字写成“（几）”，没定的阵营写成“（哪方）”（只用来显示，不回传树）
+	var holey: Array = _merge_list(trees, true)
+	return {"text": G.describe(G.skill("x", merged)), "ok": true, "merged": merged, "samples": trees.size(),
+		"human": humanize(G.describe(G.skill("x", holey)))}
 
-static func _merge_list(trees: Array) -> Array:
+# ------------------------------------------------------------ 4. 先看后拼：接上某一张之后，整句读起来是什么
+# 只做显示用的少量随机补全（默认 5 个样本），调用方按“当前这一串牌”缓存，不要每帧算。
+# 返回 {ok, text, complete, odd}：ok=false 表示接上这张后，用你现有的词拼不出整句（会卡住）；
+# odd=true 表示合语法、但补不出“像样”的句子（比如给敌人回血），读出来让玩家自己判断
+static func preview_after(tokens: Array, tok: Dictionary, avail: Dictionary, samples: int = 5) -> Dictionary:
+	var toks: Array = tokens.duplicate()
+	toks.append(tok)
+	var a := avail.duplicate()
+	if str(tok.get("t", "")) == "W":
+		a[tok.v] = int(a.get(tok.v, 0)) - 1
+	return preview_of(toks, a, samples)
+
+# 任意一串牌（比如把某张数字牌改了之后）的预览；avail 是这串牌用掉之后还剩的词
+static func preview_of(toks: Array, a: Dictionary, samples: int = 5) -> Dictionary:
+	var res := S.analyze(toks)
+	if res.complete:
+		return {"ok": true, "complete": true, "text": humanize(G.describe(G.skill("x", res.skills[0])))}
+	var h := human_hint(toks, a, 5, samples)
+	var odd := false
+	if not bool(h.get("ok", false)):
+		# 像样的整句拼不出来：放宽到“合语法就行”再试一次，读出来让玩家自己判断（比如给敌人回血）
+		h = human_hint(toks, a, 7, maxi(2, samples - 2), false)
+		odd = true
+	if not bool(h.get("ok", false)):
+		return {"ok": false, "complete": false, "odd": false, "text": ""}
+	return {"ok": true, "complete": false, "odd": odd, "text": str(h.get("human", h.get("text", "")))}
+
+# 把人话里的“未定”写得更像人话：数字空位 →（几），阵营空位 →（哪方），数值写法未定 →（多少）
+const HOLE_N := 9999      # 只在 holes 合并里出现：时长/间隔/延后/分到的点数还没填
+static func humanize(text: String) -> String:
+	var s := text
+	s = s.replace("降低 某某", "降低（几成）")
+	s = s.replace("造成与 某某 相等的伤害", "造成（多少）伤害")
+	s = s.replace("恢复与 某某 相等的生命", "恢复（多少）生命")
+	s = s.replace(" %d " % HOLE_N, "（几）")
+	s = s.replace(" %d" % HOLE_N, "（几）")
+	s = s.replace("%d " % HOLE_N, "（几）")
+	s = s.replace(str(HOLE_N), "（几）")
+	for unit in ["点", "秒", "个"]:
+		s = s.replace(" 某某 " + unit, "（几）" + unit)
+	var re := RegEx.new()
+	re.compile("(减少|增加) 某某(?=$|，|；|（)")
+	s = re.sub(s, "$1（几）", true)
+	s = s.replace(" -1 ", "（几）")
+	s = s.replace("某某的某某", "（多少）")
+	s = s.replace("某某随从", "（哪方）随从")
+	return s
+
+static func _merge_list(trees: Array, holes: bool = false) -> Array:
 	var cnt: int = 99
 	for t in trees:
 		cnt = mini(cnt, t.size())
@@ -215,11 +270,15 @@ static func _merge_list(trees: Array) -> Array:
 		var col: Array = []
 		for t in trees:
 			col.append(t[k])
-		out.append(_merge(col))
+		out.append(_merge(col, holes))
 	return out
 
+# 这些键是“数字空位”：所有样本都有、都大于 0、只是数不同 → 说明这里一定要填一个数，只是还没填
+const HOLE_KEYS := ["delay", "dur", "gap", "rep_gap", "part", "total"]
+
 # 把若干棵“长得差不多”的树合成一棵：处处一致的地方保留，不一致的地方变成“某某”
-static func _merge(vals: Array):
+# holes=true（只用于显示）：时长/间隔这类“一定有、但数还没填”的地方保留成 HOLE_N，而不是整段丢掉
+static func _merge(vals: Array, holes: bool = false):
 	var first = vals[0]
 	if first is Dictionary:
 		for v in vals:
@@ -253,7 +312,10 @@ static func _merge(vals: Array):
 					all_have = false
 			if not all_have:
 				continue   # 有的样本有、有的没有（可选修饰）：不显示
-			var m = _merge(col)
+			if holes and k in HOLE_KEYS and not _all_equal(col) and _all_positive_ints(col):
+				out[k] = HOLE_N
+				continue
+			var m = _merge(col, holes)
 			if k in OPTIONAL_KEYS and not _all_equal(col):
 				continue
 			out[k] = m
@@ -269,13 +331,19 @@ static func _merge(vals: Array):
 			var col2: Array = []
 			for v in vals:
 				col2.append(v[k])
-			arr.append(_merge(col2))
+			arr.append(_merge(col2, holes))
 		return arr
 	if _all_equal(vals):
 		return first
 	if first is int or first is float:
 		return -1       # 数字未定
 	return "某某"      # 词/名称未定
+
+static func _all_positive_ints(vals: Array) -> bool:
+	for v in vals:
+		if not (v is int) or int(v) <= 0:
+			return false
+	return true
 
 static func _all_equal(vals: Array) -> bool:
 	for v in vals:

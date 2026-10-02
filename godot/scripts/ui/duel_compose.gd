@@ -78,7 +78,8 @@ func setup(unit_name: String, avail: Dictionary, ap: int, cooling: Dictionary, i
 			use.pressed.connect(func():
 				picked_rec = rr
 				composer.setup(avail, S.tokens_of_skill(rr.sk.nodes)))
-			rbox.add_child(use)
+			# 先看后拼：人话直接写在按钮下面，鼠标停上去拼句台的人话提示也读一遍
+			rbox.add_child(_with_text(use, str(r.text), "推荐【%s】填进去读作：" % str(r.name)))
 		v.add_child(rbox)
 	_avail = avail
 	intent_box = K.hbox(8)
@@ -155,4 +156,26 @@ func _find_intent() -> void:
 		b.pressed.connect(func():
 			picked_rec = {}
 			composer.setup(_avail, S.tokens_of_skill(sk.nodes)))
-		intent_box.add_child(b)
+		var head_t: String = ("【%s】填进去读作：" % str(it.name)) if bool(it.ok) else ("【%s】（词还不够）拼成了会读作：" % str(it.name))
+		intent_box.add_child(_with_text(b, str(it.skill.get("text", "")), head_t))
+
+# 按钮 + 它下面的一行人话（最多两行，全文在悬停时由拼句台的人话提示读出来）
+func _with_text(b: Control, text: String, head: String) -> Control:
+	var col := K.vbox(2)
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(b)
+	if text != "":
+		var l := K.wrap_label("读作：" + text, 13, Color("e6ecff"))
+		l.max_lines_visible = 2
+		l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		l.tooltip_text = text
+		l.mouse_filter = Control.MOUSE_FILTER_PASS
+		col.add_child(l)
+		for c in [b, l]:
+			c.mouse_entered.connect(func():
+				if composer != null:
+					composer.show_preview(head + text))
+			c.mouse_exited.connect(func():
+				if composer != null:
+					composer.clear_preview())
+	return col

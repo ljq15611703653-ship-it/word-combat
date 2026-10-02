@@ -5,6 +5,8 @@ extends Control
 #   · 人话提示：这句话到目前为止大概是什么意思，还不确定的地方写“某某”
 #   · 三种流派：按现在的拼法，接下来可能变成的三句话（也是拼出来的，点一下接上第一张）
 #   · 数字：手填，填完变成一张金属数字牌烙进去；点数字牌可以改，改完重新烙
+#   · 先看后拼：鼠标停在能接的词（连接牌、建议里的“接【某】”）上、或者在数字框里打数字时，
+#     人话提示先读出“接上之后整句是什么”；句子轨下面一直写着现在读作什么（没填的数字写“（几）”）
 # 拼出来的是一串牌，解析成技能树交给上层；规则本身（引擎、费用、词的统计）一点没变。
 
 const K = preload("res://scripts/ui/kit.gd")
@@ -72,6 +74,13 @@ var _hint_token := 0
 var _sugg_seed := 1
 var _built := false
 var last_hint_nodes: Array = []
+var rail_read: Label                       # 句子轨下面：现在这串牌读作什么（带“（几）”“某某”空位）
+var strip_cards := {}                      # “现在能接”条里的词 → 卡片（悬停预览用）
+var _preview_cache := {}                   # 先看后拼的缓存：只对“当前这一串牌”有效，牌一变就清空
+var _hover_key := ""                       # 正在预览的那张（""=没在预览，人话提示显示“到目前为止”）
+var _idle_hint := ""                       # 不预览时人话提示该显示的文字
+const HINT_COLOR := Color("f1e3b0")
+const PREVIEW_COLOR := Color("9fe0ff")
 
 func _ready() -> void:
 	_build()
@@ -116,10 +125,16 @@ func _build() -> void:
 	rs.content_margin_bottom = 10
 	rail_box.add_theme_stylebox_override("panel", rs)
 	rail_box.custom_minimum_size = Vector2(0, 84 if compact else 124)
+	var rv := K.vbox(4)
+	rail_box.add_child(rv)
 	rail = HFlowContainer.new()
 	rail.add_theme_constant_override("h_separation", 6)
 	rail.add_theme_constant_override("v_separation", 6)
-	rail_box.add_child(rail)
+	rv.add_child(rail)
+	# 句子轨下面一行：现在这串牌读作什么（没定的地方写“（几）”“某某”）
+	rail_read = K.wrap_label("", 14 if compact else 16, Color("f3d9a0"))
+	rail_read.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rv.add_child(rail_read)
 	Tut.tag(rail_box, "c:rail")
 	v.add_child(rail_box)
 	# 模糊匹配的托盘：词随便扔，不用按语法顺序
@@ -151,9 +166,9 @@ func _build() -> void:
 	hint_panel = hp
 	var hv := K.vbox(2)
 	hp.add_child(hv)
-	hint_label = K.wrap_label("", 15 if compact else 18, Color("f1e3b0"))
+	hint_label = K.wrap_label("", 15 if compact else 18, HINT_COLOR)
 	hv.add_child(hint_label)
-	status_label = K.label("", 14, K.MUTED)
+	status_label = K.wrap_label("", 14, K.MUTED)
 	hv.add_child(status_label)
 	help_label = K.wrap_label("", 13, Color("9fd0ff"))
 	hv.add_child(help_label)
@@ -314,6 +329,8 @@ func _after_change(stamp_last: bool, stamp_idx: int = -1) -> void:
 	changed.emit()
 
 func _recompute() -> void:
+	_preview_cache.clear()          # 牌变了：先看后拼的缓存作废
+	_hover_key = ""
 	if fuzzy_mode:
 		avail = pool.duplicate()
 		for w in tray:
@@ -534,7 +551,8 @@ func _number_entry(role: String, prefill: int) -> Control:
 				clean += ch
 		if clean != t:
 			le.text = clean
-			le.caret_column = clean.length())
+			le.caret_column = clean.length()
+		_preview_number(role, clean))
 	var submit := func():
 		if le.text == "":
 			return
@@ -629,6 +647,7 @@ func _build_rack() -> void:
 		pt.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 				add_part(pn))
+		_hook_preview(pt, S.Part(pn), true, str(PART_HELP.get(pn, "")))
 		pfl.add_child(pt)
 		part_tiles[pname] = pt
 	prow.add_child(K.label("免费，不占你的词", 12, K.MUTED))
@@ -685,6 +704,7 @@ func _rack_card(w: String) -> Control:
 	root.gui_input.connect(func(ev):
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 			add_word(ww))
+	_hook_preview(root, S.W(w), true)
 	Tut.tag(root, "c:word:" + w)
 	rack_cards[w] = {"root": root, "hl": hl, "badge": badge, "tween": null}
 	return root
@@ -751,16 +771,21 @@ func _refresh_hint() -> void:
 	help_label.text = _context_help()
 	last_hint_nodes = []
 	if tokens.is_empty():
-		hint_label.text = "这句话还没开始：某某。\n可以先放一个目标（比如“自身”“选择 一个 敌方 随从”），或者先放“当”设一个埋伏。"
-		status_label.text = ""
+		_set_idle_hint("这句话还没开始：某某。\n可以先放一个目标（比如“自身”“选择 一个 敌方 随从”），或者先放“当”设一个埋伏。")
+		rail_read.text = "读作：（还没开始）"
+		status_label.text = _next_summary()
+		status_label.add_theme_color_override("font_color", K.MUTED)
 		return
 	var h := H.human_hint(tokens, avail)
 	if not bool(h.get("ok", false)):
-		hint_label.text = "这样拼下去暂时接不上（词不够或语法不通）。试试“撤回一张”。"
+		_set_idle_hint("这样拼下去暂时接不上（词不够或语法不通）。试试“撤回一张”。")
+		rail_read.text = "读作：（这样拼下去接不上了，撤回一张试试）"
 		status_label.text = ""
 		return
 	last_hint_nodes = h.get("merged", [])
-	hint_label.text = "到目前为止的人话版：" + str(h.text)
+	var human: String = str(h.get("human", h.text))
+	_set_idle_hint("到目前为止的人话版：" + human)
+	rail_read.text = "读作：" + human + ("。" if is_complete() else " ……")
 	if is_complete():
 		var probs: Array = G.problems(G.finalize(G.skill("x", skill_nodes())))
 		if probs.is_empty():
@@ -770,9 +795,142 @@ func _refresh_hint() -> void:
 			status_label.text = "成句了，但有问题：" + str(probs[0])
 			status_label.add_theme_color_override("font_color", K.RED)
 	else:
-		status_label.text = "还没拼完：“某某”是你还没定的地方"
+		status_label.text = "还没拼完：“某某”“（几）”是你还没定的地方。" + _next_summary()
 		status_label.add_theme_color_override("font_color", K.MUTED)
 	hint_ready.emit()
+
+# 下一张能接什么，一句话说清（词按词表顺序，最多列 6 个）
+func _next_summary() -> String:
+	var items: Array = []
+	for role in opts.get("numbers", []):
+		items.append("填一个数（%s）" % str(ROLE_TEXT.get(role, "数字")))
+	if compact:
+		# 窄窗口：能接的词下面“现在能接”条里已经摆着了，这里只留一句怎么先看
+		return ("下一张：" + "、".join(items) + "。" if not items.is_empty() else "") + "鼠标停在亮着的词上，先读出接上之后的整句。"
+	var have: Array = opts.get("words_have", []).duplicate()
+	have.sort_custom(func(a, b): return Lex.words[a].id < Lex.words[b].id)
+	for w in have.slice(0, 6):
+		items.append("【%s】" % w)
+	if have.size() > 6:
+		items.append("等 %d 个词" % have.size())
+	for pn in opts.get("parts", []):
+		items.append("连接牌【%s】" % pn)
+	if items.is_empty():
+		return ""
+	return "下一张可以接：" + "、".join(items) + "。鼠标停在词上，上面先读出接上之后的整句。"
+
+# ------------------------------------------------------------ 先看后拼
+# 人话提示平时显示“到目前为止”；鼠标停在某张能接的牌上时，换成“接上它之后整句读作什么”
+func _set_idle_hint(text: String) -> void:
+	_idle_hint = text
+	if _hover_key == "":
+		hint_label.text = text
+		hint_label.add_theme_color_override("font_color", HINT_COLOR)
+
+func _show_hint_preview(key: String, text: String) -> void:
+	_hover_key = key
+	hint_label.text = text
+	hint_label.add_theme_color_override("font_color", PREVIEW_COLOR)
+
+func _end_hint_preview(key: String) -> void:
+	if _hover_key != key:
+		return
+	_hover_key = ""
+	hint_label.text = _idle_hint
+	hint_label.add_theme_color_override("font_color", HINT_COLOR)
+
+static func _cand_key(tok: Dictionary) -> String:
+	return "%s:%s" % [str(tok.get("t", "")), str(tok.get("v", ""))]
+
+# 接上这一张之后整句的人话（按当前这串牌缓存；第一次算大约几十毫秒，之后直接取）
+func preview_for(tok: Dictionary) -> Dictionary:
+	var key := _cand_key(tok)
+	if _preview_cache.has(key):
+		return _preview_cache[key]
+	var p: Dictionary = H.preview_after(tokens, tok, avail)
+	_preview_cache[key] = p
+	return p
+
+# 给玩家看的一句：如果接上【某】：……
+func preview_line(tok: Dictionary) -> String:
+	return _preview_text(_tok_act(tok), preview_for(tok))
+
+static func _tok_act(tok: Dictionary) -> String:
+	if str(tok.get("t", "")) == "N":
+		return "填上 %s" % str(tok.v)
+	if str(tok.get("t", "")) == "P":
+		return "接上连接牌【%s】" % str(tok.v)
+	return "接上【%s】" % str(tok.v)
+
+# act：“接上【造成】”“填上 12”“把数字改成 12”这类动作
+static func _preview_text(act: String, p: Dictionary) -> String:
+	var a2 := act + (" " if act.right(1) >= "0" and act.right(1) <= "9" else "")    # “填上 14 就成句”
+	if not bool(p.get("ok", false)):
+		return "%s之后，用你现有的词拼不成整句（会卡住），换一张试试。" % a2
+	if bool(p.get("complete", false)):
+		return "%s就成句 ✓：%s。" % [a2, str(p.text)]
+	if bool(p.get("odd", false)):
+		return "如果%s：%s ……（合语法，但这样用一般不划算）" % [act, str(p.text)]
+	return "如果%s：%s ……" % [act, str(p.text)]
+
+func _hover_in(tok: Dictionary, src: Control, tip_head: String = "") -> void:
+	if fuzzy_mode:
+		return
+	var line := preview_line(tok)
+	_show_hint_preview(_cand_key(tok), line)
+	if src != null and is_instance_valid(src):
+		src.tooltip_text = (tip_head + "\n" if tip_head != "" else "") + line     # 提示框弹出时读的是这时的文字
+
+func _hover_out(tok: Dictionary) -> void:
+	_end_hint_preview(_cand_key(tok))
+
+# 给一张卡/按钮挂上“先看后拼”的悬停（only_if_next：只有它现在真能接时才预览，词库里的卡用）
+func _hook_preview(c: Control, tok: Dictionary, only_if_next: bool = false, tip_head: String = "") -> void:
+	var tk := tok
+	c.mouse_entered.connect(func():
+		if only_if_next and not _can_take(tk):
+			return
+		_hover_in(tk, c, tip_head))
+	c.mouse_exited.connect(func(): _hover_out(tk))
+
+# 这一张现在真的能接上（语法上要它，而且你手里还有）
+func _can_take(tok: Dictionary) -> bool:
+	match str(tok.get("t", "")):
+		"W": return str(tok.v) in opts.get("words_have", [])
+		"P": return str(tok.v) in opts.get("parts", [])
+		"N": return not opts.get("numbers", []).is_empty()
+	return false
+
+# 数字框里打数字时：先读出填进去之后整句是什么（改已有数字牌时同样）
+func _preview_number(role: String, txt: String) -> void:
+	if fuzzy_mode:
+		return
+	if txt == "":
+		_end_hint_preview("num")
+		return
+	var v := int(txt)
+	var rg: Array = ROLE_RANGE.get(role, [0, 99])
+	if v < int(rg[0]) or v > int(rg[1]):
+		_show_hint_preview("num", "这里要填 %d~%d（%s）。" % [int(rg[0]), int(rg[1]), str(ROLE_TEXT.get(role, "数字"))])
+		return
+	var p: Dictionary
+	if editing_idx >= 0 and editing_idx < tokens.size():
+		var key := "E%d:%d" % [editing_idx, v]
+		if not _preview_cache.has(key):
+			var toks: Array = tokens.duplicate()
+			toks[editing_idx] = S.Num(v)
+			_preview_cache[key] = H.preview_of(toks, avail)
+		p = _preview_cache[key]
+		_show_hint_preview("num", _preview_text("把数字改成 %d" % v, p))
+		return
+	_show_hint_preview("num", preview_line(S.Num(v)))
+
+# 外部（推荐句子、“我想干什么”的结果）也可以借人话提示先读给玩家听
+func show_preview(text: String) -> void:
+	_show_hint_preview("ext", text)
+
+func clear_preview() -> void:
+	_end_hint_preview("ext")
 
 # ------------------------------------------------------------ 三种流派
 func reroll_suggestions() -> void:
@@ -809,11 +967,23 @@ func _suggestion_row(sg: Dictionary) -> Control:
 	for i in all_t.size():
 		fl.add_child(_mini_chip(all_t[i], i >= placed))
 	vb.add_child(fl)
-	vb.add_child(K.wrap_label("= " + str(sg.text), 13, Color("c8d0e8")))
-	var b := K.button("接这一张 ▶", "ghost", 13)
-	b.custom_minimum_size = Vector2(0, 30)
+	# 整句的人话放大写，先读懂再决定要不要接
+	vb.add_child(K.wrap_label("读作：" + H.humanize(str(sg.text)), 14 if compact else 16, Color("e6ecff")))
+	var has_num := false
+	for t in sg.added:
+		if str(t.t) == "N":
+			has_num = true
+	if has_num:
+		vb.add_child(K.label("（还没填的数字是示例，拼到那里自己填）", 12, K.MUTED))
 	var first: Dictionary = sg.added[0] if not sg.added.is_empty() else {}
+	var btxt := "接这一张 ▶"
+	if not first.is_empty():
+		btxt = ("填 %s ▶" % str(first.v)) if str(first.t) == "N" else ("接【%s】▶" % str(first.v))
+	var b := K.button(btxt, "ghost", 13)
+	b.custom_minimum_size = Vector2(0, 30)
 	b.pressed.connect(func(): _take_first(first))
+	if not first.is_empty():
+		_hook_preview(b, first)
 	hb.add_child(b)
 	return p
 
@@ -843,6 +1013,8 @@ func _prefill_number(v: int) -> void:
 		_num_edit.text = str(v)
 		_num_edit.grab_focus()
 		_num_edit.caret_column = _num_edit.text.length()
+		if not opts.numbers.is_empty():
+			_preview_number(str(opts.numbers[0]), str(v))
 
 # ------------------------------------------------------------ 拼好了：所有词飞起来，组合成一句人话
 func play_combine(text: String) -> void:
@@ -851,6 +1023,7 @@ func play_combine(text: String) -> void:
 # “现在能接”条：把当前能接的词、连接牌放大摆在最上面
 func _rebuild_strip() -> void:
 	K.clear_children(strip_flow)
+	strip_cards.clear()
 	var have: Array = opts.words_have.duplicate()
 	have.sort_custom(func(a, b): return Lex.words[a].id < Lex.words[b].id)
 	for w in have:
@@ -863,6 +1036,7 @@ func _rebuild_strip() -> void:
 		pt.gui_input.connect(func(ev):
 			if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 				add_part(pn))
+		_hook_preview(pt, S.Part(pn), false, str(PART_HELP.get(pn, "")))
 		strip_flow.add_child(pt)
 	var note := ""
 	if not opts.numbers.is_empty():
@@ -897,6 +1071,9 @@ func _strip_card(w: String) -> Control:
 	root.gui_input.connect(func(ev):
 		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
 			add_word(ww))
+	root.tooltip_text = "鼠标停一下：上面先读出接上【%s】之后整句是什么" % w
+	_hook_preview(root, S.W(w))
+	strip_cards[w] = root
 	Tut.tag(root, "c:next:" + w)
 	return root
 
