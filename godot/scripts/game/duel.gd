@@ -18,6 +18,7 @@ const HP_POOL := 66
 const HP_MIN := 10
 const OPEN_PICKS := 2
 const OPEN_BAGS := 3
+const UNDO_MAX := 3                  # 每轮最多撤回几次已宣告的行动
 
 var rng := RandomNumberGenerator.new()
 var st: Dictionary = {}
@@ -43,6 +44,7 @@ var log_lines: Array = []
 var personas: Array = ["", ""]        # 电脑的流派（决定偏好、估值口味、攒不攒行动点）
 var tutorial := false                 # 教程：电脑只做脚本动作，人类先手
 var last_sentence: Dictionary = {}    # 随从 uid → 它最近一次宣告的句子（界面“沿用上一句”用）
+var undo_left := UNDO_MAX
 var staged: Dictionary = {}           # 界面用：uid → 已拼好但还没宣告的句子 sid
 var opening_idx := 0                  # 兜子界面用的兼容字段
 var opening_total := OPEN_PICKS
@@ -154,6 +156,7 @@ func begin_round() -> void:
 	E.begin_round(st)
 	E.clear_round_skills(st)
 	declared = [[], []]
+	undo_left = UNDO_MAX
 	staged = {}
 	declare_done = [false, false]
 	var f := E.first_side(st)
@@ -281,6 +284,26 @@ func submit(side: int, act: Dictionary) -> String:
 	used_log[side][int(st.round)] = rec
 	stats.sentences += 1
 	return ""
+
+# 撤回自己已宣告的一个行动（还没点“完成宣告”时；每轮 UNDO_MAX 次）。句子留在随从身上，可以重选目标/时间再宣告
+func retract(side: int, sid: int) -> String:
+	if declare_done[side]:
+		return "宣告已经结束，不能撤回了"
+	if undo_left <= 0:
+		return "本轮的撤回次数用完了（每轮 %d 次）" % UNDO_MAX
+	for i in declared[side].size():
+		if int(declared[side][i].sid) == sid:
+			declared[side].remove_at(i)
+			var uid := E.host_of(st, sid)
+			var rec: Dictionary = used_log[side].get(int(st.round), {})
+			for w in E.skill_of(st, sid).words:
+				if not Lex.is_basic(w):
+					rec[w] = maxi(0, int(rec.get(w, 0)) - 1)
+			staged[uid] = sid
+			undo_left -= 1
+			stats.sentences -= 1
+			return ""
+	return "找不到这个行动"
 
 func public_declared(side: int) -> Array:
 	return declared[side].duplicate(true)

@@ -701,6 +701,30 @@ func _render_action_panel() -> void:
 		passb.pressed.connect(_pass)
 		Tut.tag(passb, "b:finish_decl")
 		action_box.add_child(passb)
+		if m.has_method("retract") and not m.declared[0].is_empty():
+			action_box.add_child(K.label("已宣告（还能撤回 %d 次）" % int(m.undo_left), 14, K.MUTED))
+			for a in m.declared[0]:
+				var ask := E.skill_of(m.st, int(a.sid))
+				var rr := K.hbox(6)
+				var al := K.label("%s" % str(ask.get("name", "")), 14, K.TEXT)
+				al.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				rr.add_child(al)
+				var rb := K.button("撤回", "ghost", 13)
+				rb.disabled = int(m.undo_left) <= 0
+				var asid: int = int(a.sid)
+				rb.pressed.connect(func():
+					var e: String = m.retract(0, asid)
+					if e != "":
+						toast(e, K.RED)
+						return
+					_clear_selection()
+					_update_marks()
+					_update_hud()
+					_rebuild_hand()
+					_show_enemy_declared()
+					_render_action_panel())
+				rr.add_child(rb)
+				action_box.add_child(rr)
 		return
 	var sk := E.skill_of(m.st, sel_sid)
 	var nm := K.hbox(8)
