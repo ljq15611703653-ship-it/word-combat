@@ -4,6 +4,7 @@ extends Control
 const K = preload("res://scripts/ui/kit.gd")
 const NR = preload("res://scripts/numcard/nc_rules.gd")
 const NE = preload("res://scripts/numcard/nc_engine.gd")
+const NAI = preload("res://scripts/numcard/nc_ai.gd")
 const NT = preload("res://scripts/numcard/nc_text.gd")
 const Composer = preload("res://scripts/numcard/ui/nc_composer.gd")
 const Setup = preload("res://scripts/numcard/ui/nc_setup.gd")
@@ -16,7 +17,8 @@ signal quit_to_title()
 const MARK := ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧"]
 
 var M
-var ui := "idle"              # idle / foe / pick_unit / compose / target / timing / resolving / round_end / over
+var ui := "idle"              # idle / foe / pick_unit / compose / target / timing / assign / resolving / round_end / over
+var late_pick: Array = []     # 择流定目标：这一段已经点了谁
 var sel_uid := -1
 var pending: Array = []       # 拼好、还在选目标的段落
 var pend_i := 0
@@ -156,18 +158,21 @@ func _refresh_top() -> void:
 	for s in 2:
 		var c: String = M.cls_of(s)
 		var h := K.hbox(8)
-		h.add_child(K.chip(("你 · " if s == 0 else "电脑 · ") + c, NR.CLASS_COLOR[c], 15))
+		h.add_child(K.chip(("你 · " if s == 0 else "电脑 · ") + NR.CLASS_NAME[c], NR.CLASS_COLOR[c], 15))
 		var pb := _bar(100, minf(100.0, 100.0 * M.progress(s)), NR.CLASS_COLOR[c].lightened(0.2))
 		pb.custom_minimum_size = Vector2(320, 16)
 		h.add_child(pb)
 		var raw: float = float(M.R.M[s][NR.METRIC[c]])
-		h.add_child(K.label("%d%%（%s %.0f / %d，击倒 +%d%%）" % [int(100.0 * M.progress(s)), _metric_name(c), raw, int(NR.TARGET[c]), int(100.0 * float(M.R.kob[s]))], 15, K.TEXT))
+		var lb := K.label("%d%%（%s %.0f / %d，击倒 +%d%%）" % [int(100.0 * M.progress(s)), _metric_name(c), raw, int(NR.TARGET[c]), int(100.0 * float(M.R.kob[s]))], 15, K.TEXT)
+		lb.tooltip_text = "得分：" + str(NR.CLASS_GOAL[c]) + "\n特长：" + NR.talent_text(c)
+		lb.mouse_filter = Control.MOUSE_FILTER_PASS
+		h.add_child(lb)
 		var apv: int = int(M.res[s].ap) if M.phase == "declare" else int(M.sides[s].ap)
 		h.add_child(K.chip("行动点 %d/%d" % [apv, NR.AP_CAP], Color("7a6424"), 14))
 		prog_box.add_child(h)
 
 func _metric_name(c: String) -> String:
-	return {"进攻": "伤害", "守护": "挡下", "积蓄": "兑现", "治疗": "治疗", "控制": "白花"}.get(c, "")
+	return str(NR.METRIC_NAME.get(c, ""))
 
 func _refresh_hand() -> void:
 	K.clear_children(hand_box)
@@ -213,6 +218,8 @@ func _unit_card(u: Dictionary) -> PanelContainer:
 		hl = true
 	if ui == "target" and _target_ok(uid):
 		hl = true
+	if ui == "assign" and _late_ok(uid):
+		hl = true
 	p.add_theme_stylebox_override("panel", K.style(Color("1d2233"), K.GOLD if hl else col.darkened(0.2), 12, 3 if hl else 2, 4))
 	var v := K.vbox(3)
 	p.add_child(v)
@@ -231,11 +238,14 @@ func _unit_card(u: Dictionary) -> PanelContainer:
 	flow.add_theme_constant_override("h_separation", 4)
 	for nm in u.st:
 		var e: Array = u.st[nm]
-		flow.add_child(K.chip(NT.status_chip(str(nm), e, int(M.rnd)), Color("6a4a2a") if str(nm) in ["蓄力", "铁壁"] else Color("6a2a4a"), 13))
+		flow.add_child(K.chip(NT.status_chip(str(nm), e, int(M.rnd)), Color("6a2a4a"), 13))
 	if int(u.mit) > 0:
 		flow.add_child(K.chip("减伤%d" % int(u.mit), Color("2a4a6a"), 13))
 	for l in u.lis:
-		flow.add_child(K.chip("回敬" if str(l.k) == "reflect" else "转移", Color("4a2a6a"), 13))
+		flow.add_child(K.chip("转移", Color("4a2a6a"), 13))
+	for cc in M.R.conts:
+		if int(cc.uid) == uid:
+			flow.add_child(K.chip(NT.cont_chip(cc), NR.CLASS_COLOR["续"].darkened(0.35), 13))
 	if mine and M.phase == "declare":
 		if uid in M.passed[0]:
 			flow.add_child(K.chip("本轮不出手", Color("3a3a3a"), 13))
@@ -262,8 +272,9 @@ func _refresh_decl() -> void:
 		decl_box.add_child(K.label("（还没有）", 15, K.MUTED))
 	for a in list:
 		var mine: bool = int(a.side) == 0
-		var t := "%s %s · %s · 第 %d 秒 · 花 %d 点%s：%s" % [MARK[mini(int(a.ord), MARK.size() - 1)], "你" if mine else "电脑", str(M.R.U[int(a.uid)].name), int(a.start), int(a.cost),
-			("，数字牌 " + str(a.cv)) if not (a.cv as Array).is_empty() else "", NT.action_text(M, a.cl)]
+		var t := "%s %s · %s · 第 %d 秒 · 花 %d 点%s%s：%s" % [MARK[mini(int(a.ord), MARK.size() - 1)], "你" if mine else "电脑", str(M.R.U[int(a.uid)].name), int(a.start), int(a.cost),
+			("（其中 %d 点用血付）" % int(a.blood)) if int(a.get("blood", 0)) > 0 else "",
+			("，数字牌 " + str(a.cv)) if not (a.cv as Array).is_empty() else "", NT.action_text(M, a.cl, 0, int(a.side)) if M.phase in ["declare", "assign"] else NT.action_text(M, a.cl)]
 		decl_box.add_child(K.wrap_label(t, 15, Color("9fd0ff") if mine else Color("f0a0a0")))
 	if M.phase == "declare":
 		for s in 2:
@@ -299,6 +310,9 @@ func _draw_timeline() -> void:
 func _step() -> void:
 	if M.phase == "over":
 		_show_over()
+		return
+	if M.phase == "assign":
+		_begin_assign()
 		return
 	if M.phase != "declare":
 		return
@@ -368,6 +382,9 @@ func _render_panel() -> void:
 			action_box.add_child(K.label("第几秒起效？", 22, K.GOLD))
 			action_box.add_child(K.wrap_label(NT.action_text(M, pending), 15, K.TEXT))
 			action_box.add_child(K.wrap_label("这句最早第 %d 秒。越早越不容易被打断；对方的招落在哪一秒，看上面的时间轴。" % ms, 15, K.MUTED))
+			var cst := NE.action_cost(pending, int(M.caps(0)["and"]))
+			if cst > int(M.res[0].ap):
+				action_box.add_child(K.wrap_label("行动点差 %d：开打时先从【%s】身上扣 %d 点生命付掉。" % [cst - int(M.res[0].ap), str(M.R.U[sel_uid].name), cst - int(M.res[0].ap)], 15, NR.CLASS_COLOR["血"].lightened(0.3)))
 			var flow := HFlowContainer.new()
 			flow.add_theme_constant_override("h_separation", 6)
 			var foe_starts := {}
@@ -383,6 +400,32 @@ func _render_panel() -> void:
 			var back2 := K.button("重新拼", "ghost", 15)
 			back2.pressed.connect(func(): _open_composer(sel_uid))
 			action_box.add_child(back2)
+		"assign":
+			var pl: Array = M.pending_late(0)
+			if pl.is_empty():
+				return
+			var item: Dictionary = pl[0]
+			var c2: Dictionary = item.cl
+			var need: int = mini(int(c2.count), _late_pool(c2).size())
+			action_box.add_child(K.label("择流 · 定目标（还剩 %d 段）" % pl.size(), 22, NR.CLASS_COLOR["择"].lightened(0.3)))
+			action_box.add_child(K.wrap_label("双方都宣告完了，对手看不到你的目标。现在点 %d 个%s随从（已点 %d 个）。出手前目标倒了会自动换人。" % [need, "敌方" if str(c2.side) == "enemy" else "你的", late_pick.size()], 15, K.TEXT))
+			for a in M.declared:
+				if int(a.ord) == int(item.ord):
+					action_box.add_child(K.wrap_label("%s %s 第 %d 秒：%s" % [MARK[mini(int(a.ord), MARK.size() - 1)], str(M.R.U[int(a.uid)].name), int(a.start), NT.clause_text(M, c2)], 15, Color("9fd0ff")))
+			var sug: Array = NAI.suggest_late(M, 0, int(item.ord), int(item.ci))
+			var names: Array = []
+			for x in sug:
+				names.append(str(M.R.U[int(x)].name))
+			var sb := K.button("用建议：" + "、".join(names), "normal", 16)
+			sb.pressed.connect(func():
+				late_pick = sug.duplicate()
+				_commit_late())
+			action_box.add_child(sb)
+			var ab := K.button("剩下的全部用建议", "ghost", 15)
+			ab.pressed.connect(func():
+				NAI.assign_late(M, 0)
+				_finish_assign())
+			action_box.add_child(ab)
 		"resolving":
 			action_box.add_child(K.label("结算中……", 22, K.GOLD))
 			var sk := K.button("跳过动画", "ghost", 15)
@@ -395,6 +438,8 @@ func _on_unit_clicked(uid: int) -> void:
 		_open_composer(uid)
 	elif ui == "target":
 		_pick_target(uid)
+	elif ui == "assign":
+		_pick_late(uid)
 
 func _pass(uid: int) -> void:
 	var e: String = M.submit(0, uid, null)
@@ -425,7 +470,7 @@ func _start_targeting(cls: Array) -> void:
 	for c in pending:
 		if str(c.get("tmode", "")) == "self":
 			c["tg"] = [sel_uid]
-		elif not c.has("tg") or str(c.k) != "delay":
+		elif str(c.k) != "delay":
 			c["tg"] = []
 	pend_i = 0
 	_advance_targets()
@@ -438,7 +483,7 @@ func _advance_targets() -> void:
 				pend_i += 1
 				continue
 			break
-		if (c.tg as Array).size() >= int(c.get("count", 1)):
+		if str(c.get("tmode", "")) == "late" or (c.tg as Array).size() >= int(c.get("count", 1)):
 			pend_i += 1
 			continue
 		break
@@ -490,6 +535,62 @@ func _declare(start: int) -> void:
 	_refresh_all()
 	_step()
 
+# ---------------------------------------------------------------- 择流定目标
+func _begin_assign() -> void:
+	if M.pending_late(0).is_empty():
+		_finish_assign()
+		return
+	ui = "assign"
+	late_pick = []
+	_rebuild_rows()
+	_render_panel()
+	if auto_test:
+		await get_tree().process_frame
+		NAI.assign_late(M, 0)
+		_finish_assign()
+
+func _late_pool(c: Dictionary) -> Array:
+	var out: Array = []
+	for u in M.R.U:
+		if int(u.down) == -1 and ((int(u.side) == 1) == (str(c.side) == "enemy")):
+			out.append(int(u.uid))
+	return out
+
+func _late_ok(uid: int) -> bool:
+	var pl: Array = M.pending_late(0)
+	if pl.is_empty():
+		return false
+	return uid in _late_pool(pl[0].cl) and not (uid in late_pick)
+
+func _pick_late(uid: int) -> void:
+	if not _late_ok(uid):
+		return
+	Sfx.play("click")
+	late_pick.append(uid)
+	var c: Dictionary = M.pending_late(0)[0].cl
+	if late_pick.size() >= mini(int(c.count), _late_pool(c).size()):
+		_commit_late()
+	else:
+		_rebuild_rows()
+		_render_panel()
+
+func _commit_late() -> void:
+	var pl: Array = M.pending_late(0)
+	if pl.is_empty():
+		return
+	M.set_late(int(pl[0].ord), int(pl[0].ci), late_pick)
+	late_pick = []
+	if M.pending_late(0).is_empty():
+		_finish_assign()
+	else:
+		_rebuild_rows()
+		_render_panel()
+
+func _finish_assign() -> void:
+	M.finish_assign()
+	_refresh_all()
+	_step()
+
 # ---------------------------------------------------------------- 结算回放
 func _resolve() -> void:
 	ui = "resolving"
@@ -523,12 +624,15 @@ func _apply_shown(ev: Dictionary) -> void:
 	var uid := -1
 	var delta := 0
 	match t:
-		"hit", "redirected", "reflected", "burn":
+		"hit", "redirected", "burn":
 			uid = int(ev.tgt)
 			delta = -int(ev.get("amount", 0))
 		"heal":
 			uid = int(ev.tgt)
 			delta = int(ev.amount)
+		"blood":
+			uid = int(ev.uid)
+			delta = -int(ev.amount)
 		"ko":
 			uid = int(ev.tgt)
 			shown_hp[uid] = [0, true]
@@ -555,12 +659,23 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 	var nm := func(uid: int) -> String: return NT.unit_name(M, uid)
 	match t:
 		"fire":
+			if bool(ev.get("cont", false)):
+				return "第 %d 秒 [color=#d89a2a]%s 的续自动再来一次[/color]" % [int(ev.t), nm.call(int(ev.uid))]
 			return "第 %d 秒 %s %s出手" % [int(ev.t), MARK[mini(int(ev.ord), MARK.size() - 1)], nm.call(int(ev.uid))]
+		"blood":
+			return "[color=#e0606e]开打前 %s 用 %d 点生命付了 %s 的行动点[/color]" % [nm.call(int(ev.uid)), int(ev.amount), MARK[mini(int(ev.ord), MARK.size() - 1)]]
+		"lock":
+			var ns: Array = []
+			for x in ev.tgts:
+				ns.append(nm.call(int(x)))
+			return "    [color=#9ac43a]择定目标：%s%s[/color]" % ["、".join(ns), "（原定的倒了，换人）" if bool(ev.changed) else ""]
+		"cont_set":
+			return "    [color=#d89a2a]→ 挂上续：以后 %d 轮每轮同一秒再来一次[/color]" % int(ev.rounds)
+		"chain":
+			return "[color=#2fb8c8]%s 连段：兑现 %s，得 %d 分%s[/color]" % [MARK[mini(int(ev.ord), MARK.size() - 1)], "、".join(ev.kinds), int(ev.points), ("（整句全中 +%d）" % NR.B_BONUS) if bool(ev.all) else ""]
 		"hit":
 			var parts: Dictionary = ev.parts
 			var ex: Array = []
-			if int(ev.get("chg", 0)) > 0:
-				ex.append("蓄力 +%d" % int(ev.chg))
 			if int(ev.get("vuln", 0)) > 0:
 				ex.append("易伤 +%d" % int(ev.vuln))
 			for k in parts:
@@ -568,8 +683,6 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 			return "    → %s 受到 %d 点%s" % [nm.call(int(ev.tgt)), int(ev.amount), ("（" + "、".join(ex) + "）") if not ex.is_empty() else ""]
 		"redirected":
 			return "    → 转移：%d 点转给 %s" % [int(ev.amount), nm.call(int(ev.tgt))]
-		"reflected":
-			return "    → 回敬：%d 点打回 %s" % [int(ev.amount), nm.call(int(ev.tgt))]
 		"heal":
 			return "    → %s 恢复 %d 点" % [nm.call(int(ev.tgt)), int(ev.amount)]
 		"mit":
@@ -577,16 +690,16 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 		"status":
 			return "    → %s【%s】%d 级（撑到第 %d 轮）" % [nm.call(int(ev.tgt)), str(ev.st), int(ev.lv), int(ev.end)]
 		"listen":
-			return "    → %s 本轮%s" % [nm.call(int(ev.tgt)), "会回敬" if str(ev.k) == "reflect" else "受到的伤害会转给出手的人"]
+			return "    → %s 本轮受到的伤害会转给出手的人" % nm.call(int(ev.tgt))
 		"delay":
 			return "    → 把 %s 推到第 %d 秒" % [MARK[mini(int(ev.ord), MARK.size() - 1)], int(ev.to)]
 		"remove":
-			return "    → 拆掉了 %s 的保护" % nm.call(int(ev.tgt))
+			return "    → 拆掉了 %s 的保护%s" % [nm.call(int(ev.tgt)), ("，掐断 %d 个续" % int(ev.broke)) if int(ev.get("broke", 0)) > 0 else ""]
 		"fizzle":
 			return "[color=#ad9aa0]%s 落空：%s[/color]" % [MARK[mini(int(ev.ord), MARK.size() - 1)], str(ev.why)]
 		"ko":
 			Sfx.play("ko")
-			return "[color=#e8434d]%s 倒下了！[/color]" % nm.call(int(ev.tgt))
+			return "[color=#e8434d]%s 倒下了！%s[/color]" % [nm.call(int(ev.tgt)), ("它的 %d 个续断了" % int(ev.broke)) if int(ev.get("broke", 0)) > 0 else ""]
 		"endure":
 			return "    → %s【不屈】留了 1 血" % nm.call(int(ev.tgt))
 		"burn":
@@ -608,6 +721,10 @@ func _round_summary(prog_before: Array) -> void:
 				if int(r) > 1:
 					got.append(str(r))
 			action_box.add_child(K.wrap_label("%s %s，掷骰子：%s → %s" % [who, str(n.why), "、".join(rolls.map(func(x): return str(x))), ("得到一次性数字牌 " + "、".join(got)) if not got.is_empty() else "运气不好，都是 1"], 16, K.GOLD))
+		elif str(n.type) == "floor":
+			action_box.add_child(K.wrap_label("%s 得到保底数字【%d】（能反复用）" % [who, int(n.value)], 16, K.GOLD))
+		elif str(n.type) == "talent":
+			action_box.add_child(K.wrap_label("%s 的职业特长升级：%s" % [who, str(n.text)], 16, K.GREEN))
 		elif str(n.type) == "ladder":
 			action_box.add_child(K.wrap_label("%s 得分到 %d%%：解锁 %d 张【%d】（能反复用，用完冷却一轮）" % [who, int(100.0 * float(n.at)), int(n.copies), int(n.value)], 16, K.GREEN))
 	if M.phase == "over":

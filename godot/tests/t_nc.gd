@@ -20,12 +20,14 @@ func _init() -> void:
 	var kos := 0
 	var t0 := Time.get_ticks_msec()
 	var problems := 0
+	var talent_lines: Array = []
 	for c in NR.CLASSES:
 		wins[c] = 0
 		games[c] = 0
 	for g in n:
-		var c0: String = NR.CLASSES[g % 5]
-		var c1: String = NR.CLASSES[(g / 5) % 5]
+		var nc: int = NR.CLASSES.size()
+		var c0: String = NR.CLASSES[g % nc]
+		var c1: String = NR.CLASSES[(g + 1 + (g / nc) % (nc - 1)) % nc]
 		for c in [c0, c1]:
 			var p := NR.deck_problem(NR.PRESETS[c].words, NR.PRESETS[c].kws)
 			if p != "":
@@ -46,6 +48,14 @@ func _init() -> void:
 		if c0 != c1:
 			games[c0] += 1
 			games[c1] += 1
+		for s in 2:
+			var st: Dictionary = m.stats[s]
+			var tl := []
+			for k in st:
+				if not str(k).begins_with("tal_"):
+					tl.append("%s%d" % [k, int(st[k])])
+			if g < 4:
+				talent_lines.append("  第%d局 %s：%s" % [g + 1, m.cls_of(s), " ".join(tl)])
 		if g < 3:
 			print("第%d局 %s 对 %s：%d 轮，胜者 %d，完成度 %.0f%% / %.0f%%" % [g + 1, c0, c1, m.rnd, m.winner, 100.0 * m.progress(0), 100.0 * m.progress(1)])
 	var parts: Array = []
@@ -54,4 +64,6 @@ func _init() -> void:
 	print("数字牌模式 %d 局：平均 %.1f 轮；首轮先宣告方胜 %d/%d；用时 %.1f 秒" % [n, float(rounds) / n, first_w, decided, (Time.get_ticks_msec() - t0) / 1000.0])
 	print("职业胜场：" + "  ".join(parts))
 	print("预设卡组问题 %d" % problems)
+	for line in talent_lines:
+		print(line)
 	quit(1 if problems > 0 else 0)

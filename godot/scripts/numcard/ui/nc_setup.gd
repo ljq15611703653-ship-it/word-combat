@@ -11,7 +11,7 @@ signal back()
 
 const SAVE := "user://numcard_deck.json"
 
-var cls := "进攻"
+var cls := "并"
 var words: Dictionary = {}
 var kws: Array = []
 var hps: Array = [7, 7, 7]
@@ -82,7 +82,7 @@ func _build() -> void:
 	bk.pressed.connect(func(): back.emit())
 	head.add_child(bk)
 	body.add_child(head)
-	body.add_child(K.wrap_label("数字是牌：1 免费无限用，更大的数字靠职业阶梯和挫折骰子拿到。数字也是次数：选几个目标、打几点、重复几次、持续几轮都放数字牌。五个职业各有各的得分方式，先到自己目标分的赢；击倒一个敌人也算目标分的 15%。", 17, K.MUTED))
+	body.add_child(K.wrap_label("数字是牌：1 免费无限用，更大的数字靠职业阶梯、挫折骰子和保底数字拿到。数字也是次数：选几个目标、打几点、重复几次、持续几轮都放数字牌。四个职业各擅长一个人人都用的基础词（并、持续、选择、自身），各有各的得分方式，先到自己目标分的赢；击倒一个敌人也算目标分的 15%。", 17, K.MUTED))
 	body.add_child(_class_box())
 	body.add_child(_deck_box())
 	var row := K.hbox(14)
@@ -111,13 +111,13 @@ func _class_box() -> Control:
 	var row := K.hbox(10)
 	for c in NR.CLASSES:
 		var b := Button.new()
-		b.text = "%s\n目标 %d 分" % [c, int(NR.TARGET[c])]
+		b.text = "%s\n擅长【%s】" % [NR.CLASS_NAME[c], NR.CLASS_WORD[c]]
 		b.custom_minimum_size = Vector2(150, 70)
 		b.add_theme_font_size_override("font_size", 20)
 		var col: Color = NR.CLASS_COLOR[c]
 		b.add_theme_stylebox_override("normal", K.style(col.darkened(0.55) if c != cls else col.darkened(0.15), K.GOLD if c == cls else col, 10, 3 if c == cls else 1, 4))
 		b.add_theme_stylebox_override("hover", K.style(col.darkened(0.3), K.GOLD, 10, 2, 4))
-		b.tooltip_text = "得分：" + str(NR.CLASS_GOAL[c])
+		b.tooltip_text = "特长：" + NR.talent_text(c) + "\n得分：" + str(NR.CLASS_GOAL[c])
 		var cc: String = c
 		b.pressed.connect(func():
 			if cls != cc:
@@ -129,7 +129,8 @@ func _class_box() -> Control:
 				_build())
 		row.add_child(b)
 	s[1].add_child(row)
-	s[1].add_child(K.wrap_label("【%s】得分：%s。目标 %d 分。" % [cls, str(NR.CLASS_GOAL[cls]), int(NR.TARGET[cls])], 17, K.TEXT))
+	s[1].add_child(K.wrap_label("【%s】特长：%s。" % [NR.CLASS_NAME[cls], NR.talent_text(cls)], 17, NR.CLASS_COLOR[cls].lightened(0.35)))
+	s[1].add_child(K.wrap_label("得分：%s。目标 %d 分。" % [str(NR.CLASS_GOAL[cls]), int(NR.TARGET[cls])], 17, K.TEXT))
 	return s[0]
 
 func _deck_box() -> Control:
@@ -236,7 +237,7 @@ func _foe_box() -> Control:
 	var row := HFlowContainer.new()
 	row.add_theme_constant_override("h_separation", 6)
 	for c in opts:
-		var b := K.button("随机" if c == "" else str(c), "primary" if c == foe else "normal", 16)
+		var b := K.button("随机" if c == "" else str(NR.CLASS_NAME[c]), "primary" if c == foe else "normal", 16)
 		var cc: String = str(c)
 		b.pressed.connect(func():
 			foe = cc
@@ -290,12 +291,16 @@ func _show_rules() -> void:
 static func rules_lines() -> Array:
 	return [
 		"· 双方各 3 个随从，共 %d 点生命。被击倒的随从休整一轮，再满血回来。" % NR.HP_POOL,
-		"· 每轮轮流宣告：一方定一个随从的一句，另一方再定一个，交替进行；每轮换一方先定。你能看到对方已经定下的句子。",
+		"· 每轮轮流宣告：一方定一个随从的一句，另一方再定一个，交替进行；每轮换一方先定。你能看到对方已经定下的句子（择流的目标除外）。",
 		"· 一句话就是一张张词拼起来的：比如 选择 2 个 敌方 随从，造成 3 点 伤害，重复 2 次。数字都是牌：1 免费无限用，2 以上要用手里的数字牌，每个位置一张。",
-		"· 数字牌从哪来：你的职业得分到 10%%、25%%、45%%、70%% 时，各解锁两张 2、3、4、5（能反复用，用完冷却一轮）；一轮里掉了 %d 点以上血或有随从倒下，掷两个骰子，掷出几给一张几（只能用一次）。" % NR.DICE_HP,
+		"· 数字牌从哪来：你的职业得分到 10%%、25%%、45%%、70%% 时，各解锁两张 2、3、4、5（能反复用，用完冷却一轮）；一轮里掉了 %d 点以上血或有随从倒下，掷两个骰子，掷出几给一张几（只能用一次）；第 3、5、7 轮开始时各发一张保底数字 2、3、4（能反复用）。" % NR.DICE_HP,
 		"· 行动点：开局 %d，每轮 +%d，最多 %d。一句的花费 = %d + 进阶词价格 + 每多一段（并）%d。" % [NR.AP_START, NR.AP_INCOME, NR.AP_CAP, NR.BASE_COST, NR.AND_COST],
-		"· 时间轴 0~%d 秒：一句最早第（1 + 进阶词数 + 段数 − 1）秒起效；同一秒里减伤、回敬这类保护先生效；出手的随从先被打倒，它的招就落空。" % NR.TIMELINE,
-		"· 进阶词要组进卡组（%d 张，同名最多 %d 张）；用过的那一张下一轮冷却。" % [NR.DECK_SIZE, NR.COPY_MAX],
-		"· 状态每过一轮自己 +1 级：易伤（每次多受）、灼烧（每轮末掉血）、衰弱（每次少打）、蓄力（下一次出手每下多打，用掉）、铁壁（每次少受）。",
-		"· 五个职业：进攻=打出的伤害；守护=挡掉/转走的伤害；积蓄=状态兑现出来的效果；治疗=回的血（自残再奶也算）；控制=让对方白花的行动点。先到自己目标分的赢；击倒一个敌人算目标分的 15%%；打满 %d 轮比完成的百分比。" % NR.MAX_ROUNDS,
+		"· 时间轴 0~%d 秒：一句最早第（1 + 进阶词数 + 段数 − 1）秒起效；同一秒里减伤、转移这类保护先生效；出手的随从先被打倒，它的招就落空。" % NR.TIMELINE,
+		"· 进阶词要组进卡组（%d 张，同名最多 %d 张）；用过的那一张下一轮冷却。进阶词：易伤、灼烧、衰弱（状态，每过一轮自己 +1 级）、转移、延后、移除。" % [NR.DECK_SIZE, NR.COPY_MAX],
+		"· 四个职业，各擅长一个基础词：",
+		"    并流（并）：" + NR.talent_text("并") + "。得分：" + str(NR.CLASS_GOAL["并"]) + "。",
+		"    续流（持续）：" + NR.talent_text("续") + "。得分：" + str(NR.CLASS_GOAL["续"]) + "。",
+		"    择流（选择）：" + NR.talent_text("择") + "。得分：" + str(NR.CLASS_GOAL["择"]) + "。",
+		"    血流（自身）：" + NR.talent_text("血") + "。得分：" + str(NR.CLASS_GOAL["血"]) + "。",
+		"· 先到自己目标分的赢；击倒一个敌人算目标分的 15%%；打满 %d 轮比完成的百分比。" % NR.MAX_ROUNDS,
 	]

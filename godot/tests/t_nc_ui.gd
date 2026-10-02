@@ -14,6 +14,13 @@ func _init() -> void:
 		quit(1)
 		return
 	NcBattle.test_auto = true
+	var args := OS.get_cmdline_user_args()
+	if args.size() > 0:
+		s.cls = args[0]
+		s.words = (s.NR.PRESETS[args[0]].words as Dictionary).duplicate()
+		s.kws = (s.NR.PRESETS[args[0]].kws as Array).duplicate()
+	if args.size() > 1:
+		s.foe = args[1]
 	s._go()
 	await create_timer(0.3).timeout
 	var b = main.screen

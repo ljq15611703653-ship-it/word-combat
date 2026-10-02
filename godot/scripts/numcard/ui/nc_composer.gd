@@ -1,7 +1,9 @@
 extends Control
-# 数字牌模式 · 拼句台：一张一张点词和数字牌，拼成一句（最多三段，用“并”连起来）。
+# 数字牌模式 · 拼句台：一张一张点词和数字牌，拼成一句（用“并”连成多段；并流能拼更长）。
 # 数字就是次数：选几个目标、打几点、重复几次、持续几轮、延后几秒，都放一张数字牌；1 免费，其余要用手里的牌。
-# 完成后发出 done(clauses)：每段带 tmode/side/count，具体打谁在战斗界面点。
+# 拼之前就能看到人话：每个能接的词、每张数字牌，鼠标移上去就显示“接上它以后这句话怎么说”；
+# 拼到一半，没定的数字写成“几”、没定的目标写成“几个”，整句话一直读得通。
+# 完成后发出 done(clauses)：每段带 tmode/side/count，具体打谁在战斗界面点（择流不用点：宣告完再定）。
 
 const K = preload("res://scripts/ui/kit.gd")
 const NR = preload("res://scripts/numcard/nc_rules.gd")
@@ -20,9 +22,9 @@ const BASIC_DESC := {
 	"恢复": "回血：后面放数字牌（几点）", "生命": "生命",
 	"减伤": "本轮每次少受几点伤害：后面放数字牌",
 	"施加": "上一个状态（要卡组里的状态词）",
-	"持续": "状态撑几轮：后面放数字牌（不写就只撑本轮）",
+	"持续": "撑几轮：后面放数字牌",
 	"重复": "再来几次：后面放数字牌（一共几次）",
-	"并": "接着说下一段（每多一段 +%d 行动点，最多 %d 段）" % [NR.AND_COST, NR.CLAUSE_MAX],
+	"并": "接着说下一段",
 }
 
 var M
@@ -32,14 +34,17 @@ var rail: HFlowContainer
 var opt_flow: HFlowContainer
 var num_flow: HFlowContainer
 var text_label: Label
+var preview_label: Label
 var info_label: Label
 var help_label: Label
 var ok_btn: Button
 var parsed: Dictionary = {}
+var cp: Dictionary = {}
 
 func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	M = match_obj
 	uid = unit_id
+	cp = M.caps(0)
 	tokens = init_tokens.duplicate(true)
 	K.clear_children(self)
 	var dim := ColorRect.new()
@@ -58,7 +63,11 @@ func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	var head := K.hbox(10)
 	var u: Dictionary = M.R.U[uid]
 	head.add_child(K.label("给【%s】拼一句" % str(u.name), 28, K.GOLD))
+	var cls: String = M.cls_of(0)
+	head.add_child(K.chip(NR.CLASS_NAME[cls], NR.CLASS_COLOR[cls], 16))
 	head.add_child(K.chip("本轮还剩行动点 %d" % int(M.res[0].ap), Color("7a6424"), 16))
+	if int(cp.blood) > 0:
+		head.add_child(K.chip("不够可用血付，最多 %d" % M.blood_room(0, uid), Color("7a1f2a"), 16))
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
@@ -74,6 +83,7 @@ func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	cancel.pressed.connect(func(): cancelled.emit())
 	head.add_child(cancel)
 	v.add_child(head)
+	v.add_child(K.wrap_label("职业特长：" + NR.talent_text(cls), 14, Color("c9b27a")))
 	var rail_box := K.panel(Color("2a0d14"), Color("a3121f"), 12, 2)
 	rail_box.custom_minimum_size = Vector2(0, 110)
 	rail = HFlowContainer.new()
@@ -83,9 +93,11 @@ func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	v.add_child(rail_box)
 	text_label = K.wrap_label("", 20, Color("f1e3b0"))
 	v.add_child(text_label)
+	preview_label = K.wrap_label("", 17, Color("9fe0b0"))
+	v.add_child(preview_label)
 	help_label = K.wrap_label("", 16, Color("9fd0ff"))
 	v.add_child(help_label)
-	v.add_child(K.label("下一张可以接", 16, K.MUTED))
+	v.add_child(K.label("下一张可以接（鼠标移上去，先看接上以后这句话怎么说）", 16, K.MUTED))
 	opt_flow = HFlowContainer.new()
 	opt_flow.add_theme_constant_override("h_separation", 8)
 	opt_flow.add_theme_constant_override("v_separation", 8)
@@ -110,11 +122,13 @@ func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	_refresh()
 
 # ---------------------------------------------------------------- 语法：一边读一边建段落
+# 状态（expect）：start → count → side → unit → action → 数值 → 单位词 → end（可接 重复 / 持续 / 并）
 func parse(toks: Array) -> Dictionary:
 	var clauses: Array = []
 	var cur = null
 	var expect := "start"
 	var glue: Array = []
+	var late: bool = bool(cp.get("late", false))
 	for tok in toks:
 		var g := ""
 		var w: String = str(tok.v) if str(tok.t) == "w" else ""
@@ -122,7 +136,7 @@ func parse(toks: Array) -> Dictionary:
 		match expect:
 			"start":
 				if w == "选择":
-					cur = {"tmode": "choose"}
+					cur = {"tmode": "late" if late else "choose"}
 					expect = "count"
 				elif w == "自身":
 					cur = {"tmode": "self", "side": "ally", "count": 1}
@@ -161,13 +175,8 @@ func parse(toks: Array) -> Dictionary:
 					"施加":
 						cur["k"] = "st"
 						expect = "st_name"
-					"回敬":
-						cur["k"] = "reflect"
-						cur["cap"] = null
-						expect = "end"
 					"转移":
 						cur["k"] = "redirect"
-						cur["cap"] = null
 						expect = "end"
 			"atk_n":
 				cur["n"] = n
@@ -175,14 +184,14 @@ func parse(toks: Array) -> Dictionary:
 				g = "点"
 			"atk_dmg":
 				cur["rep"] = 1
-				expect = "end_rep"
+				expect = "end"
 			"heal_n":
 				cur["n"] = n
 				expect = "heal_hp"
 				g = "点"
 			"heal_hp":
 				cur["rep"] = 1
-				expect = "end_rep"
+				expect = "end"
 			"mit_n":
 				cur["n"] = n
 				expect = "end"
@@ -190,35 +199,47 @@ func parse(toks: Array) -> Dictionary:
 			"st_name":
 				cur["st"] = w
 				cur["n"] = 1
-				expect = "end_dur"
+				expect = "end"
 			"rep_n":
 				cur["rep"] = n
+				cur["rep_set"] = true
 				expect = "end"
 				g = "次"
 			"dur_n":
-				cur["n"] = n
+				if str(cur.get("k", "")) == "st":
+					cur["n"] = n
+				else:
+					cur["cont"] = n
+				cur["dur_set"] = true
 				expect = "end"
 				g = "轮"
 			"delay_n":
 				cur["n"] = n
 				expect = "end"
 				g = "秒"
-			"end_rep", "end_dur", "end":
-				if w == "重复" and expect == "end_rep":
+			"end":
+				if w == "重复":
 					expect = "rep_n"
-					g = ""
-				elif w == "持续" and expect == "end_dur":
+				elif w == "持续":
 					expect = "dur_n"
 				elif w == "并":
-					clauses.append(cur)
+					clauses.append(_clean(cur))
 					cur = null
 					expect = "start"
 		glue.append(g)
-	var complete: bool = cur != null and expect in ["end", "end_rep", "end_dur"]
+	var complete: bool = cur != null and expect == "end"
 	var all_cl: Array = clauses.duplicate()
 	if complete:
-		all_cl.append(cur)
+		all_cl.append(_clean(cur))
 	return {"clauses": all_cl, "done": clauses, "cur": cur, "expect": expect, "complete": complete, "glue": glue}
+
+func _clean(c: Dictionary) -> Dictionary:
+	var d := c.duplicate()
+	d.erase("rep_set")
+	d.erase("dur_set")
+	if not d.has("tg"):
+		d["tg"] = []
+	return d
 
 func _used_values() -> Dictionary:
 	var out := {}
@@ -250,6 +271,9 @@ func _enemy_declared() -> bool:
 			return true
 	return false
 
+func _cont_room() -> int:
+	return int(cp.slots) - M.conts_of(0).size() - int(M.res[0].conts)
+
 # 现在能接的词：[{w, ok, why}]，以及要不要数字
 func options() -> Dictionary:
 	var pr := parse(tokens)
@@ -267,40 +291,79 @@ func options() -> Dictionary:
 			need_num = true
 		"side":
 			var cnt: int = int(cur.get("count", 1))
-			ws = [["敌方", _alive("enemy") >= cnt, "" if _alive("enemy") >= cnt else "对面只剩 %d 个随从" % _alive("enemy")],
-				["友方", _alive("ally") >= cnt, "" if _alive("ally") >= cnt else "你只剩 %d 个随从" % _alive("ally")]]
+			ws = [["敌方", _alive("enemy") >= cnt or str(cur.get("tmode", "")) == "late", "" if _alive("enemy") >= cnt else "对面只剩 %d 个随从" % _alive("enemy")],
+				["友方", _alive("ally") >= cnt or str(cur.get("tmode", "")) == "late", "" if _alive("ally") >= cnt else "你只剩 %d 个随从" % _alive("ally")]]
 		"unit":
 			ws = [["随从", true, ""]]
 		"action":
 			if str(cur.get("side", "enemy")) == "enemy":
-				ws = [["造成", true, ""], ["施加", _any_status("enemy"), "" if _any_status("enemy") else "卡组里没有能用的易伤/灼烧/衰弱"]]
+				ws = [["造成", true, ""], ["施加", _any_status(), "" if _any_status() else "卡组里没有能用的易伤/灼烧/衰弱"]]
 			else:
-				ws = [["恢复", true, ""], ["减伤", true, ""], ["造成", true, "（打自己人：治疗职业可以自残再奶）"],
-					["施加", _any_status("ally"), "" if _any_status("ally") else "卡组里没有能用的蓄力/铁壁"],
-					["回敬", word_left("回敬") > 0, "" if word_left("回敬") > 0 else "【回敬】用完了或在冷却"],
+				ws = [["恢复", true, ""], ["减伤", true, ""], ["造成", true, "（打自己人）"],
 					["转移", word_left("转移") > 0, "" if word_left("转移") > 0 else "【转移】用完了或在冷却"]]
 		"atk_dmg":
 			ws = [["伤害", true, ""]]
 		"heal_hp":
 			ws = [["生命", true, ""]]
 		"st_name":
-			var names: Array = ["易伤", "灼烧", "衰弱"] if str(cur.get("side", "enemy")) == "enemy" else ["蓄力", "铁壁"]
-			for nm in names:
+			for nm in NR.ENEMY_ST:
 				ws.append([nm, word_left(nm) > 0, "" if word_left(nm) > 0 else "用完了或在冷却"])
-		"end_rep":
-			ws = [["重复", true, ""]]
-		"end_dur":
-			ws = [["持续", true, ""]]
-	if e in ["end", "end_rep", "end_dur"] and nclauses + 1 < NR.CLAUSE_MAX:
+		"end":
+			var k: String = str(cur.get("k", ""))
+			if k in ["atk", "heal"] and not bool(cur.get("rep_set", false)):
+				ws.append(["重复", true, ""])
+			if not bool(cur.get("dur_set", false)):
+				if k == "st":
+					ws.append(["持续", true, ""])
+				elif k in ["atk", "heal", "mit"] and int(cp.slots) > 0:
+					var room := _cont_room()
+					ws.append(["持续", room > 0, "" if room > 0 else "续挂满了（同时最多 %d 个）" % int(cp.slots)])
+	if e == "end" and nclauses + 1 < int(cp.clauses):
 		ws.append(["并", true, ""])
 	return {"words": ws, "num": need_num, "parsed": pr}
 
-func _any_status(side: String) -> bool:
-	var names: Array = ["易伤", "灼烧", "衰弱"] if side == "enemy" else ["蓄力", "铁壁"]
-	for nm in names:
+func _any_status() -> bool:
+	for nm in NR.ENEMY_ST:
 		if word_left(nm) > 0:
 			return true
 	return false
+
+# ---------------------------------------------------------------- 人话预览
+# 拼到一半的句子也翻成人话：没定的写“几”“几个”，还没说做什么就写“……”
+func draft_text(toks: Array) -> String:
+	var pr := parse(toks)
+	if pr.has("err"):
+		return str(pr.err)
+	var parts: Array = []
+	for c in pr.done:
+		parts.append(NT.clause_text(M, c))
+	var cur = pr.get("cur")
+	if cur != null:
+		var c2: Dictionary = (cur as Dictionary).duplicate()
+		if not c2.has("k"):
+			var who := "自身" if str(c2.get("tmode", "")) == "self" else ("%s%s随从" % [("%d 个" % int(c2.count)) if c2.has("count") else "几个", ("敌方" if str(c2.get("side", "enemy")) == "enemy" else "友方") if c2.has("side") else "某方"])
+			if str(c2.get("tmode", "")) == "late" and c2.has("side"):
+				who += "（待定）"
+			parts.append("对%s……" % who)
+		else:
+			parts.append(NT.clause_text(M, c2))
+			if str(pr.expect) == "rep_n":
+				parts[parts.size() - 1] += "，一共 几 次"
+			if str(pr.expect) == "dur_n":
+				parts[parts.size() - 1] += ("，持续 几 轮" if str(c2.k) == "st" else "，以后每轮同一秒再来一次（共 几 轮）")
+	var s := "；并且".join(parts)
+	if s == "":
+		s = "（空）"
+	return s
+
+func _preview_with(tok: Dictionary) -> String:
+	var t2 := tokens.duplicate()
+	t2.append(tok)
+	var pr := parse(t2)
+	var s := draft_text(t2)
+	if bool(pr.get("complete", false)):
+		s += "。（到这里就能拼好）"
+	return s
 
 # ---------------------------------------------------------------- 点击
 func add_word(w: String) -> void:
@@ -349,7 +412,14 @@ func _tile(text: String, col: Color, big: bool = false) -> PanelContainer:
 func _word_color(w: String) -> Color:
 	if NR.WORDS.has(w):
 		return K.GOLD
+	if w == NR.CLASS_WORD.get(M.cls_of(0), ""):
+		return NR.CLASS_COLOR[M.cls_of(0)]
 	return Color("5a6a8a")
+
+func _hover(b: Button, text: String) -> void:
+	b.mouse_entered.connect(func(): preview_label.text = "接上它：" + text)
+	b.mouse_exited.connect(func(): preview_label.text = "")
+	b.focus_entered.connect(func(): preview_label.text = "接上它：" + text)
 
 func _refresh() -> void:
 	var op := options()
@@ -373,28 +443,37 @@ func _refresh() -> void:
 	var ghost := _tile("?", Color(1, 1, 1, 0.15))
 	ghost.modulate.a = 0.4
 	rail.add_child(ghost)
-	# 人话
+	# 人话：一直显示整句（没定的写“几”）
 	if pr.has("err"):
 		text_label.text = str(pr.err)
 	elif bool(pr.get("complete", false)):
-		text_label.text = "这句话：" + NT.action_text(null, pr.clauses) + "。"
+		text_label.text = "这句话：" + NT.action_text(M, pr.clauses) + "。"
+	elif tokens.is_empty():
+		text_label.text = "这句话：（还是空的，从下面挑第一张）"
 	else:
-		var done_cl: Array = pr.get("done", [])
-		text_label.text = ("已经拼好：" + NT.action_text(null, done_cl) + "；正在拼下一段…") if not done_cl.is_empty() else "还没拼完。"
+		text_label.text = "拼到这里：" + draft_text(tokens) + "（还没拼完）"
+	preview_label.text = ""
 	help_label.text = _help(str(pr.get("expect", "start")))
 	# 词
 	K.clear_children(opt_flow)
 	for item in op.words:
 		var w: String = str(item[0])
-		var b := K.button(w, "primary" if bool(item[1]) and NR.WORDS.has(w) else "normal", 22)
+		var b := K.button(w, "primary" if bool(item[1]) and (NR.WORDS.has(w) or w == NR.CLASS_WORD.get(M.cls_of(0), "")) else "normal", 22)
 		b.custom_minimum_size = Vector2(96, 56)
 		b.disabled = not bool(item[1])
 		var tip: String = str(NR.WORDS[w].desc) if NR.WORDS.has(w) else str(BASIC_DESC.get(w, ""))
+		if w == "并":
+			tip += "（每多一段 +%d 行动点，最多 %d 段）" % [int(cp["and"]), int(cp.clauses)]
+		if w == "持续" and str((pr.get("cur", {}) as Dictionary).get("k", "")) != "st":
+			tip = "续流特长：这一段以后每轮同一秒自动再来一次，后面放数字牌（一共几轮）"
 		if NR.WORDS.has(w):
 			tip += "\n（进阶词：卡组里还能用 %d 张，价格 %d）" % [word_left(w), int(NR.WORDS[w].price)]
 		if str(item[2]) != "":
 			tip += "\n" + str(item[2])
+		var pv := _preview_with({"t": "w", "v": w})
+		tip += "\n接上以后：" + pv
 		b.tooltip_text = tip
+		_hover(b, pv)
 		var ww := w
 		b.pressed.connect(func(): add_word(ww))
 		opt_flow.add_child(b)
@@ -407,6 +486,10 @@ func _refresh() -> void:
 	var b1 := K.button("1（免费）", "primary" if bool(op.num) else "normal", 22)
 	b1.custom_minimum_size = Vector2(120, 56)
 	b1.disabled = not bool(op.num)
+	if bool(op.num):
+		var pv1 := _preview_with({"t": "n", "v": 1})
+		b1.tooltip_text = "接上以后：" + pv1
+		_hover(b1, pv1)
 	b1.pressed.connect(func(): add_number(1))
 	num_flow.add_child(b1)
 	var vals: Array = have.keys()
@@ -416,6 +499,10 @@ func _refresh() -> void:
 		var bn := K.button("%d ×%d" % [int(v), left], "primary" if bool(op.num) and left > 0 else "normal", 22)
 		bn.custom_minimum_size = Vector2(110, 56)
 		bn.disabled = not (bool(op.num) and left > 0)
+		if bool(op.num):
+			var pvn := _preview_with({"t": "n", "v": int(v)})
+			bn.tooltip_text = "接上以后：" + pvn
+			_hover(bn, pvn)
 		var vv: int = int(v)
 		bn.pressed.connect(func(): add_number(vv))
 		num_flow.add_child(bn)
@@ -428,12 +515,35 @@ func _refresh() -> void:
 	# 花费
 	if bool(pr.get("complete", false)):
 		var cl: Array = pr.clauses
-		var cost := NE.action_cost(cl)
+		var cost := NE.action_cost(cl, int(cp["and"]))
 		var ms := NE.action_windup(cl)
-		info_label.text = "花 %d 行动点（还剩 %d）· 最早第 %d 秒起效 · 用数字牌 %s" % [cost, int(M.res[0].ap), ms, str(NE.action_numbers(cl)) if not NE.action_numbers(cl).is_empty() else "无（全是 1）"]
-		ok_btn.disabled = cost > int(M.res[0].ap)
-		if cost > int(M.res[0].ap):
-			info_label.text += "  —— 行动点不够"
+		var ap: int = int(M.res[0].ap)
+		var blood: int = maxi(0, cost - ap)
+		info_label.text = "花 %d 行动点（还剩 %d）· 最早第 %d 秒起效 · 用数字牌 %s" % [cost, ap, ms, str(NE.action_numbers(cl)) if not NE.action_numbers(cl).is_empty() else "无（全是 1）"]
+		var bad := false
+		if blood > 0:
+			if int(cp.blood) > 0:
+				var has_heal := false
+				for c3 in cl:
+					if str(c3.k) == "heal":
+						has_heal = true
+				if has_heal:
+					info_label.text += "  —— 行动点不够；用血付的句子不能有【恢复】"
+					bad = true
+				elif blood > M.blood_room(0, uid):
+					info_label.text += "  —— 差 %d 点，这个随从最多只能付 %d 血" % [blood, M.blood_room(0, uid)]
+					bad = true
+				else:
+					info_label.text += "  —— 差的 %d 点用【%s】的生命付" % [blood, str(M.R.U[uid].name)]
+			else:
+				info_label.text += "  —— 行动点不够"
+				bad = true
+		ok_btn.disabled = bad
+		var all_late := true
+		for c4 in cl:
+			if not (str(c4.get("tmode", "")) in ["late", "self"]) and str(c4.k) != "delay":
+				all_late = false
+		ok_btn.text = "拼好了 → 定起手秒数" if all_late else "拼好了 → 去选目标"
 	else:
 		info_label.text = "拼完整之后才能用。"
 		ok_btn.disabled = true
@@ -441,7 +551,10 @@ func _refresh() -> void:
 func _help(e: String) -> String:
 	match e:
 		"start":
-			return "第一张：【选择】几个目标 / 【自身】 / 【延后】对方的一句 / 【移除】敌人的保护。"
+			var h := "第一张：【选择】几个目标 / 【自身】 / 【延后】对方的一句 / 【移除】敌人的保护。"
+			if bool(cp.get("late", false)):
+				h += " 择流：选择的目标现在不用定，双方宣告完你再定（对手只看到“待定”）。"
+			return h
 		"count":
 			return "选几个目标？放一张数字牌：1 免费；2、3 要用手里的牌。"
 		"side":
@@ -461,13 +574,17 @@ func _help(e: String) -> String:
 		"rep_n":
 			return "一共打几次？放一张数字牌。"
 		"dur_n":
-			return "持续几轮？放一张数字牌（状态每过一轮自己 +1 级）。"
+			return "持续几轮？放一张数字牌。"
 		"delay_n":
 			return "往后推几秒？放一张数字牌。推出第 %d 秒就落空。" % NR.TIMELINE
-		"end_rep":
-			return "可以拼好了；也可以接【重复】让它多打几次，或者【并】接下一段。"
-		"end_dur":
-			return "可以拼好了；也可以接【持续】让状态多撑几轮，或者【并】接下一段。"
 		"end":
-			return "可以拼好了；也可以【并】接下一段。"
+			var parts: Array = ["可以拼好了"]
+			for item in options().words:
+				if str(item[0]) == "重复":
+					parts.append("接【重复】多打几次")
+				elif str(item[0]) == "持续":
+					parts.append("接【持续】让它多撑几轮" if str((parsed.get("cur", {}) as Dictionary).get("k", "")) == "st" else "接【持续】让它以后每轮自动再来")
+				elif str(item[0]) == "并":
+					parts.append("【并】接下一段")
+			return "；也可以".join(parts) + "。"
 	return ""
