@@ -6,6 +6,9 @@ func _init() -> void:
 	var args := OS.get_cmdline_user_args()
 	var d := Duel.new()
 	d.start(false, int(args[0]) if args.size() > 0 else 1, false)
+	if args.size() > 1:
+		d.personas = [args[1], args[1]]
+	print("流派 ", d.personas)
 	var guard := 0
 	var last_phase := ""
 	while d.step_auto() and guard < 400:

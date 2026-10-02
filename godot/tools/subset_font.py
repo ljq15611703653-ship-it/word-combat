@@ -12,6 +12,13 @@ chars = set(chr(i) for i in range(32, 127))
 for pat in ["scripts/**/*.gd", "data/*.json", "data/*.tsv"]:
     for f in glob.glob(pat, recursive=True):
         chars |= set(c for c in open(f, encoding="utf-8").read() if ord(c) > 126 and c not in "\n\r\t")
+# 常用字表（GB2312 一级 3755 字）：以后新加的文字不用每次重新裁剪也不会变方块
+for hi in range(0xB0, 0xD8):
+    for lo in range(0xA1, 0xFF):
+        try:
+            chars.add(bytes([hi, lo]).decode("gb2312"))
+        except UnicodeDecodeError:
+            pass
 chars |= set("０１２３４５６７８９，。！？：；、（）【】《》“”‘’…—·～＋－×÷↑↓←→")
 
 font = TTFont(SRC)

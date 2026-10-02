@@ -164,7 +164,7 @@ func _bag_panel(i: int) -> Control:
 		var ra: Array = Coach.route_status(after_av)
 		for k in rb.size():
 			if int(rb[k].n) > 0 and int(ra[k].n) == 0:
-				lines.append("✔ 拿了就能拼：%s（%s）" % [str(ra[k].name), str(ra[k].role)])
+				lines.append("✓ 拿了就能拼：%s（%s）" % [str(ra[k].name), str(ra[k].role)])
 			elif int(ra[k].n) < int(rb[k].n) and int(ra[k].n) <= 2:
 				lines.append("◦ 再差一点：%s，还缺 %s" % [str(ra[k].name), str(Coach._missing_text(ra[k].missing))])
 		if lines.is_empty():

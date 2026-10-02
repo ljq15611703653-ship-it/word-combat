@@ -334,6 +334,15 @@ func resolve() -> Dictionary:
 		for a in declared[s]:
 			names.append(str(E.skill_of(st, int(a.sid)).get("text", "")))
 		last_skills[s] = {"texts": names}
+	for ord_i in 2:
+		var sd3: int = declare_order[ord_i]
+		var tag := "first" if ord_i == 0 else "second"
+		var spent := 0
+		for a3 in declared[sd3]:
+			spent += E.action_cost(st, a3)
+		stats[tag + "_sent"] = int(stats.get(tag + "_sent", 0)) + declared[sd3].size()
+		stats[tag + "_ap"] = int(stats.get(tag + "_ap", 0)) + spent
+		stats[tag + "_n"] = int(stats.get(tag + "_n", 0)) + 1
 	var res := E.run_round(st, acts)
 	last_events = res.events
 	for s2 in 2:
@@ -573,6 +582,7 @@ func _mood(side: int) -> Dictionary:
 	return out
 
 # ---------------------------------------------------------------- 电脑：现场拼
+static var BLIND_EARLY := 0.0         # 盲拼时越早起手越好（后手看见了可以抢在前面把你打倒，你的招就落空）
 static var LOOKAHEAD := false         # 盲拼的先手也会“想对手会怎么应对”
 static var LOOK_TOP := 3              # 先手每个随从只对前几名候选做应对推演
 static var RESP_CAND := 5             # 推演对手应对时，对手每个随从比较几句候选
@@ -653,7 +663,10 @@ func _scan_unit(side: int, u: Dictionary, enemy_list: Array, mine_decl: Array, a
 			if a.is_empty() or int(a.sid) != sid:
 				continue
 			tried += 1
-			out.list.append({"sk": sk, "act": a, "v": _eval(base_acts + [a], side) + rng.randf() * 1.2})
+			var early := 0.0
+			if enemy_list.is_empty() and BLIND_EARLY > 0.0:
+				early = float(19 - int(a.start)) * BLIND_EARLY
+			out.list.append({"sk": sk, "act": a, "v": _eval(base_acts + [a], side) + rng.randf() * 1.2 + early})
 			if tried >= picks:
 				break
 		E.remove_round_skill(st, int(u.uid), sid)

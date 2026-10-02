@@ -41,6 +41,7 @@ func _ready() -> void:
 	var f: Font = load("res://assets/fonts/NotoSansSC-subset.ttf")   # 内置字体：网页版没有系统字体可用
 	var th := Theme.new()
 	th.default_font = f
+	ThemeDB.fallback_font = f       # Label3D 等没挂主题的地方也用内置字体（网页版没有系统字体）
 	th.default_font_size = 18
 	theme = th
 	# 桌宠在最上层（引导的遮罩之上）

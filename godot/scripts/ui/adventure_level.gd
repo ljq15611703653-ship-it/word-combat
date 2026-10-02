@@ -514,7 +514,7 @@ func _show_result(res: Dictionary, tokens: Array) -> void:
 	v.add_child(K.wrap_label("你的招：" + str(res.skill.text) + "（操作费 %d，第 %d 秒起效）" % [int(res.cost), int(res.start)], 16, K.TEXT))
 	for it in res.get("goal_items", []):
 		if str(it.text) != "":
-			v.add_child(K.label("%s %s" % ["✓" if it.ok else "✗", str(it.text)], 17, K.GREEN if it.ok else K.RED))
+			v.add_child(K.label("%s %s" % ["✓" if it.ok else "×", str(it.text)], 17, K.GREEN if it.ok else K.RED))
 	var line := str(op.get("beaten", "……我认输。")) if res.win else str(op.get("gloat", "哈哈，不过如此！"))
 	v.add_child(K.wrap_label("%s：「%s」" % [str(op.get("name", "对手")), line], 17, Color("f0c8c0")))
 	if res.win:

@@ -17,6 +17,9 @@ func _init() -> void:
 	if ov.has("base"): E.STACK_BASE = ov.base
 	if ov.has("blind"): Duel.BLIND_SECOND = true
 	if ov.has("look"): Duel.LOOKAHEAD = int(ov.look) == 1
+	if ov.has("resp"): Duel.RESP_CAND = int(ov.resp)
+	if ov.has("rpicks"): Duel.RESP_PICKS = int(ov.rpicks)
+	if ov.has("early"): Duel.BLIND_EARLY = float(ov.early)
 	if ov.has("fap"): Duel.FIRST_AP = int(ov.fap)
 	if ov.has("cand"): Duel.CAND_MAX = int(ov.cand)
 	if ov.has("starts"): Duel.START_PICKS = int(ov.starts)
@@ -33,6 +36,7 @@ func _init() -> void:
 	var empty := 0
 	var tally := {}
 	var f1win := 0
+	var fs := [0, 0, 0, 0, 0, 0]
 	var payoff := 0
 	var held := 0
 	var stack_games := 0
@@ -40,6 +44,12 @@ func _init() -> void:
 		var d := Duel.new()
 		d.ai_epsilon = eps
 		d.start(false, s0 + g, false)
+		if ov.has("gain"): d.st.rules.ap_gain = int(ov.gain)
+		if ov.has("sap"):
+			d.st.rules.start_ap = int(ov.sap)
+			for sd2 in 2:
+				d.st.sides[sd2].ap = int(ov.sap)
+		if ov.has("cap"): d.st.rules.ap_cap = int(ov.cap)
 		if ov.has("win"): d.st.rules.win_score = int(ov.win)
 		if ov.has("rounds"): d.st.rules.max_rounds = int(ov.rounds)
 		if ov.has("cd"): d.st.rules.cooldown = int(ov.cd)
@@ -65,6 +75,12 @@ func _init() -> void:
 		var w: int = d.winner
 		if w == d.first0:
 			f1win += 1
+		fs[0] += int(d.stats.get("first_sent", 0))
+		fs[1] += int(d.stats.get("first_ap", 0))
+		fs[2] += int(d.stats.get("first_n", 0))
+		fs[3] += int(d.stats.get("second_sent", 0))
+		fs[4] += int(d.stats.get("second_ap", 0))
+		fs[5] += int(d.stats.get("second_n", 0))
 		held += int(d.stats.get("held", 0))
 		for sd in 2:
 			var pn: String = d.personas[sd]
@@ -94,6 +110,7 @@ func _init() -> void:
 	var parts: Array = []
 	for k in keys:
 		parts.append("%s %d/%d（%.0f%%）" % [k, tally[k][1], tally[k][0], 100.0 * tally[k][1] / maxf(1.0, tally[k][0])])
+	print("先手每轮 %.2f 句/花 %.0f 行动点；后手每轮 %.2f 句/花 %.0f 行动点" % [float(fs[0]) / maxf(1.0, fs[2]), float(fs[1]) / maxf(1.0, fs[2]), float(fs[3]) / maxf(1.0, fs[5]), float(fs[4]) / maxf(1.0, fs[5])])
 	print("首轮先手方胜 %d/%d；续暴兑现（蓄力≥2层爆发或灼烧≥3层）的局：%d/%d = %.2f" % [f1win, n, payoff, n, float(payoff) / n])
 	print("流派胜率：" + "  ".join(parts) + "；攒行动点 %.1f 次/局" % (float(held) / n))
 	quit()

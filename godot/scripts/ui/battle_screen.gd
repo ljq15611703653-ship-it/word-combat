@@ -410,10 +410,10 @@ func _compose_card(u: Dictionary, redo: bool) -> Control:
 	var v := K.vbox(6)
 	root.add_child(v)
 	if redo:
-		v.add_child(K.label("✎ 重拼这一句", 16, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(K.label("重拼这一句", 16, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
 	else:
 		v.add_child(K.spacer(40))
-		v.add_child(K.label("✎", 52, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
+		v.add_child(K.label("拼", 52, K.GREEN, HORIZONTAL_ALIGNMENT_CENTER))
 		v.add_child(K.label("给%s拼这一句" % u.name, 18, K.TEXT, HORIZONTAL_ALIGNMENT_CENTER))
 		v.add_child(K.wrap_label("从零开始，基础词不限量", 13, K.MUTED))
 	var uid: int = int(u.uid)
@@ -423,7 +423,7 @@ func _compose_card(u: Dictionary, redo: bool) -> Control:
 	Tut.tag(root, "b:compose")
 	if not redo and m.last_sentence.has(uid):
 		var last: Dictionary = m.last_sentence[uid]
-		var reuse := K.button("↻ 沿用：" + str(last.get("name", "上一句")), "normal", 14)
+		var reuse := K.button("沿用：" + str(last.get("name", "上一句")), "normal", 14)
 		reuse.tooltip_text = str(last.get("text", ""))
 		reuse.pressed.connect(func(): _reuse_last(uid))
 		v.add_child(reuse)
