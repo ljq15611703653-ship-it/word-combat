@@ -391,8 +391,11 @@ func _render_panel() -> void:
 			for a2 in M.declared:
 				if int(a2.side) == 1:
 					foe_starts[int(a2.start)] = true
+			var best_t: int = int(pending[0].get("sugg_start", ms)) if not pending.is_empty() else ms
+			if best_t != ms:
+				action_box.add_child(K.wrap_label("辅助轮建议第 %d 秒。" % best_t, 15, K.GREEN))
 			for t in range(ms, NR.TIMELINE + 1):
-				var bt2 := K.button(("%d 秒" % t) + ("·对方" if foe_starts.has(t) else ""), "primary" if t == ms else "normal", 16)
+				var bt2 := K.button(("%d 秒" % t) + ("·对方" if foe_starts.has(t) else ""), "primary" if t == best_t else "normal", 16)
 				var tt := t
 				bt2.pressed.connect(func(): _declare(tt))
 				flow.add_child(bt2)
@@ -470,7 +473,7 @@ func _start_targeting(cls: Array) -> void:
 	for c in pending:
 		if str(c.get("tmode", "")) == "self":
 			c["tg"] = [sel_uid]
-		elif str(c.k) != "delay":
+		elif str(c.k) != "delay" and not bool(c.get("pre", false)):
 			c["tg"] = []
 	pend_i = 0
 	_advance_targets()

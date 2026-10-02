@@ -10,6 +10,7 @@ const NR = preload("res://scripts/numcard/nc_rules.gd")
 const NE = preload("res://scripts/numcard/nc_engine.gd")
 const NT = preload("res://scripts/numcard/nc_text.gd")
 const Sfx = preload("res://scripts/ui/sfx.gd")
+const NAI = preload("res://scripts/numcard/nc_ai.gd")
 
 signal done(clauses)
 signal cancelled()
@@ -40,6 +41,8 @@ var help_label: Label
 var ok_btn: Button
 var parsed: Dictionary = {}
 var cp: Dictionary = {}
+var sugg_box: VBoxContainer
+var sugg: Dictionary = {}       # 用了哪条建议：{act, tokens}，原样拼好时连目标、秒数一起带过去
 
 func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	M = match_obj
@@ -84,6 +87,12 @@ func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	head.add_child(cancel)
 	v.add_child(head)
 	v.add_child(K.wrap_label("职业特长：" + NR.talent_text(cls), 14, Color("c9b27a")))
+	# 辅助轮：电脑用同一套估值给这个随从出主意，先读人话，再一键装进句子
+	sugg_box = K.vbox(4)
+	var sb := K.button("辅助轮：让电脑出几个主意（先看人话，点一下装进来）", "ghost", 15)
+	sb.pressed.connect(_show_suggestions)
+	sugg_box.add_child(sb)
+	v.add_child(sugg_box)
 	var rail_box := K.panel(Color("2a0d14"), Color("a3121f"), 12, 2)
 	rail_box.custom_minimum_size = Vector2(0, 110)
 	rail = HFlowContainer.new()
@@ -397,7 +406,102 @@ func _ok() -> void:
 	var pr := parse(tokens)
 	if not bool(pr.complete):
 		return
-	done.emit((pr.clauses as Array).duplicate(true))
+	var cl: Array = (pr.clauses as Array).duplicate(true)
+	# 原样用了建议：目标也照建议的（还能在下一步改）
+	if not sugg.is_empty() and str(sugg.tokens) == str(tokens) and cl.size() == (sugg.act.cl as Array).size():
+		for i in cl.size():
+			var sc: Dictionary = sugg.act.cl[i]
+			if str(sc.get("tmode", "")) == "choose" and not (sc.get("tg", []) as Array).is_empty():
+				cl[i]["tg"] = (sc.tg as Array).duplicate()
+				cl[i]["pre"] = true
+			if str(sc.k) == "delay":
+				cl[i]["act"] = int(sc.act)
+		cl[0]["sugg_start"] = int(sugg.act.start)
+	done.emit(cl)
+
+# ---------------------------------------------------------------- 辅助轮
+# 一段话 → 词牌（拼句台的语法）
+static func clause_tokens(c: Dictionary) -> Array:
+	var t: Array = []
+	var W := func(w: String): t.append({"t": "w", "v": w})
+	var N := func(n: int): t.append({"t": "n", "v": n})
+	var k: String = str(c.k)
+	match k:
+		"delay":
+			W.call("延后")
+			N.call(int(c.n))
+			return t
+		"remove":
+			W.call("移除")
+			return t
+	if str(c.get("tmode", "")) == "self":
+		W.call("自身")
+	else:
+		W.call("选择")
+		N.call(int(c.get("count", 1)))
+		W.call("敌方" if str(c.get("side", "enemy")) == "enemy" else "友方")
+		W.call("随从")
+	match k:
+		"atk":
+			W.call("造成")
+			N.call(int(c.n))
+			W.call("伤害")
+		"heal":
+			W.call("恢复")
+			N.call(int(c.n))
+			W.call("生命")
+		"mit":
+			W.call("减伤")
+			N.call(int(c.n))
+		"st":
+			W.call("施加")
+			W.call(str(c.st))
+			if int(c.n) > 1:
+				W.call("持续")
+				N.call(int(c.n))
+		"redirect":
+			W.call("转移")
+	if k in ["atk", "heal"] and int(c.get("rep", 1)) > 1:
+		W.call("重复")
+		N.call(int(c.rep))
+	if int(c.get("cont", 1)) > 1:
+		W.call("持续")
+		N.call(int(c.cont))
+	return t
+
+static func act_tokens(cl: Array) -> Array:
+	var out: Array = []
+	for i in cl.size():
+		if i > 0:
+			out.append({"t": "w", "v": "并"})
+		out.append_array(clause_tokens(cl[i]))
+	return out
+
+func _show_suggestions() -> void:
+	K.clear_children(sugg_box)
+	var list: Array = NAI.suggest(M, 0, uid, 3)
+	if list.is_empty():
+		sugg_box.add_child(K.label("辅助轮：这个随从现在没什么好打的，可以让它这轮不出手。", 15, K.MUTED))
+		return
+	sugg_box.add_child(K.label("辅助轮 · 电脑会这样拼（按它的估值排；点一下装进句子，还能接着改）：", 15, K.MUTED))
+	for it in list:
+		var a: Dictionary = it.act
+		var tg_txt := NT.action_text(M, a.cl)
+		var extra := "第 %d 秒 · 花 %d 点%s" % [int(a.start), int(a.cost), ("（%d 点用血付）" % int(a.blood)) if int(a.get("blood", 0)) > 0 else ""]
+		if float(it.gain) < NAI.PASS_GAIN:
+			extra += " · 电脑觉得不太值"
+		var b := K.button("%s  （%s）" % [tg_txt, extra], "normal", 15)
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.custom_minimum_size = Vector2(0, 40)
+		var toks := act_tokens(a.cl)
+		var aa := a
+		b.pressed.connect(func():
+			tokens = toks.duplicate(true)
+			sugg = {"act": aa, "tokens": toks.duplicate(true)}
+			Sfx.play("stamp")
+			_refresh())
+		sugg_box.add_child(b)
 
 # ---------------------------------------------------------------- 显示
 func _tile(text: String, col: Color, big: bool = false) -> PanelContainer:

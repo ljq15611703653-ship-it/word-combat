@@ -242,13 +242,10 @@ static func _make(M, s: int, uid: int, cl_list: Array, start: int) -> Variant:
 static func _kind(c: Dictionary) -> String:
 	return str(c.st) if str(c.k) == "st" else str(c.k)
 
-# 返回 {"uid": 随从, "act": 行动或 null（这个随从这一轮不出手）}
-static func choose(M, s: int) -> Dictionary:
+# 一个随从的所有候选，按估值从高到低：[[估值, 行动], ...]
+static func candidates(M, s: int, uid: int, noise: bool = true) -> Array:
 	var R0: Dictionary = M.R
 	var cp: Dictionary = M.caps(s)
-	var base_R := NE.clone_R(R0)
-	NE.resolve(base_R, M.declared, M.rnd)
-	var u0 := util(M, base_R, s)
 	var cards: Array = M.sides[s].cards
 	var enemy_starts: Array = []
 	for a in M.declared:
@@ -261,84 +258,95 @@ static func choose(M, s: int) -> Dictionary:
 		var v := util(M, R2, s) - 0.6 * float(act.cost)
 		for i in act.cards:
 			v -= (0.5 if bool(cards[i].once) else 0.25) * float(cards[i].v)
-		return v + M.rng.randf() * 0.3
+		return v + (M.rng.randf() * 0.3 if noise else 0.0)
+	var local: Array = []
+	for item in singles(M, s, uid, cp):
+		var a = _make(M, s, uid, item[0], int(item[1]))
+		if a == null:
+			continue
+		local.append([evaluate.call(a), a])
+	local.sort_custom(func(x, y): return float(x[0]) > float(y[0]))
+	# 拼多段：每种效果先各拿最好的一个，再按分数补满，两两三三连起来
+	if int(cp.clauses) >= 2:
+		var top: Array = []
+		var kinds := {}
+		for it in local:
+			var c0: Dictionary = it[1].cl[0]
+			if str(c0.k) == "delay" or kinds.has(_kind(c0)) or top.size() >= COMBO_K:
+				continue
+			kinds[_kind(c0)] = true
+			top.append(it[1])
+		for it2 in local:
+			if top.size() >= COMBO_K:
+				break
+			if str(it2[1].cl[0].k) == "delay" or it2[1] in top:
+				continue
+			top.append(it2[1])
+		for size in range(2, mini(int(cp.clauses), top.size()) + 1):
+			for comb in _combos(top.size(), size):
+				var cl_list: Array = []
+				for idx in comb:
+					for c1 in top[idx].cl:
+						cl_list.append((c1 as Dictionary).duplicate(true))
+				var a2 = _make(M, s, uid, cl_list, -1)
+				if a2 != null:
+					local.append([evaluate.call(a2), a2])
+		# 一大串 1 点
+		var E: Array = []
+		for u in R0.U:
+			if int(u.side) != s and int(u.down) == -1:
+				E.append(u)
+		if not E.is_empty():
+			E.sort_custom(func(x, y): return int(x.hp) < int(y.hp))
+			for kk in range(2, int(cp.clauses) + 1):
+				var chain: Array = []
+				for j in kk:
+					chain.append(_cl("atk", "enemy", null if bool(cp.late) else [int(E[j % E.size()].uid)], 1, {"n": 1, "rep": 1}))
+				var a3 = _make(M, s, uid, chain, -1)
+				if a3 != null:
+					local.append([evaluate.call(a3), a3])
+	local.sort_custom(func(x, y): return float(x[0]) > float(y[0]))
+	# 起手秒数：前几名再试几个时间
+	var extra: Array = []
+	for it3 in local.slice(0, 4):
+		var a4: Dictionary = it3[1]
+		if str(a4.cl[0].k) == "delay":
+			continue
+		var sts := {int(a4.ms) + 1: true}
+		for t in enemy_starts:
+			if int(t) >= int(a4.ms):
+				sts[int(t)] = true
+			if int(t) - 1 >= int(a4.ms):
+				sts[int(t) - 1] = true
+		for st in sts:
+			if int(st) > NR.TIMELINE or int(st) == int(a4.start):
+				continue
+			var b: Dictionary = a4.duplicate()
+			b.start = int(st)
+			extra.append([evaluate.call(b), b])
+	local.append_array(extra)
+	local.sort_custom(func(x, y): return float(x[0]) > float(y[0]))
+	return local
+
+# 这一轮什么都不做时的估值（比较“出手值不值”用）
+static func base_util(M, s: int) -> float:
+	var base_R := NE.clone_R(M.R)
+	NE.resolve(base_R, M.declared, M.rnd)
+	return util(M, base_R, s)
+
+# 返回 {"uid": 随从, "act": 行动或 null（这个随从这一轮不出手）}
+static func choose(M, s: int) -> Dictionary:
+	var u0 := base_util(M, s)
 	var best = null
 	var best_v := -1.0e9
 	var worst_uid := -1
 	var worst_gain := 1.0e9
 	for uid in M.remaining[s]:
-		var local: Array = []
-		for item in singles(M, s, int(uid), cp):
-			var a = _make(M, s, int(uid), item[0], int(item[1]))
-			if a == null:
-				continue
-			local.append([evaluate.call(a), a])
-		local.sort_custom(func(x, y): return float(x[0]) > float(y[0]))
-		# 拼多段：每种效果先各拿最好的一个，再按分数补满，两两三三连起来
-		if int(cp.clauses) >= 2:
-			var top: Array = []
-			var kinds := {}
-			for it in local:
-				var c0: Dictionary = it[1].cl[0]
-				if str(c0.k) == "delay" or kinds.has(_kind(c0)) or top.size() >= COMBO_K:
-					continue
-				kinds[_kind(c0)] = true
-				top.append(it[1])
-			for it2 in local:
-				if top.size() >= COMBO_K:
-					break
-				if str(it2[1].cl[0].k) == "delay" or it2[1] in top:
-					continue
-				top.append(it2[1])
-			for size in range(2, mini(int(cp.clauses), top.size()) + 1):
-				for comb in _combos(top.size(), size):
-					var cl_list: Array = []
-					for idx in comb:
-						for c1 in top[idx].cl:
-							cl_list.append((c1 as Dictionary).duplicate(true))
-					var a2 = _make(M, s, int(uid), cl_list, -1)
-					if a2 != null:
-						local.append([evaluate.call(a2), a2])
-			# 一大串 1 点
-			var E: Array = []
-			for u in R0.U:
-				if int(u.side) != s and int(u.down) == -1:
-					E.append(u)
-			if not E.is_empty():
-				E.sort_custom(func(x, y): return int(x.hp) < int(y.hp))
-				for kk in range(2, int(cp.clauses) + 1):
-					var chain: Array = []
-					for j in kk:
-						chain.append(_cl("atk", "enemy", null if bool(cp.late) else [int(E[j % E.size()].uid)], 1, {"n": 1, "rep": 1}))
-					var a3 = _make(M, s, int(uid), chain, -1)
-					if a3 != null:
-						local.append([evaluate.call(a3), a3])
-		local.sort_custom(func(x, y): return float(x[0]) > float(y[0]))
-		# 起手秒数：前几名再试几个时间
-		var extra: Array = []
-		for it3 in local.slice(0, 4):
-			var a4: Dictionary = it3[1]
-			if str(a4.cl[0].k) == "delay":
-				continue
-			var sts := {int(a4.ms) + 1: true}
-			for t in enemy_starts:
-				if int(t) >= int(a4.ms):
-					sts[int(t)] = true
-				if int(t) - 1 >= int(a4.ms):
-					sts[int(t) - 1] = true
-			for st in sts:
-				if int(st) > NR.TIMELINE or int(st) == int(a4.start):
-					continue
-				var b: Dictionary = a4.duplicate()
-				b.start = int(st)
-				extra.append([evaluate.call(b), b])
-		local.append_array(extra)
-		var lb := -1.0e9
-		for it4 in local:
-			lb = maxf(lb, float(it4[0]))
-			if float(it4[0]) > best_v:
-				best_v = float(it4[0])
-				best = it4[1]
+		var local := candidates(M, s, int(uid))
+		var lb: float = float(local[0][0]) if not local.is_empty() else -1.0e9
+		if not local.is_empty() and lb > best_v:
+			best_v = lb
+			best = local[0][1]
 		var g := lb - u0
 		if g < worst_gain:
 			worst_gain = g
@@ -346,6 +354,22 @@ static func choose(M, s: int) -> Dictionary:
 	if best == null or best_v - u0 < PASS_GAIN:
 		return {"uid": worst_uid if worst_uid != -1 else int(M.remaining[s][0]), "act": null}
 	return {"uid": int(best.uid), "act": best}
+
+# 给玩家的拼句建议（辅助轮）：这个随从估值最高的几句，人话不重复。[{act, gain}]
+static func suggest(M, s: int, uid: int, k: int = 3) -> Array:
+	var u0 := base_util(M, s)
+	var out: Array = []
+	var seen := {}
+	for it in candidates(M, s, uid, false):
+		var a: Dictionary = it[1]
+		var key := str(a.cl)
+		if seen.has(key):
+			continue
+		seen[key] = true
+		out.append({"act": a, "gain": float(it[0]) - u0})
+		if out.size() >= k:
+			break
+	return out
 
 # n 个里挑 k 个的所有组合（下标）
 static func _combos(n: int, k: int) -> Array:

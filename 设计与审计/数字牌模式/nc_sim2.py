@@ -34,16 +34,17 @@ BASE = dict(
     # 目标分
     t_chain=30, t_cont=40, t_pick=45, t_blood=50,
     # 并流
-    b_cap=5, b_cap_up="", b_and=1, b_bonus=1, b_mode="kinds",
+    b_cap=5, b_cap_up="", b_and=1, b_bonus=1, b_mode="kinds", b_stkind=0,
     # 续流
     x_slots=1, x_slots_up="0.25,0.7", x_payoff=1,
     # 择流
     z_heal=1, z_ko=0,
     # 血流
-    y_cap=3, y_cap_up="0.25:5,0.7:8", y_paid=1.0, y_dice=1, y_all=0, y_bw=1.0,
+    y_cap=3, y_cap_up="0.25:5,0.7:8", y_paid=1.0, y_dice=1, y_all=0, y_bw=1.0, y_guard=0.0,
     # 电脑
     pass_gain=0.3, ko_look=0.5, danger_hp=4, danger_w=0.0, combo_k=6, smart_late=1, cont_look=0.6,
     rep_max=3,
+    off="",
 )
 
 PRESET = {
@@ -112,6 +113,8 @@ def caps(G, s):
     c = sd["cls"]
     p = prog(G["R"], s, c, cfg)
     out = {"clauses": cfg["clause_max"], "and": cfg["and_cost"], "slots": 0, "blood": 0, "late": False}
+    if c == cfg["off"]:
+        return out
     if c == "并":
         out["clauses"] = cfg["b_cap"] + sum(1 for t in cfg["b_cap_up_l"] if p >= t)
         out["and"] = cfg["b_and"]
@@ -388,6 +391,8 @@ def resolve(R, acts_in, cfg, cls, rnd):
         if b > 0:
             u = R["U"][a["uid"]]
             u["hp"] -= b
+            if cfg["y_guard"]:
+                u["mit"] += int(b * cfg["y_guard"])
             if cls[a["side"]] == "血":
                 credit(R, a["side"], "blood", b * cfg["y_bw"])
     tl = cfg["timeline"]
@@ -427,7 +432,7 @@ def resolve(R, acts_in, cfg, cls, rnd):
         if cls[s] == "并" and len(a["cl"]) >= 2:
             landed = [ci for ci in range(len(a["cl"])) if (a["ord"], ci) in R["eff"]]
             if cfg["b_mode"] == "kinds":
-                kinds = {a["cl"][ci]["k"] if a["cl"][ci]["k"] != "st" else a["cl"][ci]["st"] for ci in landed}
+                kinds = {a["cl"][ci]["k"] if (a["cl"][ci]["k"] != "st" or cfg["b_stkind"]) else a["cl"][ci]["st"] for ci in landed}
                 n = len(kinds)
             else:
                 n = len(landed)
