@@ -32,6 +32,7 @@ func _init() -> void:
 	var empty := 0
 	var tally := {}
 	var f1win := 0
+	var payoff := 0
 	var held := 0
 	var stack_games := 0
 	for g in n:
@@ -43,18 +44,23 @@ func _init() -> void:
 		if ov.has("cd"): d.st.rules.cooldown = int(ov.cd)
 		var guard := 0
 		var g_stack := false
+		var g_pay := false
 		while d.step_auto() and guard < 900:
 			guard += 1
 			if d.phase == "draft" or d.phase == "over":
 				for e in d.last_events:
 					var t := str(e.type)
 					ev[t] = int(ev.get(t, 0)) + 1
+					if (t == "stack_spent" and int(e.get("stacks", 0)) >= 2) or (t == "burn" and int(e.get("stacks", 0)) >= 3):
+						g_pay = true
 					if t == "stack":
 						g_stack = true
 					if t == "dmg":
 						maxhit = maxi(maxhit, int(e.amount))
 		if g_stack:
 			stack_games += 1
+		if g_pay:
+			payoff += 1
 		var w: int = d.winner
 		if w == d.first0:
 			f1win += 1
@@ -87,6 +93,6 @@ func _init() -> void:
 	var parts: Array = []
 	for k in keys:
 		parts.append("%s %d/%d（%.0f%%）" % [k, tally[k][1], tally[k][0], 100.0 * tally[k][1] / maxf(1.0, tally[k][0])])
-	print("首轮先手方胜 %d/%d" % [f1win, n])
+	print("首轮先手方胜 %d/%d；续暴兑现（蓄力≥2层爆发或灼烧≥3层）的局：%d/%d = %.2f" % [f1win, n, payoff, n, float(payoff) / n])
 	print("流派胜率：" + "  ".join(parts) + "；攒行动点 %.1f 次/局" % (float(held) / n))
 	quit()
