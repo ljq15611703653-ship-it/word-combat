@@ -943,6 +943,20 @@ func _union_rect(rects: Array) -> Rect2:
 			r = r.merge(x)
 	return r
 
+# Esc：先关拼句窗口，再关各种弹层（对局结束的面板除外）
+func _unhandled_input(ev: InputEvent) -> void:
+	if not (ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE):
+		return
+	for c in get_children():
+		if c is DuelCompose:
+			c.cancelled.emit()
+			get_viewport().set_input_as_handled()
+			return
+	if overlay != null and overlay.get_child_count() > 0 and int(m.winner) == -1:
+		K.clear_children(overlay)
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		get_viewport().set_input_as_handled()
+
 func _tut_setup() -> void:
 	if not Tut.is_on():
 		return
@@ -1471,10 +1485,12 @@ func _show_game_over() -> void:
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 	var p := K.panel(Color("171b29"), K.GOLD, 20, 3, 20)
-	p.set_anchors_preset(Control.PRESET_CENTER)
 	p.custom_minimum_size = Vector2(620, 380)
-	p.position = Vector2(490, 260)
-	overlay.add_child(p)
+	var cc := CenterContainer.new()
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(cc)
+	cc.add_child(p)
 	var v := K.vbox(14)
 	p.add_child(v)
 	var w: int = m.winner
@@ -1539,10 +1555,12 @@ func _peek_duel(side: int) -> void:
 	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	overlay.add_child(dim)
 	var p := K.panel(Color("171b29"), K.GOLD_D, 18, 2, 18)
-	p.set_anchors_preset(Control.PRESET_CENTER)
 	p.custom_minimum_size = Vector2(760, 0)
-	p.position = Vector2(420, 190)
-	overlay.add_child(p)
+	var cc := CenterContainer.new()
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	overlay.add_child(cc)
+	cc.add_child(p)
 	var v := K.vbox(10)
 	p.add_child(v)
 	v.add_child(K.label(("对手" if side == 1 else "我方") + "公开信息", 28, K.GOLD))
@@ -1554,10 +1572,14 @@ func _peek_duel(side: int) -> void:
 	v.add_child(K.wrap_label("持有的进阶词：" + words, 17, K.TEXT))
 	v.add_child(K.wrap_label("对手每轮怎么拼是现场决定的，要等它宣告了才看得到。", 15, K.MUTED))
 	var close := K.button("关闭", "primary", 20)
-	close.pressed.connect(func():
+	var close_fn := func():
 		dim.queue_free()
-		p.queue_free()
-		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE)
+		cc.queue_free()
+		overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	close.pressed.connect(close_fn)
+	dim.gui_input.connect(func(ev):
+		if ev is InputEventMouseButton and ev.pressed:
+			close_fn.call())
 	v.add_child(close)
 
 func _peek(title: String, units: Array, extra: String) -> void:

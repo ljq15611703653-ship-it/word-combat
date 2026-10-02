@@ -199,6 +199,7 @@ static func begin_round(st: Dictionary) -> Array:
 		for u in side.units:
 			u.statuses = []
 			u.bonus = 0
+			u.kw_spent = false              # 首挡/不屈/回击/回春 每轮重新可用
 			u["rnd"] = int(st.round)       # 记下现在是第几轮（界面算“还剩几轮”用）
 			if u.down_round != -1 and st.round >= u.down_round + 2:
 				u.down_round = -1

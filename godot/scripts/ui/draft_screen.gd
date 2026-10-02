@@ -180,6 +180,11 @@ func _bag_panel(i: int) -> Control:
 	p.mouse_exited.connect(func(): _hover(i, false))
 	return p
 
+func _unhandled_input(ev: InputEvent) -> void:
+	if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE and detail_layer != null and is_instance_valid(detail_layer):
+		detail_layer.queue_free()
+		get_viewport().set_input_as_handled()
+
 func _show_detail(i: int) -> void:
 	if detail_layer != null and is_instance_valid(detail_layer):
 		detail_layer.queue_free()
@@ -194,10 +199,12 @@ func _show_detail(i: int) -> void:
 			detail_layer.queue_free())
 	detail_layer.add_child(dim)
 	var win := K.panel(Color("170d11"), K.GOLD_D, 16, 2, 14)
-	win.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	win.custom_minimum_size = Vector2(900, 460)
-	win.position = Vector2(350, 220)
-	detail_layer.add_child(win)
+	var cc := CenterContainer.new()
+	cc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	cc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	detail_layer.add_child(cc)
+	cc.add_child(win)
 	var v := K.vbox(10)
 	win.add_child(v)
 	var hb := K.hbox(10)
