@@ -8,7 +8,6 @@ import * as NR from "../engine/rules";
 import type { DeckSpec, GameView, View } from "../../shared/protocol";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -239,17 +238,11 @@ export class OnlineGame extends Game {
     this.foeName = v.sides[1 - v.you].name;
     if (!hadView) { this.refreshAll(true); this.lastProgBefore = progBefore; this.roundSummary(progBefore); return; }
     this.setUi("resolving"); this.renderAct();
+    const declCopy = [...(M.declared ?? [])];
     this.shown = before;
     this.elLog.innerHTML = "";
     this.log(`—— 第 ${v.round} 轮结算 ——`, "gold");
-    for (const raw of events) {
-      const ev = M.ev(raw);
-      const line = this.eventText(ev, []);
-      if (line) this.log(line.text, line.cls);
-      this.applyShown(ev);
-      if (!this.fast) await sleep(350);
-      if (tk !== this.token) return;
-    }
+    if (!(await this.playEvents(events.map((raw) => M.ev(raw)), declCopy, tk))) return;
     this.refreshAll(true);
     this.lastProgBefore = progBefore;
     this.nextSent = false;
