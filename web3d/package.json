@@ -6,10 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "serve": "tsx server/index.ts",
+    "online": "npm run build && tsx server/index.ts",
+    "selftest": "tsx server/selftest.ts",
+    "dev:online": "vite --host 0.0.0.0"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "@types/ws": "^8.18.2",
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
