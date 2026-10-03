@@ -26,7 +26,7 @@ function tokEl(t: Tok, fresh: boolean): HTMLElement {
       break;
     case "unit":
       el.textContent = t.name;
-      el.style.setProperty("--c", SIDE[t.name[0] === "红" ? "r" : "b"]);
+      el.style.setProperty("--c", SIDE[t.side ?? (t.name[0] === "红" ? "r" : "b")]);
       el.classList.add("w-unit");
       break;
     case "num":

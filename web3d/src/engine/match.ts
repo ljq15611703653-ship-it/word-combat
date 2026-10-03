@@ -19,6 +19,18 @@ export class Rng {
   int(lo: number, hi: number) { return lo + Math.floor(this.randf() * (hi - lo + 1)); }
 }
 
+/** 剧情关卡的特殊设置：不填 = 标准规则 */
+export interface MatchOpts {
+  koWin?: boolean;            // 只看击倒：一方随从全倒就输（不看完成度）
+  maxRounds?: number;         // 超过这一轮数还没分出胜负，算玩家（0 方）输
+  perma?: number[];           // 这些编号的随从不上场（一直倒着）
+  names?: string[][];         // 每方三个随从的名字
+  glyphs?: string[][];
+  give?: number[][];          // 每方开局送的数字牌（可反复用）
+  ap?: number[];              // 每方开局行动点
+  first?: number;             // 第 1 轮谁先宣告
+  kwOff?: boolean;
+}
 export type Phase = "setup" | "declare" | "assign" | "resolved" | "over";
 
 export class Match {
@@ -39,11 +51,14 @@ export class Match {
   roundNotes: any[] = [];
   lastDeclared: Act[] = [];
   stats: any[] = [{}, {}];
+  opts: MatchOpts = {};
 
-  start(d0: Deck, d1: Deck, seed = 1, human0 = true, human1 = false) {
+  start(d0: Deck, d1: Deck, seed = 1, human0 = true, human1 = false, opts: MatchOpts = {}) {
+    this.opts = opts;
     this.rng = new Rng(seed);
     this.human = [human0, human1];
     this.first0 = this.rng.int(0, 1);
+    if (opts.first !== undefined) this.first0 = opts.first;
     this.rnd = 0;
     this.winner = -1;
     this.sides = [];
@@ -51,10 +66,12 @@ export class Match {
     const U: any[] = [];
     for (let s = 0; s < 2; s++) {
       const d = s === 0 ? d0 : d1;
-      this.sides.push({ cls: d.cls, ap: NR.AP_START, deck: { ...d.words }, used: {}, prev: {}, cards: [], lad: [] });
+      this.sides.push({ cls: d.cls, ap: opts.ap?.[s] ?? NR.AP_START, deck: { ...d.words }, used: {}, prev: {}, cards: [], lad: [] });
+      for (const v of opts.give?.[s] ?? []) this.sides[s].cards.push({ v, once: false, last: -9, src: "赠" });
       for (let i = 0; i < 3; i++) {
-        U.push({ uid: s * 3 + i, side: s, name: NR.UNIT_NAMES[i], glyph: NR.UNIT_GLYPHS[i], hp: d.hp[i], mx: d.hp[i],
-          down: -1, st: {}, kw: d.kws[i], kws: false, mit: 0, mitc: 0, shield: 0, msrc: [], lis: [], last: null });
+        const perma = !!opts.perma?.includes(s * 3 + i);
+        U.push({ uid: s * 3 + i, side: s, name: opts.names?.[s]?.[i] ?? NR.UNIT_NAMES[i], glyph: opts.glyphs?.[s]?.[i] ?? NR.UNIT_GLYPHS[i], hp: perma ? 0 : d.hp[i], mx: d.hp[i], perma,
+          down: perma ? 9999 : -1, st: {}, kw: d.kws[i], kws: false, mit: 0, mitc: 0, shield: 0, msrc: [], lis: [], last: null });
       }
     }
     this.R = NE.newR(U, [d0.cls, d1.cls]);
@@ -72,7 +89,7 @@ export class Match {
     this.rnd++;
     for (const u of this.R.U) {
       u.mit = 0; u.mitc = 0; u.msrc = []; u.lis = []; u.kws = false; u.shield = 0;
-      if (u.down !== -1 && this.rnd >= u.down + 2) { u.down = -1; u.hp = u.mx; u.st = {}; }
+      if (u.down !== -1 && !u.perma && this.rnd >= u.down + 2) { u.down = -1; u.hp = u.mx; u.st = {}; }
       else if (u.down === -1) {
         for (const nm of Object.keys(u.st)) {
           const e = u.st[nm];
@@ -278,7 +295,11 @@ export class Match {
       });
     }
     const p0 = this.progress(0), p1 = this.progress(1);
-    if (p0 >= 1 || p1 >= 1 || this.rnd >= NR.MAX_ROUNDS) this.winner = p0 > p1 ? 0 : p1 > p0 ? 1 : -2;
+    if (this.opts.koWin) {
+      const out = [0, 1].map((s) => this.R.U.filter((u: any) => u.side === s).every((u: any) => u.down !== -1));
+      if (out[0] || out[1]) this.winner = out[0] && out[1] ? -2 : out[0] ? 1 : 0;
+      else if (this.opts.maxRounds && this.rnd >= this.opts.maxRounds) this.winner = 1;
+    } else if (p0 >= 1 || p1 >= 1 || this.rnd >= NR.MAX_ROUNDS) this.winner = p0 > p1 ? 0 : p1 > p0 ? 1 : -2;
     this.phase = this.winner !== -1 ? "over" : "resolved";
     return this.lastEvents;
   }

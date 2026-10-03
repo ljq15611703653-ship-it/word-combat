@@ -10,7 +10,8 @@
     "serve": "tsx server/index.ts",
     "online": "npm run build && tsx server/index.ts",
     "selftest": "tsx server/selftest.ts",
-    "dev:online": "vite --host 0.0.0.0"
+    "dev:online": "vite --host 0.0.0.0",
+    "test:campaign": "tsx src/campaign/campaign-test.ts"
   },
   "dependencies": {
     "@types/ws": "^8.18.2",

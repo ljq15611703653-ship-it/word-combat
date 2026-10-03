@@ -48,3 +48,18 @@ npm run build    # 类型检查 + 打包到 dist/
 ## 联机（打真人）
 
 主菜单「打真人」= 局域网匹配：两个人在同一服务器上都点「开始匹配」就自动配对开打，不用房间号。启动和使用见 [ONLINE.md](ONLINE.md)（Windows 双击 `start-online.bat`）。
+
+## 词战冒险（新手教程）
+
+`campaign.html`（dev 下 http://localhost:5173/campaign.html）：14 关渐进教程，教会攻击、数字牌与重复、治疗、减伤、状态、起手秒数、转移、延后、移除，四个职业（并 / 续 / 择 / 血），最后一关用完整规则打电脑。每关有剧情对话、目标、强制跟做的引导（要点的按钮高亮并写出原因）和对手脚本；通关记录存在 localStorage。
+
+| 文件 | 内容 |
+| --- | --- |
+| `src/campaign/levels.ts` | 14 关数据（剧情、引导、对手脚本） |
+| `src/campaign/session.ts` | 关卡会话：点击 → 对局操作，按引导校验；界面和测试共用 |
+| `src/campaign/ui.ts` / `main.ts` | 对话、关卡选择、操作栏、结算回放 / 3D 场景接线 |
+| `src/campaign/campaign-test.ts` | 命令行测试：按引导自动点完每一关并断言胜利 |
+
+```bash
+npm run test:campaign   # = tsx src/campaign/campaign-test.ts
+```

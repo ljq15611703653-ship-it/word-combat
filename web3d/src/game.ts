@@ -41,9 +41,38 @@ export interface GameCtx {
   onToggle: (on: boolean) => void;
 }
 
+// ---- [campaign hook] 可选钩子：教程盖在正常对局上用。不传 hooks 时行为和原来完全一样。
+export type GameClickKind = "unit" | "pass" | "word" | "num" | "undo" | "clear" | "restart" | "assist" | "done" | "target" | "act" | "time" | "late";
+export interface GameClick { kind: GameClickKind; value?: string | number; uid?: number; stage: string; tokens: number; clause: number; picked: number[]; latePick: number[] }
+/** 当前该点什么（高亮用） */
+export interface GameHl { kind: GameClickKind; value?: string | number; uid?: number }
+export interface GameHooks {
+  /** 拼句台只开放这些词（没教到的词不出现） */
+  allow?: string[];
+  /** 对手轮到宣告时接管；返回 true = 已经宣告（不再走电脑 AI） */
+  foeStep?: (M: Match) => boolean;
+  /** 点击拦截：返回字符串 = 拒绝并弹出这句提示；返回 null = 放行 */
+  before?: (c: GameClick) => string | null;
+  /** 当前该点什么；返回 null = 不高亮（自由操作） */
+  expect?: (c: GameClick) => GameHl | null;
+  /** 每一轮开始（宣告之前）调用，go() 之后才开始这一轮的宣告；可用来放剧情对话 */
+  roundStart?: (M: Match, go: () => void) => void;
+  /** 一轮结算完、轮末面板画好之后调用 */
+  roundEnd?: (M: Match) => void;
+  /** 每次操作栏画完之后调用（教程据此摆气泡 / 聚光灯） */
+  rendered?: (c: GameClick) => void;
+  /** 对局结束；返回 true = 教程接管结果页（不弹默认的结果弹窗） */
+  over?: (M: Match) => boolean;
+  /** 点「退出」时调用，代替默认的退出 */
+  exit?: () => void;
+}
+
 export class Game {
   active = false;
   protected foeName = "电脑";
+  hooks: GameHooks | null = null;
+  /** 当前高亮的随从卡（教程摆气泡用） */
+  hlCards: number[] = [];
   M = new Match();
   protected ui = "idle";
   protected S: Settings = structuredClone(DEFAULT);
@@ -74,12 +103,50 @@ export class Game {
 
   // ------------------------------------------------------------ 进出
   open() {
+    this.hooks = null;
     this.active = true;
     document.body.classList.add("game");
     this.root.hidden = false;
     this.ctx.onToggle(true);
     this.showSetup();
   }
+  /** [campaign hook] 用给定的对局直接开始（跳过开局设置），并挂上钩子 */
+  startLevel(match: Match, hooks: GameHooks) {
+    this.hooks = hooks;
+    this.active = true;
+    document.body.classList.add("game");
+    this.root.hidden = false;
+    this.overlay.hidden = true;
+    this.ctx.onToggle(true);
+    this.M = match;
+    this.token++;
+    this.ui = "idle";
+    this.fast = false;
+    this.elLog.innerHTML = "";
+    this.refreshAll(true);
+    this.roundBegin();
+  }
+  private roundBegin() {
+    const hk = this.hooks;
+    if (hk?.roundStart) hk.roundStart(this.M, () => { this.refreshAll(true); void this.step(); });
+    else void this.step();
+  }
+  private clickInfo(kind: GameClickKind, extra: Partial<GameClick> = {}): GameClick {
+    const pr = this.pending[this.pendI];
+    return { kind, stage: this.ui, tokens: this.cmp?.tokens.length ?? 0, clause: this.pendI, picked: pr?.tg ? [...pr.tg] : [], latePick: [...this.latePick], ...extra };
+  }
+  /** 拦截：返回 false = 被教程拒绝（已弹提示） */
+  private gate(kind: GameClickKind, extra: Partial<GameClick> = {}): boolean {
+    const e = this.hooks?.before?.(this.clickInfo(kind, extra));
+    if (e) { this.toast(e); return false; }
+    return true;
+  }
+  private hl(kind: GameClickKind, value?: string | number, uid?: number): boolean {
+    const x = this.hooks?.expect?.(this.clickInfo(kind));
+    return !!x && x.kind === kind && (value === undefined || x.value === value) && (uid === undefined || x.uid === uid);
+  }
+  /** 引导里：这一类按钮当前有发光的 */
+  private hlKind(kind: GameClickKind): boolean { return this.hooks?.expect?.(this.clickInfo(kind))?.kind === kind; }
   close() {
     this.token++;
     this.active = false;
@@ -206,6 +273,7 @@ export class Game {
   protected syncCards() {
     const M = this.M;
     for (const u of M.R.U) {
+      if (u.perma) continue;
       const card = this.ctx.cards[cardIndex(u.uid)];
       const sh = this.shown[u.uid] ?? [u.hp, u.down !== -1];
       card.syncHp(sh[1] ? 0 : sh[0], u.mx);
@@ -222,12 +290,17 @@ export class Game {
 
   protected highlight() {
     const M = this.M;
+    this.hlCards = [];
+    const guide = this.hooks?.expect ? this.hooks.expect(this.clickInfo("unit")) : null;
     this.ctx.cards.forEach((card, i) => {
       const uid = uidOfCard(i);
       let on = false;
       if (this.ui === "pick_unit") on = uid < 3 && M.remaining[0].includes(uid);
       else if (this.ui === "target") on = this.targetOk(uid);
       else if (this.ui === "assign") on = this.lateOk(uid);
+      if (this.hooks?.expect && on && guide && guide.uid !== undefined && ["unit", "pass", "target", "late"].includes(guide.kind)) on = guide.uid === uid;
+      else if (this.hooks?.expect && guide && !["unit", "pass", "target", "late"].includes(guide.kind)) on = false;
+      if (on && guide && guide.uid === uid) this.hlCards.push(uid);
       card.setSelected(on);
     });
   }
@@ -251,7 +324,7 @@ export class Game {
     }
     const bar = h("div", "gm-tools");
     bar.append(btn("怎么玩", "ghost", () => this.showRules()), btn(this.fast ? "动画：快" : "动画：正常", "ghost", (e) => { this.fast = !this.fast; (e.target as HTMLElement).textContent = this.fast ? "动画：快" : "动画：正常"; }),
-      btn("退出", "ghost", () => this.close()));
+      btn("退出", "ghost", () => (this.hooks?.exit ? this.hooks.exit() : this.close())));
     el.append(bar);
   }
 
@@ -259,6 +332,7 @@ export class Game {
     const M = this.M, el = this.elUnits;
     el.innerHTML = "";
     for (const u of M.R.U) {
+      if (u.perma) continue;
       const sh = this.shown[u.uid] ?? [u.hp, u.down !== -1];
       const r = h("div", `gm-u ${u.side === 0 ? "me" : "foe"}${sh[1] ? " down" : ""}`);
       const chips: string[] = [];
@@ -320,19 +394,20 @@ export class Game {
     this.setUi("foe"); this.renderAct();
     await sleep(this.fast ? 50 : 600);
     if (tk !== this.token) return;
-    M.aiStep();
+    if (!this.hooks?.foeStep?.(M)) M.aiStep();
     this.refreshAll();
     void this.step();
   }
 
   cardClicked(uid: number) {
     if (!this.active) return;
-    if (this.ui === "pick_unit" && this.M.remaining[0].includes(uid)) this.openComposer(uid);
+    if (this.ui === "pick_unit" && this.M.remaining[0].includes(uid)) { if (this.gate("unit", { uid })) this.openComposer(uid); }
     else if (this.ui === "target") this.pickTarget(uid);
     else if (this.ui === "assign") this.pickLate(uid);
   }
 
   protected pass(uid: number) {
+    if (!this.gate("pass", { uid })) return;
     const e = this.M.submit(0, uid, null);
     if (e) { this.toast(e); return; }
     this.refreshAll(); void this.step();
@@ -341,7 +416,7 @@ export class Game {
   // ------------------------------------------------------------ 拼句
   protected openComposer(uid: number) {
     this.selUid = uid;
-    this.cmp = new Composer(this.M, uid, 0);
+    this.cmp = new Composer(this.M, uid, 0, this.hooks?.allow);
     this.setUi("compose");
     this.renderAct();
   }
@@ -357,7 +432,7 @@ export class Game {
     el.append(head, h("small", "talent", `职业特长：${NR.CLASS_TALENT[cls]}`));
     // 辅助轮
     const sugg = h("div", "sugg");
-    sugg.append(btn("辅助轮：让电脑出几个主意（先看人话，点一下装进来）", "ghost", () => this.showSuggestions(sugg)));
+    sugg.append(btn("辅助轮：让电脑出几个主意（先看人话，点一下装进来）", "ghost", () => { if (this.gate("assist")) this.showSuggestions(sugg); }));
     el.append(sugg);
     // 句子轨
     const rail = h("div", "rail");
@@ -374,7 +449,8 @@ export class Game {
     // 词
     const words = h("div", "opts");
     for (const it of op.words) {
-      const b = h("button", it.ok && (NR.WORDS[it.w] || it.w === NR.CLASS_WORD[cls]) ? "w primary" : "w", it.w);
+      const hlW = this.hl("word", it.w);
+      const b = h("button", hlW ? "w hl" : this.hlKind("word") ? "w dimmed" : it.ok && (NR.WORDS[it.w] || it.w === NR.CLASS_WORD[cls]) ? "w primary" : "w", it.w);
       b.disabled = !it.ok;
       let tip = NR.WORDS[it.w] ? NR.WORDS[it.w].desc : BASIC_DESC[it.w] ?? "";
       if (it.w === "并") tip += `（每多一段 +${cmp.cp.and} 行动点，最多 ${cmp.cp.clauses} 段）`;
@@ -386,7 +462,7 @@ export class Game {
       const show = () => { pv.textContent = it.ok ? `接上它：${pvt}` : it.why; };
       b.addEventListener("mouseenter", show); b.addEventListener("focus", show);
       b.addEventListener("mouseleave", () => { pv.textContent = ""; });
-      b.addEventListener("click", () => { if (cmp.addWord(it.w)) this.renderAct(); });
+      b.addEventListener("click", () => { if (!this.gate("word", { value: it.w })) return; if (cmp.addWord(it.w)) this.renderAct(); });
       words.append(b);
     }
     if (!op.words.length && !op.num) words.append(h("small", "dim", "（这一段拼完了）"));
@@ -396,7 +472,7 @@ export class Game {
     const nums = h("div", "opts");
     const have = M.usableValues(0), used = cmp.usedValues();
     const nb = (label: string, n: number, ok: boolean, hint = "") => {
-      const b = h("button", ok ? "w primary" : "w", label);
+      const b = h("button", this.hl("num", n) ? "w hl" : this.hlKind("num") ? "w dimmed" : ok ? "w primary" : "w", label);
       b.disabled = !ok;
       if (ok) {
         const pvt = cmp.previewWith({ t: "n", v: n, free: !!hint });
@@ -404,7 +480,7 @@ export class Game {
         const show = () => { pv.textContent = `接上它：${pvt}`; };
         b.addEventListener("mouseenter", show); b.addEventListener("focus", show); b.addEventListener("mouseleave", () => { pv.textContent = ""; });
       }
-      b.addEventListener("click", () => { if (cmp.addNumber(n)) this.renderAct(); });
+      b.addEventListener("click", () => { if (!this.gate("num", { value: n })) return; if (cmp.addNumber(n)) this.renderAct(); });
       nums.append(b);
     };
     nb("1（免费）", 1, op.num);
@@ -420,9 +496,9 @@ export class Game {
     const ci = cmp.costInfo();
     el.append(h("p", "cmp-cost", ci.text));
     const foot = h("div", "cmp-foot");
-    foot.append(btn("撤回一张", "ghost", () => { cmp.undo(); this.renderAct(); }), btn("全部拿下", "ghost", () => { cmp.clear(); this.renderAct(); }),
-      btn("取消", "ghost", () => { this.cmp = null; this.setUi("pick_unit"); this.renderAct(); }));
-    const ok = btn(ci.allLate ? "拼好了 → 定起手秒数" : "拼好了 → 去选目标", "primary", () => this.composerDone());
+    foot.append(btn("撤回一张", "ghost", () => { if (!this.gate("undo")) return; cmp.undo(); this.renderAct(); }), btn("全部拿下", "ghost", () => { if (!this.gate("clear")) return; cmp.clear(); this.renderAct(); }),
+      btn("取消", "ghost", () => { if (!this.gate("restart")) return; this.cmp = null; this.setUi("pick_unit"); this.renderAct(); }));
+    const ok = btn(ci.allLate ? "拼好了 → 定起手秒数" : "拼好了 → 去选目标", "primary" + (this.hl("done") ? " hl" : ""), () => { if (this.gate("done")) this.composerDone(); });
     ok.disabled = ci.bad || !pr.complete;
     foot.append(ok);
     el.append(foot);
@@ -484,6 +560,7 @@ export class Game {
   }
   protected pickTarget(uid: number) {
     if (!this.targetOk(uid)) return;
+    if (!this.gate("target", { uid })) return;
     this.pending[this.pendI].tg.push(uid);
     this.advanceTargets();
   }
@@ -514,6 +591,7 @@ export class Game {
   }
   protected pickLate(uid: number) {
     if (!this.lateOk(uid)) return;
+    if (!this.gate("late", { uid })) return;
     this.latePick.push(uid);
     const c = this.M.pendingLate(0)[0].cl;
     if (this.latePick.length >= Math.min(c.count, this.latePool(c).length)) this.commitLate();
@@ -618,15 +696,17 @@ export class Game {
       else if (n.type === "ladder") el.append(h("p", "green", `${who} 得分到 ${Math.round(n.at * 100)}%：解锁 ${n.copies} 张【${n.value}】（能反复用，用完冷却一轮）`));
     }
     if (M.phase === "over") { el.append(btn("看结果", "primary", () => this.showOver())); return; }
-    el.append(btn("下一轮 →", "primary big", () => this.nextRoundClicked()));
+    el.append(btn("下一轮 →", "primary big" + (this.hooks ? " hl" : ""), () => this.nextRoundClicked()));
+    this.hooks?.roundEnd?.(M);
   }
 
   /** 点「下一轮」：本地直接开下一轮；联机版改成通知服务端 */
-  protected nextRoundClicked() { const M = this.M; M.nextRound(); this.refreshAll(true); this.log(`—— 第 ${M.rnd} 轮 ——`, "gold"); void this.step(); }
+  protected nextRoundClicked() { const M = this.M; M.nextRound(); this.refreshAll(true); this.log(`—— 第 ${M.rnd} 轮 ——`, "gold"); this.roundBegin(); }
 
   protected showOver() {
     const M = this.M, o = this.overlay;
     this.setUi("over");
+    if (this.hooks?.over?.(M)) return;
     o.hidden = false; o.innerHTML = "";
     const m = h("div", "gm-modal");
     const w = M.winner;
@@ -642,6 +722,11 @@ export class Game {
 
   // ------------------------------------------------------------ 操作栏
   protected renderAct() {
+    this.renderAct0();
+    this.highlight();
+    this.hooks?.rendered?.(this.clickInfo("unit"));
+  }
+  protected renderAct0() {
     const M = this.M, el = this.elAct;
     if (this.ui === "compose") { this.renderComposer(); return; }
     el.innerHTML = "";
@@ -652,7 +737,7 @@ export class Game {
         el.append(h("small", "dim", "点下面的按钮（或点你的随从卡）。每个随从一轮一句；可以先让一个随从出手，看看对方怎么接，再定下一个。"));
         for (const uid of M.remaining[0]) {
           const u = M.R.U[uid], row = h("div", "row2");
-          row.append(btn(`给【${u.name}】拼一句`, "primary", () => this.openComposer(uid)), btn("它这轮不出手", "ghost", () => this.pass(uid)));
+          row.append(btn(`给【${u.name}】拼一句`, "primary" + (this.hl("unit", undefined, uid) ? " hl" : ""), () => { if (this.gate("unit", { uid })) this.openComposer(uid); }), btn("它这轮不出手", "ghost" + (this.hl("pass", undefined, uid) ? " hl" : ""), () => this.pass(uid)));
           el.append(row);
         }
         el.append(h("p", "", `本轮行动点还剩 ${M.res[0].ap}`));
@@ -663,9 +748,9 @@ export class Game {
         el.append(h("h3", "gold", `选目标（第 ${this.pendI + 1} / ${this.pending.length} 段）`), h("p", "", NT.clauseText(null, c)));
         if (c.k === "delay") {
           el.append(h("p", "", "要延后对方的哪一句？"));
-          for (const a of M.declared) if (a.side === 1) el.append(btn(`${mk(a.ord)} ${this.foeName}·${M.R.U[a.uid].name} 第 ${a.start} 秒：${NT.actionText(M as any, a.cl)}`, "sug", () => { c.act = a.ord; this.advanceTargets(); }));
+          for (const a of M.declared) if (a.side === 1) el.append(btn(`${mk(a.ord)} ${this.foeName}·${M.R.U[a.uid].name} 第 ${a.start} 秒：${NT.actionText(M as any, a.cl)}`, "sug" + (this.hl("act", a.ord) ? " hl" : ""), () => { if (!this.gate("act", { value: a.ord })) return; c.act = a.ord; this.advanceTargets(); }));
         } else el.append(h("p", "", `点 ${c.count ?? 1} 个${(c.side ?? "enemy") === "enemy" ? "敌方" : "你的"}随从（已选 ${c.tg.length} 个）——直接点场上的卡`));
-        el.append(btn("重新拼", "ghost", () => this.openComposer(this.selUid)));
+        el.append(btn("重新拼", "ghost", () => { if (this.gate("restart")) this.openComposer(this.selUid); }));
         break;
       }
       case "timing": {
@@ -678,8 +763,8 @@ export class Game {
         if (best !== ms) el.append(h("p", "green", `辅助轮建议第 ${best} 秒。`));
         const foe = new Set(M.declared.filter((a: any) => a.side === 1).map((a: any) => a.start));
         const flow = h("div", "opts");
-        for (let t = ms; t <= NR.TIMELINE; t++) flow.append(btn(`${t} 秒${foe.has(t) ? "·对方" : ""}`, t === best ? "w primary" : "w", () => this.declare(t)));
-        el.append(flow, btn("重新拼", "ghost", () => this.openComposer(this.selUid)));
+        for (let t = ms; t <= NR.TIMELINE; t++) flow.append(btn(`${t} 秒${foe.has(t) ? "·对方" : ""}`, this.hl("time", t) ? "w hl" : this.hlKind("time") ? "w dimmed" : t === best ? "w primary" : "w", () => { if (this.gate("time", { value: t })) this.declare(t); }));
+        el.append(flow, btn("重新拼", "ghost", () => { if (this.gate("restart")) this.openComposer(this.selUid); }));
         break;
       }
       case "assign": {
@@ -692,8 +777,8 @@ export class Game {
         const a = M.declared.find((x: any) => x.ord === item.ord);
         if (a) el.append(h("p", "decl me", `${mk(a.ord)} ${M.R.U[a.uid].name} 第 ${a.start} 秒：${NT.clauseText(M as any, c2)}`));
         const sug = suggestLate(M, 0, item.ord, item.ci);
-        el.append(btn(`用建议：${sug.map((x) => M.R.U[x].name).join("、")}`, "ghost", () => { this.latePick = [...sug]; this.commitLate(); }),
-          btn("剩下的全部用建议", "ghost", () => { assignLate(M, 0); this.finishAssign(); }));
+        el.append(btn(`用建议：${sug.map((x) => M.R.U[x].name).join("、")}`, "ghost", () => { if (!this.gate("late", { value: "auto" })) return; this.latePick = [...sug]; this.commitLate(); }),
+          btn("剩下的全部用建议", "ghost", () => { if (!this.gate("late", { value: "auto" })) return; assignLate(M, 0); this.finishAssign(); }));
         break;
       }
       case "resolving":
