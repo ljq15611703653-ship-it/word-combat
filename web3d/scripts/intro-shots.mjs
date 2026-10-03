@@ -24,7 +24,7 @@ await cdp("Emulation.setDeviceMetricsOverride", { width: 1440, height: 810, devi
 await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/intro.html?t=0&pause=1` });
 for (let i = 0; i < 60; i++) { if (await ev("!!window.__intro")) break; await sleep(500); }
 await sleep(800);
-const TIMES = [1, 2.5, 4, 7, 9.5, 11, 13, 15.5, 18.5, 20, 22, 24.5, 28, 31, 32.5, 33.5, 35, 37.5, 39, 41, 43, 45.5, 47, 48.5, 50, 52, 53.5, 55, 57, 59];
+const TIMES = process.env.TIMES ? process.env.TIMES.split(",").map(Number) : [1, 3, 5.5, 8, 11, 14, 16, 18, 21, 22.5, 25, 26.5, 28, 31, 33, 35, 37, 40, 43, 46, 48.5, 50, 52, 54, 57, 59, 61];
 for (const t of TIMES) {
   await ev(`window.__intro.seek(${t})`); await sleep(500);
   const r = await cdp("Page.captureScreenshot", { format: "png" });

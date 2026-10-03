@@ -13,8 +13,10 @@ export interface IntroOptions {
   paused?: boolean;
   /** 拿到控制句柄（调试/截图用） */
   onControl?: (c: IntroControl) => void;
-  /** 黑客立绘地址；null = 不用立绘。默认 BASE_URL + portraits/hacker.png */
+  /** 零（黑客立绘）地址；null = 不用立绘。默认 BASE_URL + portraits/hacker.png */
   portraitUrl?: string | null;
+  /** 小剑立绘地址；null = 用发光体代替。默认 BASE_URL + portraits/cyborg_zealot.png */
+  swordUrl?: string | null;
 }
 export interface IntroControl { seek(t: number): void; pause(p: boolean): void; time(): number; skipShot(): void; skipAll(): void }
 
@@ -51,7 +53,8 @@ export async function runIntro(container: HTMLElement, o: IntroOptions = {}): Pr
 
   try { await Promise.race([document.fonts.load('700 30px "Noto Sans SC"'), new Promise((r) => setTimeout(r, 1500))]); } catch { /* 字体可缺 */ }
   const portraitUrl = o.portraitUrl === undefined ? `${import.meta.env.BASE_URL}portraits/hacker.png` : o.portraitUrl;
-  const env: Env = await buildEnv(portraitUrl);
+  const swordUrl = o.swordUrl === undefined ? `${import.meta.env.BASE_URL}portraits/cyborg_zealot.png` : o.swordUrl;
+  const env: Env = await buildEnv(portraitUrl, swordUrl);
   loading.remove();
 
   let T = Math.max(0, Math.min(TOTAL, o.start ?? 0));

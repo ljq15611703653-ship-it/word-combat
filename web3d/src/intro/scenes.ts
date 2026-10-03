@@ -1,4 +1,4 @@
-// 开场演出的画面：全部是 Canvas2D 程序化绘制（逻辑分辨率 1280x720），不依赖外部图片（黑客立绘除外，可缺省）。
+// 开场演出的画面：全部是 Canvas2D 程序化绘制（逻辑分辨率 1280x720），不依赖外部图片（零、小剑的立绘除外，可缺省）。
 import type { SceneId } from "./script";
 
 export const W = 1280, H = 720;
@@ -11,8 +11,10 @@ type Cv = HTMLCanvasElement;
 
 export interface Env {
   bgNormal: Cv; bgRuin: Cv; signs: Sign[];
-  portrait: HTMLImageElement | null; portraitGlow: Cv | null;
+  /** 黑客「零」、随从「小剑」的发光立绘；缺图时为 null（画面用剪影/发光体代替） */
+  zero: Char | null; sword: Char | null;
 }
+export interface Char { glow: Cv; pw: number; ph: number; pad: number }
 export interface Sign { x: number; y: number; w: number; h: number; color: string; seed: number }
 // ---------- 小工具 ----------
 function rng(seed: number) {
@@ -139,9 +141,6 @@ export function buildCity(ruin: boolean, seed: number): { cv: Cv; signs: Sign[] 
   return { cv, signs };
 }
 
-function drawBg(c: Ctx, bg: Cv, s = 1, dx = 0, dy = 0) {
-  c.save(); c.translate(W / 2, H / 2); c.scale(s, s); c.translate(dx, dy); c.drawImage(bg, -BW / 2, -BH / 2); c.restore();
-}
 /** 招牌闪烁：在背景上叠一层加亮；与 drawBg 同一相机 */
 function flicker(c: Ctx, signs: Sign[], t: number, s: number, dx: number, dy: number, k = 1) {
   c.save(); c.translate(W / 2, H / 2); c.scale(s, s); c.translate(dx, dy); c.translate(-BW / 2, -BH / 2);
@@ -187,286 +186,382 @@ function text(c: Ctx, s: string, x: number, y: number, size: number, color: stri
   c.save(); c.globalAlpha = alpha; c.font = `${weight} ${size}px ${FONT}`; c.textAlign = "center"; c.textBaseline = "middle";
   c.shadowColor = color; c.shadowBlur = blur; c.fillStyle = "#fff"; c.fillText(s, x, y); c.restore();
 }
-function beam(c: Ctx, x1: number, y1: number, x2: number, y2: number, color: string, t: number, a = 1) {
-  c.save(); c.globalAlpha = a; c.lineCap = "round";
-  c.shadowColor = color; c.shadowBlur = 16; c.strokeStyle = color; c.lineWidth = 3; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
-  c.shadowBlur = 0; c.strokeStyle = "#fff"; c.lineWidth = 1.2; c.stroke();
-  const p = (t * 1.2) % 1;
-  c.fillStyle = "#fff"; c.shadowColor = color; c.shadowBlur = 12; c.beginPath(); c.arc(x1 + (x2 - x1) * p, y1 + (y2 - y1) * p, 3.2, 0, 6.283); c.fill();
-  c.restore();
-}
-const POOL = ["选择", "造成", "恢复", "友方", "敌方", "减伤", "重复", "延后", "并", "持续", "转移", "移除", "灼烧", "易伤"];
-const POOLC = [COL.cyan, COL.magenta, COL.amber, COL.green, COL.violet];
+
+// ---------- 各场景 ----------
 
 // ---------- 各场景 ----------
 type Draw = (c: Ctx, ts: number, dur: number, e: Env) => void;
 
-/** S1 夜城：雨、霓虹、缓慢推进 */
-const city: Draw = (c, ts, dur, e) => {
-  const p = ts / dur, s = lerp(1, 1.14, easeInOut(p)), dy = lerp(18, -14, p), dx = Math.sin(ts * 0.3) * 10;
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  drawBg(c, e.bgNormal, s, dx, dy);
-  flicker(c, e.signs, ts, s, dx, dy, 1);
-  fog(c, ts, COL.magenta, 0.9);
-  const vx = ((ts * 70 + 200) % 1500) - 100;
-  c.save(); c.globalCompositeOperation = "lighter"; glow(c, vx, 190 + Math.sin(ts) * 6, 26, COL.cyan, 0.9); c.fillStyle = hexA(COL.red, 0.9); c.fillRect(vx + 7, 188, 3, 3); glow(c, vx - 40, 192, 70, COL.cyan, 0.12); c.restore();
-  ripples(c, ts); rain(c, ts, 1);
-};
+/** 镜头：以世界坐标 (fx,fy) 为焦点缩放 s，并把焦点放到屏幕 (tx,ty)。需配合 c.restore() */
+function cam(c: Ctx, s: number, fx: number, fy: number, tx = fx, ty = fy) { c.save(); c.translate(tx, ty); c.scale(s, s); c.translate(-fx, -fy); }
+function bgWorld(c: Ctx, bg: Cv) { c.drawImage(bg, W / 2 - BW / 2, H / 2 - BH / 2); }
+function black(c: Ctx) { c.fillStyle = "#000"; c.fillRect(-W, -H, W * 3, H * 3); }
 
-/** S2 词牌升空：行人头顶飞出词牌，天空里漂满发光的词 */
-const words: Draw = (c, ts, dur, e) => {
-  const p = ts / dur; const s = lerp(1.1, 1.0, easeOut(p * 1.4));
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  drawBg(c, e.bgNormal, s);
-  c.globalAlpha = clamp((p - 0.15) / 0.6) * 0.8; drawBg(c, e.bgRuin, s); c.globalAlpha = 1;
-  flicker(c, e.signs, ts, s, 0, 0, lerp(1, 0.6, p));
-  const R = rng(55);
-  for (let i = 0; i < 6; i++) {
-    const x = 120 + i * 200 + R() * 60, y = 640 + R() * 40, k = 0.8 + R() * 0.5, t0 = 0.6 + i * 0.7;
-    c.save(); c.translate(x, y); c.scale(k, k); c.fillStyle = "#050210";
-    c.beginPath(); c.arc(0, -108, 13, 0, 6.283); c.fill();
-    c.beginPath(); c.moveTo(-18, -92); c.lineTo(18, -92); c.lineTo(24, -10); c.lineTo(-24, -10); c.closePath(); c.fill();
-    c.fillRect(-14, -12, 10, 60); c.fillRect(4, -12, 10, 60);
-    c.strokeStyle = "rgba(25,230,255,.35)"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-24, -10); c.lineTo(-18, -92); c.lineTo(18, -92); c.stroke();
-    c.restore();
-    const q = (ts - t0) / 3.6;
-    if (q > 0 && q < 1) {
-      const gx = x + Math.sin(q * 5 + i) * 26, gy = y - 120 * k - q * 520;
-      c.save(); c.globalCompositeOperation = "lighter"; blit(c, glyphSprite(POOL[(i * 2) % POOL.length], POOLC[i % 5]), gx, gy, 0.8 + q * 0.7, q * 3 * (i % 2 ? 1 : -1), 1 - q * q);
-      c.restore();
-    }
-  }
-  const R2 = rng(3);
-  c.save(); c.globalCompositeOperation = "lighter";
-  for (let i = 0; i < 42; i++) {
-    const x0 = R2() * W, y0 = 120 + R2() * 520, sp = 20 + R2() * 70, t0 = R2() * 7, sz = 0.5 + R2() * 0.9, ph = R2() * 6;
-    const q = ts - t0; if (q < 0) continue;
-    const a = clamp(q / 0.8) * clamp(1.2 - (y0 - sp * q) / 700);
-    blit(c, glyphSprite(POOL[i % POOL.length], POOLC[i % 5]), x0 + Math.sin(q * 0.8 + ph) * 30, y0 - sp * q, sz, q * 0.6 * (i % 2 ? 1 : -1) + ph, a * 0.9);
+/** 立绘：cx 为水平中心，topY 为图顶，hh 为图高；alpha 透明度 */
+function drawChar(c: Ctx, ch: Char, cx: number, topY: number, hh: number, alpha = 1) {
+  const k = hh / ch.ph, dw = ch.pw * k, pad = ch.pad * k;
+  c.save(); c.globalAlpha = alpha; c.drawImage(ch.glow, cx - dw / 2 - pad, topY - pad, ch.glow.width * k, ch.glow.height * k); c.restore();
+}
+
+/** 人形剪影（行人 / 街头对峙者）。(x,y) 为腰部，k 为缩放，rim 为轮廓光色，umbrella 打伞，flip 朝左 */
+function figure(c: Ctx, x: number, y: number, k: number, rim: string, flip = false, umbrella = false, step = 0) {
+  c.save(); c.translate(x, y); c.scale(flip ? -k : k, k); c.fillStyle = "#050210";
+  const sw = Math.sin(step) * 7;
+  c.beginPath(); c.arc(0, -112, 12, 0, 6.283); c.fill();
+  c.fillRect(-5, -102, 10, 12);
+  c.beginPath(); c.moveTo(-22, -92); c.lineTo(22, -92); c.lineTo(25, -34); c.lineTo(30, 14); c.lineTo(-30, 14); c.lineTo(-25, -34); c.closePath(); c.fill();
+  c.beginPath(); c.moveTo(-14, 8); c.lineTo(-9 + sw, 44); c.lineTo(-3 + sw, 44); c.lineTo(0, 8); c.fill();
+  c.beginPath(); c.moveTo(14, 8); c.lineTo(9 - sw, 44); c.lineTo(3 - sw, 44); c.lineTo(0, 8); c.fill();
+  c.strokeStyle = "#050210"; c.lineWidth = 8; c.lineCap = "round";
+  c.beginPath(); c.moveTo(-22, -88); c.lineTo(-30, -40); c.moveTo(22, -88); c.lineTo(umbrella ? 30 : 30, umbrella ? -100 : -40); c.stroke();
+  c.strokeStyle = hexA(rim, 0.6); c.lineWidth = 1.6; c.beginPath(); c.moveTo(-30, 12); c.lineTo(-25, -34); c.lineTo(-22, -92); c.lineTo(22, -92); c.stroke();
+  if (umbrella) {
+    c.fillStyle = "#0a0420"; c.strokeStyle = hexA(rim, 0.6); c.lineWidth = 1.6; c.beginPath(); c.moveTo(-50, -126); c.quadraticCurveTo(0, -186, 50, -126); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(30, -100); c.lineTo(30, -150); c.stroke();
   }
   c.restore();
-  ripples(c, ts); rain(c, ts, 1); fog(c, ts, COL.cyan, 0.5);
-  dim(c, lerp(0.05, 0.25, p));
-};
+}
 
-/** S3 黑客立绘 + 词牌拼成一句 */
-const hacker: Draw = (c, ts, dur, e) => {
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  const s = lerp(1.05, 1.0, ts / dur);
-  drawBg(c, e.bgRuin, s, -20, 0);
-  flicker(c, e.signs, ts, s, -20, 0, 0.7);
-  fog(c, ts, COL.cyan, 0.8);
-  c.save(); c.globalCompositeOperation = "lighter"; glow(c, 930, 690, 330, COL.cyan, 0.12); glow(c, 320, 650, 300, COL.magenta, 0.1); c.restore();
-  const pin = easeOut(ts / 1.4), bob = Math.sin(ts * 1.3) * 3;
-  const hh = 660, ww = hh * (832 / 1216);
-  if (e.portraitGlow && e.portrait) {
-    const px = 940 + (1 - pin) * 80, py = H - hh + 24 + bob;
-    c.save(); c.globalAlpha = pin; c.globalCompositeOperation = "lighter"; glow(c, px, py + hh * 0.45, 330, COL.cyan, 0.16); c.restore();
-    c.save(); c.globalAlpha = pin;
-    c.drawImage(e.portraitGlow, px - ww / 2 - 30, py - 30, ww + 60, hh + 60);
-    c.restore();
-  } else text(c, "黑客", 940, 360, 90, COL.cyan, 0.8);
-  const tiles: [string, string, number, number, number][] = [["选择", COL.cyan, 1.2, 250, 250], ["敌方", COL.magenta, 2.4, 400, 370], ["造成", COL.red, 3.6, 550, 490]];
-  const ready = tiles.filter((t) => ts > t[2]);
-  for (let i = 1; i < ready.length; i++) beam(c, ready[i - 1][3], ready[i - 1][4], ready[i][3], ready[i][4], COL.violet, ts + i, clamp((ts - ready[i][2]) / 0.3));
-  for (const [tx, col, t0, x, y] of tiles) {
-    const q = ts - t0; if (q < 0) continue;
-    const fl = Math.sin(ts * 1.6 + x) * 5;
-    blit(c, tileSprite(tx, col, true), x, y + fl, backOut(q / 0.5), (1 - clamp(q / 0.5)) * -0.3, clamp(q / 0.2));
-    c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, y + fl, 160 * (1 + pulse(q, 0, 0.5)), col, 0.12 + pulse(q, 0, 0.5) * 0.5); c.restore();
-  }
-  // 拼成之后：一道光沿着连线冲向立绘
-  if (ts > 6.6) { const q = clamp((ts - 6.6) / 1.2); const x = lerp(550, 820, q), y = lerp(490, 430, q); c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, y, 120, COL.white, 0.5 * (1 - q * 0.5)); c.restore(); }
-  ripples(c, ts); rain(c, ts, 0.9);
-  dim(c, 0.12);
-};
+/** 披斗篷的词师阿词，脚底在 (x,y)。f：0 背对镜头，1 正对镜头（转身中间会收窄） */
+function mentor(c: Ctx, x: number, y: number, k: number, f: number, t: number) {
+  const sx = f <= 0 ? 1 : Math.max(0.08, Math.abs(Math.cos(f * Math.PI)));
+  c.save(); c.translate(x, y); c.scale(k * sx, k);
+  c.save(); c.fillStyle = "rgba(0,0,0,.5)"; c.beginPath(); c.ellipse(0, 4, 78, 12, 0, 0, 6.283); c.fill(); c.restore();
+  const sway = Math.sin(t * 1.4) * 2;
+  c.fillStyle = "#07031a"; c.strokeStyle = hexA(COL.cyan, 0.7); c.lineWidth = 3; c.lineJoin = "round";
+  c.beginPath(); c.moveTo(-74, 0); c.quadraticCurveTo(-54, -150, -36, -250); c.lineTo(36, -250); c.quadraticCurveTo(56, -150, 76 + sway, 0); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(-40, -250); c.quadraticCurveTo(0, -330, 40, -250); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.arc(0, -282, 30, 0, 6.283); c.fill(); c.stroke();
+  c.beginPath(); c.moveTo(-52, -296); c.quadraticCurveTo(0, -352, 52, -296); c.quadraticCurveTo(0, -318, -52, -296); c.fill(); c.stroke();
+  if (f > 0.5) { c.save(); c.shadowColor = COL.cyan; c.shadowBlur = 14; c.fillStyle = COL.cyan; c.fillRect(-14, -280, 10, 4); c.fillRect(6, -280, 10, 4); c.restore(); }
+  c.strokeStyle = hexA(COL.amber, 0.9); c.lineWidth = 5; c.lineCap = "round"; c.beginPath(); c.moveTo(-96, 4); c.lineTo(-92, -300); c.stroke();
+  c.restore();
+}
 
-/** S4 暗巷训练场：稻草人，词师阿词的全息影像 */
-const mentor: Draw = (c, ts) => {
-  const wake = 5.0;
-  c.fillStyle = "#020008"; c.fillRect(0, 0, W, H);
-  const near = easeInOut(ts / 5.0), back = easeInOut((ts - 5.4) / 2.2), z = 1 + (lerp(0, 0.45, near)) * (1 - back);
-  const fx = lerp(640, 380, near * (1 - back)), fy = lerp(360, 380, near * (1 - back));
-  c.save(); c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-fx, -fy);
-  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#07020f"); g.addColorStop(1, "#150628");
-  c.fillStyle = g; c.fillRect(-300, -300, W + 600, H + 600);
-  c.strokeStyle = "rgba(138,77,255,.07)"; c.lineWidth = 1;
-  for (let y = -200; y < 620; y += 26) { c.beginPath(); c.moveTo(-300, y); c.lineTo(W + 300, y); c.stroke(); }
-  for (let y = -200, r = 0; y < 620; y += 26, r++) for (let x = -300 + (r % 2) * 30; x < W + 300; x += 60) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 26); c.stroke(); }
-  c.fillStyle = "#0c0520"; c.fillRect(-300, 600, W + 600, 400);
-  c.save(); c.globalCompositeOperation = "lighter"; glow(c, 640, 200, 520, COL.magenta, 0.2); glow(c, 260, 600, 380, COL.cyan, 0.08); glow(c, 600, 620, 300, COL.magenta, 0.12); c.restore();
-  c.save(); c.shadowColor = COL.magenta; c.shadowBlur = 22; c.strokeStyle = COL.magenta; c.lineWidth = 4; c.strokeRect(540, 90, 190, 60);
-  c.fillStyle = COL.magenta; c.font = `700 34px ${FONT}`; c.textAlign = "center"; c.textBaseline = "middle"; c.globalAlpha = Math.sin(ts * 27) > 0.9 ? 0.4 : 1; c.fillText("训练场", 635, 121); c.restore();
-  // 稻草人：木桩 + 横杆 + 麻袋头，缝线眼睛
-  c.save(); c.translate(-220, 0); c.fillStyle = "#06020d"; c.strokeStyle = "rgba(255,176,46,.55)"; c.lineWidth = 2;
+/** 零（背影）：连帽衫、双马尾、护目镜已戴上。脚底在 (x,y) */
+function zeroBack(c: Ctx, x: number, y: number, k: number, t: number, walk: number) {
+  const sw = Math.sin(walk) * 10, bob = Math.abs(Math.sin(walk)) * 3;
+  c.save(); c.translate(x, y - bob); c.scale(k, k); c.fillStyle = "#06030f"; c.strokeStyle = hexA(COL.cyan, 0.6); c.lineWidth = 2.5; c.lineJoin = "round";
+  c.beginPath(); c.moveTo(-18, -70); c.lineTo(-10 + sw, 0); c.lineTo(-24 + sw, 0); c.lineTo(-30, -70); c.fill();
+  c.beginPath(); c.moveTo(18, -70); c.lineTo(10 - sw, 0); c.lineTo(24 - sw, 0); c.lineTo(30, -70); c.fill();
+  c.beginPath(); c.moveTo(-40, -40); c.quadraticCurveTo(-52, -190, -30, -214); c.lineTo(30, -214); c.quadraticCurveTo(52, -190, 40, -40); c.closePath(); c.fill(); c.stroke();
+  c.beginPath(); c.arc(0, -246, 28, 0, 6.283); c.fill(); c.stroke();
+  const tail = Math.sin(t * 3.1) * 4;
+  for (const d of [-1, 1]) { c.beginPath(); c.moveTo(d * 20, -258); c.quadraticCurveTo(d * (52 + tail), -240, d * (44 + tail), -196); c.quadraticCurveTo(d * 34, -226, d * 18, -240); c.closePath(); c.fill(); c.stroke(); }
+  c.save(); c.shadowColor = COL.cyan; c.shadowBlur = 10; c.strokeStyle = COL.cyan; c.lineWidth = 3; c.beginPath(); c.moveTo(-27, -250); c.lineTo(27, -250); c.stroke(); c.restore();
+  c.restore();
+}
+
+/** 稻草人，脚底在 (x,y)，lit 为眼睛亮起的程度 0~1 */
+function scarecrow(c: Ctx, x: number, y: number, k: number, lit: number, t: number) {
+  c.save(); c.translate(x, y); c.scale(k, k); c.translate(-600, -610);
+  c.fillStyle = "#06020d"; c.strokeStyle = "rgba(255,176,46,.55)"; c.lineWidth = 2;
   c.beginPath(); c.roundRect(588, 330, 24, 280, 6); c.fill(); c.stroke();
   c.beginPath(); c.roundRect(480, 380, 240, 18, 8); c.fill(); c.stroke();
   c.beginPath(); c.roundRect(540, 396, 120, 110, 20); c.fill(); c.stroke();
   c.beginPath(); c.arc(600, 322, 38, 0, 6.283); c.fill(); c.stroke();
   c.beginPath(); c.moveTo(552, 306); c.lineTo(648, 306); c.lineTo(618, 262); c.lineTo(582, 262); c.closePath(); c.fill(); c.stroke();
-  c.strokeStyle = hexA(COL.red, 0.9); c.lineWidth = 3;
+  c.strokeStyle = hexA(COL.red, 0.9 * (1 - lit)); c.lineWidth = 3;
   for (const ex of [-14, 14]) { c.beginPath(); c.moveTo(600 + ex - 6, 314); c.lineTo(600 + ex + 6, 326); c.moveTo(600 + ex + 6, 314); c.lineTo(600 + ex - 6, 326); c.stroke(); }
-  c.beginPath(); c.moveTo(584, 342); c.lineTo(616, 342); c.stroke();
+  c.strokeStyle = hexA(COL.red, 0.9); c.beginPath(); c.moveTo(584, 342); c.lineTo(616, 342); c.stroke();
   c.strokeStyle = "rgba(255,176,46,.6)"; c.lineWidth = 2;
   for (let i = 0; i < 6; i++) { const sx = 482 + i * 3, sy = 398; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx - 12 - i * 2, sy + 22 + i * 2); c.moveTo(718 - i * 3, sy); c.lineTo(730 + i * 2, sy + 22 + i * 2); c.stroke(); }
-  c.restore();
-  c.save(); c.translate(-220, 0); // 头顶 2 点生命
-  for (let i = 0; i < 2; i++) { c.save(); c.shadowColor = COL.green; c.shadowBlur = 10; c.fillStyle = COL.green; c.beginPath(); c.arc(582 + i * 36, 238, 9, 0, 6.283); c.fill(); c.restore(); }
-  text(c, "HP 2", 600, 212, 20, COL.green, 0.9, 8, 500);
-  c.restore();
-  c.restore();
-  // 阿词：披斗篷的词师，从巷口的阴影里走进霓虹光里
-  if (ts > 5.0) {
-    const q = ts - 5.0, walk = easeOut(q / 2.6), x = lerp(1180, 900, walk), a = clamp(q / 0.8);
-    const step = walk < 0.98 ? Math.abs(Math.sin(q * 5.5)) * 5 : Math.sin(ts * 1.4) * 1.5, y = 596 - step;
-    c.save(); c.globalAlpha = a; c.translate(x, y);
-    c.save(); c.fillStyle = "rgba(0,0,0,.5)"; c.beginPath(); c.ellipse(0, 4, 78, 12, 0, 0, 6.283); c.fill(); c.restore();
-    c.fillStyle = "#07031a"; c.strokeStyle = hexA(COL.cyan, 0.7); c.lineWidth = 3; c.lineJoin = "round";
-    c.beginPath(); c.moveTo(-74, 0); c.quadraticCurveTo(-54, -150, -36, -250); c.lineTo(36, -250); c.quadraticCurveTo(56, -150, 76, 0); c.closePath(); c.fill(); c.stroke();
-    c.beginPath(); c.moveTo(-40, -250); c.quadraticCurveTo(0, -330, 40, -250); c.closePath(); c.fill(); c.stroke();
-    c.beginPath(); c.arc(0, -282, 30, 0, 6.283); c.fill(); c.stroke();
-    c.beginPath(); c.moveTo(-52, -296); c.quadraticCurveTo(0, -352, 52, -296); c.quadraticCurveTo(0, -318, -52, -296); c.fill(); c.stroke();
-    c.save(); c.shadowColor = COL.cyan; c.shadowBlur = 14; c.fillStyle = COL.cyan; c.fillRect(-14, -280, 10, 4); c.fillRect(6, -280, 10, 4); c.restore();
-    c.strokeStyle = hexA(COL.amber, 0.9); c.lineWidth = 5; c.lineCap = "round"; c.beginPath(); c.moveTo(-96, 4); c.lineTo(-92, -300); c.stroke();
-    c.restore();
-    c.save(); c.globalCompositeOperation = "lighter"; glow(c, x + 96, y - 190, 150, COL.cyan, 0.3 * a); c.restore();
-    blit(c, tileSprite("词", COL.cyan, true), x + 96, y - 190 + Math.sin(ts * 2.2) * 8, 0.8, 0.12, a);
-  }
-  rain(c, ts, 0.6); fog(c, ts, COL.magenta, 0.6);
-  dim(c, 0.1 * (1 - clamp((ts - wake) / 1)));
-};
-
-/** S5 时间轴：双方每秒各说一句，先出手的先落下 */
-const timeline: Draw = (c, ts, _dur, e) => {
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  drawBg(c, e.bgNormal, 1.0); dim(c, 0.8);
-  flicker(c, e.signs, ts, 1, 0, 0, 0.25);
-  const x0 = 110, step = 106, yb = 380;
-  const xOf = (s: number) => x0 + (s - 0.5) * step;
-  const cur = x0 + clamp((ts - 0.8) / 6.6) * step * 10;
-  const appear = clamp(ts / 0.6);
-  // 轴
-  c.save(); c.globalAlpha = appear;
-  c.shadowColor = COL.violet; c.shadowBlur = 14; c.strokeStyle = COL.violet; c.lineWidth = 3; c.beginPath(); c.moveTo(x0, yb); c.lineTo(x0 + step * 10, yb); c.stroke(); c.shadowBlur = 0;
-  c.font = `500 18px ${FONT}`; c.textAlign = "center"; c.fillStyle = "#b8a8ff";
-  for (let i = 0; i <= 10; i++) { c.strokeStyle = "rgba(184,168,255,.6)"; c.lineWidth = 1.5; c.beginPath(); c.moveTo(x0 + i * step, yb - 8); c.lineTo(x0 + i * step, yb + 8); c.stroke(); if (i) c.fillText(`${i}`, xOf(i), yb + 34); }
-  c.restore();
-  text(c, "我方", 62, 300, 22, COL.cyan, appear, 8); text(c, "敌方", 62, 460, 22, COL.red, appear, 8);
-  const ev: [number, string, string, boolean, number, string][] = [
-    [1, "造成 3", COL.cyan, true, 0.5, "-3"], [3, "造成 3", COL.red, false, 1.0, "-3"], [4, "恢复 2", COL.green, true, 1.5, "+2"], [6, "造成 4", COL.red, false, 2.0, "-4"],
-  ];
-  for (const [sec, label, col, mine, t0, num] of ev) {
-    const q = ts - t0; if (q < 0) continue; const p = easeOut(q / 0.5);
-    const x = xOf(sec), y = (mine ? 300 : 460) + (1 - p) * (mine ? -40 : 40);
-    const hitT = 0.8 + (sec - 0.5) / 10 * 6.6, hq = ts - hitT, done = hq >= 0;
-    c.save(); c.globalAlpha = p;
-    c.shadowColor = col; c.shadowBlur = done ? 26 : 12;
-    c.beginPath(); c.roundRect(x - 46, y - 22, 92, 44, 8); c.fillStyle = done ? hexA(col, 0.35) : "rgba(10,5,30,.85)"; c.fill(); c.lineWidth = 2.5; c.strokeStyle = col; c.stroke();
-    c.shadowBlur = 0; c.font = `700 20px ${FONT}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = "#fff"; c.fillText(label, x, y + 1);
-    c.strokeStyle = hexA(col, 0.5); c.lineWidth = 1.5; c.setLineDash([4, 5]); c.beginPath(); c.moveTo(x, mine ? y + 22 : y - 22); c.lineTo(x, yb); c.stroke();
-    c.restore();
-    if (done && hq < 1.4) {
-      c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, yb, 120 * (1 + pulse(hq, 0, 0.5)), col, 0.5 * (1 - hq / 1.4)); c.restore();
-      text(c, num, x, yb + (mine ? -90 : 90) - hq * 30 * (mine ? 1 : -1) * -1 * 0 + (mine ? -hq * 30 : hq * 30), 44, col, 1 - hq / 1.4, 18);
-    }
-  }
-  // 游标
-  if (ts > 0.8) {
-    c.save(); c.shadowColor = COL.white; c.shadowBlur = 20; c.strokeStyle = "#fff"; c.lineWidth = 2.5;
-    c.beginPath(); c.moveTo(cur, 230); c.lineTo(cur, 530); c.stroke(); c.restore();
-    c.save(); c.globalCompositeOperation = "lighter"; const lg = c.createLinearGradient(cur - 120, 0, cur, 0); lg.addColorStop(0, "rgba(138,77,255,0)"); lg.addColorStop(1, "rgba(138,77,255,.28)"); c.fillStyle = lg; c.fillRect(cur - 120, 230, 120, 300); c.restore();
-  }
-  rain(c, ts, 0.4);
-  let gl = 0.04; for (const [sec] of ev) gl = Math.max(gl, pulse(ts, 0.8 + (sec - 0.5) / 10 * 6.6, 0.2) * 0.5);
-};
-
-const FAM: [string, string, string, string][] = [["并", COL.cyan, "把句子接长", "并流"], ["续", COL.green, "让效果持续", "续流"], ["择", COL.amber, "目标事后再定", "择流"], ["血", COL.red, "以血换行动", "血流"]];
-/** S6 四个职业 */
-const families: Draw = (c, ts, _dur, e) => {
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  drawBg(c, e.bgNormal, 1.0); dim(c, 0.72);
-  flicker(c, e.signs, ts, 1, 0, 0, 0.3);
-  c.save(); c.strokeStyle = "rgba(138,77,255,.22)"; c.lineWidth = 1;
-  for (let i = 0; i < 12; i++) { const y = 420 + Math.pow(i / 11, 2) * 300 + ((ts * 20) % 1); c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke(); }
-  c.restore();
-  const xs = [0, 1, 2, 3].map((i) => 190 + i * 300);
-  FAM.forEach(([ch, col, sub, name], i) => {
-    const t0 = 0.6 + i, q = ts - t0, x = xs[i], y = 330;
-    const on = clamp(q / 0.35), kick = pulse(q, 0, 0.5);
-    c.save(); c.translate(x, y + (1 - easeOut(q / 0.5)) * 40); c.globalAlpha = 0.25 + on * 0.75;
-    const w = 220, h = 380;
-    c.shadowColor = col; c.shadowBlur = on * (22 + kick * 30);
-    c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, 16);
-    const g = c.createLinearGradient(0, -h / 2, 0, h / 2); g.addColorStop(0, hexA(col, 0.18 * on)); g.addColorStop(1, "rgba(8,4,24,.85)");
-    c.fillStyle = g; c.fill(); c.lineWidth = 3; c.strokeStyle = on > 0.1 ? col : "#3a3350"; c.stroke();
-    c.restore();
-    if (on > 0) {
-      text(c, ch, x, y - 40, 150 + kick * 20, col, on, 30);
-      text(c, name, x, y + 80, 28, col, on, 10);
-      text(c, sub, x, y + 128, 22, "#d8d0ff", on * 0.9, 4, 500);
-      c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, y - 40, 190 * (1 + kick * 0.5), col, 0.15 + kick * 0.3); c.restore();
-    }
-  });
-  if (ts > 4.1) for (let i = 0; i < 3; i++) beam(c, xs[i] + 112, 330, xs[i + 1] - 112, 330, COL.violet, ts + i * 0.3, clamp((ts - 4.1) / 0.5));
-  rain(c, ts, 0.4);
-};
-
-/** S7 拼出第一句「选择 1 敌方 造成 1」，标题《词战》 */
-const assemble: Draw = (c, ts, dur, e) => {
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  const zoom = 1 + easeOut(ts / dur) * 0.06;
-  drawBg(c, e.bgNormal, zoom); dim(c, lerp(0.7, 0.45, clamp(ts / 5)));
-  flicker(c, e.signs, ts, zoom, 0, 0, 0.6);
-  fog(c, ts, COL.cyan, 0.7);
-  const seq: [string, string, number][] = [["选择", COL.cyan, 1.2], ["1", COL.white, 1.9], ["敌方", COL.magenta, 2.6], ["造成", COL.red, 3.3], ["1", COL.white, 4.0]];
-  const xs = seq.map((_, i) => 160 + i * 240), y = 330;
-  const disp = clamp((ts - 5.0) / 0.5);
-  const fire = pulse(ts, 4.5, 0.6);
-  for (let i = 1; i < 5; i++) if (ts > seq[i][2]) beam(c, xs[i - 1] + 70, y, xs[i] - 70, y, COL.violet, ts + i, clamp((ts - seq[i][2]) / 0.3) * (1 - disp));
-  seq.forEach(([tx, col, t0], i) => {
-    const q = ts - t0; if (q < 0) return;
-    const fromX = i % 2 ? W + 120 : -120, fromY = i % 2 ? 80 : 640;
-    const p = easeOut(q / 0.55);
-    const x = lerp(fromX, xs[i], p), yy = lerp(fromY, y, p) + Math.sin(ts * 2 + i) * 3 * p;
-    blit(c, tileSprite(tx, col, true), lerp(x, 640, disp), lerp(yy, y, disp), (1 + pulse(q - 0.5, 0, 0.3) * 0.25 + fire * 0.12) * (1 - disp * 0.6), (1 - p) * (i % 2 ? 0.8 : -0.8), 1 - disp);
-    c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, yy, 180 * (1 + pulse(q - 0.5, 0, 0.5)), col, 0.12 + pulse(q - 0.5, 0, 0.5) * 0.45 + fire * 0.2); c.restore();
-  });
-  const fl = pulse(ts, 5.0, 0.8);
-  if (fl > 0) { c.fillStyle = `rgba(255,245,255,${fl * 0.85})`; c.fillRect(0, 0, W, H); }
-  if (ts > 5.1) {
-    const q = ts - 5.1;
+  if (lit > 0) {
     c.save(); c.globalCompositeOperation = "lighter";
-    glow(c, 640, 300, 420 + Math.sin(ts * 2) * 20, COL.magenta, 0.2); glow(c, 640, 300, 300, COL.cyan, 0.16);
+    const fl = lit * (0.85 + Math.sin(t * 9) * 0.1);
+    for (const ex of [-14, 14]) { glow(c, 600 + ex, 320, 70 * lit, COL.cyan, 0.7 * fl); c.fillStyle = hexA("#d8fbff", fl); c.beginPath(); c.arc(600 + ex, 320, 6.5, 0, 6.283); c.fill(); }
+    glow(c, 600, 330, 220 * lit, COL.cyan, 0.18 * fl);
     c.restore();
+  }
+  c.restore();
+}
+
+/** 暗巷背景：透视的两面墙、地面、灯，消失点 (640,330)；near 越大越近 */
+function alleyBg(c: Ctx, ts: number) {
+  black(c);
+  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#06020f"); g.addColorStop(0.5, "#160628"); g.addColorStop(1, "#05010c");
+  c.fillStyle = g; c.fillRect(-W, -H, W * 3, H * 3);
+  const wall = (side: number) => {
+    const sx = side < 0 ? 0 : W;
+    c.beginPath(); c.moveTo(sx, -60); c.lineTo(side < 0 ? 520 : 760, 250); c.lineTo(side < 0 ? 520 : 760, 420); c.lineTo(sx, 780); c.closePath();
+    const wg = c.createLinearGradient(sx, 0, 640, 0); wg.addColorStop(0, "#0b0420"); wg.addColorStop(1, "#1a0a34"); c.fillStyle = wg; c.fill();
+    c.strokeStyle = "rgba(138,77,255,.22)"; c.lineWidth = 1.5; c.stroke();
+    // 砖缝
+    c.save(); c.clip(); c.strokeStyle = "rgba(138,77,255,.1)";
+    for (let i = 0; i < 9; i++) { const d = i / 9; c.beginPath(); c.moveTo(sx, lerp(-60, 780, d)); c.lineTo(side < 0 ? 520 : 760, lerp(250, 420, d)); c.stroke(); }
+    c.restore();
+  };
+  wall(-1); wall(1);
+  c.beginPath(); c.moveTo(0, 780); c.lineTo(W, 780); c.lineTo(760, 420); c.lineTo(520, 420); c.closePath();
+  const fg = c.createLinearGradient(0, 420, 0, 780); fg.addColorStop(0, "#1b0a33"); fg.addColorStop(1, "#06020f"); c.fillStyle = fg; c.fill();
+  // 沿墙的霓虹条与灯（越靠近消失点越小）
+  c.save(); c.globalCompositeOperation = "lighter";
+  const cols = [COL.magenta, COL.cyan, COL.violet, COL.amber, COL.cyan];
+  for (let i = 0; i < 5; i++) {
+    const d = i / 5, x = lerp(70, 500, d), y = lerp(180, 300, d), r = lerp(70, 18, d);
+    for (const side of [-1, 1]) {
+      const px = side < 0 ? x : W - x; const f = 0.75 + Math.sin(ts * 2 + i * 1.7 + side) * 0.2 + (Math.sin(ts * 21 + i * 5) > 0.95 ? -0.4 : 0);
+      glow(c, px, y, r * 4, cols[(i + (side < 0 ? 0 : 2)) % 5], 0.22 * f);
+      c.fillStyle = hexA(cols[(i + (side < 0 ? 0 : 2)) % 5], 0.8 * f); c.fillRect(px - r * 0.14, y - r * 1.5, r * 0.28, r * 3);
+    }
+  }
+  glow(c, 640, 360, 300, COL.magenta, 0.35); glow(c, 640, 380, 120, COL.white, 0.14);
+  // 地面湿反光
+  for (let i = -6; i <= 6; i++) { c.strokeStyle = hexA(i % 2 ? COL.cyan : COL.magenta, 0.06); c.lineWidth = 2; c.beginPath(); c.moveTo(640 + i * 12, 420); c.lineTo(640 + i * 150, 780); c.stroke(); }
+  c.restore();
+}
+
+/** S1 街头：两个人互相把词吐出来砸向对方，围观者照常走路 */
+const street: Draw = (c, ts, dur, e) => {
+  const p = ts / dur, s = lerp(1.0, 1.22, easeInOut(p)), fx = lerp(560, 640, p);
+  black(c); cam(c, s, fx, 330, 640, 360);
+  bgWorld(c, e.bgNormal); flicker(c, e.signs, ts, 1, 0, 0, 1); fog(c, ts, COL.magenta, 0.8);
+  // 路人：在后面一层，照常走过去，打伞，看都不看
+  const walkers: [number, number, number, boolean][] = [[-100, 60, 0, false], [1380, -48, 1.7, true], [-500, 74, 3.1, false], [1900, -64, 5, true]];
+  walkers.forEach(([x0, sp, off, flip], i) => {
+    const x = x0 + sp * (ts + off), y = 458 + (i % 2) * 8, k = 0.95 - (i % 2) * 0.08;
+    figure(c, x, y, k, i % 2 ? COL.magenta : COL.cyan, sp < 0, i % 2 === 0, ts * 6 + i);
+    void flip;
+  });
+  // 两个对峙的人
+  const L = { x: 450, col: COL.cyan }, R = { x: 830, col: COL.magenta }, y = 470, k = 1.45;
+  const volleys: [number, boolean, string][] = [[0.9, true, "闭嘴"], [2.5, false, "你错了"], [4.1, true, "滚开"], [5.5, false, "胡说"], [6.9, true, "认输"], [8.0, false, "你输了"]];
+  let recoilL = 0, recoilR = 0;
+  const flights: (() => void)[] = [];
+  for (const [t0, fromL, word] of volleys) {
+    const q = (ts - t0) / 0.8; if (q < 0) continue;
+    const ax = fromL ? L.x + 22 * k : R.x - 22 * k, bx = fromL ? R.x - 14 * k : L.x + 14 * k, my = y - 108 * k, by = y - 70 * k;
+    if (q < 1) {
+      const px = lerp(ax, bx, easeInOut(q)), py = lerp(my, by, q) - Math.sin(q * Math.PI) * 60, sc = lerp(0.2, 0.6, easeOut(q * 1.5));
+      flights.push(() => { c.save(); c.globalCompositeOperation = "lighter"; glow(c, px, py, 70, fromL ? COL.cyan : COL.magenta, 0.5); c.restore(); blit(c, tileSprite(word, fromL ? COL.cyan : COL.magenta), px, py, sc, (fromL ? 1 : -1) * 0.25 * (1 - q), 1); });
+    } else if (q < 1.9) {
+      const h = q - 1; const col = fromL ? COL.cyan : COL.magenta;
+      flights.push(() => { c.save(); c.globalCompositeOperation = "lighter"; glow(c, bx, by, 150 * (1 + h * 0.6), col, 0.6 * (1 - h / 0.9)); c.restore(); blit(c, tileSprite(word, col), bx + (fromL ? 1 : -1) * h * 30, by + h * 24, 0.6 - h * 0.15, (fromL ? 1 : -1) * h * 0.6, 1 - h / 0.9); });
+      if (fromL) recoilR = Math.max(recoilR, (1 - h / 0.9) * 16); else recoilL = Math.max(recoilL, (1 - h / 0.9) * 16);
+    }
+  }
+  figure(c, L.x - recoilL, y, k, L.col, false, false, 0);
+  figure(c, R.x + recoilR, y, k, R.col, true, false, 0);
+  flights.forEach((f) => f());
+  c.restore();
+  ripples(c, ts); rain(c, ts, 1);
+  dim(c, 0.08);
+};
+
+/** 屋顶底图：夜城远景 + 天台边缘。zoom 与焦点由调用方给 */
+function roofBack(c: Ctx, ts: number, e: Env) {
+  bgWorld(c, e.bgRuin); flicker(c, e.signs, ts, 1, 0, 0, 0.5); fog(c, ts, COL.cyan, 0.7);
+  c.fillStyle = "rgba(3,1,10,.45)"; c.fillRect(-W, -H, W * 3, H * 3);
+  // 天线与水塔剪影
+  c.fillStyle = "#050210"; c.fillRect(1010, 330, 5, 230); c.fillRect(990, 380, 45, 3); c.fillRect(1000, 420, 25, 3);
+  c.beginPath(); c.roundRect(90, 440, 150, 130, 6); c.fill(); c.fillRect(110, 560, 6, 30); c.fillRect(214, 560, 6, 30);
+  c.save(); c.globalCompositeOperation = "lighter"; glow(c, 1012, 330, 20, COL.red, 0.5 + Math.sin(ts * 3) * 0.4); c.restore();
+}
+function roofFront(c: Ctx) {
+  const g = c.createLinearGradient(0, 505, 0, 700); g.addColorStop(0, "#150a2e"); g.addColorStop(1, "#030108");
+  c.fillStyle = g; c.fillRect(-W, 505, W * 3, 500);
+  c.fillStyle = "rgba(138,77,255,.5)"; c.fillRect(-W, 505, W * 3, 3);
+}
+
+/** S2 天台：零独自坐着，身边只剩三个字 */
+const rooftop: Draw = (c, ts, dur, e) => {
+  const p = ts / dur, s = lerp(1.0, 1.22, easeInOut(p));
+  black(c); cam(c, s, 640, 330, 640, 360);
+  roofBack(c, ts, e);
+  // 空空的词牌轮廓：淡淡地飘散
+  const R = rng(21);
+  c.save(); c.setLineDash([6, 6]); c.lineWidth = 1.5;
+  for (let i = 0; i < 9; i++) {
+    const x = 160 + R() * 960, y0 = 140 + R() * 330, ph = R() * 6, q = ts * 0.12 + R();
+    c.strokeStyle = `rgba(184,168,255,${0.2 * clamp(1 - ts / 5.5) * (0.6 + Math.sin(ts + ph) * 0.4)})`;
+    c.beginPath(); c.roundRect(x + Math.sin(q * 5 + ph) * 18, y0 - ts * 8, 78, 44, 7); c.stroke();
+  }
+  c.restore();
+  const bob = Math.sin(ts * 1.2) * 2.5;
+  const topY = 70 + bob, hh = 500;
+  if (e.zero) {
+    c.save(); c.globalCompositeOperation = "lighter"; glow(c, 640, 360, 300, COL.cyan, 0.13); c.restore();
+    drawChar(c, e.zero, 640, topY, hh, easeOut(ts / 1.2));
+  } else text(c, "零", 640, 360, 120, COL.cyan, 0.8);
+  roofFront(c);
+  // 三个字：在她头顶一张张亮起
+  const k = hh / 1216, ux = (u: number) => 640 - (832 * k) / 2 + u * k, vy = (v: number) => topY + v * k;
+  const tri: [string, string, number, number, number][] = [["选择", COL.cyan, 4.6, ux(130), vy(130)], ["敌方", COL.magenta, 5.4, ux(420), vy(30)], ["造成", COL.red, 6.2, ux(710), vy(130)]];
+  for (const [tx, col, t0, x, y] of tri) {
+    const q = ts - t0; if (q < 0) continue;
+    const fl = Math.sin(ts * 1.5 + x) * 6;
+    blit(c, tileSprite(tx, col), x, y + fl, backOut(q / 0.5) * 0.9, (1 - clamp(q / 0.5)) * -0.3, clamp(q / 0.25));
+    c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, y + fl, 120 * (1 + pulse(q, 0, 0.5)), col, 0.12 + pulse(q, 0, 0.6) * 0.5); c.restore();
+  }
+  c.restore();
+  ripples(c, ts * 0.0 + 1); rain(c, ts, 0.8);
+  dim(c, 0.1);
+};
+
+/** S3 键盘旁亮起一道光，随从小剑出现 */
+const sword: Draw = (c, ts, dur, e) => {
+  const p = ts / dur, s = lerp(1.1, 1.0, easeOut(p));
+  black(c); cam(c, s, 640, 330, 640, 360);
+  roofBack(c, ts, e);
+  const zx = 470, topY = 70, hh = 500, k = hh / 1216;
+  const kbx = zx - (832 * k) / 2 + 520 * k, kby = topY + 780 * k; // 键盘位置
+  const lightT = 4.6;
+  if (e.zero) { c.save(); c.globalCompositeOperation = "lighter"; glow(c, zx, 360, 280, COL.cyan, 0.12); c.restore(); drawChar(c, e.zero, zx, topY, hh, 1); }
+  else text(c, "零", zx, 360, 120, COL.cyan, 0.8);
+  roofFront(c);
+  // 亮光：从键盘旁升起，凝成小剑
+  const q = ts - lightT;
+  if (q > 0) {
+    const rise = easeOut(q / 1.0), swx = lerp(kbx + 80, 900, easeOut(q / 1.6)), swy = lerp(kby, 330, rise);
+    c.save(); c.globalCompositeOperation = "lighter";
+    glow(c, kbx, kby, 130 * (1 + pulse(q, 0, 0.8) * 0.8), COL.amber, 0.4 * clamp(q / 0.2) * (1 - clamp((q - 1.4) / 1.2) * 0.6));
+    const bw = 90 * (1 - clamp(q / 1.4)); if (bw > 1) { const bg = c.createLinearGradient(kbx - bw, 0, kbx + bw, 0); bg.addColorStop(0, hexA(COL.amber, 0)); bg.addColorStop(0.5, hexA(COL.amber, 0.45)); bg.addColorStop(1, hexA(COL.amber, 0)); c.fillStyle = bg; c.fillRect(kbx - bw, kby - 300, bw * 2, 300); }
+    c.restore();
+    if (e.sword) {
+      const a = clamp((q - 0.5) / 0.9), shh = lerp(280, 400, easeOut((q - 0.5) / 1.6));
+      c.save(); c.globalCompositeOperation = "lighter"; glow(c, swx, swy + 60, 240, COL.amber, 0.3 * a); c.restore();
+      drawChar(c, e.sword, swx, swy - shh * 0.35 + Math.sin(ts * 1.6) * 4, shh, a);
+    } else {
+      c.save(); c.globalCompositeOperation = "lighter"; glow(c, swx, swy, 140, COL.amber, 0.5 * clamp(q / 0.8)); c.restore();
+    }
+    const fl = pulse(q, 0, 0.5); if (fl > 0) { c.save(); c.globalCompositeOperation = "lighter"; c.fillStyle = hexA(COL.amber, fl * 0.2); c.fillRect(-W, -H, W * 3, H * 3); c.restore(); }
+  }
+  c.restore();
+  rain(c, ts, 0.8);
+  dim(c, 0.08);
+};
+
+/** S4 屏幕跳出匿名消息；零犹豫，戴上护目镜，站起来 */
+const message: Draw = (c, ts, dur, e) => {
+  black(c);
+  // 背景：天台，慢推向消息卡片所在的位置
+  const s = lerp(1.0, 1.12, easeInOut(ts / dur));
+  cam(c, s, 640, 360, 640, 360);
+  roofBack(c, ts, e); roofFront(c);
+  c.fillStyle = "rgba(3,1,10,.55)"; c.fillRect(-W, -H, W * 3, H * 3);
+  // 零：近景，低头看屏幕 -> 抬头 -> 护目镜落下 -> 站起
+  const rise = easeInOut((ts - 5.8) / 1.8), hh = 520, topY = lerp(60, 30, rise), cx = 360;
+  if (e.zero) {
+    drawChar(c, e.zero, cx, topY, hh, 1 - clamp((ts - 7.0) / 0.8) * 0.0);
+    const g = clamp((ts - 4.6) / 0.5);
+    if (g > 0) { // 护目镜：镜片先亮起一道光，再落到眼前
+      const k = hh / 1216, ux = (u: number) => cx - (832 * k) / 2 + u * k, vy = (v: number) => topY + v * k;
+      c.save(); c.globalCompositeOperation = "lighter"; glow(c, ux(530), vy(245), 150 * k * 2, COL.cyan, 0.5 * pulse(ts, 4.6, 1.2)); c.restore();
+      const dn = easeOut((ts - 5.0) / 0.5);
+      if (dn > 0) {
+        c.save(); c.globalAlpha = 0.3 * dn; c.fillStyle = hexA(COL.cyan, 0.8); c.shadowColor = COL.cyan; c.shadowBlur = 10;
+        c.beginPath(); c.roundRect(ux(300), vy(lerp(300, 345, dn)), 215 * k, 50 * k, 12 * k); c.fill(); c.restore();
+      }
+    }
+  }
+  c.restore();
+  // 消息卡片（屏幕上弹出的一条）
+  const q = ts - 0.6;
+  if (q > 0) {
+    const a = easeOut(q / 0.5) * (1 - clamp((ts - 5.2) / 0.5)), py = 365 + (1 - easeOut(q / 0.5)) * 40 + clamp((ts - 5.2) / 0.5) * 20;
+    c.save(); c.globalAlpha = a; c.translate(900, py);
+    c.shadowColor = COL.cyan; c.shadowBlur = 26;
+    c.beginPath(); c.roundRect(-250, -118, 500, 236, 14);
+    const g2 = c.createLinearGradient(0, -118, 0, 118); g2.addColorStop(0, "rgba(10,28,44,.94)"); g2.addColorStop(1, "rgba(6,12,28,.94)");
+    c.fillStyle = g2; c.fill(); c.lineWidth = 2.5; c.strokeStyle = COL.cyan; c.stroke(); c.shadowBlur = 0;
+    c.textAlign = "left"; c.textBaseline = "middle";
+    c.font = `500 20px ${FONT}`; c.fillStyle = hexA(COL.cyan, 0.85); c.fillText("匿名消息", -218, -80);
+    c.strokeStyle = "rgba(25,230,255,.25)"; c.lineWidth = 1; c.beginPath(); c.moveTo(-218, -56); c.lineTo(218, -56); c.stroke();
+    c.font = `700 30px ${FONT}`; c.fillStyle = "#fff";
+    const body = "想要回你的词，";
+    const body2 = "到巷子最深处。";
+    const n1 = Math.floor(clamp((ts - 1.2) / 1.4) * body.length), n2 = Math.floor(clamp((ts - 2.6) / 1.4) * body2.length);
+    c.fillText(body.slice(0, n1), -218, -14); c.fillText(body2.slice(0, n2), -218, 30);
+    if (ts > 4.0) { c.font = `500 24px ${FONT}`; c.fillStyle = hexA(COL.cyan, clamp((ts - 4.0) / 0.5)); c.textAlign = "right"; c.fillText("——阿词", 218, 82); }
+    c.restore();
+  }
+  rain(c, ts, 0.6);
+  dim(c, 0.06);
+};
+
+/** S5 暗巷：零一步步走进雨里，尽头披斗篷的阿词背对着她，身旁立着稻草人 */
+const alley: Draw = (c, ts, dur, _e) => {
+  const p = ts / dur, z = lerp(1.0, 1.5, easeInOut(p));
+  black(c); cam(c, z, 640, 400, 640, 430);
+  alleyBg(c, ts);
+  // 尽头的两个人
+  mentor(c, 620, 405, 0.42, 0, ts); scarecrow(c, 722, 405, 0.4, 0, ts);
+  // 零：背影，越走越远
+  const q = easeInOut(ts / (dur - 0.5)), y = lerp(640, 470, q), k = lerp(1.15, 0.62, q);
+  zeroBack(c, lerp(480, 530, q), y, k, ts, ts * 5.2 * lerp(1, 0.7, q));
+  c.restore();
+  ripples(c, ts); rain(c, ts, 1); fog(c, ts, COL.magenta, 0.5);
+  dim(c, lerp(0.15, 0.0, p));
+};
+
+/** S6 阿词转身；零的背影在前景，稻草人的眼睛亮起 */
+const turn: Draw = (c, ts, dur, e) => {
+  const p = ts / dur, z = lerp(2.3, 2.55, easeInOut(p));
+  black(c); cam(c, z, 660, 400, 720, 470);
+  alleyBg(c, ts);
+  const f = easeInOut((ts - 0.5) / 1.0), lit = easeOut((ts - 5.8) / 1.2);
+  mentor(c, 620, 405, 0.42, f, ts); scarecrow(c, 722, 405, 0.4, lit, ts);
+  c.restore();
+  // 前景：零的背影（越肩镜头）
+  zeroBack(c, 150, 930, 2.6, ts, 0);
+  c.save(); c.globalCompositeOperation = "lighter"; glow(c, 880, 330, 340, COL.cyan, 0.1 + lit * 0.12); c.restore();
+  void e;
+  rain(c, ts, 1); fog(c, ts, COL.magenta, 0.4);
+  dim(c, 0.05);
+};
+
+/** S7 稻草人的光漫开，化为标题《词战》 */
+const title: Draw = (c, ts, dur, e) => {
+  black(c);
+  const z = lerp(2.55, 3.4, easeInOut(ts / dur));
+  cam(c, z, 722, 330, 640, 330);
+  alleyBg(c, ts); scarecrow(c, 722, 405, 0.4, 1, ts);
+  c.restore();
+  const wash = clamp(ts / 2.6);
+  c.fillStyle = `rgba(3,1,10,${lerp(0.1, 0.86, easeInOut(wash))})`; c.fillRect(0, 0, W, H);
+  c.save(); c.globalCompositeOperation = "lighter"; glow(c, 640, 300, 460 + Math.sin(ts * 2) * 20, COL.cyan, 0.16 * easeInOut(wash)); glow(c, 640, 300, 320, COL.magenta, 0.12 * easeInOut(wash)); c.restore();
+  // 三个字缓缓升空
+  const tri: [string, string, number, number][] = [["选择", COL.cyan, 0, 230], ["敌方", COL.magenta, 0.35, 1040], ["造成", COL.red, 0.7, 150]];
+  for (const [tx, col, d, bx] of tri) { const q = (ts - 0.4 - d) / 3.4; if (q > 0 && q < 1) blit(c, tileSprite(tx, col), bx + Math.sin(q * 4) * 20, 600 - q * 420, 0.8, 0.2 * (d - 0.35), Math.sin(q * Math.PI) * 0.7); }
+  const q = ts - 1.2;
+  if (q > 0) {
     c.save(); c.globalAlpha = clamp((q - 0.8) / 0.6); c.font = `700 24px ${FONT}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = COL.cyan; c.shadowColor = COL.cyan; c.shadowBlur = 14;
     if ("letterSpacing" in c) (c as unknown as { letterSpacing: string }).letterSpacing = "14px";
     c.fillText("WORD  COMBAT", 640 + 7, 452); c.restore();
     c.save(); c.globalAlpha = clamp((q - 1) / 0.6) * 0.8; c.strokeStyle = COL.magenta; c.shadowColor = COL.magenta; c.shadowBlur = 12; c.lineWidth = 2;
     const L = 220 * easeOut((q - 1) / 0.8); c.beginPath(); c.moveTo(640 - L, 480); c.lineTo(640 + L, 480); c.stroke(); c.restore();
   }
-  rain(c, ts, 0.5);
+  rain(c, ts, 0.6);
+  void e;
 };
 
-export const SCENES: Record<SceneId, Draw> = { city, words, hacker, mentor, timeline, families, assemble };
+export const SCENES: Record<SceneId, Draw> = { street, rooftop, sword, message, alley, turn, title };
 
 // ---------- 环境构建（一次） ----------
-export async function buildEnv(portraitUrl: string | null): Promise<Env> {
+function loadImg(url: string | null): Promise<HTMLImageElement | null> {
+  if (!url) return Promise.resolve(null);
+  return new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = url; });
+}
+/** 立绘 -> 带描边发光的精灵 */
+function makeChar(img: HTMLImageElement | null, color: string, rim: [string, string]): Char | null {
+  if (!img) return null;
+  const pw = 460, ph = Math.round((460 * img.height) / img.width), pad = 30;
+  const [gc, g] = mk(pw + pad * 2, ph + pad * 2);
+  const [tc, t] = mk(pw, ph); t.drawImage(img, 0, 0, pw, ph); t.globalCompositeOperation = "source-in"; t.fillStyle = color; t.fillRect(0, 0, pw, ph);
+  g.filter = "blur(10px)"; g.globalAlpha = 0.85; g.drawImage(tc, pad, pad); g.filter = "none"; g.globalAlpha = 1;
+  g.drawImage(img, pad, pad, pw, ph);
+  const [rc, r] = mk(pw, ph); r.drawImage(img, 0, 0, pw, ph); r.globalCompositeOperation = "source-in";
+  const lg = r.createLinearGradient(0, 0, pw, 0); lg.addColorStop(0, rim[0]); lg.addColorStop(0.5, "rgba(0,0,0,0)"); lg.addColorStop(1, rim[1]);
+  r.fillStyle = lg; r.fillRect(0, 0, pw, ph);
+  g.globalCompositeOperation = "lighter"; g.drawImage(rc, pad, pad); g.globalCompositeOperation = "source-over";
+  return { glow: gc, pw, ph, pad };
+}
+export async function buildEnv(zeroUrl: string | null, swordUrl: string | null): Promise<Env> {
   const a = buildCity(false, 11), b = buildCity(true, 11);
-  let portrait: HTMLImageElement | null = null, portraitGlow: Cv | null = null;
-  if (portraitUrl) {
-    portrait = await new Promise<HTMLImageElement | null>((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = portraitUrl; });
-    if (portrait) {
-      const pw = 460, ph = Math.round((460 * portrait.height) / portrait.width), pad = 30;
-      const [gc, g] = mk(pw + pad * 2, ph + pad * 2);
-      const [tc, t] = mk(pw, ph); t.drawImage(portrait, 0, 0, pw, ph); t.globalCompositeOperation = "source-in"; t.fillStyle = COL.cyan; t.fillRect(0, 0, pw, ph);
-      g.filter = "blur(10px)"; g.globalAlpha = 0.85; g.drawImage(tc, pad, pad); g.filter = "none"; g.globalAlpha = 1;
-      g.drawImage(portrait, pad, pad, pw, ph);
-      const [rc, r] = mk(pw, ph); r.drawImage(portrait, 0, 0, pw, ph); r.globalCompositeOperation = "source-in";
-      const lg = r.createLinearGradient(0, 0, pw, 0); lg.addColorStop(0, "rgba(255,47,160,.55)"); lg.addColorStop(0.5, "rgba(255,47,160,0)"); lg.addColorStop(1, "rgba(25,230,255,.4)");
-      r.fillStyle = lg; r.fillRect(0, 0, pw, ph);
-      g.globalCompositeOperation = "lighter"; g.drawImage(rc, pad, pad); g.globalCompositeOperation = "source-over";
-      portraitGlow = gc;
-    }
-  }
-  return { bgNormal: a.cv, bgRuin: b.cv, signs: a.signs, portrait, portraitGlow };
+  const [zi, si] = await Promise.all([loadImg(zeroUrl), loadImg(swordUrl)]);
+  return {
+    bgNormal: a.cv, bgRuin: b.cv, signs: a.signs,
+    zero: makeChar(zi, COL.cyan, ["rgba(255,47,160,.55)", "rgba(25,230,255,.4)"]),
+    sword: makeChar(si, COL.amber, ["rgba(255,176,46,.5)", "rgba(255,47,160,.3)"]),
+  };
 }

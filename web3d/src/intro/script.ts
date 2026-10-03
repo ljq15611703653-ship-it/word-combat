@@ -1,11 +1,12 @@
 // 开场动画分镜脚本（纯数据）。想改字、改时长、挂音频，只改这个文件即可。
-// 故事来源：教程（src/campaign/levels.ts）的世界观——「词战」里不靠手速、靠拼一句话；
-// 词牌是零件、句子是招式；词师阿词在训练场教新人，对手从稻草人开始；时间轴上谁先出手谁先落下；
-// 并/续/择/血四个职业。整段是第三人称旁观的短片：镜头在夜城里推拉移动，底部只有字幕。
-// 开场结束后，教程第一关由阿词接一句「欢迎来到词战。」。说话人写在 who 里（字幕前显示署名）；旁白不填 who。
+// 故事（序幕）：雨夜夜城，街头一方的词牌从嘴边浮出砸在另一方身上，围观者继续走路 → 天台，黑客少女零独自坐着，
+// 词库几乎是空的，只剩「选择、敌方、造成」三个字 → 键盘旁亮起一道光，随从小剑出现，只会喊「砍！」→ 屏幕跳出匿名消息
+// → 零戴上护目镜站起来，走进暗巷 → 尽头披斗篷的阿词转身，稻草人眼睛亮起 → 标题《词战》。
+// 之后教程第一关由阿词接「别怕。先从你手里这三张牌开始……」。台词不讲规则。
+// 说话人写在 who 里（字幕前显示署名：旁白不填 who，零 / 小剑 / 阿词 / 匿名消息）。
 
 /** 画面场景 id（对应 scenes.ts 里的绘制函数） */
-export type SceneId = "city" | "words" | "hacker" | "mentor" | "timeline" | "families" | "assemble";
+export type SceneId = "street" | "rooftop" | "sword" | "message" | "alley" | "turn" | "title";
 
 /** 一行字幕。at 为相对本镜头开头的秒数，dur 为停留秒数 */
 export interface Line {
@@ -32,78 +33,65 @@ export interface Shot {
   sfx?: { at: number; id: string }[];
 }
 
-const MENTOR = "词师 · 阿词";
-
 export const SHOTS: Shot[] = [
   {
-    id: "S1", scene: "city", dur: 8,
-    note: "夜晚雨街，霓虹招牌闪烁，镜头缓缓推进；标题字「夜城」淡入淡出",
+    id: "S1", scene: "street", dur: 10,
+    note: "雨夜夜城街头，镜头缓缓推进：两个人对骂，词牌从嘴边浮出、砸在对方身上；围观的路人撑着伞继续走路，看都不看",
     bgm: "intro_theme",
-    sfx: [{ at: 0, id: "rain_loop" }, { at: 0.4, id: "neon_buzz" }],
+    sfx: [{ at: 0, id: "rain_loop" }, { at: 0.9, id: "word_hit" }, { at: 2.5, id: "word_hit" }, { at: 4.1, id: "word_hit" }, { at: 5.5, id: "word_hit" }, { at: 6.9, id: "word_hit" }, { at: 8, id: "word_hit" }],
     lines: [
-      { at: 0.6, dur: 3.2, kind: "title", text: "夜城" },
-      { at: 3.8, dur: 4, text: "雨一直下，霓虹一直亮。" },
+      { at: 4.4, dur: 5.2, text: "这座城只有一条规矩：谁的话先落下，谁就是对的。" },
     ],
   },
   {
-    id: "S2", scene: "words", dur: 9,
-    note: "行人头顶飞出发光的词牌，在雨里升向夜空，镜头微微后拉",
-    sfx: [{ at: 0.3, id: "word_rise" }, { at: 4.8, id: "word_swirl" }],
-    lines: [
-      { at: 0.4, dur: 4.2, text: "在这座城里，没人靠手速分胜负。" },
-      { at: 4.8, dur: 4, text: "招式，是一句话。" },
-    ],
-  },
-  {
-    id: "S3", scene: "hacker", dur: 9,
-    note: "黑客立绘立在霓虹前，词牌「选择 敌方 造成」逐张落下、连成一条线",
-    bgm: "intro_theme",
-    sfx: [{ at: 1.2, id: "tile_snap" }, { at: 2.4, id: "tile_snap" }, { at: 3.6, id: "tile_snap" }, { at: 6.4, id: "cast" }],
-    lines: [
-      { at: 0.4, dur: 3.2, text: "每一张词牌，都是一个零件。" },
-      { at: 3.8, dur: 2.4, text: "选择、敌方、造成——" },
-      { at: 6.4, dur: 2.4, text: "拼在一起，就是一招。" },
-    ],
-  },
-  {
-    id: "S4", scene: "mentor", dur: 10,
-    note: "暗巷里的训练场，镜头缓缓推向霓虹下的稻草人；拉远，词师阿词从巷口的阴影里走出来",
-    bgm: "",
-    sfx: [{ at: 1, id: "heartbeat" }, { at: 5.4, id: "footstep" }],
-    lines: [
-      { at: 0.4, dur: 4.2, text: "巷子深处，有人在等新来的学徒。" },
-      { at: 5.8, dur: 2.2, who: MENTOR, text: "新来的？站稳了。" },
-      { at: 8.2, dur: 1.8, who: MENTOR, text: "别怕，它只是个稻草人。" },
-    ],
-  },
-  {
-    id: "S5", scene: "timeline", dur: 8,
-    note: "时间轴：我方与敌方的句子按起手秒数排好，光标扫过，逐句落下",
+    id: "S2", scene: "rooftop", dur: 10,
+    note: "天台，镜头从远处缓缓推向黑客少女零；她身边只剩淡淡的空词牌轮廓；三个字「选择」「敌方」「造成」依次在她头顶亮起",
     bgm: "intro_danger",
-    sfx: [{ at: 1.6, id: "hit" }, { at: 2.9, id: "hit" }, { at: 4.4, id: "heal" }, { at: 5.9, id: "hit" }],
+    sfx: [{ at: 4.6, id: "tile_snap" }, { at: 5.4, id: "tile_snap" }, { at: 6.2, id: "tile_snap" }],
     lines: [
-      { at: 0.4, dur: 3.6, text: "每一秒，双方各说一句。" },
-      { at: 4.2, dur: 3.6, text: "先出手的先落下，倒下的人，话也落空。" },
+      { at: 0.6, dur: 4, text: "三年前，静默法案之后，全城人的词都被语法公司收走了。" },
+      { at: 5.4, dur: 4.2, text: "只有她，留下了三个字。" },
     ],
   },
   {
-    id: "S6", scene: "families", dur: 6.5,
-    note: "四个职业依次亮起：并（青）、续（绿）、择（琥珀）、血（赤红）",
-    bgm: "intro_theme",
-    sfx: [{ at: 0.6, id: "tile_snap" }, { at: 1.6, id: "tile_snap" }, { at: 2.6, id: "tile_snap" }, { at: 3.6, id: "tile_snap" }],
+    id: "S3", scene: "sword", dur: 9,
+    note: "零靠在键盘前；键盘旁亮起一道暖光，凝成她的随从小剑，只会喊「砍！」",
+    sfx: [{ at: 4.6, id: "spawn" }, { at: 6, id: "slash" }],
     lines: [
-      { at: 0.4, dur: 3.4, text: "并、续、择、血——四种流派，四种拼法。" },
-      { at: 4, dur: 2.3, who: MENTOR, text: "先学基础，再选你的路。" },
+      { at: 0.5, dur: 3.8, who: "零", text: "一句话就够了——只要那句话是我拼的。" },
+      { at: 6, dur: 2.4, who: "小剑", text: "砍！" },
     ],
   },
   {
-    id: "S7", scene: "assemble", dur: 9.5,
-    note: "词牌飞来，拼成第一句「选择 1 敌方 造成 1」，闪光，标题《词战》；之后接教程第一关阿词的「欢迎来到词战」",
+    id: "S4", scene: "message", dur: 9,
+    note: "屏幕上跳出匿名消息；零犹豫了一下，护目镜落到眼前，站了起来",
+    sfx: [{ at: 0.6, id: "msg_ping" }, { at: 5, id: "visor" }, { at: 6, id: "footstep" }],
+    lines: [
+      { at: 1.0, dur: 4, who: "匿名消息", text: "想要回你的词，到巷子最深处。——阿词" },
+    ],
+  },
+  {
+    id: "S5", scene: "alley", dur: 9,
+    note: "暗巷，镜头跟在零身后缓缓推进；她一步步走进雨里；尽头披斗篷的阿词背对着她，身旁立着稻草人",
+    bgm: "intro_danger",
+    sfx: [{ at: 0.5, id: "footstep" }, { at: 1.4, id: "footstep" }, { at: 2.3, id: "footstep" }, { at: 3.2, id: "footstep" }, { at: 4.1, id: "footstep" }, { at: 5, id: "footstep" }, { at: 5.9, id: "footstep" }, { at: 6.8, id: "footstep" }, { at: 7.7, id: "footstep" }],
+    lines: [],
+  },
+  {
+    id: "S6", scene: "turn", dur: 9,
+    note: "越肩镜头：阿词转身，稻草人的眼睛亮起",
     bgm: "intro_resolve",
-    sfx: [{ at: 1.2, id: "tile_snap" }, { at: 1.9, id: "tile_snap" }, { at: 2.6, id: "tile_snap" }, { at: 3.3, id: "tile_snap" }, { at: 4, id: "tile_snap" }, { at: 5, id: "title_hit" }],
+    sfx: [{ at: 0.6, id: "cloak" }, { at: 6, id: "eyes_on" }],
     lines: [
-      { at: 0.3, dur: 4, who: MENTOR, text: "来，我们先拼第一句。" },
-      { at: 5.6, dur: 3.6, kind: "title", text: "词战" },
+      { at: 1.8, dur: 4.6, who: "阿词", text: "来了。你的词库是空的，但你听得见词。" },
+    ],
+  },
+  {
+    id: "S7", scene: "title", dur: 6,
+    note: "稻草人的光漫开，三个字缓缓升空，标题《词战 WORD COMBAT》；之后接教程第一关阿词的「别怕」",
+    sfx: [{ at: 1.2, id: "title_hit" }],
+    lines: [
+      { at: 1.2, dur: 4.6, kind: "title", text: "词战" },
     ],
   },
 ];
