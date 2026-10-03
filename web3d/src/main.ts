@@ -75,7 +75,7 @@ async function main() {
   // 视角收窄：远近两排的大小差更小，对方的句子不会被透视缩得太小
   const camera = new THREE.PerspectiveCamera(20, 1, 0.1, 300);
   // 新风格：镜头压低一些，才看得见街两侧的楼；旧风格保持俯拍
-  const camBase = new THREE.Vector3(0, 11.6, 11.2);
+  const camBase = STYLE === "neo" ? new THREE.Vector3(0, 11.4, 11.5) : new THREE.Vector3(0, 11.6, 11.2);
   const look = new THREE.Vector3(0, 0.7, -1.1);
 
   // 对局背景：新风格 = 赛博朋克街道（src/scene/street.ts），旧风格 = 电路板

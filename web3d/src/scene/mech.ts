@@ -236,7 +236,7 @@ export function buildMechBase(w: number, d: number, t: number, cardW: number, si
     const slot = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.012, 0.07), sh.dark);
     slot.position.set(x, t + 0.006, frontZ);
     g.add(slot);
-    const l = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.01, 0.014), led(i % 4 === 1 ? 0xffb347 : 0x8fe8ff));
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.01, 0.014), led(i % 4 === 1 ? 0xffb347 : 0x8fb0ff));
     l.position.set(x + 0.04, t + 0.012, frontZ + 0.028);
     g.add(l);
     // 前沿面板上的铆钉
@@ -274,10 +274,10 @@ export function buildMechBase(w: number, d: number, t: number, cardW: number, si
   const core = new THREE.Mesh(new RoundedBoxGeometry(0.22, 0.2, 0.34, 2, 0.02), sh.paint);
   core.position.set(mx, t + 0.1, -0.62);
   g.add(core);
-  const slit = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.02), led(0x8fe8ff));
+  const slit = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.02), led(0x8fb0ff));
   slit.position.set(mx, t + 0.16, -0.45);
   g.add(slit);
-  const slit2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.02), led(0x8fe8ff));
+  const slit2 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.014, 0.02), led(0x8fb0ff));
   slit2.position.set(mx, t + 0.12, -0.45);
   g.add(slit2);
   for (let i = 0; i < 5; i++) {                       // 散热格栅
@@ -306,7 +306,7 @@ export function buildMechBase(w: number, d: number, t: number, cardW: number, si
   hinge.position.set(0, t + 0.03, -d / 2 + 0.07);
   g.add(hinge);
   for (let i = 0; i < 5; i++) {
-    const l = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.01, 0.02), led(r() < 0.3 ? 0xffb347 : 0x8fe8ff));
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.01, 0.02), led(r() < 0.3 ? 0xffb347 : 0x8fb0ff));
     l.position.set(-0.5 + i * 0.25, t + 0.012, -d / 2 + 0.16);
     g.add(l);
   }

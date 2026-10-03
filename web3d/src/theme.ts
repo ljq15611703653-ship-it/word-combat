@@ -8,8 +8,8 @@ export const C = NEO ? {
   void: 0x04060d,        // 夜空最深处
   fog: 0x0b1226,         // 街道尽头的雾
   pcb: 0x0a0f1c,
-  trace: 0x35c8ff,       // 冷青霓虹
-  traceDim: 0x16506e,
+  trace: 0x3d6bff,       // 钴蓝霓虹
+  traceDim: 0x1a2f78,
   glass: 0xa9d8ff,       // 全息卡面的染色
   copper: 0xb9a37c,      // 铜色接口
   silver: 0xc4ccd6,
@@ -39,7 +39,7 @@ export const C = NEO ? {
 export const CSS = {
   hp: "#3dffa6",
   hpLow: "#ffb238",
-  trace: NEO ? "#35c8ff" : "#1fd6b4",
+  trace: NEO ? "#3d6bff" : "#1fd6b4",
   side: (NEO ? { b: "#2fd8ff", r: "#ff4f6a" } : { b: "#2fd8ff", r: "#ff5a6e" }) as Record<"b" | "r", string>,
 };
 
