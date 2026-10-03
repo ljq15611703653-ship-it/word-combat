@@ -18,6 +18,7 @@ const MIME: Record<string, string> = {
 };
 const MAX_PAYLOAD = 16 * 1024;
 const ROOM_IDLE_MS = 30 * 60_000;
+const rate = () => +(process.env.RATE_PER_SEC ?? 10); // 每连接每秒补充的消息数（容量 30）
 
 interface Conn { room: Room | null; side: number; bucket: number; stamp: number }
 
@@ -55,9 +56,9 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
     const err = (code: string, msg: string, seq?: number) => send({ t: "err", code, msg, seq });
 
     ws.on("message", (data) => {
-      // 简单限流：令牌桶，每秒补 10 条，容量 30
+      // 简单限流：令牌桶，每秒补 RATE 条，容量 30
       const now = Date.now();
-      conn.bucket = Math.min(30, conn.bucket + ((now - conn.stamp) / 1000) * 10); conn.stamp = now;
+      conn.bucket = Math.min(30, conn.bucket + ((now - conn.stamp) / 1000) * rate()); conn.stamp = now;
       if (conn.bucket < 1) return err("rate", "操作太快了");
       conn.bucket--;
       let m: any;

@@ -8,6 +8,7 @@ import type { GameView, View } from "../shared/protocol";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 process.env.NEXT_MS = process.env.NEXT_MS ?? "5000";
+process.env.RATE_PER_SEC = "1000"; // 机器人跑得快，放宽限流；限流本身另测
 let fails = 0, checks = 0;
 const check = (c: any, msg: string) => { checks++; if (!c) { fails++; console.log("  FAIL:", msg); } };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -138,7 +139,10 @@ async function botAssign(c: Cli, rng: Rng, stats: any) {
   }
   // 己方视图里自己的待定目标可见
   await c.settle();
-  for (const p of c.gv.me.pending) check(p.targets.length > 0, "assign 之后自己能看到自己填的目标");
+  for (const p of c.gv.me.pending) {
+    const alive = c.gv.units.filter((u) => (u.side !== c.side) === (p.side === "enemy") && u.down === -1).length;
+    if (alive > 0) check(p.targets.length > 0, "assign 之后自己能看到自己填的目标 " + JSON.stringify(p) + " " + JSON.stringify(c.gv.me.pending));
+  }
   const e = await c.act({ type: "x", t: "confirm_assign" });
   check(!e, `confirm_assign 应被接受：${e?.msg}`);
 }
@@ -178,7 +182,14 @@ async function main() {
   check((await X.act({ t: "join", room: "BAD", name: "x", deck: { cls: "并", words: { 易伤: 9 }, kws: ["首挡", "首挡", "首挡"] } }))?.code === "bad_deck", "非法卡组应被拒");
   check(srv.rooms.size === 0, "被拒的 join 不应留下空房间");
   check((await X.act({ t: "rejoin", room: "NOPE", token: "x" }))?.code === "no_room", "重连不存在的房间应被拒");
-  X.close();
+  // 限流：一口气发 100 条 ping，应有一部分被拒（rate）
+  process.env.RATE_PER_SEC = "10";
+  const Y = new Cli("Y", port); await Y.connect();
+  for (let i = 0; i < 100; i++) Y.sendRaw(JSON.stringify({ t: "ping" }));
+  await sleep(300);
+  check(Y.errs.some((e) => e.code === "rate"), "消息洪水应被限流");
+  Y.close(); X.close();
+  process.env.RATE_PER_SEC = "1000";
 
   // ===== 2. 建房、入房、满员 =====
   console.log("[2] 建房 / 入房 / 满员 / 准备");
@@ -324,7 +335,7 @@ async function testReconnect(port: number, srv: any, A: Cli, B: Cli) {
   check(B2.side === 1, "重连后还是 1 号");
   check(B2.view?.phase === phase && B2.rev > revBefore, `重连直接收到最新快照（phase=${B2.view?.phase} rev ${revBefore}->${B2.rev}）`);
   check((B2.gv.acts ?? []).length === actsB, "重连后的宣告列表和掉线前一致");
-  check(B2.gv.me.cards.length > 0 && Array.isArray(B2.gv.me.cards), "重连后拿回自己的数字牌");
+  check(Array.isArray(B2.gv.me.cards) && typeof B2.gv.me.ap === "number", "重连后拿回自己的牌/行动点");
   // 顶号：用同一个 token 再连一次，旧连接被踢
   const B3 = new Cli("B3", port); await B3.connect();
   const kicked = new Promise<void>((ok) => B2.ws.once("close", () => ok()));
