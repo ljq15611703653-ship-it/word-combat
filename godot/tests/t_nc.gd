@@ -21,6 +21,7 @@ func _init() -> void:
 	var t0 := Time.get_ticks_msec()
 	var problems := 0
 	var talent_lines: Array = []
+	var pair := {}
 	for c in NR.CLASSES:
 		wins[c] = 0
 		games[c] = 0
@@ -45,6 +46,8 @@ func _init() -> void:
 				first_w += 1
 			if c0 != c1:
 				wins[m.cls_of(m.winner)] += 1
+				var key: String = m.cls_of(m.winner) + ">" + m.cls_of(1 - m.winner)
+				pair[key] = int(pair.get(key, 0)) + 1
 		if c0 != c1:
 			games[c0] += 1
 			games[c1] += 1
@@ -63,6 +66,11 @@ func _init() -> void:
 		parts.append("%s %d/%d" % [c, int(wins[c]), int(games[c])])
 	print("数字牌模式 %d 局：平均 %.1f 轮；首轮先宣告方胜 %d/%d；用时 %.1f 秒" % [n, float(rounds) / n, first_w, decided, (Time.get_ticks_msec() - t0) / 1000.0])
 	print("职业胜场：" + "  ".join(parts))
+	var pl: Array = []
+	for k in pair:
+		pl.append("%s %d" % [k, int(pair[k])])
+	pl.sort()
+	print("对局：" + "  ".join(pl))
 	print("预设卡组问题 %d" % problems)
 	for line in talent_lines:
 		print(line)
