@@ -284,3 +284,81 @@ html:not(.classic) {
   .cg-tr > button { clip-path: var(--cut-s); box-shadow: var(--card-in); border: 0; background: rgba(9, 18, 36, 0.5); backdrop-filter: blur(10px); }
   .cg-say .who { border-left: 3px solid var(--teal); padding-left: 8px; text-transform: uppercase; }
 }
+
+/* ====== 第三档：右键面板布局（game.ts 里 pl = 非 classic）======
+   右边缘窄条 .gm.pl：回合 / 得分 / 工具、六个随从、数字牌（常驻信息）。
+   .gm-float（铺满全屏、自身不吃点击）里放三样：随从旁的悬浮面板 .gm-pop、右下操作卡 .gm-dock、日志抽屉 .gm-drawer。
+   .gm-float 也带 .gm 类：教程找 .gm .hl、聚光灯模式 .gm button 的规则照样管到它。 */
+html:not(.classic) {
+  --strip: 264px;
+  body.game #app, body.game .hud.top, body.game .tl, body.game .ro-layer { right: var(--strip); }
+  .gm.pl { width: var(--strip); padding: 10px 10px 10px 4px; gap: 8px; }
+  .gm.pl .gm-tools { flex-wrap: wrap; gap: 4px; }
+  .gm.pl .gm-tools button { padding: 4px 7px; font-size: 12px; }
+  .gm.pl .gm-prog small { font-size: 11px; }
+  .gm.pl .gm-u { gap: 3px 6px; padding: 4px 7px; }
+  .gm.pl .gm-u b { min-width: 0; flex: 1 1 auto; font-size: 13px; }
+  .gm.pl .gm-u .hp { order: 5; flex: 1 1 100%; width: auto; }
+  .gm.pl .gm-u em { min-width: 0; font-size: 12px; }
+  .gm.pl .gm-u small { font-size: 11px; }
+  .gm.pl .gm-u .chip { font-size: 10px; padding: 0 6px; }
+  .gm.pl .gm-hand { font-size: 12px; }
+  .gm.pl .gm-tools button.on { border-color: var(--g-line-hi); background: rgba(74, 163, 255, 0.2); }
+  /* 窄条底部的操作卡：内容多了窄条会滚动，操作卡始终贴底可见 */
+  .gm.pl .gm-dock { position: sticky; bottom: 0; margin-top: auto; flex: none; z-index: 1; }
+  .gm.pl .gm-dock:empty, .gm.pl .gm-dock[hidden] { display: none; }
+  .gm.pl .gm-dock .gm-act { background: var(--ticks), rgba(9, 18, 36, 0.86); gap: 5px; }
+  .gm.pl .gm-dock .gm-act h3 { font-size: 14px; margin: 0; }
+  .gm.pl .gm-dock .gm-act p, .gm.pl .gm-dock .gm-act small { font-size: 12px; margin: 0; }
+  .gm.pl .gm-dock .gm-act .row2 button { flex: 1 1 auto; padding: 5px 6px; font-size: 12px; }
+  .gm.pl .gm-dock .gm-act button.big { padding: 9px; font-size: 15px; }
+
+  .gm.gm-float {
+    position: fixed; inset: 0; width: auto; height: auto; padding: 0; display: block; overflow: visible; z-index: 6;
+    background: none; border: 0; box-shadow: none; backdrop-filter: none; pointer-events: none;
+  }
+  .gm.pl[hidden] + .gm-float { display: none; }
+  .gm-float > * { pointer-events: auto; }
+  .gm-float > [hidden] { display: none; }
+
+  .gm-pop, .gm-drawer { position: absolute; box-sizing: border-box; overflow-y: auto; overscroll-behavior: contain; }
+  .gm-pop {
+    width: 400px; max-height: calc(100vh - 76px); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px 12px;
+    background: var(--ticks), rgba(9, 18, 36, 0.72); backdrop-filter: blur(16px) saturate(1.3); clip-path: var(--cut); box-shadow: var(--card-in);
+    border-left: 3px solid var(--b); animation: g-in 0.16s ease-out both;
+  }
+  .gm-pop.foe { border-left-color: var(--r); }
+  .gm-pop.max { left: 18px !important; top: 52px !important; right: calc(var(--strip) + 10px); bottom: 14px; width: auto; max-height: none; animation: none; }
+  .gm-pop-head { display: flex; flex-direction: column; gap: 5px; }
+  .pp-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .pp-title b { font-size: 16px; letter-spacing: 0.04em; }
+  .pp-title .sp { flex: 1; }
+  .pp-title button { padding: 2px 8px; font-size: 12px; }
+  .pp-hp { height: 5px; background: rgba(140, 196, 255, 0.12); box-shadow: inset 0 0 0 1px rgba(140, 196, 255, 0.2); }
+  .pp-hp i { display: block; height: 100%; background: #4ef0b4; box-shadow: 0 0 8px rgba(78, 240, 180, 0.8); transition: width 0.3s; }
+  .pp-hp.foe i { background: #ff7a92; box-shadow: 0 0 8px rgba(255, 122, 146, 0.8); }
+  .pp-chips .chip { font-size: 11px; }
+  .pp-decl { margin: 0; font-family: var(--mono); font-size: 12px; line-height: 1.5; color: #c4d8f0; }
+  .gm-pop-body { display: flex; flex-direction: column; gap: 8px; }
+  .gm-pop-body:empty { display: none; }
+  .gm-pop .row2 { display: flex; gap: 6px; }
+  .gm-pop .row2 button { flex: 1; }
+  /* 操作区原本是一张独立卡片；放进悬浮面板后去掉自己的卡片外观 */
+  html body .gm-pop .gm-act { background: none; box-shadow: none; clip-path: none; backdrop-filter: none; border: 0; padding: 0; }
+  .gm-pop .cmp-head h3 { display: none; }
+  /* 平时只留拼句要用的：轨道、人话、辅助轮、词牌、数字牌、费用、按钮。说明类文字等「最大化」再看 */
+  .gm-pop:not(.max) .gm-act > .talent, .gm-pop:not(.max) .gm-act > .cmp-help, .gm-pop:not(.max) .gm-act > small.dim { display: none; }
+  .gm-pop.max .gm-act .opts .w { font-size: 17px; padding: 9px 12px; }
+  .gm-pop.nudge { animation: pp-nudge 0.45s ease-out; }
+  .gm-pop.nudge .pp-x { border-color: var(--g-amber); box-shadow: 0 0 14px rgba(255, 212, 94, 0.6); }
+
+  .gm-drawer { right: calc(var(--strip) + 4px); top: 52px; width: 360px; max-height: calc(100vh - 64px); display: flex; flex-direction: column; gap: 8px; padding: 2px; }
+  .gm-drawer .gm-log { min-height: 60px; max-height: 52vh; flex: 0 1 auto; }
+}
+@keyframes pp-nudge { 0%, 100% { transform: none; } 25% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+@media (max-width: 900px) {
+  html:not(.classic) body.game #app, html:not(.classic) body.game .hud.top, html:not(.classic) body.game .tl, html:not(.classic) body.game .ro-layer { right: 0; }
+  html:not(.classic) .gm.pl { width: 100%; }
+  html:not(.classic) .gm-pop { width: min(400px, calc(100vw - 16px)); }
+  html:not(.classic) .gm-drawer { right: 8px; width: min(360px, calc(100vw - 16px)); bottom: calc(46vh + 8px); }
+}

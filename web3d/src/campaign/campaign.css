@@ -70,6 +70,7 @@ body.cg .tl-mark em { white-space: nowrap; }
 /* 战斗界面是 game.ts 的：这里只补引导用的发光、顶栏标题和右上角标签的位置 */
 body.cg.game .hud.top > :not(.panel):not(.sp) { display: revert; }
 body.game .cg-tr { right: 410px; }
+html:not(.classic) body.game .cg-tr { right: calc(var(--strip, 250px) + 10px); }
 .gm .hl, .gm button.hl { border-color: #ffd24a !important; box-shadow: 0 0 0 2px rgba(255, 210, 74, 0.7), 0 0 18px rgba(255, 210, 74, 0.7); background: rgba(120, 90, 10, 0.75) !important; color: #fff7d0 !important; animation: cg-pulse 1.1s ease-in-out infinite; }
 .gm button.dimmed { opacity: 0.45; }
 body.spotlight .gm button:not(.hl) { pointer-events: none; }

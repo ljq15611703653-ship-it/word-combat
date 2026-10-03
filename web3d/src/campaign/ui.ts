@@ -212,6 +212,14 @@ export class CampaignUI {
     if (!this.backdrop.hidden || !this.menu.hidden || !this.res.hidden) return;
     this.ctx.game.cardClicked(uid);
   }
+  cardContext(uid: number) {
+    if (!this.backdrop.hidden || !this.menu.hidden || !this.res.hidden) return;
+    this.ctx.game.cardContext(uid);
+  }
+  blankClicked() {
+    if (!this.backdrop.hidden || !this.menu.hidden || !this.res.hidden) return;
+    this.ctx.game.blankClicked();
+  }
 
   // ------------------------------------------------------------ 气泡 + 聚光灯：发光的东西旁边写「为什么点它」
   private layout(c0?: GameClick) {
@@ -223,16 +231,25 @@ export class CampaignUI {
     if (!inGame) { bub.hidden = true; sp.hidden = true; return; }
     const info = c ?? ({ kind: "unit", stage: "", tokens: 0, clause: 0, picked: [], latePick: [] } as GameClick);
     let rect: { left: number; top: number; right: number; bottom: number } | null = null;
-    let onPanel = false;
+    let onPanel = false, edge: { left: number; right: number } | null = null;
     const hl = document.querySelector(".gm .hl") as HTMLElement | null;
-    if (hl) { const r = hl.getBoundingClientRect(); rect = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; onPanel = true; }
+    if (hl) {
+      const r = hl.getBoundingClientRect(); rect = { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; onPanel = true;
+      // 新界面：发光的按钮在悬浮面板 / 操作卡 / 窄条里时，气泡摆在那块面板的外侧，不压住面板
+      const box = hl.closest(".gm-pop, .gm-dock, .gm-drawer, .gm.pl") as HTMLElement | null;
+      if (box) { const b = box.getBoundingClientRect(); edge = { left: b.left, right: b.right }; }
+    }
     else if (game.hlCards.length) { const [x, y] = this.ctx.anchor(game.hlCards[0]); rect = { left: x - 62, top: y - 80, right: x + 62, bottom: y + 50 }; }
     const html = c && this.tracker.guided ? this.tracker.hint(c) : "";
     if (rect && html && !dlg) {
       bub.hidden = false; bub.innerHTML = html;
       const bw = bub.offsetWidth, bh = bub.offsetHeight;
       let left: number, side: string;
-      if (onPanel) { left = rect.left - bw - 16; side = "l"; } else { left = rect.right + 14; side = "r"; if (left + bw > innerWidth - 8) { left = rect.left - bw - 14; side = "l"; } }
+      if (onPanel && edge) {
+        left = edge.left - bw - 16; side = "l";
+        const strip = (document.querySelector(".gm.pl") as HTMLElement | null)?.getBoundingClientRect().left ?? innerWidth;
+        if (left < 8 && edge.right + 16 + bw <= strip - 8) { left = edge.right + 16; side = "r"; }
+      } else if (onPanel) { left = rect.left - bw - 16; side = "l"; } else { left = rect.right + 14; side = "r"; if (left + bw > innerWidth - 8) { left = rect.left - bw - 14; side = "l"; } }
       bub.className = `cg-bubble ${side}`;
       bub.style.left = `${Math.max(8, left)}px`;
       bub.style.top = `${clamp((rect.top + rect.bottom) / 2 - 20, 56, innerHeight - bh - 8)}px`;

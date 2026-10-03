@@ -317,11 +317,13 @@ export class OnlineGame extends Game {
     if (this.ui === "waitassign") {
       this.elAct.innerHTML = "";
       this.elAct.append(h("h3", "green", "目标已定，等对手定目标……"), h("small", "dim", "对手也在偷偷定，双方都确认（或超时）后一起揭晓。"));
+      if (this.pl) this.placeAct();
       return;
     }
     if (this.ui === "sending") {
       this.elAct.innerHTML = "";
       this.elAct.append(h("h3", "gold", "已提交，等服务器确认……"));
+      if (this.pl) this.placeAct();
       return;
     }
     super.renderAct();

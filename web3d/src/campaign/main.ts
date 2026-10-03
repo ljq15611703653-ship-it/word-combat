@@ -159,7 +159,14 @@ async function main() {
   renderer.domElement.addEventListener("click", (e) => {
     setNdc(e);
     const c = pickCard();
-    if (c) ui.cardClicked(uidOfCard(cards.indexOf(c)));
+    if (c) ui.cardClicked(uidOfCard(cards.indexOf(c))); else ui.blankClicked();
+  });
+  // 右键随从：弹出详情面板（右键空白处 = 关面板）
+  renderer.domElement.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    setNdc(e);
+    const c = pickCard();
+    if (c) ui.cardContext(uidOfCard(cards.indexOf(c))); else ui.blankClicked();
   });
 
   // ---------- 顶部时间轴（0~10 秒） ----------
@@ -203,7 +210,7 @@ async function main() {
     solve: (pts) => solve(pts, header.offsetHeight + tlEl.offsetHeight + 6, 50),
     release: () => { goal.look.copy(home.look); goal.dist = home.dist; goal.offY = home.offY; goal.offX = home.offX; },
   });
-  const game = new Game({ cast, cards, panels, onChange: renderTimeline, onToggle: () => requestAnimationFrame(resize) });
+  const game = new Game({ cast, cards, panels, anchor, onChange: renderTimeline, onToggle: () => requestAnimationFrame(resize) });
   const ui = new CampaignUI({ cards, panels, game, onLevel: () => requestAnimationFrame(resize), anchor, onReplayIntro: () => void playIntro(document.body) });
   ui.showMenu();
   await playIntroIfFirst(document.body);   // 首次进入：先看开场；之后不再自动播放

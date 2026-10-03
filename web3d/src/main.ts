@@ -107,7 +107,11 @@ async function main() {
     cards.push(c);
     // 句子读数面板：屏幕空间，顶边对齐卡的前沿
     const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句",
-      enemy ? undefined : () => { if (game?.active || online?.active) return; if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); } });
+      enemy ? undefined : () => {
+        if (game?.active) { game.cardClicked(uidOfCard(i)); return; }
+        if (online?.active) { online.cardClicked(uidOfCard(i)); return; }
+        if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); }
+      });
     if (seat.sentence) panel.set(parse(seat.sentence), seat.sec ?? 0);
     layer.appendChild(panel.el);
     panels.push(panel);
@@ -304,7 +308,7 @@ async function main() {
   renderer.domElement.addEventListener("pointerleave", () => ndc.set(-9, -9));
   renderer.domElement.addEventListener("click", (e) => {
     hovered = pick(e);
-    if (!hovered) return;
+    if (!hovered) { if (game.active) game.blankClicked(); else if (online.active) online.blankClicked(); return; }
     if (game.active) { game.cardClicked(uidOfCard(cards.indexOf(hovered))); return; }
     if (online.active) { online.cardClicked(uidOfCard(cards.indexOf(hovered))); return; }
     const i = cards.indexOf(hovered);
@@ -319,6 +323,23 @@ async function main() {
       openKb(i);
     }
   });
+
+  // 右键随从：对局里弹出它的详情面板（右键空白处 = 关面板）
+  renderer.domElement.addEventListener("contextmenu", (e) => {
+    const g = game.active ? game : online.active ? online : null;
+    if (!g) return;
+    e.preventDefault();
+    const c = pick(e);
+    if (c) g.cardContext(uidOfCard(cards.indexOf(c))); else g.blankClicked();
+  });
+  // 随从在屏幕上的位置（卡面中心略上方），悬浮面板贴着它弹出
+  const av = new THREE.Vector3();
+  const anchor = (uid: number): [number, number] => {
+    const p = cards[uid < 3 ? 3 + uid : uid - 3].root.position;
+    camera.updateMatrixWorld();
+    av.set(p.x, 1.1, p.z).project(camera);
+    return [((av.x + 1) / 2) * app.clientWidth, ((1 - av.y) / 2) * app.clientHeight];
+  };
 
   // ---------- 演示面板 ----------
   const $ = (id: string) => document.getElementById(id) as HTMLInputElement;
@@ -344,13 +365,13 @@ async function main() {
   const cast = new CastShow({ camera, app, cards, panels, goal, release: reframe, solve: (pts) => solve(pts, header.offsetHeight + tlEl.offsetHeight + 6, 16) });
   // ---------- 完整对局：真人对电脑 ----------
   game = new Game({
-    cast,
+    cast, anchor,
     cards, panels, onChange: () => { renderTimeline(); },
     onToggle: (on) => { live.stop(); requestAnimationFrame(() => { resize(); }); if (!on) menu?.show(); },
   });
   // 联机：同一个 3D 场景、同一套拼句界面，对手和结算由服务端驱动
   online = new OnlineGame({
-    cast,
+    cast, anchor,
     cards, panels, onChange: () => { renderTimeline(); },
     onToggle: () => { live.stop(); requestAnimationFrame(() => { resize(); }); },
   });

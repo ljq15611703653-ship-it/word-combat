@@ -42,6 +42,8 @@ export interface GameCtx {
   onToggle: (on: boolean) => void;
   /** 技能演出（可选）：结算回放时每一句演一遍；不传 = 原来的逐事件回放 */
   cast?: CastShow;
+  /** 随从在屏幕上的位置（悬浮面板贴着它弹出）；不传 = 面板放在屏幕中间 */
+  anchor?: (uid: number) => [number, number];
 }
 
 // ---- [campaign hook] 可选钩子：教程盖在正常对局上用。不传 hooks 时行为和原来完全一样。
@@ -95,12 +97,42 @@ export class Game {
   protected latePick: number[] = [];
   protected fast = false;
   protected token = 0;
+  // ---- 新界面：右边缘窄条（回合/得分/行动点/血条/数字牌，底部是当前操作卡）+ 随从旁的悬浮面板 + 日志抽屉。
+  //      ?style=classic 时保持原来的右侧操作栏（pl = false）。
+  protected pl = !document.documentElement.classList.contains("classic");
+  protected float = h("div", "gm gm-float");
+  protected elPop = h("div", "gm-pop");
+  protected elPopHead = h("div", "gm-pop-head");
+  protected elPopBody = h("div", "gm-pop-body");
+  protected elDock = h("div", "gm-dock");
+  protected elDrawer = h("div", "gm-drawer");
+  protected popUid = -1;
+  protected popMode: "" | "info" | "act" = "";
+  protected popMax = false;
 
   constructor(protected ctx: GameCtx) {
-    this.root.append(this.elTop, this.elUnits, this.elHand, this.elAct, this.elDecl, this.elLog);
     this.root.hidden = true;
     this.overlay.hidden = true;
-    document.body.append(this.root, this.overlay);
+    if (this.pl) {
+      this.root.classList.add("pl");
+      this.elDock.append(this.elAct);
+      this.root.append(this.elTop, this.elUnits, this.elHand, this.elDock);
+      this.elPop.append(this.elPopHead, this.elPopBody);
+      this.elPop.hidden = true;
+      this.elDrawer.append(this.elDecl, this.elLog);
+      this.elDrawer.hidden = true;
+      this.float.append(this.elPop, this.elDrawer);
+      this.elPop.addEventListener("animationend", () => this.elPop.classList.remove("nudge"));
+      document.body.append(this.root, this.float, this.overlay);
+      window.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape" || !this.active || !this.popMode || !this.overlay.hidden || this.ctx.cast?.active) return;
+        this.dismissPop();
+      });
+      window.addEventListener("resize", () => this.placePop());
+    } else {
+      this.root.append(this.elTop, this.elUnits, this.elHand, this.elAct, this.elDecl, this.elLog);
+      document.body.append(this.root, this.overlay);
+    }
     try { const s = localStorage.getItem("nc-settings"); if (s) this.S = { ...DEFAULT, ...JSON.parse(s) }; } catch { /* 没有存储也能用 */ }
   }
 
@@ -151,6 +183,7 @@ export class Game {
   /** 引导里：这一类按钮当前有发光的 */
   private hlKind(kind: GameClickKind): boolean { return this.hooks?.expect?.(this.clickInfo(kind))?.kind === kind; }
   close() {
+    this.closePop();
     this.token++;
     this.active = false;
     document.body.classList.remove("game");
@@ -271,6 +304,7 @@ export class Game {
     const M = this.M;
     if (resetShown) { this.shown = {}; for (const u of M.R.U) this.shown[u.uid] = [u.hp, u.down !== -1]; }
     this.renderTop(); this.renderUnits(); this.renderHand(); this.renderDecl(); this.syncCards();
+    if (this.pl && this.popMode) this.renderPop();
   }
 
   protected syncCards() {
@@ -326,8 +360,9 @@ export class Game {
       el.append(row);
     }
     const bar = h("div", "gm-tools");
-    bar.append(btn("怎么玩", "ghost", () => this.showRules()), btn(this.fast ? "动画：快" : "动画：正常", "ghost", (e) => { this.fast = !this.fast; (e.target as HTMLElement).textContent = this.fast ? "动画：快" : "动画：正常"; }),
-      btn("退出", "ghost", () => (this.hooks?.exit ? this.hooks.exit() : this.close())));
+    bar.append(btn("怎么玩", "ghost", () => this.showRules()), btn(this.fast ? "动画：快" : "动画：正常", "ghost", (e) => { this.fast = !this.fast; (e.target as HTMLElement).textContent = this.fast ? "动画：快" : "动画：正常"; }));
+    if (this.pl) bar.append(btn("日志", "ghost" + (this.elDrawer.hidden ? "" : " on"), (e) => { this.elDrawer.hidden = !this.elDrawer.hidden; (e.target as HTMLElement).classList.toggle("on", !this.elDrawer.hidden); }));
+    bar.append(btn("退出", "ghost", () => (this.hooks?.exit ? this.hooks.exit() : this.close())));
     el.append(bar);
   }
 
@@ -351,6 +386,7 @@ export class Game {
       const hpPct = sh[1] ? 0 : (100 * sh[0]) / u.mx;
       r.innerHTML = `<b>${u.side === 0 ? "你的" : "对手的"}${u.name}</b><span class="hp"><i style="width:${hpPct}%"></i></span><em>${sh[1] ? "倒下·休整" : `${sh[0]}/${u.mx}`}</em><small>【${u.kw}】${u.kws ? "已用" : ""}</small>${chips.map((c) => `<span class="chip">${c}</span>`).join("")}`;
       r.addEventListener("click", () => this.cardClicked(u.uid));
+      r.addEventListener("contextmenu", (e) => { e.preventDefault(); this.cardContext(u.uid); });
       el.append(r);
     }
   }
@@ -407,6 +443,7 @@ export class Game {
     if (this.ui === "pick_unit" && this.M.remaining[0].includes(uid)) { if (this.gate("unit", { uid })) this.openComposer(uid); }
     else if (this.ui === "target") this.pickTarget(uid);
     else if (this.ui === "assign") this.pickLate(uid);
+    else if (this.pl && (this.ui === "pick_unit" || this.ui === "foe" || this.ui === "round_end")) this.cardContext(uid);
   }
 
   protected pass(uid: number) {
@@ -435,7 +472,7 @@ export class Game {
     el.append(head, h("small", "talent", `职业特长：${NR.CLASS_TALENT[cls]}`));
     // 辅助轮
     const sugg = h("div", "sugg");
-    sugg.append(btn("辅助轮：让电脑出几个主意（先看人话，点一下装进来）", "ghost", () => { if (this.gate("assist")) this.showSuggestions(sugg); }));
+    sugg.append(btn(this.pl ? "辅助轮：让电脑出几个主意" : "辅助轮：让电脑出几个主意（先看人话，点一下装进来）", "ghost", () => { if (this.gate("assist")) this.showSuggestions(sugg); }));
     el.append(sugg);
     // 句子轨
     const rail = h("div", "rail");
@@ -709,8 +746,9 @@ export class Game {
       } else if (n.type === "floor") el.append(h("p", "gold", `${who} 得到保底数字【${n.value}】（能反复用）`));
       else if (n.type === "ladder") el.append(h("p", "green", `${who} 得分到 ${Math.round(n.at * 100)}%：解锁 ${n.copies} 张【${n.value}】（能反复用，用完冷却一轮）`));
     }
-    if (M.phase === "over") { el.append(btn("看结果", "primary", () => this.showOver())); return; }
+    if (M.phase === "over") { el.append(btn("看结果", "primary", () => this.showOver())); if (this.pl) this.placeAct(); return; }
     el.append(btn("下一轮 →", "primary big" + (this.hooks ? " hl" : ""), () => this.nextRoundClicked()));
+    if (this.pl) this.placeAct();
     this.hooks?.roundEnd?.(M);
   }
 
@@ -737,6 +775,7 @@ export class Game {
   // ------------------------------------------------------------ 操作栏
   protected renderAct() {
     this.renderAct0();
+    if (this.pl) this.placeAct();
     this.highlight();
     this.hooks?.rendered?.(this.clickInfo("unit"));
   }
@@ -747,8 +786,8 @@ export class Game {
     switch (this.ui) {
       case "foe": el.append(h("h3", "dim", `${this.foeName}在想……`)); break;
       case "pick_unit": {
-        el.append(h("h3", "gold", "轮到你：选一个随从，给它拼一句"));
-        el.append(h("small", "dim", "点下面的按钮（或点你的随从卡）。每个随从一轮一句；可以先让一个随从出手，看看对方怎么接，再定下一个。"));
+        el.append(h("h3", "gold", this.pl ? "轮到你：点随从拼一句" : "轮到你：选一个随从，给它拼一句"));
+        el.append(h("small", "dim", this.pl ? "左键点随从＝在它旁边拼一句；右键＝看它的详情。每个随从一轮一句。" : "点下面的按钮（或点你的随从卡）。每个随从一轮一句；可以先让一个随从出手，看看对方怎么接，再定下一个。"));
         for (const uid of M.remaining[0]) {
           const u = M.R.U[uid], row = h("div", "row2");
           row.append(btn(`给【${u.name}】拼一句`, "primary" + (this.hl("unit", undefined, uid) ? " hl" : ""), () => { if (this.gate("unit", { uid })) this.openComposer(uid); }), btn("它这轮不出手", "ghost" + (this.hl("pass", undefined, uid) ? " hl" : ""), () => this.pass(uid)));
@@ -799,6 +838,114 @@ export class Game {
         el.append(h("h3", "gold", "结算中……"), btn("跳过动画", "ghost", () => { this.fast = true; this.ctx.cast?.skip(); }));
         break;
     }
+  }
+
+  // ------------------------------------------------------------ 新界面：悬浮面板 / 操作卡
+  /** 正在为某个随从拼句 / 选目标 / 定秒数：操作放进它旁边的悬浮面板；其余时候放在窄条底部的操作卡里 */
+  protected placeAct() {
+    const inPop = (this.ui === "compose" || this.ui === "target" || this.ui === "timing") && this.selUid >= 0;
+    if (inPop) {
+      if (this.popMode !== "act" || this.popUid !== this.selUid) this.popMax = false;
+      this.popUid = this.selUid; this.popMode = "act";
+      if (this.elAct.parentElement !== this.elPopBody) { this.elPopBody.innerHTML = ""; this.elPopBody.append(this.elAct); }
+      this.elDock.hidden = true;
+    } else {
+      if (this.popMode === "act" || this.ui === "resolving") this.closePop();
+      if (this.elAct.parentElement !== this.elDock) this.elDock.append(this.elAct);
+      this.elDock.hidden = !this.elAct.childElementCount;
+    }
+    this.renderPop();
+  }
+  /** 右键随从：弹出它的详情（我方能直接拼一句 / 不出手；对手只显示公开信息） */
+  cardContext(uid: number) {
+    if (!this.active || !this.pl) return;
+    if (["compose", "target", "timing", "assign", "resolving", "sending"].includes(this.ui)) return;
+    if (this.popMode === "info" && this.popUid === uid) { this.closePop(); return; }
+    this.popUid = uid; this.popMode = "info"; this.popMax = false;
+    this.renderPop();
+  }
+  /** 点 3D 场景的空白处：详情面板直接关；拼句面板只在还没放进任何牌时关，拼了一半的不因误点丢掉（面板抖一下，提示用 ✕ / Esc） */
+  blankClicked() {
+    if (!this.active || !this.pl || !this.popMode) return;
+    if (this.popMode === "info") { this.closePop(); return; }
+    if (this.ui === "compose" && !this.cmp?.tokens.length) { this.dismissPop(); return; }
+    const pop = this.elPop;
+    pop.classList.remove("nudge"); void pop.offsetWidth; pop.classList.add("nudge");
+  }
+  /** ✕ / Esc：关掉悬浮面板；正在拼的这一句作废（和「取消」一样，教程不让取消时不关） */
+  dismissPop() {
+    if (!this.active || !this.popMode) return;
+    if (this.popMode === "info") { this.closePop(); return; }
+    if (!this.gate("restart")) return;
+    this.cmp = null; this.pending = [];
+    this.closePop();
+    this.setUi("pick_unit");
+    this.renderAct();
+  }
+  protected closePop() {
+    this.popMode = ""; this.popUid = -1; this.popMax = false;
+    this.elPop.hidden = true; this.elPop.classList.remove("nudge");
+    if (this.elAct.parentElement === this.elPopBody) { this.elDock.append(this.elAct); this.elDock.hidden = !this.elAct.childElementCount; }
+  }
+  protected renderPop() {
+    const pop = this.elPop, M = this.M;
+    const u = this.popUid >= 0 ? M.R.U[this.popUid] : null;
+    if (!this.popMode || !u) { pop.hidden = true; return; }
+    pop.hidden = false;
+    pop.classList.toggle("max", this.popMax);
+    pop.classList.toggle("foe", u.side !== 0);
+    const hd = this.elPopHead;
+    hd.innerHTML = "";
+    const sh = this.shown[u.uid] ?? [u.hp, u.down !== -1];
+    const title = h("div", "pp-title");
+    title.append(h("b", "", `${u.side === 0 ? "你的" : "对手的"}${u.name}`), h("span", `chip ${sh[1] ? "gray" : u.side === 0 ? "" : "red"}`, sh[1] ? "倒下·休整中" : `生命 ${sh[0]}/${u.mx}`), h("span", "chip", `【${u.kw}】${u.kws ? "本轮已用" : ""}`));
+    title.append(h("span", "sp"), btn(this.popMax ? "恢复" : "最大化", "ghost pp-max", () => { this.popMax = !this.popMax; this.renderPop(); }), btn("✕", "ghost pp-x", () => this.dismissPop()));
+    hd.append(title);
+    const bar = h("div", `pp-hp${u.side === 0 ? "" : " foe"}`), fill = h("i");
+    fill.style.width = `${sh[1] ? 0 : (100 * sh[0]) / u.mx}%`;
+    bar.append(fill);
+    hd.append(bar);
+    const chips: string[] = [];
+    for (const nm of Object.keys(u.st)) chips.push(NT.statusChip(nm, u.st[nm], M.rnd));
+    if (u.mit > 0) chips.push(`减伤${u.mit}`);
+    if (u.shield > 0) chips.push(`血痂${u.shield}`);
+    for (const _l of u.lis) { void _l; chips.push("转移"); }
+    for (const c of M.R.conts) if (c.uid === u.uid) chips.push(`续·${c.cl.k === "atk" ? "打" : c.cl.k === "heal" ? "奶" : "减伤"}${c.cl.n}·第${c.start}秒·还${c.left}轮`);
+    if (chips.length) { const row = h("div", "pp-chips"); for (const c of chips) row.append(h("span", "chip", c)); hd.append(row); }
+    const now = M.phase === "declare" || M.phase === "assign";
+    const a = (now ? M.declared : M.lastDeclared).find((x: any) => x.uid === u.uid);
+    if (a) hd.append(h("p", "pp-decl", `${now ? "本轮" : "上一轮"}宣告 ${mk(a.ord)} · 第 ${a.start} 秒 · 花 ${a.cost} 点${a.blood > 0 ? `（${a.blood} 点用血付）` : ""}：${NT.actionText(M as any, a.cl, 0, a.side)}`));
+    else if (M.phase === "declare" && M.passed[u.side].includes(u.uid)) hd.append(h("p", "pp-decl dim", "本轮不出手"));
+    if (this.popMode === "info") {
+      const body = this.elPopBody;
+      body.innerHTML = "";
+      if (u.side === 0 && this.ui === "pick_unit" && M.remaining[0].includes(u.uid)) {
+        const row = h("div", "row2");
+        row.append(btn("拼一句", "primary" + (this.hl("unit", undefined, u.uid) ? " hl" : ""), () => { if (this.gate("unit", { uid: u.uid })) this.openComposer(u.uid); }),
+          btn("它这轮不出手", "ghost" + (this.hl("pass", undefined, u.uid) ? " hl" : ""), () => { this.closePop(); this.pass(u.uid); }));
+        body.append(row);
+      } else if (u.side !== 0) body.append(h("small", "dim", "只显示公开信息：它这轮宣告的句子看得到；对手的数字牌、卡组和择流的待定目标看不到。"));
+      if (this.popMax) {
+        const c = M.clsOf(u.side);
+        body.append(h("p", "", `${u.side === 0 ? "你" : this.foeName}的职业：${NR.CLASS_NAME[c]}`), h("small", "talent", `特长：${NR.CLASS_TALENT[c]}`), h("small", "dim", `得分：${NR.CLASS_GOAL[c]}`));
+      }
+    }
+    this.placePop();
+  }
+  protected placePop() {
+    const pop = this.elPop;
+    if (pop.hidden) return;
+    if (this.popMax) { pop.style.left = ""; pop.style.top = ""; return; }
+    // 可用区域：窄条在右边时是它左边；窄屏时窄条在底部，就是它上面
+    const r = this.root.getBoundingClientRect(), onRight = !this.root.hidden && r.width < innerWidth * 0.6;
+    const right = onRight ? r.left : innerWidth, bottom = onRight || this.root.hidden ? innerHeight : r.top;
+    const [ax, ay] = this.ctx.anchor ? this.ctx.anchor(this.popUid) : [right / 2, bottom / 2];
+    const w = pop.offsetWidth, ht = pop.offsetHeight;
+    let left = ax + 110;
+    if (left + w > right - 8) left = ax - 110 - w;
+    left = Math.max(8, Math.min(left, right - w - 8));
+    const top = Math.max(64, Math.min(ay - ht / 2, bottom - ht - 10));
+    pop.style.left = `${left}px`; pop.style.top = `${top}px`;
   }
 
   protected toast(text: string) {
