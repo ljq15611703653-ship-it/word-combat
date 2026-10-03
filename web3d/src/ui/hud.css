@@ -1,0 +1,62 @@
+/* 通用 HUD（智能眼镜上的信息元素）组件。命名 .hud-*，不依赖任何具体界面。
+   只做信息元素：括号、读数、准星、锁定框、读数条、扫描线；不做镜片暗角/弯曲/色散，世界画面保持清晰。
+   用法见 hud.ts；用 --hud-c（主色）、--hud-c2（辅色）覆盖即可换色。 */
+.hud-root { --hud-c: #19e6ff; --hud-c2: #ff2fa0; --hud-ok: #3cff9a; --hud-warn: #ffb02e; --hud-font: "Chakra Petch", "Noto Sans SC", "Microsoft YaHei", monospace; position: absolute; inset: 0; pointer-events: none; color: var(--hud-c); font-family: var(--hud-font); }
+
+/* 扫描线：一条缓慢下移的细亮带（不遮挡画面） */
+.hud-scan { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.hud-scan::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; top: -4%; background: linear-gradient(90deg, transparent, rgba(25,230,255,.55), transparent); box-shadow: 0 0 0.875em 2px rgba(25,230,255,.35); animation: hud-sweep 6s linear infinite; }
+@keyframes hud-sweep { to { top: 104%; } }
+
+/* 角落括号 */
+.hud-corner { position: absolute; width: 2.875em; height: 2.875em; border: 0 solid var(--hud-c); filter: drop-shadow(0 0 0.375em var(--hud-c)); opacity: .9; }
+.hud-corner.tl { left: 1.125em; top: 1.125em; border-left-width: 3px; border-top-width: 3px; }
+.hud-corner.tr { right: 1.125em; top: 1.125em; border-right-width: 3px; border-top-width: 3px; }
+.hud-corner.bl { left: 1.125em; bottom: 1.125em; border-left-width: 3px; border-bottom-width: 3px; }
+.hud-corner.br { right: 1.125em; bottom: 1.125em; border-right-width: 3px; border-bottom-width: 3px; }
+
+/* 边缘读数 */
+.hud-readout { position: absolute; font-size: 0.75em; line-height: 1.55; letter-spacing: .12em; white-space: pre; text-shadow: 0 0 0.5em var(--hud-c), 0 1px 3px #000; opacity: .9; }
+.hud-readout b { color: #fff; font-weight: 500; }
+.hud-readout .ok { color: var(--hud-ok); } .hud-readout .warn { color: var(--hud-warn); }
+.hud-readout.tl { left: 4.75em; top: 1.5em; } .hud-readout.tr { right: 4.75em; top: 1.5em; text-align: right; }
+.hud-readout.bl { left: 4.75em; bottom: 3.5em; } .hud-readout.br { right: 4.75em; bottom: 3.5em; text-align: right; }
+
+/* 读数条（分段） */
+.hud-bar { display: flex; gap: 3px; height: 0.375em; }
+.hud-bar > i { flex: 1; background: rgba(25,230,255,.2); position: relative; overflow: hidden; }
+.hud-bar > i > u { position: absolute; inset: 0; background: var(--hud-c); box-shadow: 0 0 0.5em var(--hud-c); transform-origin: left; transform: scaleX(0); }
+
+/* 中心准星（焦点） */
+.hud-reticle { position: absolute; left: 50%; top: 46%; width: 3.375em; height: 3.375em; margin: -1.688em 0 0 -1.688em; opacity: .8; }
+.hud-reticle::before { content: ""; position: absolute; inset: 0; border: 1.5px solid var(--hud-c); border-radius: 50%; filter: drop-shadow(0 0 5px var(--hud-c));
+  clip-path: polygon(0 0, 38% 0, 38% 100%, 0 100%, 0 62%, 100% 62%, 100% 100%, 62% 100%, 62% 0, 100% 0, 100% 38%, 0 38%); animation: hud-spin 14s linear infinite; }
+.hud-reticle::after { content: ""; position: absolute; inset: 1.5em; background: radial-gradient(circle, var(--hud-c) 0 2px, transparent 3px); }
+.hud-reticle i { position: absolute; background: var(--hud-c); }
+.hud-reticle i:nth-child(1) { left: 50%; top: -0.75em; width: 1.5px; height: 0.625em; } .hud-reticle i:nth-child(2) { left: 50%; bottom: -0.75em; width: 1.5px; height: 0.625em; }
+.hud-reticle i:nth-child(3) { top: 50%; left: -0.75em; height: 1.5px; width: 0.625em; } .hud-reticle i:nth-child(4) { top: 50%; right: -0.75em; height: 1.5px; width: 0.625em; }
+@keyframes hud-spin { to { transform: rotate(360deg); } }
+
+/* 目标锁定框：四角括号 + 标签 + 细线（位置由 JS 设置 left/top/width/height，百分比） */
+.hud-lock { position: absolute; opacity: 0; transition: opacity .18s; }
+.hud-lock.on { opacity: 1; animation: hud-lock-in .45s cubic-bezier(.2,.9,.3,1.2); }
+@keyframes hud-lock-in { from { transform: scale(1.35); opacity: 0; } to { transform: none; opacity: 1; } }
+.hud-lock::before, .hud-lock::after, .hud-lock > i { content: ""; position: absolute; width: 1.375em; height: 1.375em; border: 0 solid var(--lock-c, var(--hud-c)); filter: drop-shadow(0 0 5px var(--lock-c, var(--hud-c))); }
+.hud-lock::before { left: 0; top: 0; border-left-width: 3px; border-top-width: 3px; }
+.hud-lock::after { right: 0; bottom: 0; border-right-width: 3px; border-bottom-width: 3px; }
+.hud-lock > i.a { right: 0; top: 0; border-right-width: 3px; border-top-width: 3px; } .hud-lock > i.b { left: 0; bottom: 0; border-left-width: 3px; border-bottom-width: 3px; }
+.hud-lock > span { position: absolute; left: 0; top: -1.625em; font-size: 0.813em; letter-spacing: .1em; padding: 2px 0.875em 2px 0.5em; color: #04101a; background: var(--lock-c, var(--hud-c)); white-space: nowrap; font-weight: 700; clip-path: polygon(0 0, 100% 0, calc(100% - 0.5em) 100%, 0 100%); }
+.hud-lock > em { position: absolute; right: 0; bottom: -1.375em; font-style: normal; font-size: 0.75em; letter-spacing: .1em; color: var(--lock-c, var(--hud-c)); text-shadow: 0 0 0.375em var(--lock-c, var(--hud-c)), 0 1px 3px #000; white-space: nowrap; }
+
+/* 通用标签/面板 */
+.hud-tag { display: inline-block; padding: 2px 0.625em; font-size: 0.75em; letter-spacing: .14em; border: 1px solid var(--hud-c); color: var(--hud-c); background: rgba(25,230,255,.08); }
+.hud-panel { border: 1px solid rgba(25,230,255,.5); background: linear-gradient(180deg, rgba(8,24,40,.6), rgba(4,8,24,.75)); box-shadow: 0 0 1.125em rgba(25,230,255,.18), inset 0 0 1.25em rgba(25,230,255,.06); clip-path: polygon(0 0.625em, 0.625em 0, 100% 0, 100% calc(100% - 0.625em), calc(100% - 0.625em) 100%, 0 100%); }
+
+/* 故障：给任意元素加 .hud-glitch 一次（0.35s） */
+.hud-glitch { animation: hud-glitch .35s steps(2, end); }
+@keyframes hud-glitch {
+  0% { transform: translate(0,0); } 20% { transform: translate(-4px,1px); }
+  40% { transform: translate(5px,-1px); clip-path: inset(10% 0 55% 0); } 60% { transform: translate(-3px,0); clip-path: inset(50% 0 10% 0); }
+  80% { transform: translate(2px,1px); clip-path: none; } 100% { transform: none; clip-path: none; }
+}
+@media (prefers-reduced-motion: reduce) { .hud-scan::after, .hud-reticle::before { animation: none; } .hud-glitch { animation: none; } }

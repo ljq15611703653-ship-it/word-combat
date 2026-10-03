@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>词战 · 开场演出预览</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+  <style>
+    html, body { margin: 0; height: 100%; background: #020008; color: #cfe; font-family: "Noto Sans SC", sans-serif; }
+    #end { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 18px; }
+    #end button { font: inherit; padding: 10px 26px; background: #0a2030; color: #19e6ff; border: 1px solid #19e6ff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="end"><div id="msg">开场已结束</div><button id="again">重新播放</button></div>
+  <script type="module" src="/src/intro/demo.ts"></script>
+</body>
+</html>
