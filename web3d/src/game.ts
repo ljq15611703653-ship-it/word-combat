@@ -44,6 +44,9 @@ export interface GameCtx {
   cast?: CastShow;
   /** 随从在屏幕上的位置（悬浮面板贴着它弹出）；不传 = 面板放在屏幕中间 */
   anchor?: (uid: number) => [number, number];
+  /** "top" = 横版布局：没有右边的栏，只有顶部一小块（回合、双方生命/成长/行动点、数字牌）+ 底部中间的操作卡；
+   *  不传 = 原来的右侧窄条（教程页还在用） */
+  layout?: "strip" | "top";
 }
 
 // ---- [campaign hook] 可选钩子：教程盖在正常对局上用。不传 hooks 时行为和原来完全一样。
@@ -109,20 +112,25 @@ export class Game {
   protected popUid = -1;
   protected popMode: "" | "info" | "act" = "";
   protected popMax = false;
+  /** 横版布局：顶部一小块代替右栏 */
+  protected topLayout = false;
 
   constructor(protected ctx: GameCtx) {
     this.root.hidden = true;
     this.overlay.hidden = true;
     if (this.pl) {
+      this.topLayout = ctx.layout === "top";
       this.root.classList.add("pl");
+      if (this.topLayout) this.root.classList.add("tp");
       this.elDock.append(this.elAct);
       this.elDock.hidden = true;
-      this.root.append(this.elTop, this.elUnits, this.elHand, this.elDock);
+      if (this.topLayout) this.root.append(this.elTop);                 // 顶部一小块；人物列表不要了（头顶名牌里有血条）
+      else this.root.append(this.elTop, this.elUnits, this.elHand, this.elDock);
       this.elPop.append(this.elPopHead, this.elPopBody);
       this.elPop.hidden = true;
       this.elDrawer.append(this.elDecl, this.elLog);
       this.elDrawer.hidden = true;
-      this.float.append(this.elPop, this.elDrawer);
+      if (this.topLayout) this.float.append(this.elDock, this.elPop, this.elDrawer); else this.float.append(this.elPop, this.elDrawer);
       this.elPop.addEventListener("animationend", () => this.elPop.classList.remove("nudge"));
       document.body.append(this.root, this.float, this.overlay);
       window.addEventListener("keydown", (e) => {
@@ -143,6 +151,7 @@ export class Game {
     this.hooks = null;
     this.active = true;
     document.body.classList.add("game");
+    document.body.classList.toggle("gm-top", this.topLayout);
     this.root.hidden = false;
     this.ctx.onToggle(true);
     this.showSetup();
@@ -188,7 +197,7 @@ export class Game {
     this.closePop();
     this.token++;
     this.active = false;
-    document.body.classList.remove("game");
+    document.body.classList.remove("game", "gm-top");
     this.root.hidden = true;
     this.overlay.hidden = true;
     this.ctx.cards.forEach((c) => c.setSelected(false));
@@ -319,6 +328,7 @@ export class Game {
       card.setLoadout(loadoutOf(M, u.uid));
       // 句子读数面板：本轮宣告的句子
       const panel = this.ctx.panels[cardIndex(u.uid)];
+      if (this.topLayout) { panel.setName(u.name); card.setName(u.name); }   // 横版：名牌写真名（小剑/小盾/小咒），不是「蓝一」
       const list = M.phase === "declare" || M.phase === "assign" ? M.declared : M.lastDeclared;
       const a = list.find((x: any) => x.uid === u.uid);
       if (a) panel.set(actionToks(M as any, a, 0), a.start);
@@ -345,7 +355,45 @@ export class Game {
   }
 
   // ------------------------------------------------------------ 顶栏、单位、手牌、宣告
+  /** 横版布局的顶部一小块：回合 + 双方（生命 / 存活 / 成长 / 行动点）+ 我方数字牌 + 小工具 */
+  protected renderTopHud() {
+    const M = this.M, el = this.elTop, wipe = !!M.opts.wipe;
+    el.innerHTML = "";
+    const first = M.firstSide();
+    const mid = h("div", "gm-round", `第 ${M.rnd} / ${NR.MAX_ROUNDS} 轮 · 本轮先宣告：${first === 0 ? "你" : this.foeName}`);
+    if (wipe) {
+      const hf = NR.W.HEAT_FROM;
+      mid.append(h("span", M.rnd >= hf ? "heat on" : "heat", M.rnd >= hf ? `过热：本轮末每个随从 −${M.rnd - hf + 1}` : `第 ${hf} 轮起过热`));
+    }
+    const cols = h("div", "sv-cols");
+    for (let s = 0; s < 2; s++) {
+      const c = M.clsOf(s), p = M.progress(s);
+      const us = M.R.U.filter((u: any) => u.side === s && !u.perma);
+      let hp = 0, mx = 0, alive = 0;
+      for (const u of us) { const sh = this.shown[u.uid] ?? [u.hp, u.down !== -1]; mx += u.mx; if (!sh[1]) { hp += sh[0]; alive++; } }
+      const ap = M.phase === "declare" ? M.res[s].ap : M.sides[s].ap;
+      const col = h("div", `sv-col ${s === 0 ? "me" : "foe"}`);
+      col.title = `成长：${NR.CLASS_GOAL[c]}\n特长：${NR.talentOf(c, wipe)}`;
+      const l1 = h("div", "l1");
+      const chip = h("span", "chip", `${s === 0 ? "你" : this.foeName} · ${NR.CLASS_NAME[c]}`); chip.style.background = NR.CLASS_COLOR[c];
+      l1.append(chip, h("b", "", `生命 ${hp}/${mx}`), h("span", "dim", `存活 ${alive}/${us.length}`));
+      const l2 = h("div", "l2");
+      const bar = h("span", "bar"), fill = h("i"); fill.style.width = `${Math.min(100, p * 100)}%`; fill.style.background = NR.CLASS_COLOR[c];
+      bar.append(fill);
+      l2.append(h("span", "dim", wipe ? "成长" : "完成度"), bar, h("span", "dim", `${Math.round(p * 100)}%`), h("span", "ap", `行动点 ${ap}/${wipe ? NR.W.AP_CAP : NR.AP_CAP}`));
+      col.append(l1, l2);
+      if (s === 0) col.append(this.elHand); else col.append(h("div", "gm-hand dim", `数字牌 ${M.sides[1].cards.length} 张`));
+      cols.append(col);
+    }
+    const bar = h("div", "gm-tools");
+    bar.append(btn("怎么玩", "ghost", () => this.showRules()), btn(this.fast ? "动画：快" : "动画：正常", "ghost", (e) => { this.fast = !this.fast; (e.target as HTMLElement).textContent = this.fast ? "动画：快" : "动画：正常"; }),
+      btn("日志", "ghost" + (this.elDrawer.hidden ? "" : " on"), (e) => { this.elDrawer.hidden = !this.elDrawer.hidden; (e.target as HTMLElement).classList.toggle("on", !this.elDrawer.hidden); }),
+      btn("退出", "ghost", () => (this.hooks?.exit ? this.hooks.exit() : this.close())));
+    el.append(mid, cols, bar);
+  }
+
   protected renderTop() {
+    if (this.topLayout) { this.renderTopHud(); return; }
     const M = this.M, el = this.elTop;
     el.innerHTML = "";
     const first = M.firstSide();
@@ -396,7 +444,7 @@ export class Game {
   protected renderHand() {
     const M = this.M, el = this.elHand;
     el.innerHTML = "";
-    el.append(h("span", "dim", "你的数字牌："), h("span", "chip gray", "1 · 免费无限"));
+    el.append(h("span", "dim", this.topLayout ? "数字牌：" : "你的数字牌："), h("span", "chip gray", this.topLayout ? "1 · 免费" : "1 · 免费无限"));
     const reserved: number[] = M.phase === "declare" ? M.res[0].cards : [];
     M.sides[0].cards.forEach((c: any, i: number) => {
       const cooling = !c.once && M.rnd - c.last < 2;
@@ -404,7 +452,7 @@ export class Game {
       if (cooling) { t += "（冷却）"; cls = "chip gray"; } else if (reserved.includes(i)) { t += "（本轮已用）"; cls = "chip gray"; }
       el.append(h("span", cls, t));
     });
-    el.append(h("small", "dim", `${this.foeName}有 ${M.sides[1].cards.length} 张数字牌`));
+    if (!this.topLayout) el.append(h("small", "dim", `${this.foeName}有 ${M.sides[1].cards.length} 张数字牌`));
   }
 
   protected renderDecl() {
@@ -735,19 +783,33 @@ export class Game {
     return null;
   }
 
+  /** 全灭模式：一方还活着几个随从、剩多少生命 */
+  protected teamStatus(s: number): string {
+    const M = this.M;
+    let alive = 0, hp = 0, mx = 0;
+    for (const u of M.R.U) { if (u.side !== s || u.perma) continue; mx += u.mx; if (u.down === -1) { alive++; hp += u.hp; } }
+    return `存活 ${alive}/3 · 生命 ${hp}/${mx}`;
+  }
+
   protected roundSummary(progBefore: number[]) {
-    const M = this.M, el = this.elAct;
+    const M = this.M, el = this.elAct, wipe = !!M.opts.wipe;
     this.setUi("round_end");
     el.innerHTML = "";
     el.append(h("h3", "", `第 ${M.rnd} 轮结束`));
-    for (let s = 0; s < 2; s++) el.append(h("p", "", `${s === 0 ? "你" : this.foeName}：完成度 ${Math.round(progBefore[s] * 100)}% → ${Math.round(M.progress(s) * 100)}%`));
+    if (wipe) {
+      for (let s = 0; s < 2; s++) el.append(h("p", "", `${s === 0 ? "你" : this.foeName}：${this.teamStatus(s)} · 成长 ${Math.round(progBefore[s] * 100)}% → ${Math.round(M.progress(s) * 100)}%`));
+      if (M.phase !== "over") {
+        const nx = M.rnd + 2 - NR.W.HEAT_FROM;      // 下一轮结束时的过热点数
+        el.append(h("small", "dim", nx >= 1 ? `下一轮结束时过热：每个随从 −${nx}` : `第 ${NR.W.HEAT_FROM} 轮起过热`));
+      }
+    } else for (let s = 0; s < 2; s++) el.append(h("p", "", `${s === 0 ? "你" : this.foeName}：完成度 ${Math.round(progBefore[s] * 100)}% → ${Math.round(M.progress(s) * 100)}%`));
     for (const n of M.roundNotes) {
       const who = n.side === 0 ? "你" : this.foeName;
       if (n.type === "dice") {
         const got = n.rolls.filter((x: number) => x > 1);
         el.append(h("p", "gold", `${who} ${n.why}，掷骰子：${n.rolls.join("、")} → ${got.length ? `得到一次性数字牌 ${got.join("、")}` : "运气不好，都是 1"}`));
       } else if (n.type === "floor") el.append(h("p", "gold", `${who} 得到保底数字【${n.value}】（能反复用）`));
-      else if (n.type === "ladder") el.append(h("p", "green", `${who} 得分到 ${Math.round(n.at * 100)}%：解锁 ${n.copies} 张【${n.value}】（能反复用，用完冷却一轮）`));
+      else if (n.type === "ladder") el.append(h("p", "green", `${who} ${wipe ? "成长" : "得分"}到 ${Math.round(n.at * 100)}%：解锁 ${n.copies} 张【${n.value}】（能反复用，用完冷却一轮）`));
     }
     if (M.phase === "over") { el.append(btn("看结果", "primary", () => this.showOver())); if (this.pl) this.placeAct(); return; }
     el.append(btn("下一轮 →", "primary big" + (this.hooks ? " hl" : ""), () => this.nextRoundClicked()));
@@ -767,7 +829,7 @@ export class Game {
     const w = M.winner;
     const t = h("h1", w === 0 ? "win" : w === 1 ? "lose" : "", w === 0 ? "胜利！" : w === 1 ? "落败" : "平局");
     m.append(t);
-    for (let s = 0; s < 2; s++) m.append(h("p", "", `${s === 0 ? "你" : this.foeName}（${M.clsOf(s)}）完成度 ${Math.round(M.progress(s) * 100)}%`));
+    for (let s = 0; s < 2; s++) m.append(h("p", "", M.opts.wipe ? `${s === 0 ? "你" : this.foeName}（${M.clsOf(s)}）${this.teamStatus(s)}` : `${s === 0 ? "你" : this.foeName}（${M.clsOf(s)}）完成度 ${Math.round(M.progress(s) * 100)}%`));
     m.append(h("p", "dim", `共 ${M.rnd} 轮`));
     const row = h("div", "foot");
     row.append(btn("再来一局", "primary", () => { o.hidden = true; this.begin(); }), btn("改设置", "ghost", () => this.showSetup()), btn("退出", "ghost", () => { o.hidden = true; this.close(); }));
@@ -789,6 +851,14 @@ export class Game {
     switch (this.ui) {
       case "foe": el.append(h("h3", "dim", `${this.foeName}在想……`)); break;
       case "pick_unit": {
+        if (this.topLayout) {
+          // 横版：直接点随从（或点它头顶的「＋ 拼一句」）；这里只留「不出手」和提示
+          el.append(h("h3", "gold", "轮到你：点一个随从，给它拼一句"));
+          const row = h("div", "row2 wrap");
+          for (const uid of M.remaining[0]) row.append(btn(`${M.R.U[uid].name}不出手`, "ghost" + (this.hl("pass", undefined, uid) ? " hl" : ""), () => this.pass(uid)));
+          el.append(row, h("small", "dim", `行动点还剩 ${M.res[0].ap} · 右键随从看详情`));
+          break;
+        }
         el.append(h("h3", "gold", this.pl ? "轮到你：点随从拼一句" : "轮到你：选一个随从，给它拼一句"));
         el.append(h("small", "dim", this.pl ? "左键点随从＝在它旁边拼一句；右键＝看它的详情。每个随从一轮一句。" : "点下面的按钮（或点你的随从卡）。每个随从一轮一句；可以先让一个随从出手，看看对方怎么接，再定下一个。"));
         for (const uid of M.remaining[0]) {
@@ -943,14 +1013,14 @@ export class Game {
     if (pop.hidden) return;
     if (this.popMax) { pop.style.left = ""; pop.style.top = ""; return; }
     // 可用区域：窄条在右边时是它左边；窄屏时窄条在底部，就是它上面
-    const r = this.root.getBoundingClientRect(), onRight = !this.root.hidden && r.width < innerWidth * 0.6;
-    const right = onRight ? r.left : innerWidth, bottom = onRight || this.root.hidden ? innerHeight : r.top;
+    const r = this.root.getBoundingClientRect(), onRight = !this.topLayout && !this.root.hidden && r.width < innerWidth * 0.6;
+    const right = onRight ? r.left : innerWidth, bottom = onRight || this.root.hidden || this.topLayout ? innerHeight : r.top;
     const [ax, ay] = this.ctx.anchor ? this.ctx.anchor(this.popUid) : [right / 2, bottom / 2];
     const w = pop.offsetWidth, ht = pop.offsetHeight;
     let left = ax + 110;
     if (left + w > right - 8) left = ax - 110 - w;
     left = Math.max(8, Math.min(left, right - w - 8));
-    const top = Math.max(64, Math.min(ay - ht / 2, bottom - ht - 10));
+    const top = Math.max(this.topLayout ? 120 : 64, Math.min(ay - ht / 2, bottom - ht - 10));
     pop.style.left = `${left}px`; pop.style.top = `${top}px`;
   }
 

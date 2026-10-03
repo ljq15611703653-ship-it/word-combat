@@ -31,6 +31,13 @@ const START: Seat[] = [
 // 句子是屏幕空间的标注，浮在每个人物右侧的空位里
 // 时间轴在屏幕顶部，两排之间不再留时间轴的位置
 const COL_X = 4.9, ENEMY_Z = -3.9, MINE_Z = 1.4, LINE_Z = -1.2;
+// 横版 3v3（同伙的布局原型 side.html）：蓝方（我方）在左、红方在右，各自三人从中线向外斜排，前排靠中线、往外往后错开。
+// ?layout=rows 可以切回原来的前后两排（教程页一直是前后两排）。
+const SIDE = typeof location === "undefined" || new URLSearchParams(location.search).get("layout") !== "rows";
+const SIDE_SLOTS = [{ x: 2.2, z: 1.3 }, { x: 4.0, z: -0.7 }, { x: 5.8, z: -2.7 }];
+const BASE_S = 0.8;                                   // 底座在横版里整体缩小到 0.8，人物不缩
+const PANEL_UP = 1.9;                                 // 头顶名牌 + 句子占的高度（世界单位，取景时留出来）
+const clampN = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 // 键盘：原型阶段还没接语法引擎，下面这些键任意可按
 const KEYS: string[] = ["选择", "一个", "红方", "蓝方", "随从", "造成", "伤害", "施加", "易伤", "灼烧", "恢复", "当", "之后", "持久", "#12"];
@@ -76,8 +83,8 @@ async function main() {
   // 视角收窄：远近两排的大小差更小，对方的句子不会被透视缩得太小
   const camera = new THREE.PerspectiveCamera(20, 1, 0.1, 300);
   // 新风格：镜头压低一些，才看得见街两侧的楼；旧风格保持俯拍
-  const camBase = STYLE === "neo" ? new THREE.Vector3(0, 11.4, 11.5) : new THREE.Vector3(0, 11.6, 11.2);
-  const look = new THREE.Vector3(0, 0.7, -1.1);
+  const camBase = SIDE ? new THREE.Vector3(0, 7.6, 15) : STYLE === "neo" ? new THREE.Vector3(0, 11.4, 11.5) : new THREE.Vector3(0, 11.6, 11.2);
+  const look = SIDE ? new THREE.Vector3(0, 0.9, -0.8) : new THREE.Vector3(0, 0.7, -1.1);
 
   // 对局背景：新风格 = 赛博朋克街道（src/scene/street.ts），旧风格 = 电路板
   let street: Street | null = null;
@@ -98,11 +105,10 @@ async function main() {
   const cards: UnitCard[] = [];
   const panels: SentencePanel[] = [];
   START.forEach((seat, i) => {
-    const c = new UnitCard(seat.spec, i + 1);
+    const c = new UnitCard(seat.spec, i + 1, SIDE ? BASE_S : 1);
     const enemy = seat.spec.side === "r";
-    const x = ((i % 3) - 1) * COL_X;
-    const z = enemy ? ENEMY_Z : MINE_Z;
-    c.root.position.set(x, 0, z);
+    if (SIDE) { const sl = SIDE_SLOTS[i % 3]; c.root.position.set(enemy ? sl.x : -sl.x, 0, sl.z); }
+    else c.root.position.set(((i % 3) - 1) * COL_X, 0, enemy ? ENEMY_Z : MINE_Z);
     scene.add(c.root);
     cards.push(c);
     // 句子读数面板：屏幕空间，顶边对齐卡的前沿
@@ -113,6 +119,7 @@ async function main() {
         if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); }
       });
     if (seat.sentence) panel.set(parse(seat.sentence), seat.sec ?? 0);
+    if (SIDE) panel.el.classList.add("over");
     layer.appendChild(panel.el);
     panels.push(panel);
   });
@@ -134,6 +141,17 @@ async function main() {
     new THREE.Vector3(x + right, 0.2, z + EMIT.z).addScaledVector(camUp, along);
   function framePoints(mineOnly: boolean) {
     const pts: THREE.Vector3[] = [];
+    if (SIDE) {
+      cards.forEach((c) => {
+        if (mineOnly && c.spec.side !== "b") return;
+        const p = c.root.position;
+        for (const sx of [-1, 1]) {
+          pts.push(new THREE.Vector3(p.x + sx * 1.3, 0, p.z - 1.0), new THREE.Vector3(p.x + sx * 1.3, 0, p.z + 1.0));
+          pts.push(figPoint(p.x, p.z, FIG.h + PANEL_UP, sx * 1.0));   // 人物头顶 + 头顶名牌
+        }
+      });
+      return pts;
+    }
     cards.forEach((c) => {
       if (mineOnly && c.spec.side !== "b") return;
       const p = c.root.position;
@@ -174,7 +192,7 @@ async function main() {
       }
       return { x0, x1, y0, y1 };
     };
-    const shrink = STYLE === "neo" ? 0.84 : 1;   // 新风格：构图往后收，上下多留些街道
+    const shrink = SIDE ? 0.97 : STYLE === "neo" ? 0.84 : 1;   // 新风格：构图往后收，上下多留些街道（横版人物要大，不收）
     let lo = 6, hi = 120;
     for (let i = 0; i < 24; i++) {
       const mid = (lo + hi) / 2, e = extents(mid);
@@ -190,12 +208,17 @@ async function main() {
   const header = document.querySelector("header.top") as HTMLElement;
   const tlEl = document.getElementById("tl")!;
   let editing = -1;
+  /** 画面上边被顶栏（对局时是顶部一小块）+ 时间轴占掉的高度 */
+  function topPx() {
+    const hud = document.querySelector(".gm.tp:not([hidden])") as HTMLElement | null;
+    return (document.body.classList.contains("gm-top") && hud ? hud.getBoundingClientRect().bottom - 8 : header.offsetHeight) + tlEl.offsetHeight + 6;
+  }
   function reframe() {
     const kbEl = document.getElementById("kb")!;
     // 顶部给对方的读数面板、底部给我方的读数面板留出高度（拼句时只看我方，顶部不用留）
-    const top = header.offsetHeight + tlEl.offsetHeight + 6;
+    const top = topPx();
     // 底部给最下面一排的读数面板留出高度
-    const bot = editing >= 0 ? kbEl.offsetHeight + 10 : 16;
+    const bot = editing >= 0 ? kbEl.offsetHeight + 10 : SIDE && document.body.classList.contains("gm-top") ? 92 : 16;   // 横版对局：底部中间有操作卡
     const r = solve(editing >= 0 ? FRAME_MINE : FRAME_ALL, top, bot);
     goal.look.copy(r.look); goal.dist = r.dist; goal.offY = r.offY; goal.offX = r.offX;
   }
@@ -362,20 +385,22 @@ async function main() {
   });
 
   // ---------- 技能演出：镜头拉近出手随从 → 词牌飞到盔甲壳 → 命中 → 归位拉回（只借用取景，不碰场景） ----------
-  const cast = new CastShow({ camera, app, cards, panels, goal, release: reframe, solve: (pts) => solve(pts, header.offsetHeight + tlEl.offsetHeight + 6, 16) });
+  const cast = new CastShow({ camera, app, cards, panels, goal, release: reframe, solve: (pts) => solve(pts, topPx(), 16) });
   // ---------- 完整对局：真人对电脑 ----------
   game = new Game({
-    cast, anchor,
+    cast, anchor, layout: SIDE ? "top" : undefined,
     cards, panels, onChange: () => { renderTimeline(); },
     onToggle: (on) => { live.stop(); requestAnimationFrame(() => { resize(); }); if (!on) menu?.show(); },
   });
   // 联机：同一个 3D 场景、同一套拼句界面，对手和结算由服务端驱动
   online = new OnlineGame({
-    cast, anchor,
+    cast, anchor, layout: SIDE ? "top" : undefined,
     cards, panels, onChange: () => { renderTimeline(); },
     onToggle: () => { live.stop(); requestAnimationFrame(() => { resize(); }); },
   });
-  (window as any).__gm = game; (window as any).__cards = cards;
+  (window as any).__gm = game; (window as any).__cards = cards; (window as any).__cam = camera;
+  // 顶部那一小块的高度会变（换行 / 提示），取景的上边界跟着变
+  { const hudEl = document.querySelector(".gm.tp"); if (hudEl) new ResizeObserver(() => reframe()).observe(hudEl); }
   $("fullgame").addEventListener("click", () => { closeKb(); live.stop(); game.open(); });
 
   let menu: { show: (msg?: string) => void } | undefined;
@@ -402,6 +427,24 @@ async function main() {
       v.copy(p3).project(camera);
       return [((v.x + 1) / 2) * w, ((1 - v.y) / 2) * h];
     };
+    if (SIDE) {
+      // 横版：名牌（名字 + 血条 + 状态 + 这一句）浮在每个人物头顶，引线竖直连到头顶
+      // 名牌宽度 = 同队相邻两个人物的屏幕间距（再留一点缝），免得互相压住
+      const [ax] = scr(figPoint(SIDE_SLOTS[0].x, SIDE_SLOTS[0].z, 1)), [bx] = scr(figPoint(SIDE_SLOTS[1].x, SIDE_SLOTS[1].z, 1));
+      const pw = clampN(Math.abs(ax - bx) - 8, 118, 190), lead = 14;
+      START.forEach((s, i) => {
+        const el = panels[i].el;
+        if (editing >= 0 && s.spec.side === "r") { el.style.visibility = "hidden"; return; }
+        el.style.visibility = "";
+        const p = cards[i].root.position;
+        const [hx, hy] = scr(figPoint(p.x, p.z, FIG.h * (1 - cards[i].koAmount * 0.9) + 0.05));
+        el.style.setProperty("--pw", `${pw}px`);
+        el.style.setProperty("--lead", `${lead}px`);
+        el.style.left = `${Math.round(clampN(hx - pw / 2, 6, w - pw - 6))}px`;
+        el.style.top = `${Math.round(hy - lead - el.offsetHeight)}px`;
+      });
+      return;
+    }
     START.forEach((s, i) => {
       const el = panels[i].el;
       if (editing >= 0 && s.spec.side === "r") { el.style.visibility = "hidden"; return; }
@@ -466,7 +509,14 @@ async function main() {
     if (now !== hovered) hovered?.setHover(false);
     hovered = now;
     hovered?.setHover(true);
-    panels.forEach((p, i) => { p.setFocus(cards[i] === hovered); p.setDead(cards[i].spec.hp <= 0); });
+    panels.forEach((p, i) => {
+      p.setFocus(cards[i] === hovered); p.setDead(cards[i].spec.hp <= 0);
+      if (SIDE) {
+        const ld = cards[i].armor.loadout, ch = ld.statuses.map((s: { name: string; lv: number }) => `${s.name}${s.lv}`);
+        if (ld.conts > 0) ch.push(`续×${ld.conts}`);
+        p.setHp(cards[i].spec.hp, cards[i].spec.max, ch);
+      }
+    });
     const clickable = hovered && (editing >= 0 || (hovered.spec.side === "b" && hovered.spec.hp > 0));
     renderer.domElement.style.cursor = clickable ? "pointer" : "default";
 

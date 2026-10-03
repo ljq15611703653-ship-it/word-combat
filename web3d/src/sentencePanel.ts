@@ -44,13 +44,19 @@ export class SentencePanel {
   readonly el: HTMLElement;
   private body: HTMLElement;
   private code: HTMLElement;
+  private hpBar: HTMLElement; private hpFill: HTMLElement; private hpNum: HTMLElement; private chips: HTMLElement;
+  private hpSig = "";
   private toks: Tok[] = [];
   private sec: number | null = null;
 
   constructor(side: "r" | "b", name: string, private emptyText: string, onClick?: () => void) {
     this.el = document.createElement("div");
     this.el.className = `ro ro-${side}`;
-    this.el.innerHTML = `<i class="ro-lead"></i><div class="ro-head"><span class="ro-name">${name}</span><span class="ro-code"></span></div><div class="ro-body"></div>`;
+    this.el.innerHTML = `<i class="ro-lead"></i><div class="ro-head"><span class="ro-name">${name}</span><span class="ro-code"></span></div><div class="ro-hp" hidden><i></i><b></b></div><div class="ro-chips" hidden></div><div class="ro-body"></div>`;
+    this.hpBar = this.el.querySelector(".ro-hp")!;
+    this.hpFill = this.hpBar.querySelector("i")!;
+    this.hpNum = this.hpBar.querySelector("b")!;
+    this.chips = this.el.querySelector(".ro-chips")!;
     this.body = this.el.querySelector(".ro-body")!;
     this.code = this.el.querySelector(".ro-code")!;
     if (onClick) {
@@ -80,6 +86,19 @@ export class SentencePanel {
     this.render(false);
   }
 
+  /** 头顶名牌：血条 + 状态小标（横版布局用；不调用就不显示） */
+  setHp(hp: number, max: number, chips: string[] = []) {
+    const sig = `${hp}/${max}|${chips.join(",")}`;
+    if (sig === this.hpSig) return;
+    this.hpSig = sig;
+    this.hpBar.hidden = false;
+    this.hpFill.style.width = `${max ? (100 * hp) / max : 0}%`;
+    this.hpBar.classList.toggle("low", hp > 0 && hp / max < 0.35);
+    this.hpNum.textContent = hp > 0 ? `${hp}/${max}` : "倒下";
+    this.chips.hidden = !chips.length;
+    this.chips.innerHTML = chips.map((c) => `<span>${c}</span>`).join("");
+  }
+  setName(name: string) { const e = this.el.querySelector(".ro-name"); if (e && e.textContent !== name) e.textContent = name; }
   setActive(v: boolean) { this.el.classList.toggle("active", v); }
   setFocus(v: boolean) { this.el.classList.toggle("focus", v); }
   setDead(v: boolean) { this.el.classList.toggle("dead", v); }

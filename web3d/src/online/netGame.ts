@@ -299,7 +299,9 @@ export class OnlineGame extends Game {
     const el = this.elTop, v = this.view;
     if (!v) return;
     const opp = v.sides[1 - v.you];
-    el.firstElementChild?.replaceChildren(`第 ${v.round} / ${NR.MAX_ROUNDS} 轮 · 联机 · 本轮先宣告：${v.first === v.you ? "你" : opp.name}`);
+    const rd = el.querySelector(".gm-round") ?? el.firstElementChild;
+    const heat = rd?.querySelector(".heat");     // 横版顶栏里的「过热」小标要留着
+    rd?.replaceChildren(`第 ${v.round} / ${NR.MAX_ROUNDS} 轮 · 联机 · 本轮先宣告：${v.first === v.you ? "你" : opp.name}`, ...(heat ? [heat] : []));
     const warn: string[] = [];
     if (this.status === "lost") warn.push("和服务器断开了，重连中……");
     if (!opp.connected) warn.push(this.peerNote || "对手已掉线或离开");
@@ -338,7 +340,7 @@ export class OnlineGame extends Game {
     m.append(h("h1", w === 0 ? "win" : w === 1 ? "lose" : "", w === 0 ? "胜利！" : w === 1 ? "落败" : "平局"));
     const opp = v ? v.sides[1 - v.you] : null;
     if (opp && !opp.connected) m.append(h("p", "red", this.peerNote || "对手已经离开了"));
-    for (let s = 0; s < 2; s++) m.append(h("p", "", `${s === 0 ? "你" : this.foeName}（${M.clsOf(s)}）完成度 ${Math.round(M.progress(s) * 100)}%`));
+    for (let s = 0; s < 2; s++) m.append(h("p", "", `${s === 0 ? "你" : this.foeName}（${M.clsOf(s)}）${this.teamStatus(s)}`));
     m.append(h("p", "dim", `共 ${M.rnd} 轮`));
     const row = h("div", "foot");
     const again = btn(this.rematchSent ? "等对手点「再来一局」……" : "再来一局", "primary", () => {

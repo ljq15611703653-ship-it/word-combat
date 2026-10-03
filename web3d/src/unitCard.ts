@@ -130,6 +130,8 @@ function beamMaterial(color: number) {
 
 export class UnitCard {
   readonly root = new THREE.Group();
+  /** 底座整体（载板 + 卡面 + 底座下面的托架 + 选中描边）：横版布局里整体缩小，人物不跟着缩 */
+  readonly platform = new THREE.Group();
   readonly body = new THREE.Group();
   readonly figure = new THREE.Group();     // 人物全息像（脚踩投影环）
   readonly bill = new THREE.Group();       // 立绘本身：始终正对镜头（平视，不被俯视压扁）
@@ -154,19 +156,23 @@ export class UnitCard {
   private fxOn = true;
   private distortSaved = 0.4;
   private greenSaved = 0.15;
-  readonly armor = new Armor(FIG.h);
+  readonly armor: Armor;
   spec: UnitSpec;
 
-  constructor(spec: UnitSpec, seed: number) {
+  constructor(spec: UnitSpec, seed: number, baseScale = 1) {
     this.spec = { ...spec };
     const sideCol = C.side[spec.side];
-    this.root.add(this.body);
+    this.root.add(this.platform);
+    this.platform.add(this.body);
+    // 盔甲：底座外面的半透明装甲壳（世界坐标轴，不跟着底座缩放，尺寸按缩放后的底座算）+ 人物身上的小零件（挂在立绘上）
+    this.armor = new Armor(FIG.h, CARRIER.w * baseScale, CARRIER.d * baseScale, (LIFT + TOP) * baseScale, spec.side);
+    this.root.add(this.armor.base);
 
     if (STYLE === "neo") {
       // ---- 义体底座（攻壳机动队式机械质感）----
       this.mech = buildMechBase(CARRIER.w, CARRIER.d, CARRIER.t, CARD.w, sideCol, seed);
       this.body.add(this.mech.group);
-      this.root.add(buildMechPlinth(CARRIER.w, CARRIER.d, LIFT, sideCol));
+      this.platform.add(buildMechPlinth(CARRIER.w, CARRIER.d, LIFT, sideCol));
     } else {
       // ---- PCB 载板 ----
       const carrier = new THREE.Mesh(new RoundedBoxGeometry(CARRIER.w, CARRIER.t, CARRIER.d, 2, 0.03), matPcb);
@@ -293,8 +299,9 @@ export class UnitCard {
     for (const [w, d, x, z] of [[ow, 0.03, 0, -od / 2], [ow, 0.03, 0, od / 2], [0.03, od, -ow / 2, 0], [0.03, od, ow / 2, 0]]) {
       const e = new THREE.Mesh(new THREE.BoxGeometry(w, 0.01, d), this.outline);
       e.position.set(x, 0.006, z);
-      this.root.add(e);
+      this.platform.add(e);
     }
+    if (baseScale !== 1) { this.platform.scale.setScalar(baseScale); this.figure.scale.setScalar(1 / baseScale); }
 
 
     this.refreshHp();
@@ -313,6 +320,7 @@ export class UnitCard {
     this.pMat.uniforms.map.value = map;
     this.pMat.uniforms.uRect.value.set(...(flip ? [1, 0, -1, 1] : [0, 0, 1, 1]) as [number, number, number, number]);
   }
+  get koAmount() { return this.ko; }
   setActive(on: boolean) { this.root.visible = on; }
   setSelected(v: boolean) { this.selected = v; }
   setHover(v: boolean) { this.hoverTarget = v ? 1 : 0; }

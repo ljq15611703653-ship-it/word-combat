@@ -362,3 +362,50 @@ html:not(.classic) {
   html:not(.classic) .gm-pop { width: min(400px, calc(100vw - 16px)); }
   html:not(.classic) .gm-drawer { right: 8px; width: min(360px, calc(100vw - 16px)); bottom: calc(46vh + 8px); }
 }
+
+/* ====== 第四档：横版布局的顶部一小块（Game ctx.layout = "top"）======
+   没有右栏：顶部居中一小块 = 回合 + 双方（生命/存活/成长/行动点）+ 我方数字牌 + 小工具；
+   当前操作卡浮在底部中间；拼句 / 详情还是随从旁边的悬浮面板；日志是抽屉。 */
+html:not(.classic) {
+  body.gm-top { --strip: 0px; }
+  body.gm-top .hud.top { display: none; }
+  body.gm-top .tl { top: 98px; }
+  .gm.pl.tp {
+    left: 50%; right: auto; top: 8px; bottom: auto; width: min(1040px, calc(100vw - 20px)); height: auto; transform: translateX(-50%);
+    padding: 6px 14px 8px; gap: 2px; overflow: visible; z-index: 5;
+    background: var(--card); backdrop-filter: blur(12px) saturate(1.3); clip-path: var(--cut); box-shadow: var(--card-in); border: 0;
+  }
+  .gm.pl.tp .gm-top { background: none; backdrop-filter: none; clip-path: none; box-shadow: none; padding: 0; gap: 3px; position: relative; display: block; }
+  .gm.tp .gm-round { text-align: center; font-size: 13px; letter-spacing: 0.12em; }
+  .gm.tp .gm-round .heat { margin-left: 14px; font-size: 12px; letter-spacing: 0.06em; color: #ffb27a; border: 1px solid rgba(255, 178, 122, 0.45); padding: 0 8px; border-radius: 9px; }
+  .gm.tp .gm-round .heat.on { color: #ff8a6a; border-color: rgba(255, 110, 80, 0.8); background: rgba(255, 80, 50, 0.12); }
+  .gm.tp .sv-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 3px; }
+  .gm.tp .sv-col { display: flex; flex-direction: column; gap: 3px; font-size: 12px; min-width: 0; }
+  .gm.tp .sv-col.foe { align-items: flex-end; text-align: right; }
+  .gm.tp .sv-col .l1, .gm.tp .sv-col .l2 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .gm.tp .sv-col.foe .l1, .gm.tp .sv-col.foe .l2 { justify-content: flex-end; }
+  .gm.tp .sv-col b { font-family: var(--mono); font-size: 14px; }
+  .gm.tp .sv-col .bar { width: 110px; height: 5px; background: rgba(140, 196, 255, 0.14); box-shadow: inset 0 0 0 1px rgba(140, 196, 255, 0.2); }
+  .gm.tp .sv-col .bar i { display: block; height: 100%; }
+  .gm.tp .sv-col .ap { color: #ffe08a; font-family: var(--mono); }
+  .gm.tp .gm-hand { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; background: none; clip-path: none; box-shadow: none; backdrop-filter: none; padding: 0; font-size: 11px; }
+  .gm.tp .gm-hand .chip { font-size: 10px; padding: 0 7px; }
+  .gm.tp .gm-tools { position: absolute; right: 0; top: -2px; display: flex; gap: 4px; }
+  .gm.tp .gm-tools button { padding: 2px 8px; font-size: 11px; }
+  .gm.tp .gm-tools button.on { border-color: var(--g-line-hi); background: rgba(74, 163, 255, 0.2); }
+  /* 底部中间的操作卡 */
+  .gm-float > .gm-dock { left: 50%; transform: translateX(-50%); bottom: 12px; width: min(360px, 38vw); max-height: 38vh; overflow-y: auto; position: absolute; }
+  .gm-float > .gm-dock .gm-act { background: var(--ticks), rgba(9, 18, 36, 0.78); gap: 5px; padding: 8px 10px; }
+  .gm-float > .gm-dock .gm-act h3 { font-size: 14px; margin: 0; }
+  .gm-float > .gm-dock .gm-act p, .gm-float > .gm-dock .gm-act small { font-size: 12px; margin: 0; }
+  .gm-float > .gm-dock .gm-act .row2 button { flex: 1 1 auto; padding: 5px 6px; font-size: 12px; }
+  .gm-float > .gm-dock .gm-act button.big { padding: 9px; font-size: 15px; }
+  .gm-float > .gm-dock[hidden], .gm-float > .gm-dock:has(> .gm-act:empty) { display: none; }
+  .gm-drawer { top: 150px; }
+}
+html:not(.classic) .gm-float > .gm-dock .row2.wrap { flex-wrap: wrap; }
+/* 横版：头顶名牌里的句子太长时限高滚动；时间轴在顶栏下面加一层淡底，刻度才看得清 */
+html:not(.classic) {
+  .ro.over .ro-body { max-height: 150px; overflow-y: auto; scrollbar-width: thin; }
+  body.gm-top .tl::before { content: ""; position: absolute; inset: 0 -22px; background: linear-gradient(180deg, rgba(5, 10, 24, 0.55), rgba(5, 10, 24, 0)); pointer-events: none; }
+}

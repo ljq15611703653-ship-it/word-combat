@@ -144,3 +144,22 @@ body.composing .top .cta, body.composing .top .pts { visibility: hidden; }
 .ro.focus { background: linear-gradient(90deg, rgba(5, 40, 34, 0.9), rgba(5, 40, 34, 0.6) 65%, rgba(5, 40, 34, 0)); }
 .ro.active { border-left-color: #e9fffb; --sc: #e9fffb; }
 .ro.dead { opacity: 0.3; filter: grayscale(0.85); }
+
+/* ---------- 横版布局：名牌浮在人物头顶（名字 + 血条 + 状态 + 这一句），引线竖直连到头顶 ----------
+   位置由 main.ts 每帧摆放；.ro.over 才生效，旧布局（教程）不受影响。 */
+.ro.over { width: var(--pw, 176px); max-width: none; padding: 4px 8px 6px; border-left: 0; border-top: 2px solid var(--sc); text-align: center;
+  background: linear-gradient(180deg, rgba(3, 22, 19, 0.82), rgba(3, 22, 19, 0.6)); }
+.ro.over::before, .ro.over::after { display: none; }
+.ro.over .ro-lead { left: 50%; top: 100%; width: 1px; height: var(--lead, 14px); background: linear-gradient(180deg, var(--sc), transparent); }
+.ro.over .ro-lead::before { left: -2px; top: auto; bottom: -1px; }
+.ro.over .ro-head { justify-content: space-between; letter-spacing: 0.08em; }
+.ro.over .ro-body { justify-content: center; }
+.ro.over .ro-hp { position: relative; height: 12px; margin: 3px 0 2px; background: rgba(255, 255, 255, 0.1); border: 1px solid color-mix(in srgb, var(--sc) 60%, transparent); }
+.ro.over .ro-hp i { display: block; height: 100%; background: #3dffa6; box-shadow: 0 0 6px rgba(61, 255, 166, 0.7); transition: width 0.3s; }
+.ro.over .ro-r .ro-hp i, .ro-r.over .ro-hp i { background: #ff7a86; box-shadow: 0 0 6px rgba(255, 122, 134, 0.7); }
+.ro.over .ro-hp.low i { background: #ffb347; box-shadow: 0 0 6px rgba(255, 179, 71, 0.8); }
+.ro.over .ro-hp b { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font: 700 10px "Chakra Petch", monospace; color: #fff; text-shadow: 0 1px 2px #000; }
+.ro.over .ro-chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; margin-bottom: 2px; }
+.ro.over .ro-chips span { font: 600 10px "Noto Sans SC", sans-serif; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent); border-radius: 8px; color: #dff; background: rgba(0, 0, 0, 0.35); }
+.ro.over .ro-body { font-size: 12px; line-height: 1.45; }
+.ro.over.dead { opacity: 0.45; }
