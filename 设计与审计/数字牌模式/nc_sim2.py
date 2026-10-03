@@ -40,7 +40,7 @@ BASE = dict(
     # 择流
     z_heal=1, z_ko=0,
     # 血流
-    y_cap=3, y_cap_up="0.25:5,0.7:8", y_paid=1.0, y_dice=1, y_all=0, y_bw=1.0, y_guard=0.0,
+    y_cap=3, y_cap_up="0.25:5,0.7:8", y_paid=1.0, y_dice=1, y_all=0, y_bw=1.0, y_guard=0.0, y_shield=0,
     # 电脑
     pass_gain=0.3, ko_look=0.5, danger_hp=4, danger_w=0.0, combo_k=6, smart_late=1, cont_look=0.6,
     rep_max=3,
@@ -178,6 +178,10 @@ def hit(R, cfg, cls, s, cu, tu, base, a, ci, cont):
                 R["eff"].add(key)
             if cls[o] == "续" and tu["mitc"] > 0:
                 credit(R, o, "cont", min(r, tu["mitc"]))
+    if amt > 0 and enemy and tu.get("shield", 0) > 0:
+        r = min(tu["shield"], amt)
+        tu["shield"] -= r
+        amt -= r
     if amt > 0 and enemy and tu["kw"] == "首挡" and not tu["kws"]:
         tu["kws"] = True
         amt = 0
@@ -393,7 +397,10 @@ def resolve(R, acts_in, cfg, cls, rnd):
             u = R["U"][a["uid"]]
             u["hp"] -= b
             if cfg["y_guard"]:
-                u["mit"] += int(b * cfg["y_guard"])
+                if cfg["y_shield"]:
+                    u["shield"] = u.get("shield", 0) + int(b * cfg["y_guard"])
+                else:
+                    u["mit"] += int(b * cfg["y_guard"])
             if cls[a["side"]] == "血":
                 credit(R, a["side"], "blood", b * cfg["y_bw"])
     tl = cfg["timeline"]
@@ -838,6 +845,7 @@ def begin_round(G):
         u["msrc"] = []
         u["lis"] = []
         u["kws"] = False
+        u["shield"] = 0
         if u["down"] != -1 and r >= u["down"] + 2:
             u["down"] = -1
             u["hp"] = u["mx"]

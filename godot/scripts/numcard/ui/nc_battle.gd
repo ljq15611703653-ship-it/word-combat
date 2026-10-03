@@ -241,6 +241,8 @@ func _unit_card(u: Dictionary) -> PanelContainer:
 		flow.add_child(K.chip(NT.status_chip(str(nm), e, int(M.rnd)), Color("6a2a4a"), 13))
 	if int(u.mit) > 0:
 		flow.add_child(K.chip("减伤%d" % int(u.mit), Color("2a4a6a"), 13))
+	if int(u.get("shield", 0)) > 0:
+		flow.add_child(K.chip("血痂%d" % int(u.shield), NR.CLASS_COLOR["血"].darkened(0.4), 13))
 	for l in u.lis:
 		flow.add_child(K.chip("转移", Color("4a2a6a"), 13))
 	for cc in M.R.conts:
@@ -667,7 +669,7 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 			return "第 %d 秒 %s %s出手" % [int(ev.t), MARK[mini(int(ev.ord), MARK.size() - 1)], nm.call(int(ev.uid))]
 		"blood":
 			var gd := int(int(ev.amount) * NR.Y_GUARD)
-			return "[color=#e0606e]开打前 %s 用 %d 点生命付了 %s 的行动点%s[/color]" % [nm.call(int(ev.uid)), int(ev.amount), MARK[mini(int(ev.ord), MARK.size() - 1)], ("（血契护体：本轮多 %d 点减伤）" % gd) if gd > 0 else ""]
+			return "[color=#e0606e]开打前 %s 用 %d 点生命付了 %s 的行动点%s[/color]" % [nm.call(int(ev.uid)), int(ev.amount), MARK[mini(int(ev.ord), MARK.size() - 1)], (("（血契护体：本轮结一层 %d 点血痂，一共挡 %d 点）" if NR.Y_SHIELD else "（血契护体：本轮每下少受 %d 点）") % ([gd, gd] if NR.Y_SHIELD else [gd])) if gd > 0 else ""]
 		"lock":
 			var ns: Array = []
 			for x in ev.tgts:

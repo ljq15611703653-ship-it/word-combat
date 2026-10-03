@@ -42,7 +42,7 @@ func start(deck0: Dictionary, deck1: Dictionary, seed_val: int = -1, human0: boo
 			"cards": [], "lad": []})
 		for i in 3:
 			U.append({"uid": s * 3 + i, "side": s, "name": NR.UNIT_NAMES[i], "glyph": NR.UNIT_GLYPHS[i], "hp": int(d.hp[i]), "mx": int(d.hp[i]),
-				"down": -1, "st": {}, "kw": str(d.kws[i]), "kws": false, "mit": 0, "mitc": 0, "msrc": [], "lis": [], "last": null})
+				"down": -1, "st": {}, "kw": str(d.kws[i]), "kws": false, "mit": 0, "mitc": 0, "shield": 0, "msrc": [], "lis": [], "last": null})
 	R = NE.new_R(U, [str(deck0.cls), str(deck1.cls)])
 	begin_round()
 
@@ -78,6 +78,7 @@ func begin_round() -> void:
 		u.msrc = []
 		u.lis = []
 		u.kws = false
+		u["shield"] = 0
 		if int(u.down) != -1 and rnd >= int(u.down) + 2:
 			u.down = -1
 			u.hp = int(u.mx)

@@ -93,6 +93,11 @@ static func hit(R: Dictionary, a: Dictionary, ci: int, cu: Dictionary, tu: Dicti
 				_credit(R, o, "cont", mini(r3, int(tu.mitc)))
 		if r3 > 0:
 			parts["减伤"] = r3
+	if amt > 0 and enemy and int(tu.get("shield", 0)) > 0:
+		var r4: int = mini(int(tu.shield), amt)
+		tu.shield = int(tu.shield) - r4
+		amt -= r4
+		parts["血痂"] = r4
 	if amt > 0 and enemy and str(tu.kw) == "首挡" and not bool(tu.kws):
 		tu.kws = true
 		parts["首挡"] = amt
@@ -366,7 +371,10 @@ static func resolve(R: Dictionary, acts_in: Array, rnd: int) -> void:
 			var u: Dictionary = R.U[int(a1.uid)]
 			u.hp = int(u.hp) - bl
 			if NR.Y_GUARD > 0.0:
-				u.mit = int(u.mit) + int(bl * NR.Y_GUARD)
+				if NR.Y_SHIELD:
+					u["shield"] = int(u.get("shield", 0)) + int(bl * NR.Y_GUARD)
+				else:
+					u.mit = int(u.mit) + int(bl * NR.Y_GUARD)
 			_credit(R, int(a1.side), "blood", bl)
 			_ev(R, {"t": 0, "type": "blood", "uid": int(a1.uid), "amount": bl, "ord": int(a1.ord)})
 	for t in range(0, NR.TIMELINE + 1):
