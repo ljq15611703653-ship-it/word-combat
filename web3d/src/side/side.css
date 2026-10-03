@@ -1,0 +1,73 @@
+:root {
+  --sv-bg: #020b0a;
+  --sv-ink: #e9fffb;
+  --sv-dim: #7fb3aa;
+  --sv-line: rgba(31, 214, 180, 0.35);
+  --sv-b: #2fd8ff;
+  --sv-r: #ff5a6e;
+  --sv-hp: #3dffa6;
+  --sv-hp-low: #ffb238;
+  --sv-panel: rgba(4, 22, 19, 0.82);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--sv-bg); color: var(--sv-ink); font-family: "Noto Sans SC", "PingFang SC", sans-serif; }
+#app { position: fixed; inset: 0; }
+#app canvas { display: block; }
+#plates { position: fixed; inset: 0; pointer-events: none; }
+
+/* 顶栏：两队总血量 + 回合时钟 */
+.sv-top { position: fixed; top: 0; left: 0; right: 0; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 12px 20px; gap: 16px; background: linear-gradient(var(--sv-panel), transparent); }
+.sv-team { display: flex; align-items: baseline; gap: 12px; font-weight: 700; }
+.sv-team.r { justify-content: flex-end; }
+.sv-team-name { font-size: 18px; letter-spacing: 0.2em; }
+.sv-team.b .sv-team-name { color: var(--sv-b); }
+.sv-team.r .sv-team-name { color: var(--sv-r); }
+.sv-team-hp { font: 600 15px "Chakra Petch", monospace; color: var(--sv-dim); }
+.sv-clock { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+.sv-round { font-size: 12px; color: var(--sv-dim); letter-spacing: 0.15em; }
+.sv-time { font: 700 26px "Chakra Petch", monospace; font-variant-numeric: tabular-nums; }
+
+/* 时间轴：顶栏下方一条细轨 */
+.sv-tl { position: fixed; top: 64px; left: 12%; right: 12%; height: 26px; }
+.sv-tl-track { position: absolute; left: 0; right: 0; top: 12px; height: 2px; background: var(--sv-line); }
+.sv-tl-head { position: absolute; top: 4px; width: 2px; height: 18px; background: var(--sv-ink); box-shadow: 0 0 8px var(--sv-ink); }
+.sv-tl-mark { position: absolute; top: 0; transform: translateX(-50%); font-size: 11px; padding: 1px 6px; border-radius: 3px; background: var(--sv-panel); border: 1px solid currentColor; }
+.sv-tl-mark.b { color: var(--sv-b); top: -2px; }
+.sv-tl-mark.r { color: var(--sv-r); top: 14px; }
+
+/* 头顶名牌 + 血条 */
+.sv-plate { position: absolute; left: 0; top: 0; width: 112px; padding: 4px 6px 5px; background: var(--sv-panel); border-left: 3px solid; border-radius: 3px; font-size: 12px; will-change: transform; }
+.sv-plate.b { border-color: var(--sv-b); }
+.sv-plate.r { border-color: var(--sv-r); }
+.sv-plate-name { font-weight: 700; margin-bottom: 3px; }
+.sv-hp { height: 6px; background: rgba(255, 255, 255, 0.08); border-radius: 2px; overflow: hidden; }
+.sv-hp-fill { height: 100%; background: var(--sv-hp); box-shadow: 0 0 6px var(--sv-hp); transition: width 0.3s; }
+.sv-hp-fill.low { background: var(--sv-hp-low); box-shadow: 0 0 6px var(--sv-hp-low); }
+.sv-hp-num { position: absolute; right: 6px; top: 4px; font: 600 11px "Chakra Petch", monospace; color: var(--sv-dim); }
+.sv-plate.ko { opacity: 0.45; }
+
+/* 底部操作栏 */
+.sv-bar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 20px; background: linear-gradient(transparent, var(--sv-panel) 40%); }
+.sv-who { display: flex; align-items: baseline; gap: 10px; font-size: 14px; color: var(--sv-dim); min-width: 0; }
+.sv-who b { font-size: 18px; color: var(--sv-ink); }
+.sv-who b.b { color: var(--sv-b); }
+.sv-who b.r { color: var(--sv-r); }
+.sv-acts { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.sv-acts button, .sv-dbg select { font: inherit; color: var(--sv-ink); background: rgba(31, 214, 180, 0.1); border: 1px solid var(--sv-line); border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+.sv-acts button:hover { background: rgba(31, 214, 180, 0.22); }
+
+/* 调试项：放在底部栏中间，不挡人物和名牌 */
+.sv-dbg { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--sv-dim); }
+.sv-dbg label { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sv-dbg select { padding: 4px 6px; font-size: 12px; }
+
+@media (max-width: 700px) {
+  .sv-top { padding: 10px 16px; }
+  .sv-team-name { font-size: 14px; }
+  .sv-tl { left: 16px; right: 16px; }
+  .sv-bar { flex-wrap: wrap; }
+  .sv-dbg { order: 3; width: 100%; flex-wrap: wrap; gap: 8px 14px; }
+  .sv-bar { padding: 10px 16px; }
+  .sv-acts button { padding: 6px 10px; }
+  .sv-plate { width: 88px; }
+}
