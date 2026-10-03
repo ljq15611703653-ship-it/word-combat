@@ -21,6 +21,7 @@ export class Rng {
 
 /** 剧情关卡的特殊设置：不填 = 标准规则 */
 export interface MatchOpts {
+  wipe?: boolean;             // 全灭即胜：倒下的随从不再回来，一方三个随从都倒了就输；打满轮数比（活着的随从数 → 剩余血量 → 完成度）
   koWin?: boolean;            // 只看击倒：一方随从全倒就输（不看完成度）
   maxRounds?: number;         // 超过这一轮数还没分出胜负，算玩家（0 方）输
   perma?: number[];           // 这些编号的随从不上场（一直倒着）
@@ -66,7 +67,7 @@ export class Match {
     const U: any[] = [];
     for (let s = 0; s < 2; s++) {
       const d = s === 0 ? d0 : d1;
-      this.sides.push({ cls: d.cls, ap: opts.ap?.[s] ?? NR.AP_START, deck: { ...d.words }, used: {}, prev: {}, cards: [], lad: [] });
+      this.sides.push({ cls: d.cls, ap: opts.ap?.[s] ?? (opts.wipe ? NR.W.AP_START : NR.AP_START), deck: { ...d.words }, used: {}, prev: {}, cards: [], lad: [] });
       for (const v of opts.give?.[s] ?? []) this.sides[s].cards.push({ v, once: false, last: -9, src: "赠" });
       for (let i = 0; i < 3; i++) {
         const perma = !!opts.perma?.includes(s * 3 + i);
@@ -75,12 +76,13 @@ export class Match {
       }
     }
     this.R = NE.newR(U, [d0.cls, d1.cls]);
+    this.R.wipe = !!opts.wipe;
     this.beginRound();
   }
 
   clsOf(s: number): Cls { return this.sides[s].cls; }
   progress(s: number) { return NE.prog(this.R, s, this.clsOf(s)); }
-  caps(s: number) { return NR.caps(this.clsOf(s), this.progress(s)); }
+  caps(s: number) { return NR.caps(this.clsOf(s), this.progress(s), !!this.opts.wipe); }
   firstSide() { return (this.first0 + this.rnd - 1) % 2; }
   private stat(s: number, key: string, v = 1) { this.stats[s][key] = (this.stats[s][key] ?? 0) + v; }
   contsOf(s: number) { return this.R.conts.filter((c: any) => c.side === s); }
@@ -89,7 +91,7 @@ export class Match {
     this.rnd++;
     for (const u of this.R.U) {
       u.mit = 0; u.mitc = 0; u.msrc = []; u.lis = []; u.kws = false; u.shield = 0;
-      if (u.down !== -1 && !u.perma && this.rnd >= u.down + 2) { u.down = -1; u.hp = u.mx; u.st = {}; }
+      if (u.down !== -1 && !u.perma && !this.opts.wipe && this.rnd >= u.down + 2) { u.down = -1; u.hp = u.mx; u.st = {}; }
       else if (u.down === -1) {
         for (const nm of Object.keys(u.st)) {
           const e = u.st[nm];
@@ -100,7 +102,7 @@ export class Match {
     this.roundNotes = [];
     for (let s = 0; s < 2; s++) {
       const sd = this.sides[s];
-      if (this.rnd > 1) sd.ap = Math.min(sd.ap + NR.AP_INCOME, NR.AP_CAP);
+      if (this.rnd > 1) sd.ap = this.opts.wipe ? Math.min(sd.ap + NR.W.AP_INCOME, NR.W.AP_CAP) : Math.min(sd.ap + NR.AP_INCOME, NR.AP_CAP);
       sd.prev = sd.used;
       sd.used = {};
       if (NR.FLOOR[this.rnd]) {
@@ -178,10 +180,10 @@ export class Match {
     const need: Record<string, number> = {};
     for (const w of words) need[w] = (need[w] ?? 0) + 1;
     for (const w in need) if ((this.res[s].words[w] ?? 0) < need[w]) return { err: `【${w}】不够用（卡组里的张数用完了，或者在冷却）` };
-    const cost = NE.actionCost(cls, cp.and);
+    const cost = NE.totalCost(cls, cp);
     let blood = 0;
     if (cost > this.res[s].ap) {
-      blood = cost - this.res[s].ap;
+      blood = Math.ceil((cost - this.res[s].ap) / cp.bloodAp);   // 要付的生命（全灭模式下 1 点生命顶 2 点行动点）
       if (cp.blood <= 0) return { err: `行动点不够（要 ${cost}，还剩 ${this.res[s].ap}）` };
       if (blood > this.bloodRoom(s, uid)) return { err: `行动点不够，用血也付不起（差 ${blood}，这个随从最多能付 ${this.bloodRoom(s, uid)} 血）` };
       for (const c0 of cls) {
@@ -295,13 +297,29 @@ export class Match {
       });
     }
     const p0 = this.progress(0), p1 = this.progress(1);
-    if (this.opts.koWin) {
+    if (this.opts.wipe) {
+      const out = [0, 1].map((s) => this.R.U.filter((u: any) => u.side === s).every((u: any) => u.down !== -1));
+      if (out[0] && out[1]) {
+        const ph: number[] | undefined = this.R.preHeat;       // 过热前双方剩的总生命：多的赢
+        this.winner = ph && ph[0] !== ph[1] ? (ph[0] > ph[1] ? 0 : 1) : -2;
+      } else if (out[0] || out[1]) this.winner = out[0] ? 1 : 0;
+      else if (this.rnd >= NR.MAX_ROUNDS) this.winner = this.timeoutWinner();
+    } else if (this.opts.koWin) {
       const out = [0, 1].map((s) => this.R.U.filter((u: any) => u.side === s).every((u: any) => u.down !== -1));
       if (out[0] || out[1]) this.winner = out[0] && out[1] ? -2 : out[0] ? 1 : 0;
       else if (this.opts.maxRounds && this.rnd >= this.opts.maxRounds) this.winner = 1;
     } else if (p0 >= 1 || p1 >= 1 || this.rnd >= NR.MAX_ROUNDS) this.winner = p0 > p1 ? 0 : p1 > p0 ? 1 : -2;
     this.phase = this.winner !== -1 ? "over" : "resolved";
     return this.lastEvents;
+  }
+
+  /** 全灭模式打满轮数还没分出胜负：活着的随从多的赢 → 剩余总血量多的赢 → 完成度高的赢 → 平局 */
+  timeoutWinner(): number {
+    const alive = [0, 0], hp = [0, 0];
+    for (const u of this.R.U) if (u.down === -1 && !u.perma) { alive[u.side]++; hp[u.side] += u.hp; }
+    for (const k of [alive, hp]) if (k[0] !== k[1]) return k[0] > k[1] ? 0 : 1;
+    const p0 = this.progress(0), p1 = this.progress(1);
+    return p0 > p1 ? 0 : p1 > p0 ? 1 : -2;
   }
 
   nextRound() { if (this.phase === "resolved") this.beginRound(); }

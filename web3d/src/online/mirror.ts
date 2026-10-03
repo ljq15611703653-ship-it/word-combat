@@ -12,6 +12,7 @@ const copy = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 
 export class MirrorMatch extends Match {
   you = 0;
+  opts = { wipe: true };       // 联机一律是全灭模式：费用、血付换算要和服务端一致
   private first = 0;
   /** 服务端 uid ↔ 本地 uid（互为逆映射） */
   uid = (u: number) => (u < 0 ? u : (u + 3 * this.you) % 6);
@@ -52,6 +53,7 @@ export class MirrorMatch extends Match {
     }
     const cls = [v.sides[me].cls, v.sides[opp].cls];
     this.R = NE.newR(U, cls);
+    this.R.wipe = true;
     for (let s = 0; s < 2; s++) {
       const ps = v.sides[s === 0 ? me : opp];
       (this.R.M[s] as any)[NR.METRIC[ps.cls]] = ps.metric;

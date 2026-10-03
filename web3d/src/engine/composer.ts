@@ -245,17 +245,18 @@ export class Composer {
     const pr = this.parse();
     if (!pr.complete) return { text: "拼完整之后才能用。", bad: true, allLate: false };
     const cl = pr.clauses, cp = this.cp;
-    const cost = NE.actionCost(cl, cp.and), ms = NE.actionWindup(cl, cp.wind);
-    const ap = this.M.res[this.side].ap, blood = Math.max(0, cost - ap);
+    const cost = NE.totalCost(cl, cp), ms = NE.actionWindup(cl, cp.wind);
+    const tax = cost - NE.actionCost(cl, cp.and);
+    const ap = this.M.res[this.side].ap, blood = Math.max(0, Math.ceil((cost - ap) / cp.bloodAp));
     const nums = NE.actionNumbers(cl, cp.freecount);
-    let text = `花 ${cost} 行动点（还剩 ${ap}）· 最早第 ${ms} 秒起效 · 用数字牌 ${nums.length ? `[${nums.join(", ")}]` : "无（全是 1）"}`;
+    let text = `花 ${cost} 行动点${tax > 0 ? `（含待定多目标 +${tax}）` : ""}（还剩 ${ap}）· 最早第 ${ms} 秒起效 · 用数字牌 ${nums.length ? `[${nums.join(", ")}]` : "无（全是 1）"}`;
     let bad = false;
     if (blood > 0) {
       if (cp.blood > 0) {
         const bad2 = cl.some((c: any) => (cp.noheal && c.k === "heal") || (cp.nodef && ["mit", "redirect"].includes(c.k)));
         if (bad2) { text += "  —— 行动点不够要用血付；用血付的句子不能有【恢复】【减伤】【转移】"; bad = true; }
-        else if (blood > this.M.bloodRoom(this.side, this.uid)) { text += `  —— 差 ${blood} 点，这个随从最多只能付 ${this.M.bloodRoom(this.side, this.uid)} 血`; bad = true; }
-        else text += `  —— 差的 ${blood} 点用【${this.M.R.U[this.uid].name}】的生命付`;
+        else if (blood > this.M.bloodRoom(this.side, this.uid)) { text += `  —— 差 ${cost - ap} 点行动点，要付 ${blood} 点生命，这个随从最多只能付 ${this.M.bloodRoom(this.side, this.uid)} 血`; bad = true; }
+        else text += `  —— 差的 ${cost - ap} 点用【${this.M.R.U[this.uid].name}】的 ${blood} 点生命付${cp.bloodAp > 1 ? `（1 点生命顶 ${cp.bloodAp} 点）` : ""}`;
       } else { text += "  —— 行动点不够"; bad = true; }
     }
     const allLate = cl.every((c: any) => ["late", "self"].includes(c.tmode ?? "") || c.k === "delay");

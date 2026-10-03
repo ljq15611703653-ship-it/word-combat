@@ -454,7 +454,22 @@ export class CastShow {
       await this.wait(200);
       return;
     }
+    if (ev.type === "heat" && !this.skipped) {
+      // 过热：全场每个随从都吃一份，一个接一个很快地闪过去，不拉镜头
+      const [x, y] = this.anchor(ev.tgt, "chest");
+      step(ev);
+      for (let i = 0; i < 10; i++) this.add({ k: "ember", x: x + rnd(-24, 24), y: y + rnd(0, 50), vx: rnd(-30, 30), vy: rnd(-120, -40), g: -30, t: 0, life: rnd(400, 700), size: rnd(2, 4), col: i % 2 ? "#ff9a5a" : "#ff5a3a" });
+      if (ev.dealt > 0) this.popup(x, y - 24, `-${ev.dealt}`, "血", "#ff7a4a", { small: "过热" });
+      await this.wait(150);
+      return;
+    }
     step(ev);
+    if (ev.type === "ko" && !this.skipped) {
+      const [x, y] = this.anchor(ev.tgt, "chest");
+      this.popup(x, y - 10, "倒下", "血", "#ff5d73", { tag: true });
+      await this.wait(520);
+      return;
+    }
     if (ev.type === "fizzle" && !this.skipped) {
       const [x, y] = this.anchor(ev.uid, "chest");
       this.popup(x, y - 20, "落空", "并", "#93a8c9", { tag: true });

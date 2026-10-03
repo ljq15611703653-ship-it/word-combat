@@ -21,7 +21,7 @@ export function cloneR(R: RState): RState {
   });
   return {
     U, M: [{ ...R.M[0] }, { ...R.M[1] }], cls: R.cls, kob: [...R.kob], kos: [0, 0], fz: [0, 0], lost: [0, 0], maxhit: 0,
-    conts: R.conts.map((c: any) => structuredClone(c)), eff: {}, retarget: [0, 0], ev: null,
+    conts: R.conts.map((c: any) => structuredClone(c)), eff: {}, retarget: [0, 0], ev: null, wipe: !!R.wipe,
   };
 }
 export const prog = (R: RState, s: number, cls: Cls) => R.M[s][NR.METRIC[cls]] / NR.TARGET[cls] + R.kob[s];
@@ -307,6 +307,18 @@ export function resolve(R: RState, actsIn: Act[], rnd: number) {
       ev(R, { t: NR.TIMELINE + 1, type: "burn", tgt: u2.uid, amount: bu[0], dealt: d });
     }
   }
+  if (R.wipe && rnd >= NR.W.HEAT_FROM) {
+    // 过热：轮末全场每个随从受一次挡不住的伤害（第 HEAT_FROM 轮 1 点，之后每轮多 1 点）；不记击倒功劳
+    R.preHeat = [0, 0];
+    for (const uh of R.U) if (uh.down === -1 && !uh.perma && uh.hp > 0) R.preHeat[uh.side] += uh.hp;
+    const hd = rnd - NR.W.HEAT_FROM + 1;
+    for (const uh of R.U) {
+      if (uh.down !== -1 || uh.perma) continue;
+      const dealt = Math.max(0, Math.min(hd, uh.hp));
+      uh.hp -= hd; uh.last = null;
+      ev(R, { t: NR.TIMELINE + 1, type: "heat", tgt: uh.uid, amount: hd, dealt });
+    }
+  }
   koCheck(R, rnd, NR.TIMELINE + 1);
   for (const a5 of actsIn) {
     const s = a5.side;
@@ -360,6 +372,11 @@ export function actionCost(cls: Clause[], andCost: number = NR.AND_COST): number
   let cost = NR.BASE_COST + (cls.length - 1) * andCost;
   for (const w of actionWords(cls)) cost += NR.WORDS[w].price;
   return cost;
+}
+/** 实际要花的行动点：基础花费 + 择流的「待定多目标」附加费（全灭模式） */
+export function totalCost(cls: Clause[], cp: NR.Caps): number {
+  const tax = cp.lateTax > 0 && cls.some((c: any) => c.tmode === "late" && (c.count ?? 1) >= 2) ? cp.lateTax : 0;
+  return actionCost(cls, cp.and) + tax;
 }
 export const actionWindup = (cls: Clause[], perClause = 1) => 1 + actionWords(cls).length + (cls.length - 1) * perClause;
 export const isDef = (cls: Clause[]) => cls.every((c) => ["mit", "redirect", "heal"].includes(c.k));

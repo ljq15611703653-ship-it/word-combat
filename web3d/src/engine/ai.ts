@@ -6,6 +6,7 @@ import type { Act, Clause, RState } from "./engine";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const PASS_GAIN = 0.3;
 const KO_LOOK = 0.5, DANGER_HP = 4, DANGER_W = 1.0, CONT_LOOK = 0.6, COMBO_K = 6, REP_MAX = 3;
+const WIPE_PROG = 20, WIPE_UNIT = 7, WIPE_HP = 1.2, WIPE_DANGER = 0.8;
 
 export function statValue(R: RState, s: number): number {
   let v = 0;
@@ -27,7 +28,31 @@ export function contValue(R: RState, s: number): number {
   return v * CONT_LOOK;
 }
 
+/** 全灭即胜的估值：活着的随从才是本钱（倒下不再回来），完成度只剩「解锁数字牌」的意义 */
+function utilWipe(M: any, R: RState, s: number): number {
+  const c0 = M.clsOf(s), c1 = M.clsOf(1 - s);
+  const ps = NE.prog(R, s, c0), po = NE.prog(R, 1 - s, c1);
+  let u = WIPE_PROG * (ps - po);
+  let mine = 0, theirs = 0;
+  for (const x of R.U) {
+    if (x.perma) continue;
+    if (x.down === -1) {
+      const v = WIPE_UNIT + WIPE_HP * x.hp + WIPE_DANGER * Math.max(0, DANGER_HP - x.hp);
+      if (x.side === s) { u += v; mine++; } else { u -= v; theirs++; }
+    }
+  }
+  u += 0.6 * (statValue(R, s) - statValue(R, 1 - s));
+  const w0 = c0 === "续" ? 100 / NR.TARGET[c0 as NR.Cls] : 0.5;
+  const w1 = c1 === "续" ? 100 / NR.TARGET[c1 as NR.Cls] : 0.5;
+  u += (contValue(R, s) * w0 - contValue(R, 1 - s) * w1) * 0.5;
+  if (!theirs && !mine) return 0;
+  if (!theirs) u += 1000;
+  if (!mine) u -= 1000;
+  return u;
+}
+
 export function util(M: any, R: RState, s: number): number {
+  if (M.opts?.wipe) return utilWipe(M, R, s);
   const c0 = M.clsOf(s), c1 = M.clsOf(1 - s);
   const ps = NE.prog(R, s, c0), po = NE.prog(R, 1 - s, c1);
   let u = 100 * (ps - po);
@@ -108,7 +133,8 @@ function singles(M: any, s: number, cp: any): [Clause[], number][] {
     }
   }
   const hurt = F.filter((u) => u.hp < u.mx).sort((a, b) => (a.hp - a.mx) - (b.hp - b.mx));
-  if (hurt.length || cp.slots > 0) {
+  const noDef = !!M.aiNoDef?.[s];   // 平衡测试用：只进攻不防守的对照组
+  if (!noDef && (hurt.length || cp.slots > 0)) {
     for (const n2 of copts) {
       if (n2 > F.length) continue;
       for (const amt of opts) {
@@ -122,7 +148,7 @@ function singles(M: any, s: number, cp: any): [Clause[], number][] {
       }
     }
   }
-  if (enemyActs.length || cp.slots > 0 || cp.once) {
+  if (!noDef && (enemyActs.length || cp.slots > 0 || cp.once)) {
     for (const n3 of copts) {
       if (n3 > F.length) continue;
       for (const amt2 of opts) for (const ct3 of conts)
@@ -137,7 +163,7 @@ function singles(M: any, s: number, cp: any): [Clause[], number][] {
         out.push([[mkcl("st", "enemy", tg3, n4, { st: nm, n: dur })], -1]);
     }
   }
-  if ((words["转移"] ?? 0) > 0 && (enemyActs.length || cp.once)) {
+  if (!noDef && (words["转移"] ?? 0) > 0 && (enemyActs.length || cp.once)) {
     for (const n5 of copts) {
       if (n5 > F.length) continue;
       out.push([[mkcl("redirect", "ally", late ? null : threatOrder.slice(0, n5), n5, {})], -1]);

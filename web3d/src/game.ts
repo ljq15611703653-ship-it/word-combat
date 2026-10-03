@@ -33,7 +33,7 @@ function btn(text: string, cls = "", on?: (e: MouseEvent) => void) {
 }
 
 interface Settings { cls: NR.Cls; words: Record<string, number>; kws: string[]; hp: number[]; foe: NR.Cls | "随机" }
-const DEFAULT: Settings = { cls: "并", words: { ...NR.PRESETS["并"].words }, kws: [...NR.PRESETS["并"].kws], hp: [7, 7, 7], foe: "随机" };
+const DEFAULT: Settings = { cls: "并", words: { ...NR.PRESETS["并"].words }, kws: [...NR.PRESETS["并"].kws], hp: [NR.W.HP, NR.W.HP, NR.W.HP], foe: "随机" };
 
 export interface GameCtx {
   cards: UnitCard[];
@@ -135,6 +135,7 @@ export class Game {
       document.body.append(this.root, this.overlay);
     }
     try { const s = localStorage.getItem("nc-settings"); if (s) this.S = { ...DEFAULT, ...JSON.parse(s) }; } catch { /* 没有存储也能用 */ }
+    if (NR.hpProblem(this.S.hp, NR.W.POOL)) this.S.hp = [...DEFAULT.hp];   // 旧版存的是总和 21 的分配
   }
 
   // ------------------------------------------------------------ 进出
@@ -212,7 +213,7 @@ export class Game {
       for (const c of NR.CLASSES) {
         const b = h("button", "cls" + (S.cls === c ? " on" : ""));
         b.style.setProperty("--c", NR.CLASS_COLOR[c]);
-        b.innerHTML = `<b>${NR.CLASS_NAME[c]}</b><small>${NR.CLASS_TALENT[c]}</small><em>得分：${NR.CLASS_GOAL[c]}（目标 ${NR.TARGET[c]}）</em>`;
+        b.innerHTML = `<b>${NR.CLASS_NAME[c]}</b><small>${NR.talentOf(c, true)}</small><em>成长：${NR.CLASS_GOAL[c]}（目标 ${NR.TARGET[c]}，用来解锁数字牌）</em>`;
         b.addEventListener("click", () => { S.cls = c; S.words = { ...NR.PRESETS[c].words }; S.kws = [...NR.PRESETS[c].kws]; render(); });
         row.append(b);
       }
@@ -233,7 +234,7 @@ export class Game {
       }
       s2.append(grid, btn("用这个职业的建议卡组", "ghost", () => { S.words = { ...NR.PRESETS[S.cls].words }; S.kws = [...NR.PRESETS[S.cls].kws]; render(); }));
       // 关键词和生命
-      const s3 = h("section", "sec"); s3.append(h("h3", "", "3 · 每个随从的关键词和生命（总共 21 点，每个至少 3）"));
+      const s3 = h("section", "sec"); s3.append(h("h3", "", `3 · 每个随从的关键词和生命（总共 ${NR.W.POOL} 点，每个至少 ${NR.HP_MIN}）`));
       const g3 = h("div", "units3");
       for (let i = 0; i < 3; i++) {
         const r = h("div", "u3");
@@ -257,7 +258,7 @@ export class Game {
       const r4 = h("div", "foe-row");
       for (const f of ["随机", ...NR.CLASSES] as (NR.Cls | "随机")[]) r4.append(btn(f === "随机" ? "随机" : NR.CLASS_NAME[f], S.foe === f ? "on" : "", () => { S.foe = f; render(); }));
       s4.append(r4);
-      const bad = NR.deckProblem(S.words, S.kws) || NR.hpProblem(S.hp);
+      const bad = NR.deckProblem(S.words, S.kws) || NR.hpProblem(S.hp, NR.W.POOL);
       const foot = h("div", "foot");
       foot.append(h("span", "err", bad), btn("怎么玩", "ghost", () => this.showRules()), btn("退出对局模式", "ghost", () => { this.overlay.hidden = true; this.close(); }));
       const go = btn("开始对局 →", "primary", () => this.begin());
@@ -272,7 +273,7 @@ export class Game {
   showRules() {
     const m = h("div", "gm-modal");
     m.append(h("h2", "", "数字牌模式 · 怎么玩"));
-    for (const l of NR.RULES_LINES) m.append(h("p", "", l));
+    for (const l of this.hooks ? NR.RULES_LINES : NR.RULES_WIPE) m.append(h("p", "", l));
     const prev = this.overlay.innerHTML, wasHidden = this.overlay.hidden;
     const bg = h("div", "gm-overlay top");
     bg.append(m);
@@ -288,9 +289,9 @@ export class Game {
     this.overlay.hidden = true;
     const foe: NR.Cls = S.foe === "随机" ? NR.CLASSES[Math.floor(Math.random() * 4)] : S.foe;
     const mine: NR.Deck = { cls: S.cls, words: { ...S.words }, kws: [...S.kws], hp: [...S.hp] };
-    const theirs = NR.presetDeck(foe);
+    const theirs = NR.presetDeck(foe, true);
     this.M = new Match();
-    this.M.start(mine, theirs, Math.floor(Math.random() * 1e9), true, false);
+    this.M.start(mine, theirs, Math.floor(Math.random() * 1e9), true, false, { wipe: true });
     this.token++;
     this.ui = "idle";
     this.elLog.innerHTML = "";
@@ -470,7 +471,7 @@ export class Game {
     const head = h("div", "cmp-head");
     head.append(h("h3", "", `给【${u.name}】拼一句`), h("span", "chip", `本轮还剩行动点 ${M.res[0].ap}`));
     if (cmp.cp.blood > 0) head.append(h("span", "chip red", `不够可用血付，最多 ${M.bloodRoom(0, this.selUid)}`));
-    el.append(head, h("small", "talent", `职业特长：${NR.CLASS_TALENT[cls]}`));
+    el.append(head, h("small", "talent", `职业特长：${NR.talentOf(cls, !!M.opts.wipe)}`));
     // 辅助轮
     const sugg = h("div", "sugg");
     sugg.append(btn(this.pl ? "辅助轮：让电脑出几个主意" : "辅助轮：让电脑出几个主意（先看人话，点一下装进来）", "ghost", () => { if (this.gate("assist")) this.showSuggestions(sugg); }));
@@ -684,7 +685,7 @@ export class Game {
   protected applyShown(ev: any) {
     let uid = -1, delta = 0;
     switch (ev.type) {
-      case "hit": case "redirected": case "burn": uid = ev.type === "hit" ? ev.tgt : ev.tgt; delta = -(ev.type === "burn" ? ev.dealt : ev.dealt); break;
+      case "hit": case "redirected": case "burn": case "heat": uid = ev.tgt; delta = -ev.dealt; break;
       case "heal": uid = ev.tgt; delta = ev.amount; break;
       case "blood": uid = ev.uid; delta = -ev.amount; break;
       case "ko": uid = ev.tgt; this.shown[uid] = [0, true]; break;
@@ -729,6 +730,7 @@ export class Game {
       case "ko": return r(`${nm(ev.tgt)} 倒下了！${ev.broke > 0 ? `它的 ${ev.broke} 个续断了` : ""}`, "red");
       case "endure": return r(`    → ${nm(ev.tgt)}【不屈】留了 1 血`);
       case "burn": return r(`轮末 ${nm(ev.tgt)} 灼烧掉 ${ev.dealt} 血`);
+      case "heat": return r(`轮末过热：${nm(ev.tgt)} 受到 ${ev.amount} 点（挡不住）`, "red");
     }
     return null;
   }
@@ -811,8 +813,11 @@ export class Game {
         const ms = NE.actionWindup(this.pending, M.caps(0).wind);
         el.append(h("h3", "gold", "第几秒起效？"), h("p", "", NT.actionText(M as any, this.pending)));
         el.append(h("small", "dim", `这句最早第 ${ms} 秒。越早越不容易被打断；对方的招落在哪一秒，看上面的时间轴。`));
-        const cst = NE.actionCost(this.pending, M.caps(0).and);
-        if (cst > M.res[0].ap) el.append(h("p", "red", `行动点差 ${cst - M.res[0].ap}：开打时先从【${M.R.U[this.selUid].name}】身上扣 ${cst - M.res[0].ap} 点生命付掉。`));
+        const cp0 = M.caps(0), cst = NE.totalCost(this.pending, cp0);
+        if (cst > M.res[0].ap) {
+          const need = cst - M.res[0].ap, hpPay = Math.ceil(need / cp0.bloodAp);
+          el.append(h("p", "red", `行动点差 ${need}：开打时先从【${M.R.U[this.selUid].name}】身上扣 ${hpPay} 点生命付掉${cp0.bloodAp > 1 ? `（1 点生命顶 ${cp0.bloodAp} 点）` : ""}。`));
+        }
         const best = this.pending[0]?.sugg_start ?? ms;
         if (best !== ms) el.append(h("p", "green", `辅助轮建议第 ${best} 秒。`));
         const foe = new Set(M.declared.filter((a: any) => a.side === 1).map((a: any) => a.start));

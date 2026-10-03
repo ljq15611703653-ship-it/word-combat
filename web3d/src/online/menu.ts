@@ -7,7 +7,9 @@ import "./online.css";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface Settings { cls: NR.Cls; words: Record<string, number>; kws: string[]; hp: number[]; foe: NR.Cls | "随机" }
-const DEFAULT: Settings = { cls: "并", words: { ...NR.PRESETS["并"].words }, kws: [...NR.PRESETS["并"].kws], hp: [7, 7, 7], foe: "随机" };
+const DEFAULT: Settings = { cls: "并", words: { ...NR.PRESETS["并"].words }, kws: [...NR.PRESETS["并"].kws], hp: [NR.W.HP, NR.W.HP, NR.W.HP], foe: "随机" };
+/** 旧版存的设置里生命总和是 21：和现在的 18 对不上就换回默认分配 */
+const fixHp = <T extends { hp: number[] }>(s: T): T => (NR.hpProblem(s.hp, NR.W.POOL) ? { ...s, hp: [...DEFAULT.hp] } : s);
 type Choice = { src: "custom" } | { src: "preset"; cls: NR.Cls };
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, cls = "", text = ""): HTMLElementTagNameMap[K] {
@@ -36,7 +38,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
   deckLayer.hidden = true; menu.hidden = true; home.hidden = true;
   document.body.append(menu, deckLayer, home);
 
-  let S: Settings = store.get<Settings>("nc-settings", structuredClone(DEFAULT));
+  let S: Settings = fixHp(store.get<Settings>("nc-settings", structuredClone(DEFAULT)));
   let choice: Choice = (() => { try { const c = JSON.parse(store.raw("nc-online-choice")); if (c?.src === "preset" && NR.CLASSES.includes(c.cls)) return c as Choice; } catch { /* */ } return { src: "custom" } as Choice; })();
   let tab: "custom" | "preset" = choice.src === "custom" ? "custom" : "preset";
   let nick = store.raw("nc-name");
@@ -44,7 +46,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
 
   const saveS = () => store.set("nc-settings", S);
   const saveChoice = () => store.set("nc-online-choice", choice);
-  const customProblem = () => NR.deckProblem(S.words, S.kws) || NR.hpProblem(S.hp);
+  const customProblem = () => NR.deckProblem(S.words, S.kws) || NR.hpProblem(S.hp, NR.W.POOL);
 
   // ------------------------------------------------------------ 主菜单
   function show(msg = "") {
@@ -77,7 +79,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
 
   // ------------------------------------------------------------ 选卡组
   function showDeck() {
-    S = store.get<Settings>("nc-settings", structuredClone(DEFAULT));
+    S = fixHp(store.get<Settings>("nc-settings", structuredClone(DEFAULT)));
     menu.hidden = true; home.hidden = true; deckLayer.hidden = false;
     renderDeck();
   }
@@ -120,7 +122,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
       b.style.setProperty("--c", NR.CLASS_COLOR[c]);
       const p = NR.PRESETS[c];
       const words = NR.WORD_ORDER.filter((w) => p.words[w]).map((w) => `${w}×${p.words[w]}`).join(" ");
-      b.innerHTML = `<b>${NR.CLASS_NAME[c]}</b><small>${NR.CLASS_TALENT[c]}</small><em>得分：${NR.CLASS_GOAL[c]}（目标 ${NR.TARGET[c]}）</em><small>进阶词：${words}</small><small>关键词：${p.kws.join(" / ")} · 生命 7/7/7</small>`;
+      b.innerHTML = `<b>${NR.CLASS_NAME[c]}</b><small>${NR.talentOf(c, true)}</small><em>成长：${NR.CLASS_GOAL[c]}（目标 ${NR.TARGET[c]}，用来解锁数字牌）</em><small>进阶词：${words}</small><small>关键词：${p.kws.join(" / ")} · 生命 ${NR.W.HP}/${NR.W.HP}/${NR.W.HP}</small>`;
       b.addEventListener("click", () => { choice = { src: "preset", cls: c }; saveChoice(); renderDeck(); });
       row.append(b);
     }
@@ -135,7 +137,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
     for (const c of NR.CLASSES) {
       const b = h("button", "cls" + (S.cls === c ? " on" : ""));
       b.style.setProperty("--c", NR.CLASS_COLOR[c]);
-      b.innerHTML = `<b>${NR.CLASS_NAME[c]}</b><small>${NR.CLASS_TALENT[c]}</small><em>得分：${NR.CLASS_GOAL[c]}（目标 ${NR.TARGET[c]}）</em>`;
+      b.innerHTML = `<b>${NR.CLASS_NAME[c]}</b><small>${NR.talentOf(c, true)}</small><em>成长：${NR.CLASS_GOAL[c]}（目标 ${NR.TARGET[c]}，用来解锁数字牌）</em>`;
       b.addEventListener("click", () => { S.cls = c; S.words = { ...NR.PRESETS[c].words }; S.kws = [...NR.PRESETS[c].kws]; saveS(); renderDeck(); });
       row.append(b);
     }
@@ -154,7 +156,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
       grid.append(r);
     }
     s2.append(grid, btn("用这个流派的建议卡组", "ghost", () => { S.words = { ...NR.PRESETS[S.cls].words }; S.kws = [...NR.PRESETS[S.cls].kws]; saveS(); renderDeck(); }));
-    const s3 = h("section", "sec"); s3.append(h("h3", "", "3 · 每个随从的关键词和生命（总共 21 点，每个至少 3）"));
+    const s3 = h("section", "sec"); s3.append(h("h3", "", `3 · 每个随从的关键词和生命（总共 ${NR.W.POOL} 点，每个至少 ${NR.HP_MIN}）`));
     const g3 = h("div", "units3");
     for (let i = 0; i < 3; i++) {
       const r = h("div", "u3");
@@ -178,7 +180,7 @@ export function mountMenu(game: Game, online: OnlineGame) {
 
   function spec(): DeckSpec {
     if (choice.src === "custom") return { cls: S.cls, words: { ...S.words }, kws: [...S.kws], hp: [...S.hp] };
-    const d = NR.presetDeck(choice.cls);
+    const d = NR.presetDeck(choice.cls, true);
     return { cls: d.cls, words: d.words, kws: d.kws, hp: d.hp };
   }
   function start() {

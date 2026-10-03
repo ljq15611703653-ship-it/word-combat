@@ -22,13 +22,13 @@ const fail = (code: string, msg: string): never => { throw new RoomError(code, m
 export function deckFromSpec(d?: DeckSpec): Deck {
   const cls = d?.cls ?? "并";
   if (!NR.CLASSES.includes(cls)) return fail("bad_deck", "没有这个流派");
-  const base = NR.presetDeck(cls);
+  const base = NR.presetDeck(cls, true);
   if (d && (d.words || d.kws || d.hp)) {
     const words = d.words ?? base.words, kws = d.kws ?? base.kws, hp = d.hp ?? base.hp;
     if (typeof words !== "object" || !Array.isArray(kws) || !Array.isArray(hp)) return fail("bad_deck", "卡组格式不对");
     for (const w in words) if (!Number.isInteger(words[w]) || words[w] < 0) return fail("bad_deck", "卡组张数不对");
     if (!hp.every((x) => Number.isInteger(x))) return fail("bad_deck", "生命分配不对");
-    const p = NR.deckProblem(words, kws) || NR.hpProblem(hp);
+    const p = NR.deckProblem(words, kws) || NR.hpProblem(hp, NR.W.POOL);
     if (p) fail("bad_deck", p);
     return { cls, words: { ...words }, kws: [...kws], hp: [...hp] };
   }
@@ -183,7 +183,7 @@ export class Room {
     this.clearTimer();
     this.seed = randomInt(1, 2 ** 31 - 1); // 种子只留在服务端
     const M = new Match();
-    M.start(this.players[0]!.deck, this.players[1]!.deck, this.seed, true, true);
+    M.start(this.players[0]!.deck, this.players[1]!.deck, this.seed, true, true, { wipe: true });
     this.M = M;
     this.resetRound();
     this.broadcast();

@@ -387,11 +387,11 @@ async function playOut(A: Cli, B: Cli, rng: Rng, stats: any, limit = 800) {
 async function testMatchmaking(port: number, srv: any, rng: Rng, stats: any) {
   console.log("[6] 匹配队列 / 自定义卡组 / 重连 / 离开");
   const mk = async (n: string) => { const c = new Cli(n, port); await c.connect(); return c; };
-  const custom = { cls: "择", words: { 易伤: 2, 灼烧: 2, 衰弱: 2, 转移: 1, 延后: 1, 移除: 2 }, kws: ["不屈", "不屈", "首挡"], hp: [9, 6, 6] };
+  const custom = { cls: "择", words: { 易伤: 2, 灼烧: 2, 衰弱: 2, 转移: 1, 延后: 1, 移除: 2 }, kws: ["不屈", "不屈", "首挡"], hp: [8, 5, 5] };
   const P1 = await mk("P1"), P2 = await mk("P2");
   // 非法卡组：被拒，且不会进队列
   check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", words: { 易伤: 9 }, kws: ["首挡", "首挡", "首挡"] } }))?.code === "bad_deck", "队列：张数不合法的卡组被拒");
-  check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", hp: [1, 1, 19] } }))?.code === "bad_deck", "队列：生命分配不合法被拒");
+  check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", hp: [1, 1, 16] } }))?.code === "bad_deck", "队列：生命分配不合法被拒");
   check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", words: { 易伤: 2, 灼烧: 2, 衰弱: 2, 转移: 2, 延后: 2, 移除: 0.5 }, kws: ["首挡", "首挡", "首挡"] } }))?.code === "bad_deck", "队列：小数张数被拒");
   check((await P1.act({ t: "queue", name: "a", deck: { cls: "龙" as any } }))?.code === "bad_deck", "队列：不存在的流派被拒");
   check(srv.waiting.length === 0, "被拒的 queue 不入队");
@@ -418,11 +418,11 @@ async function testMatchmaking(port: number, srv: any, rng: Rng, stats: any) {
   check(P1b.side === 0 && P2.side === 1, "先入队的是 0 号");
   check(P1b.room === P2.room && /^M[0-9A-F]{6}$/.test(P1b.room), "服务端自动生成房间号 " + P1b.room);
   const g1 = P1b.gv, g2 = P2.gv;
-  check(g1.units.filter((u) => u.side === 0).map((u) => u.mx).join() === "9,6,6", "自定义卡组的生命分配生效（9/6/6）");
+  check(g1.units.filter((u) => u.side === 0).map((u) => u.mx).join() === "8,5,5", "自定义卡组的生命分配生效（8/5/5）");
   check(g1.units.filter((u) => u.side === 0).map((u) => u.kw).join() === "不屈,不屈,首挡", "自定义卡组的关键词生效");
   check(g1.sides[0].cls === "择" && g1.sides[1].cls === "并", "双方流派正确");
   check(g1.me.words["移除"] === 2 && g1.me.words["转移"] === 1, "自定义进阶词张数生效");
-  check(g2.me.words["灼烧"] === 1 && g2.units.filter((u) => u.side === 1).every((u) => u.mx === 7), "预设卡组（并流）生效");
+  check(g2.me.words["灼烧"] === 1 && g2.units.filter((u) => u.side === 1).every((u) => u.mx === 6), "预设卡组（并流）生效");
   check(g1.sides[1].name === "小二" && g2.sides[0].name === "小一", "对手昵称正确");
   check((await P1b.act({ t: "queue", name: "x" }))?.code === "already", "已在对局里不能再排队");
   // 自身（tmode self）句子：服务端补上 tg=[uid]，不信客户端
@@ -444,7 +444,7 @@ async function testMatchmaking(port: number, srv: any, rng: Rng, stats: any) {
   console.log(`  匹配对局结束：第 ${P1b.gv.round} 轮，winner=${P1b.gv.winner}，比分 ${P1b.gv.sides.map((s) => s.prog.toFixed(2)).join(" : ")}`);
   check(P1b.gv.winner === P2.gv.winner, "双方看到同一个结果");
   await P1b.act({ t: "ready" }); await P2.act({ t: "ready" }); await settleAll([P1b, P2]);
-  check(P1b.gv.phase === "declare" && P1b.gv.round === 1 && P1b.gv.units.filter((u) => u.side === 0).map((u) => u.mx).join() === "9,6,6", "再来一局沿用各自的卡组");
+  check(P1b.gv.phase === "declare" && P1b.gv.round === 1 && P1b.gv.units.filter((u) => u.side === 0).map((u) => u.mx).join() === "8,5,5", "再来一局沿用各自的卡组");
   // 离开 = 认输；对手收到结果；离开的人不能重连
   const gotOver = P1b.next((m) => (m.t === "state" || m.t === "resolved") && m.view.phase === "over");
   await P2.act({ t: "leave" });
