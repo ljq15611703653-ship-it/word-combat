@@ -1,7 +1,7 @@
 // 局域网联机服务：同一个端口托管 dist/ 静态页面和 /ws（WebSocket 房间服务，服务端权威）。
 //   npm run online          构建并启动
 //   PORT=8787 HOST=0.0.0.0  可用环境变量改
-import { createServer, type Server } from "node:http";
+import { createServer, get as httpGet, type Server } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
 import { extname, join, normalize, resolve, sep } from "node:path";
@@ -18,6 +18,7 @@ const MIME: Record<string, string> = {
   ".woff2": "font/woff2", ".txt": "text/plain; charset=utf-8", ".map": "application/json",
 };
 const MAX_PAYLOAD = 16 * 1024;
+const HELLO = "cizhan-lan";
 const ROOM_IDLE_MS = 30 * 60_000;
 const rate = () => +(process.env.RATE_PER_SEC ?? 10); // 每连接每秒补充的消息数（容量 30）
 
@@ -36,6 +37,8 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://x");
+      // 「是不是已经有一个词战服务器在这个端口上」的探测（重复双击 start.bat 时用）
+      if (url.pathname === "/__cizhan") { res.writeHead(200, { "content-type": "text/plain" }).end(HELLO); return; }
       let p = decodeURIComponent(url.pathname);
       if (p === "/" || p === "") p = "/index.html";
       const full = normalize(join(dist, p));
@@ -157,20 +160,83 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
   });
 }
 
-function lanAddrs(): string[] {
-  const out: string[] = [];
+/** 局域网地址：家用路由器常见的 192.168 / 10 / 172.16-31 排前面；虚拟网卡（WSL、Hyper-V、VMware、VirtualBox、Docker）标出来 */
+function lanAddrs(): { ip: string; name: string; virt: boolean }[] {
+  const out: { ip: string; name: string; virt: boolean; rank: number }[] = [];
   for (const [name, list] of Object.entries(networkInterfaces())) {
-    for (const i of list ?? []) if (i.family === "IPv4" && !i.internal) out.push(`${i.address}  (${name})`);
+    for (const i of list ?? []) {
+      if (i.family !== "IPv4" || i.internal) continue;
+      const a = i.address, virt = /vEthernet|WSL|Hyper-V|VMware|VirtualBox|Docker|br-|docker|veth/i.test(name);
+      const rank = virt ? 3 : a.startsWith("192.168.") ? 0 : a.startsWith("10.") || /^172\.(1[6-9]|2\d|3[01])\./.test(a) ? 1 : 2;
+      out.push({ ip: a, name, virt, rank });
+    }
   }
-  return out;
+  return out.sort((x, y) => x.rank - y.rank);
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
-  const port = +(process.env.PORT ?? 8787), host = process.env.HOST ?? "0.0.0.0";
-  startServer({ port, host }).then((r) => {
-    console.log(`词战联机服务已启动：端口 ${r.port}`);
-    console.log(`本机打开      http://localhost:${r.port}/`);
-    for (const a of lanAddrs()) console.log(`局域网其他人  http://${a.split(" ")[0]}:${r.port}/   [${a.split("(")[1]?.replace(")", "")}]`);
-    console.log("（打不开？看 README 的「Windows 防火墙」一节）");
-  }, (e) => { console.error("启动失败：", e.message); process.exit(1); });
+function fetchText(port: number, path: string): Promise<string> {
+  return new Promise((ok) => {
+    const req = httpGet({ host: "127.0.0.1", port, path, timeout: 800 }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (d) => { if (body.length < 20000) body += d; });
+      res.on("end", () => ok(body));
+    });
+    req.on("timeout", () => { req.destroy(); ok(""); });
+    req.on("error", () => ok(""));
+  });
 }
+/** 占着端口的是谁：ours = 这一版的词战服务器；old = 旧版词战（以前留下的服务器 / 开发服务器）；other = 别的程序 */
+async function whoIsOn(port: number): Promise<"ours" | "old" | "other"> {
+  if ((await fetchText(port, "/__cizhan")).trim() === HELLO) return "ours";
+  return /词战|word-combat|ci-zhan/i.test(await fetchText(port, "/")) ? "old" : "other";
+}
+
+function printHowTo(port: number) {
+  const L = (s = "") => console.log(s);
+  L("房主：用浏览器打开   http://localhost:" + port + "/");
+  const addrs = lanAddrs();
+  if (addrs.length) {
+    L("朋友（和房主连同一个 Wi-Fi / 路由器）打开：");
+    for (const a of addrs) L(`    http://${a.ip}:${port}/    [${a.name}]${a.virt ? "  ← 虚拟网卡，一般不是这个" : ""}`);
+    if (addrs.length > 1) L("  （有好几行时，通常是 192.168 开头、网卡名是 WLAN / 以太网 的那一行）");
+  } else L("没找到局域网地址：这台电脑好像没连 Wi-Fi / 网线。");
+  L();
+  L("两个人都在主菜单点「打真人」→ 选卡组 →「开始匹配」，两个人都点了就自动开打。");
+  L("朋友连不上：双击「开放防火墙.bat」，或看「联机说明.txt」第五节。");
+}
+
+async function main() {
+  const host = process.env.HOST ?? "0.0.0.0";
+  const want = +(process.env.PORT ?? 8787);
+  console.log("===== 词战 · 局域网联机服务器 =====");
+  for (let port = want; port < want + 12; port++) {
+    try {
+      const r = await startServer({ port, host });
+      if (port !== want) console.log(`（端口 ${want} 被占着，这次改用 ${port}，下面的地址就是新版的地址）`);
+      console.log(`服务器已启动，端口 ${r.port}。这个窗口别关，关了服务器就停了。`);
+      console.log();
+      printHowTo(r.port);
+      return;
+    } catch (e: any) {
+      if (e?.code !== "EADDRINUSE") { console.error("启动失败：", e?.message ?? e); process.exit(1); }
+      const who = await whoIsOn(port);
+      if (who === "ours") {
+        console.log(`已经有一个词战服务器在运行了（端口 ${port}），不用再开第二个。`);
+        console.log("直接用下面的地址；要重开的话，先把之前那个服务器窗口关掉再双击 start.bat。");
+        console.log();
+        printHowTo(port);
+        process.exit(0);
+      }
+      if (who === "old") {
+        console.log(`端口 ${port} 上开着一个【旧版】词战服务器（以前留下的），浏览器打开 ${port} 看到的是旧版。`);
+        console.log(`这次新版换个端口启动；想关掉旧的，双击「关闭旧服务器.bat」。`);
+        console.log();
+      }
+    }
+  }
+  console.error(`启动失败：端口 ${want}～${want + 11} 都被占用了。重启电脑后再试，或者先 set PORT=9000 再运行。`);
+  process.exit(1);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) void main();

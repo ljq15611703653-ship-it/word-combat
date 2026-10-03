@@ -65,13 +65,13 @@ export function mountMenu(game: Game, online: OnlineGame) {
     if (msg) box.append(h("div", "mn-msg", msg));
     if (msg === STATIC_MSG) {
       const a = h("a", "mn-btn small", "下载局域网联机版（zip）");
-      a.setAttribute("href", `${import.meta.env.BASE_URL}lan/ci-zhan-lan.zip`);
+      a.setAttribute("href", `${import.meta.env.BASE_URL}lan/ci-zhan-lan.zip?v=${encodeURIComponent(import.meta.env.VITE_BUILD ?? "")}`); // 带版本号，免得浏览器拿缓存里的旧包
       a.setAttribute("download", "");
       box.append(a);
     }
-    box.append(h("div", "mn-foot", STATIC
+    box.append(h("div", "mn-foot", (STATIC
       ? "这是网页版：打电脑、新手教程随便玩。和朋友联机请用局域网联机版（房主电脑运行，朋友用浏览器打开房主的地址）"
-      : "打真人：局域网内，两个人都点「开始匹配」就自动配对开打，不用房间号"));
+      : "打真人：局域网内，两个人都点「开始匹配」就自动配对开打，不用房间号") + `　·　版本 ${import.meta.env.VITE_BUILD ?? "开发版"}`));
     menu.append(box);
   }
 

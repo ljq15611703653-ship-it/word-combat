@@ -25,10 +25,12 @@
 第 9 关起玩家随从由「小剑」改名「零」。第 14 关对手单位叫 阿词/句号/旧部（仍是 AI 对打）。
 
 ## 3.5 发布（新增）
-- 一条命令：`sh scripts/release.sh` → `build/pages/`（静态网页版：打电脑 + 新手教程，`VITE_STATIC=1` 时「打真人」改成提示下载联机版）+ `build/pages/lan/ci-zhan-lan.zip`（局域网联机版：`dist/` + esbuild 打包好的 `server/server.mjs` + `start.bat` / `start.sh` / `开放防火墙.ps1` / `联机说明.txt`，房主只要装 Node.js，不用 npm install）。
+- 一条命令：`sh scripts/release.sh` → `build/pages/`（静态网页版：打电脑 + 新手教程，`VITE_STATIC=1` 时「打真人」改成提示下载联机版）+ `build/pages/lan/ci-zhan-lan.zip`（局域网联机版：`dist/` + esbuild 打包好的 `server/server.mjs` + `start.bat` / `start.sh` / `开放防火墙.bat` / `关闭旧服务器.bat` / `open-firewall.ps1` / `联机说明.txt`，房主只要装 Node.js，不用 npm install）。
 - 网页版发布在 gh-pages 分支的 `3d/` 子目录：https://ljq15611703653-ship-it.github.io/word-combat/3d/ （旧的 2D 版在根目录，不动）。
 - 主菜单加了「新手教程」按钮（跳 campaign.html）。
 - 云端机器装依赖：package-lock.json 里的地址是 repo.huaweicloud.com（云端被拦），临时把 lock 里的地址换成 registry.npmjs.org 再 `npm ci`，装完把 lock 还原。
+
+- 联机包的 Windows 坑（2026-10-04 修）：`.bat` 在仓库里是 UTF-8，`release.sh` 打包时转成 **GBK + CRLF**（中文 Windows 的 cmd 按 936 读批处理；UTF-8 + `chcp 65001` 会把半行中文当命令执行）。`open-firewall.ps1` / `联机说明.txt` 带 BOM（PowerShell 5.1 不认无 BOM 的 UTF-8）。服务端启动时端口被占：是本版词战 → 提示「已经在运行」并退出；是旧版词战（探测 `/` 页面）或别的程序 → 自动顺延到下一个端口并打印实际地址。新增 `关闭旧服务器.bat`（只关占着 8787-8799 的 node 进程）、`开放防火墙.bat`（自动提权，放行 8787-8799 专用网络）。主菜单底部显示「版本 = 构建时间（北京时间）」，用来分辨新旧版本。
 
 ## 4. 进行中 / 未合并的分支（全部在 origin 上）
 > 2026-10-04：street-bg、glass-ui、intro、cast-fx 已全部合进 main（cast-fx 的 WIP 一并合入：结构完整，能跑完整个回放；演出时非相关随从的读数面板会淡出）。下表保留作历史。
