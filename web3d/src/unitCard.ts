@@ -7,6 +7,7 @@ import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.j
 import { C } from "./theme";
 import { cardCircuitTexture, plateTexture, warnTexture } from "./textures";
 import { circuitMaterial, portraitMaterial } from "./shaders";
+import { Armor, type Loadout } from "./armor";
 
 export type Side = "b" | "r";
 
@@ -149,6 +150,7 @@ export class UnitCard {
   private fxOn = true;
   private distortSaved = 0.4;
   private greenSaved = 0.15;
+  readonly armor = new Armor(FIG.h);
   spec: UnitSpec;
 
   constructor(spec: UnitSpec, seed: number) {
@@ -263,6 +265,7 @@ export class UnitCard {
     art.userData.card = this;
     this.hitTargets.push(art);
     this.bill.add(art);
+    this.bill.add(this.armor.root);
     this.figure.add(this.bill);
 
     // 头顶预警牌
@@ -285,6 +288,8 @@ export class UnitCard {
     this.refreshHp();
   }
 
+  /** 装备的词在立绘周围长出的半透明外壳（立绘本身不变）。 */
+  setLoadout(l: Loadout) { this.armor.set(l); }
   setSelected(v: boolean) { this.selected = v; }
   setHover(v: boolean) { this.hoverTarget = v ? 1 : 0; }
   setDistort(v: number) { this.distortSaved = v; if (this.fxOn) this.pMat.uniforms.uDistort.value = v; }
@@ -302,6 +307,14 @@ export class UnitCard {
     this.spec.incoming = 0;
     if (this.spec.hp <= 0) this.koTarget = 1;
     this.refreshHp();
+  }
+
+  /** 引擎算出的血量直接同步到卡上（不播受击）。 */
+  syncHp(hp: number, max: number) {
+    const changed = this.spec.hp !== hp || this.spec.max !== max;
+    this.spec.hp = hp; this.spec.max = max; this.spec.incoming = 0;
+    this.koTarget = hp <= 0 ? 1 : 0;
+    if (changed) this.refreshHp();
   }
 
   reset(spec: UnitSpec) {
@@ -344,6 +357,7 @@ export class UnitCard {
     this.bill.scale.set(1 + this.ko * 0.15, Math.max(0.02, 1 - this.ko) * (1 + Math.sin(t * 1.4 + wp.x) * 0.006), 1);
     this.figure.position.y = TOP + 0.02 + Math.sin(t * 1.2 + wp.x) * 0.015;
 
+    this.armor.update(t, dt);
     this.pMat.uniforms.uTime.value = t;
     this.pMat.uniforms.uGlitch.value = this.fxOn ? this.glitch + this.ko * 0.6 : 0;
     this.pMat.uniforms.uOpacity.value = 1 - this.ko * 0.6;

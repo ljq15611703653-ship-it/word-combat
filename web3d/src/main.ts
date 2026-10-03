@@ -9,6 +9,7 @@ import { Board } from "./board";
 import { CARD, EMIT, FIG, UnitCard, type UnitSpec } from "./unitCard";
 import { SentencePanel } from "./sentencePanel";
 import { CAT_COLOR, WORDS, parse, type Tok } from "./words";
+import { Live } from "./live";
 import "./style.css";
 
 // 演示局面：红一第 2 秒打蓝方全部各 12；红二第 0 秒给蓝三易伤；蓝一第 3 秒打红二 12。
@@ -316,6 +317,20 @@ async function main() {
       p.set(s.sentence ? parse(s.sentence) : [], s.sentence ? s.sec ?? 0 : null);
     });
     renderTimeline();
+  });
+
+  // ---------- 规则引擎：电脑对电脑 ----------
+  const logEl = document.getElementById("live-log");
+  const live = new Live({
+    cards, panels, onChange: () => renderTimeline(),
+    say: (m) => { if (logEl) logEl.textContent = m; },
+  });
+  $("auto").addEventListener("click", () => {
+    closeKb();
+    if (live.running) { live.stop(); $("auto").textContent = "▶ 引擎自动对局"; return; }
+    live.begin();
+    live.start();
+    $("auto").textContent = "■ 停止";
   });
 
   // 把句子标注摆进人物右侧的空位：左边贴着人物，右边到下一个人物为止，竖直居中在人物腰部
