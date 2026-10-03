@@ -12,8 +12,9 @@ import { sanitizeClauses } from "./sanitize";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const ASSIGN_MS = +(process.env.ASSIGN_MS ?? 90_000);
 export const NEXT_MS = +(process.env.NEXT_MS ?? 30_000);
+export const reconnectMs = () => +(process.env.RECONNECT_MS ?? 90_000); // 对局中掉线超过这么久算认输
 
-interface Player { name: string; token: string; deck: Deck; ws: WebSocket | null; ready: boolean; lastSeen: number }
+interface Player { name: string; token: string; deck: Deck; ws: WebSocket | null; ready: boolean; lastSeen: number; left: boolean; dc: NodeJS.Timeout | null }
 
 export class RoomError extends Error { constructor(public code: string, msg: string) { super(msg); } }
 const fail = (code: string, msg: string): never => { throw new RoomError(code, msg); };
@@ -22,11 +23,14 @@ export function deckFromSpec(d?: DeckSpec): Deck {
   const cls = d?.cls ?? "并";
   if (!NR.CLASSES.includes(cls)) return fail("bad_deck", "没有这个流派");
   const base = NR.presetDeck(cls);
-  if (d && (d.words || d.kws)) {
-    const words = d.words ?? base.words, kws = d.kws ?? base.kws;
-    const p = NR.deckProblem(words, kws);
+  if (d && (d.words || d.kws || d.hp)) {
+    const words = d.words ?? base.words, kws = d.kws ?? base.kws, hp = d.hp ?? base.hp;
+    if (typeof words !== "object" || !Array.isArray(kws) || !Array.isArray(hp)) return fail("bad_deck", "卡组格式不对");
+    for (const w in words) if (!Number.isInteger(words[w]) || words[w] < 0) return fail("bad_deck", "卡组张数不对");
+    if (!hp.every((x) => Number.isInteger(x))) return fail("bad_deck", "生命分配不对");
+    const p = NR.deckProblem(words, kws) || NR.hpProblem(hp);
     if (p) fail("bad_deck", p);
-    return { cls, words: { ...words }, kws: [...kws], hp: [7, 7, 7] };
+    return { cls, words: { ...words }, kws: [...kws], hp: [...hp] };
   }
   return base;
 }
@@ -49,7 +53,7 @@ export class Room {
   get playing() { return !!this.M; }
   idleMs() { return Date.now() - Math.max(this.created, ...this.players.map((p) => p?.lastSeen ?? 0)); }
   anyConnected() { return this.players.some((p) => p?.ws); }
-  private connected() { return this.players.map((p) => !!p?.ws); }
+  private connected() { return this.players.map((p) => !!p?.ws && !p.left); }
 
   private meta(): RoomMeta {
     const inRound = this.M && (this.M.phase === "resolved" || this.M.phase === "over");
@@ -63,7 +67,7 @@ export class Room {
     if (!this.M) {
       const v: LobbyView = {
         phase: "lobby", rev: this.rev, room: this.id, you: side,
-        players: this.players.map((p) => (p ? { name: p.name, cls: p.deck.cls, ready: p.ready, connected: !!p.ws } : null)),
+        players: this.players.map((p) => (p ? { name: p.name, cls: p.deck.cls, ready: p.ready, connected: !!p.ws && !p.left } : null)),
       };
       return v;
     }
@@ -88,7 +92,7 @@ export class Room {
     const side = !this.players[0] ? 0 : !this.players[1] ? 1 : -1;
     if (side < 0) return fail("full", "房间已满");
     const nm = String(name || "").trim().slice(0, 12) || `玩家${side + 1}`;
-    const p: Player = { name: nm, token: randomBytes(16).toString("hex"), deck: deckFromSpec(deck), ws, ready: false, lastSeen: Date.now() };
+    const p: Player = { name: nm, token: randomBytes(16).toString("hex"), deck: deckFromSpec(deck), ws, ready: false, lastSeen: Date.now(), left: false, dc: null };
     this.players[side] = p;
     this.send(side, { t: "joined", side, token: p.token, room: this.id });
     this.send(1 - side, { t: "peer", status: "joined", name: p.name });
@@ -99,6 +103,8 @@ export class Room {
     const side = this.players.findIndex((p) => p && p.token === token);
     if (side < 0) return fail("bad_token", "重连凭证不对");
     const p = this.players[side]!;
+    if (p.left) return fail("bad_token", "你已经离开了这一局");
+    if (p.dc) { clearTimeout(p.dc); p.dc = null; }
     if (p.ws && p.ws !== ws) { try { p.ws.close(4000, "replaced"); } catch { /* ignore */ } }
     p.ws = ws; p.lastSeen = Date.now();
     this.send(side, { t: "joined", side, token: p.token, room: this.id });
@@ -112,7 +118,39 @@ export class Room {
     const p = this.players[side]!;
     p.ws = null; p.lastSeen = Date.now();
     if (!this.playing) this.players[side] = null; // 大厅里走了就腾位置；开打后保留位置等重连
+    else if (this.M!.phase !== "over" && !p.left) {
+      if (p.dc) clearTimeout(p.dc);
+      p.dc = setTimeout(() => { p.dc = null; if (!p.ws) this.forfeit(side); }, reconnectMs());
+    }
     this.send(1 - side, { t: "peer", status: "left", name: p.name });
+    this.broadcast();
+  }
+
+  /** 两个人都进来之后直接开打（匹配队列用，不需要再点准备） */
+  begin() {
+    if (this.playing || !this.players[0] || !this.players[1]) return;
+    this.startGame();
+  }
+  /** 主动离开：对局进行中视为认输；对局结束/大厅里就是单纯走人 */
+  leave(ws: WebSocket) {
+    const side = this.players.findIndex((p) => p && p.ws === ws);
+    if (side < 0) return;
+    const p = this.players[side]!;
+    if (!this.playing) { this.disconnect(ws); return; }
+    if (this.M!.phase !== "over") this.forfeit(side);
+    p.left = true; p.ws = null;
+    if (p.dc) { clearTimeout(p.dc); p.dc = null; }
+    this.send(1 - side, { t: "peer", status: "left", name: p.name, quit: true });
+    this.broadcast();
+  }
+  /** 认输（主动退出、或掉线超时）：对手获胜，对局进入 over */
+  forfeit(side: number) {
+    const M = this.M;
+    if (!M || M.phase === "over") return;
+    this.clearTimer();
+    M.winner = 1 - side; M.phase = "over";
+    this.lastEvents = []; this.nextReady = [false, false];
+    this.noteSplit = M.roundNotes.length;
     this.broadcast();
   }
 
@@ -168,7 +206,7 @@ export class Room {
     if (!Number.isInteger(uid) || uid < 0 || uid > 5) fail("bad_unit", "随从不对");
     if (!M.remaining[s].includes(uid)) fail("bad_unit", "这个随从这一轮已经定过了");
     if (!Number.isInteger(start)) fail("bad_start", "起手秒数不对");
-    const sc = sanitizeClauses(M, s, cls, M.caps(s));
+    const sc = sanitizeClauses(M, s, cls, M.caps(s), uid);
     if (sc.err) fail("bad_act", sc.err);
     const r = M.buildAction(s, uid, sc.cls!, start);
     if (r.err || !r.act) return fail("rule", r.err ?? "不行");
@@ -258,5 +296,5 @@ export class Room {
     this.timer = setTimeout(() => { this.timer = null; this.deadline = 0; try { f(); } catch (e) { console.error(e); } }, ms);
   }
   private clearTimer() { if (this.timer) clearTimeout(this.timer); this.timer = null; this.deadline = 0; }
-  dispose() { this.clearTimer(); }
+  dispose() { this.clearTimer(); for (const p of this.players) if (p?.dc) { clearTimeout(p.dc); p.dc = null; } }
 }

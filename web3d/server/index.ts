@@ -8,7 +8,8 @@ import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { C2S, S2C } from "../shared/protocol";
-import { Room, RoomError } from "./room";
+import { Room, RoomError, deckFromSpec } from "./room";
+import { randomBytes } from "node:crypto";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const MIME: Record<string, string> = {
@@ -20,19 +21,23 @@ const MAX_PAYLOAD = 16 * 1024;
 const ROOM_IDLE_MS = 30 * 60_000;
 const rate = () => +(process.env.RATE_PER_SEC ?? 10); // 每连接每秒补充的消息数（容量 30）
 
-interface Conn { room: Room | null; side: number; bucket: number; stamp: number }
+interface Conn { room: Room | null; side: number; bucket: number; stamp: number; ws: WebSocket | null }
+interface Waiting { conn: Conn; ws: WebSocket; name: string; deck: any; since: number }
 
-export interface Running { server: Server; port: number; rooms: Map<string, Room>; close: () => Promise<void> }
+export interface Running { server: Server; port: number; rooms: Map<string, Room>; waiting: Waiting[]; close: () => Promise<void> }
 
 export function startServer(opts: { port?: number; host?: string; dist?: string } = {}): Promise<Running> {
   const dist = resolve(opts.dist ?? join(fileURLToPath(new URL(".", import.meta.url)), "..", "dist"));
   const rooms = new Map<string, Room>();
+  const waiting: Waiting[] = []; // 匹配队列：先来的排前面；两人凑齐就自动开打
+  const dequeue = (conn: Conn) => { const i = waiting.findIndex((w) => w.conn === conn); if (i >= 0) waiting.splice(i, 1); return i >= 0; };
+  const newRoomId = () => { let id: string; do { id = "M" + randomBytes(3).toString("hex").toUpperCase(); } while (rooms.has(id)); return id; };
 
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url ?? "/", "http://x");
       let p = decodeURIComponent(url.pathname);
-      if (p === "/" || p === "") p = "/online.html";
+      if (p === "/" || p === "") p = "/index.html";
       const full = normalize(join(dist, p));
       if (full !== dist && !full.startsWith(dist + sep)) { res.writeHead(403).end("forbidden"); return; }
       const st = await stat(full).catch(() => null);
@@ -51,7 +56,7 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
   const normRoom = (r: any) => String(r ?? "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "").slice(0, 12);
 
   wss.on("connection", (ws: WebSocket) => {
-    const conn: Conn = { room: null, side: -1, bucket: 30, stamp: Date.now() };
+    const conn: Conn = { room: null, side: -1, bucket: 30, stamp: Date.now(), ws };
     const send = (m: S2C) => { if (ws.readyState === 1) ws.send(JSON.stringify(m)); };
     const err = (code: string, msg: string, seq?: number) => send({ t: "err", code, msg, seq });
 
@@ -89,6 +94,31 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
             conn.room = room;
             return;
           }
+          case "queue": {
+            if (conn.room) return err("already", "你已经在一局里了", seq);
+            deckFromSpec(m.deck); // 先校验：自定义卡组不合法就别进队列
+            if (waiting.some((w) => w.conn === conn)) return send({ t: "queued", size: waiting.length });
+            // 清掉已经断开的排队者
+            for (let i = waiting.length - 1; i >= 0; i--) if (waiting[i].ws.readyState !== 1) waiting.splice(i, 1);
+            const other = waiting.shift();
+            if (!other) { waiting.push({ conn, ws, name: m.name, deck: m.deck, since: Date.now() }); return send({ t: "queued", size: waiting.length }); }
+            const room = new Room(newRoomId());
+            try {
+              other.conn.side = room.join(other.ws, other.name, other.deck);
+              other.conn.room = room;
+              conn.side = room.join(ws, m.name, m.deck);
+              conn.room = room;
+            } catch (e) { room.dispose(); other.conn.room = null; waiting.unshift(other); throw e; }
+            rooms.set(room.id, room);
+            room.begin();
+            return;
+          }
+          case "unqueue": dequeue(conn); return send({ t: "unqueued" });
+          case "leave": {
+            dequeue(conn);
+            if (conn.room) { conn.room.leave(ws); conn.room = null; conn.side = -1; }
+            return send({ t: "unqueued" });
+          }
           case "ready": case "declare": case "pass": case "assign_late": case "confirm_assign":
             if (!conn.room) return err("no_room", "你还没进房间", seq);
             conn.room.handle(conn.side, m as C2S);
@@ -101,7 +131,7 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
         return err("internal", "服务器出错了", seq);
       }
     });
-    ws.on("close", () => { conn.room?.disconnect(ws); });
+    ws.on("close", () => { dequeue(conn); conn.room?.disconnect(ws); });
     ws.on("error", () => { /* close 会处理 */ });
   });
 
@@ -115,7 +145,7 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
     server.listen(opts.port ?? 8787, opts.host ?? "0.0.0.0", () => {
       const port = (server.address() as any).port as number;
       ok({
-        server, port, rooms,
+        server, port, rooms, waiting,
         close: () => new Promise<void>((r) => {
           clearInterval(gc);
           for (const room of rooms.values()) room.dispose();

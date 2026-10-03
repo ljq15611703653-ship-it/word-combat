@@ -10,7 +10,8 @@ export interface NetHandlers {
   state?: (v: View) => void;
   resolved?: (events: any[], v: GameView) => void;
   err?: (code: string, msg: string) => void;
-  peer?: (status: string, name: string) => void;
+  peer?: (status: string, name: string, quit?: boolean) => void;
+  queued?: (size: number) => void;
   status?: (s: NetStatus) => void;
   joined?: (side: number, room: string) => void;
 }
@@ -23,7 +24,7 @@ export class Net {
   private retry = 0;
   private timer = 0;
   private want = false;
-  private queue: C2S[] = [];
+  private outbox: C2S[] = [];
   status: NetStatus = "idle";
   room = "";
   token = "";
@@ -52,7 +53,7 @@ export class Net {
       this.retry = 0;
       this.setStatus("open");
       if (this.hasSession) this.raw({ t: "rejoin", room: this.room, token: this.token });
-      for (const m of this.queue.splice(0)) this.raw(m);
+      for (const m of this.outbox.splice(0)) this.raw(m);
     };
     ws.onmessage = (e) => this.onMsg(JSON.parse(e.data as string) as S2C);
     ws.onclose = () => {
@@ -79,12 +80,16 @@ export class Net {
       case "err":
         if (m.code === "no_room" || m.code === "bad_token") this.forget();
         this.h.err?.(m.code, m.msg); break;
-      case "peer": this.h.peer?.(m.status, m.name); break;
+      case "peer": this.h.peer?.(m.status, m.name, m.quit); break;
+      case "queued": this.h.queued?.(m.size); break;
     }
   }
   forget() { this.token = ""; this.room = ""; this.lastRev = 0; try { sessionStorage.removeItem(KEY); } catch { /* */ } }
-  private raw(m: C2S) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ ...m, seq: this.seq++ })); else this.queue.push(m); }
+  private raw(m: C2S) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify({ ...m, seq: this.seq++ })); else this.outbox.push(m); }
 
+  /** 进匹配队列：同一服务器上两个人都在队列里，就自动配对开打（不需要房间号） */
+  queue(name: string, deck?: DeckSpec) { this.forget(); this.raw({ t: "queue", name, deck }); }
+  unqueue() { this.outbox = this.outbox.filter((m) => m.t !== "queue"); this.raw({ t: "unqueue" }); }
   join(room: string, name: string, deck?: DeckSpec) { this.forget(); this.raw({ t: "join", room, name, deck }); }
   ready() { this.raw({ t: "ready" }); }
   /** 唯一的出招接口：提交一个已构造好的句子（随从、一串 Clause、起手秒数）。校验结果通过 err 回调返回。 */
@@ -92,5 +97,12 @@ export class Net {
   pass(uid: number) { this.raw({ t: "pass", uid }); }
   assignLate(ord: number, ci: number, targets: number[]) { this.raw({ t: "assign_late", ord, ci, targets }); }
   confirmAssign() { this.raw({ t: "confirm_assign" }); }
-  leave() { this.want = false; clearTimeout(this.timer); this.forget(); this.ws?.close(); this.ws = null; this.setStatus("idle"); }
+  /** 离开：先告诉服务端（对局中算认输），再断开 */
+  leave() {
+    this.want = false; clearTimeout(this.timer); this.forget(); this.queue_clear();
+    const ws = this.ws; this.ws = null;
+    if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify({ t: "leave" })); } catch { /* */ } setTimeout(() => ws.close(), 120); } else ws?.close();
+    this.setStatus("idle");
+  }
+  private queue_clear() { this.outbox.length = 0; }
 }

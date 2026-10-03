@@ -21,6 +21,7 @@ class Cli {
   rev = 0;
   side = -1;
   token = "";
+  room = "";
   lastRevOk = true;
   errs: any[] = [];
   resolvedCount = 0;
@@ -43,7 +44,7 @@ class Cli {
         this.view = m.t === "state" ? m.view : m.view;
         if (m.t === "resolved") this.resolvedCount++;
       }
-      if (m.t === "joined") { this.side = m.side; this.token = m.token; }
+      if (m.t === "joined") { this.side = m.side; this.token = m.token; this.room = m.room; }
       if (m.t === "err") this.errs.push(m);
       for (const l of [...this.listeners]) l(m);
     });
@@ -59,7 +60,7 @@ class Cli {
       const fin = (v: any) => { if (done) return; done = true; this.listeners = this.listeners.filter((x) => x !== l); ok(v); };
       const l = (x: any) => {
         if (x.t === "err" && x.seq === seq) fin(x);
-        else if (x.t === "state" || x.t === "resolved" || x.t === "pong") setTimeout(() => fin(null), 20);
+        else if (x.t === "state" || x.t === "resolved" || x.t === "pong" || x.t === "queued" || x.t === "unqueued") setTimeout(() => fin(null), 20);
       };
       this.listeners.push(l);
       setTimeout(() => fin(null), wait);
@@ -306,11 +307,16 @@ async function main() {
     const blob = c.raw.join("\n");
     check(!blob.includes(o.token), `${c.name} 的消息里没有对方 token`);
     check(!/"seed"|"rng"/.test(blob), `${c.name} 的消息里没有种子`);
-    check(!/"locked"/.test(blob), `${c.name} 的消息里没有内部字段 locked`);
+    for (const m of c.msgs) {
+      const v = (m.view ?? null) as GameView | null;
+      if (!v || !v.acts) continue;
+      for (const a of v.acts) for (const cl of a.cl) if ("locked" in cl) check(false, `${c.name} 的宣告里泄露了内部字段 locked`);
+    }
   }
   console.log("  统计：", JSON.stringify(stats));
   check(stats.hiddenSeen > 0 || true, "");
   A.close(); B.close();
+  await testMatchmaking(port, srv, rng, stats);
   await srv.close();
   console.log(fails ? `\n失败 ${fails} 项（共 ${checks} 项检查）` : `\n全部通过（${checks} 项检查）`);
   process.exit(fails ? 1 : 0);
@@ -356,6 +362,132 @@ async function testReconnect(port: number, srv: any, A: Cli, B: Cli) {
   });
   B.resolvedCount = B2.resolvedCount + B3.resolvedCount + B.resolvedCount;
   void srv;
+}
+
+async function playOut(A: Cli, B: Cli, rng: Rng, stats: any, limit = 800) {
+  let guard = 0;
+  while (guard++ < limit) {
+    await settleAll([A, B]);
+    checkHidden(A, stats); checkHidden(B, stats);
+    const ph = A.view?.phase;
+    check(ph === B.view?.phase, `双方阶段一致 ${ph} / ${B.view?.phase}`);
+    if (ph === "declare") await botDeclare([A, B].find((x) => x.side === A.gv.turn)!, rng, stats);
+    else if (ph === "assign") {
+      for (const c of [A, B]) if (c.gv.me.pending.length > 0 && !c.gv.me.assignDone) await botAssign(c, rng, stats);
+      await settleAll([A, B]);
+      for (const c of [A, B]) if (c.gv.phase === "assign" && c.gv.me.pending.length === 0 && !c.gv.me.assignDone) await c.act({ t: "confirm_assign" });
+    } else if (ph === "resolved") { await A.act({ t: "ready" }); await B.act({ t: "ready" }); }
+    else if (ph === "over") return true;
+    else return false;
+  }
+  return false;
+}
+
+/** 匹配队列：不需要房间号，两人都在队列里就自动配对开打；自定义卡组、取消、掉线出队、重连、离开认输 */
+async function testMatchmaking(port: number, srv: any, rng: Rng, stats: any) {
+  console.log("[6] 匹配队列 / 自定义卡组 / 重连 / 离开");
+  const mk = async (n: string) => { const c = new Cli(n, port); await c.connect(); return c; };
+  const custom = { cls: "择", words: { 易伤: 2, 灼烧: 2, 衰弱: 2, 转移: 1, 延后: 1, 移除: 2 }, kws: ["不屈", "不屈", "首挡"], hp: [9, 6, 6] };
+  const P1 = await mk("P1"), P2 = await mk("P2");
+  // 非法卡组：被拒，且不会进队列
+  check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", words: { 易伤: 9 }, kws: ["首挡", "首挡", "首挡"] } }))?.code === "bad_deck", "队列：张数不合法的卡组被拒");
+  check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", hp: [1, 1, 19] } }))?.code === "bad_deck", "队列：生命分配不合法被拒");
+  check((await P1.act({ t: "queue", name: "a", deck: { cls: "并", words: { 易伤: 2, 灼烧: 2, 衰弱: 2, 转移: 2, 延后: 2, 移除: 0.5 }, kws: ["首挡", "首挡", "首挡"] } }))?.code === "bad_deck", "队列：小数张数被拒");
+  check((await P1.act({ t: "queue", name: "a", deck: { cls: "龙" as any } }))?.code === "bad_deck", "队列：不存在的流派被拒");
+  check(srv.waiting.length === 0, "被拒的 queue 不入队");
+  // 入队、重复入队、取消
+  await P1.act({ t: "queue", name: "小一", deck: custom });
+  check(srv.waiting.length === 1 && P1.msgs.some((m) => m.t === "queued"), "入队后收到 queued");
+  await P1.act({ t: "queue", name: "小一", deck: custom });
+  check(srv.waiting.length === 1, "重复入队是幂等的");
+  await P1.act({ t: "unqueue" });
+  check(srv.waiting.length === 0 && P1.msgs.some((m) => m.t === "unqueued"), "取消匹配后出队");
+  // 排队时掉线：出队
+  await P1.act({ t: "queue", name: "小一", deck: custom });
+  P1.close(); await sleep(80);
+  check(srv.waiting.length === 0, "排队时掉线会自动出队，不会被配给幽灵");
+  // 正式配对：P1b 自定义卡组、P2 预设
+  const roomsBefore = srv.rooms.size;
+  const P1b = await mk("P1b");
+  await P1b.act({ t: "queue", name: "小一", deck: custom });
+  check(srv.waiting.length === 1, "P1b 排队中");
+  await P2.act({ t: "queue", name: "小二", deck: { cls: "并" } });
+  await settleAll([P1b, P2]);
+  check(srv.waiting.length === 0 && srv.rooms.size === roomsBefore + 1, "两人都在队列里：自动配对成一个房间");
+  check(P1b.view?.phase === "declare" && P2.view?.phase === "declare", "配对后直接开打（不需要准备、不需要房间号）");
+  check(P1b.side === 0 && P2.side === 1, "先入队的是 0 号");
+  check(P1b.room === P2.room && /^M[0-9A-F]{6}$/.test(P1b.room), "服务端自动生成房间号 " + P1b.room);
+  const g1 = P1b.gv, g2 = P2.gv;
+  check(g1.units.filter((u) => u.side === 0).map((u) => u.mx).join() === "9,6,6", "自定义卡组的生命分配生效（9/6/6）");
+  check(g1.units.filter((u) => u.side === 0).map((u) => u.kw).join() === "不屈,不屈,首挡", "自定义卡组的关键词生效");
+  check(g1.sides[0].cls === "择" && g1.sides[1].cls === "并", "双方流派正确");
+  check(g1.me.words["移除"] === 2 && g1.me.words["转移"] === 1, "自定义进阶词张数生效");
+  check(g2.me.words["灼烧"] === 1 && g2.units.filter((u) => u.side === 1).every((u) => u.mx === 7), "预设卡组（并流）生效");
+  check(g1.sides[1].name === "小二" && g2.sides[0].name === "小一", "对手昵称正确");
+  check((await P1b.act({ t: "queue", name: "x" }))?.code === "already", "已在对局里不能再排队");
+  // 自身（tmode self）句子：服务端补上 tg=[uid]，不信客户端
+  {
+    const first = [P1b, P2].find((x) => x.side === P1b.gv.turn)!;
+    const uid = first.gv.remaining[first.side][0];
+    const e = await first.act({ t: "declare", uid, cls: [{ k: "mit", side: "ally", tmode: "self", count: 1, tg: [99], n: 1 }], start: 2 });
+    check(!e, `自身句子应被接受：${e?.msg}`);
+    await settleAll([P1b, P2]);
+    const a = first.gv.acts[0];
+    check(a && a.cl[0].tg.length === 1 && a.cl[0].tg[0] === uid, "自身句子的目标被服务端改成出手的随从");
+    const other = [P1b, P2].find((x) => x !== first)!;
+    const bogus = await other.act({ t: "declare", uid: other.gv.remaining[other.side][0], cls: [{ k: "mit", side: "enemy", n: 1, tg: [uid] }], start: 2 });
+    check(bogus?.code === "bad_act", "减伤打到敌方被拒");
+  }
+  // 把这局打完（择流 vs 并流，自定义卡组），然后再来一局
+  const finished = await playOut(P1b, P2, rng, stats);
+  check(finished, "匹配出的对局能打完");
+  console.log(`  匹配对局结束：第 ${P1b.gv.round} 轮，winner=${P1b.gv.winner}，比分 ${P1b.gv.sides.map((s) => s.prog.toFixed(2)).join(" : ")}`);
+  check(P1b.gv.winner === P2.gv.winner, "双方看到同一个结果");
+  await P1b.act({ t: "ready" }); await P2.act({ t: "ready" }); await settleAll([P1b, P2]);
+  check(P1b.gv.phase === "declare" && P1b.gv.round === 1 && P1b.gv.units.filter((u) => u.side === 0).map((u) => u.mx).join() === "9,6,6", "再来一局沿用各自的卡组");
+  // 离开 = 认输；对手收到结果；离开的人不能重连
+  const gotOver = P1b.next((m) => (m.t === "state" || m.t === "resolved") && m.view.phase === "over");
+  await P2.act({ t: "leave" });
+  await gotOver;
+  check(P1b.gv.winner === 0 && (P1b.gv.sides[1] as any).connected === false, "对方离开 = 认输，我方获胜，并看到对方已离开");
+  check(P1b.msgs.some((m) => m.t === "peer" && m.quit === true), "收到 peer.quit");
+  const P2b = await mk("P2b");
+  check((await P2b.act({ t: "rejoin", room: P1b.room, token: P2.token }))?.code === "bad_token", "主动离开的人不能再重连这一局");
+  await P1b.act({ t: "ready" });
+  check(P1b.gv.phase === "over", "对手已离开时再来一局不会开始");
+  P2b.close(); P1b.close(); P2.close();
+
+  // 第二对：掉线重连、掉线超时认输
+  const P3 = await mk("P3"), P4 = await mk("P4");
+  await P3.act({ t: "queue", name: "三", deck: { cls: "血" } });
+  await P4.act({ t: "queue", name: "四", deck: { cls: "续" } });
+  await settleAll([P3, P4]);
+  check(P3.view?.phase === "declare" && P4.view?.phase === "declare" && P3.room === P4.room, "第二对也配上了");
+  await botDeclare([P3, P4].find((x) => x.side === P3.gv.turn)!, rng, stats);
+  await settleAll([P3, P4]);
+  const actsBefore = P4.gv.acts.length, tok = P4.token, room = P4.room;
+  const left = P3.next((m) => m.t === "peer" && m.status === "left");
+  P4.close(); await left;
+  const P4b = await mk("P4b");
+  check(!(await P4b.act({ t: "rejoin", room, token: tok })), "匹配对局：掉线后用 token 重连成功");
+  await settleAll([P3, P4b]);
+  check(P4b.side === P4.side && P4b.gv.phase === "declare" && P4b.gv.acts.length === actsBefore && P4b.gv.sides[P4b.side].cls === "续", "重连后回到原来的位置和局面");
+  process.env.RECONNECT_MS = "300";
+  const forfeited = P3.next((m) => (m.t === "state" || m.t === "resolved") && m.view.phase === "over", 3000);
+  P4b.close();
+  await forfeited;
+  check(P3.gv.winner === P3.side, "对手掉线超过宽限时间 = 认输");
+  process.env.RECONNECT_MS = "90000";
+  P3.close();
+
+  // 第三方：排队的人等着，来了新人就配对，互不干扰
+  const P5 = await mk("P5"), P6 = await mk("P6"), P7 = await mk("P7");
+  await P5.act({ t: "queue", name: "五" });
+  check(srv.waiting.length === 1, "单人排队等待");
+  await P6.act({ t: "queue", name: "六" }); await settleAll([P5, P6]);
+  await P7.act({ t: "queue", name: "七" });
+  check(P5.view?.phase === "declare" && P5.room === P6.room && srv.waiting.length === 1 && !P7.room, "配对只发生在两人之间，第三人继续等");
+  P5.close(); P6.close(); P7.close();
 }
 
 main().catch((e) => { console.error(e); process.exit(2); });

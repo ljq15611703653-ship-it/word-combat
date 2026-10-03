@@ -1,6 +1,7 @@
 // viewFor：把权威对局状态过滤成某一方能看到的视图。对手的待定目标、手牌、词库、种子、令牌都不出现。
 import type { Match } from "../src/engine/match";
 import type { Cls } from "../src/engine/rules";
+import * as NR from "../src/engine/rules";
 import type { GameView, PubAct, PubUnit, Note, PendingLate } from "./protocol";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -36,6 +37,7 @@ export function viewFor(M: Match, side: number, meta: RoomMeta, events?: any[]):
   const sides = [0, 1].map((s) => ({
     name: meta.names[s], cls: M.clsOf(s) as Cls, ap: M.res[s].ap ?? M.sides[s].ap, prog: M.progress(s),
     cardCount: M.sides[s].cards.length, connected: meta.connected[s], ready: meta.ready[s],
+    metric: M.R.M[s][NR.METRIC[M.clsOf(s) as Cls]], kob: M.R.kob[s],
   }));
   const usable = new Set(M.usableCards(side));
   const pending: PendingLate[] = [];
@@ -43,7 +45,7 @@ export function viewFor(M: Match, side: number, meta: RoomMeta, events?: any[]):
     for (const a of M.declared) {
       if (a.side !== side) continue;
       a.cl.forEach((c: any, ci: number) => {
-        if (c.tmode === "late") pending.push({ ord: a.ord, ci, k: c.k, side: c.side ?? "enemy", count: c.count ?? 1, targets: [...(c.tg ?? [])] });
+        if (c.tmode === "late") pending.push({ ord: a.ord, ci, k: c.k, side: c.side ?? "enemy", count: c.count ?? 1, targets: [...(c.tg ?? [])], locked: !!c.locked });
       });
     }
   }
@@ -56,7 +58,7 @@ export function viewFor(M: Match, side: number, meta: RoomMeta, events?: any[]):
     notes: copy(notes),
     me: {
       ap: M.res[side].ap, words: { ...M.res[side].words }, cooling: M.coolingWords(side),
-      cards: M.sides[side].cards.map((c: any, i: number) => ({ i, v: c.v, once: !!c.once, src: c.src, usable: usable.has(i) && !M.res[side].cards.includes(i) })),
+      cards: M.sides[side].cards.map((c: any, i: number) => ({ i, v: c.v, once: !!c.once, src: c.src, usable: usable.has(i) && !M.res[side].cards.includes(i), last: c.last ?? -9, reserved: M.res[side].cards.includes(i) })),
       caps: M.caps(side), pending, assignDone: meta.assignDone[side],
     },
     oppAssignDone: meta.assignDone[1 - side],

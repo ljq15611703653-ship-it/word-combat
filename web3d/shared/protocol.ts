@@ -6,11 +6,14 @@ import type { Cls } from "../src/engine/rules";
 /** 一段话（Clause）和一句话（Act）沿用引擎的形状，故用 any */
 export type Clause = any;
 
-export interface DeckSpec { cls: Cls; words?: Record<string, number>; kws?: string[] }
+export interface DeckSpec { cls: Cls; words?: Record<string, number>; kws?: string[]; hp?: number[] }
 
 // ---------- 客户端 → 服务端 ----------
 export type C2S =
   | { t: "join"; room: string; name: string; deck?: DeckSpec; seq?: number }       // 首人建房，次人入房
+  | { t: "queue"; name: string; deck?: DeckSpec; seq?: number }                     // 进入匹配队列（局域网：两人都在队列里就自动配对开打）
+  | { t: "unqueue"; seq?: number }                                                  // 取消匹配
+  | { t: "leave"; seq?: number }                                                    // 离开对局/房间（对局中离开视为认输）
   | { t: "rejoin"; room: string; token: string; seq?: number }                      // 断线重连
   | { t: "ready"; seq?: number }       // 大厅：准备；resolved 阶段：进入下一轮；over 阶段：再来一局
   | { t: "declare"; uid: number; cls: Clause[]; start: number; seq?: number }     // 提交已构造好的一句话（唯一的出招接口）
@@ -29,10 +32,10 @@ export interface PubAct {
   words: string[]; def: boolean; ms: number;
 }
 export interface PubCont { side: number; uid: number; cl: Clause; left: number; start: number }
-export interface MyCard { i: number; v: number; once: boolean; src: string; usable: boolean }
-export interface PubSide { name: string; cls: Cls; ap: number; prog: number; cardCount: number; connected: boolean; ready: boolean }
+export interface MyCard { i: number; v: number; once: boolean; src: string; usable: boolean; last: number; reserved: boolean }
+export interface PubSide { name: string; cls: Cls; ap: number; prog: number; cardCount: number; connected: boolean; ready: boolean; metric: number; kob: number }
 export interface Note { side: number; type: string; [k: string]: any }
-export interface PendingLate { ord: number; ci: number; k: string; side: string; count: number; targets: number[] }
+export interface PendingLate { ord: number; ci: number; k: string; side: string; count: number; targets: number[]; locked: boolean }
 
 export interface LobbyView {
   phase: "lobby"; rev: number; room: string; you: number;
@@ -66,5 +69,7 @@ export type S2C =
   | { t: "state"; rev: number; view: View }
   | { t: "resolved"; rev: number; events: any[]; view: GameView }
   | { t: "err"; code: string; msg: string; seq?: number }
-  | { t: "peer"; status: "joined" | "left" | "back"; name: string }
+  | { t: "peer"; status: "joined" | "left" | "back"; name: string; quit?: boolean }
+  | { t: "queued"; size: number }
+  | { t: "unqueued" }
   | { t: "pong"; seq?: number };
