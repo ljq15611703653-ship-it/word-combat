@@ -4,7 +4,8 @@
 // 人物：竖直立在投影环上的立绘（轻度屏幕效果），身后一道阵营色的光柱。
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { C } from "./theme";
+import { C, STYLE } from "./theme";
+import { buildMechBase, buildMechPlinth, hudPanelTexture, type MechBase } from "./scene/mech";
 import { cardCircuitTexture, plateTexture, warnTexture } from "./textures";
 import { circuitMaterial, portraitMaterial } from "./shaders";
 import { Armor, type Loadout } from "./armor";
@@ -23,7 +24,8 @@ export interface UnitSpec {
 }
 
 export const CARD = { w: 2.2, d: 1.75, t: 0.12 };
-const CARRIER = { w: 2.62, d: 2.05, t: 0.06 };
+const CARRIER = STYLE === "neo" ? { w: 2.9, d: 2.15, t: 0.06 } : { w: 2.62, d: 2.05, t: 0.06 };
+const LIFT = STYLE === "neo" ? 0.2 : 0;
 export const FIG = { h: 2.3 };                 // 人物全息像的高度
 export const EMIT = { z: -0.18, r: 0.62 };     // 投影环的位置和半径
 const SEG_HP = 2;
@@ -138,6 +140,7 @@ export class UnitCard {
   private glassMat: THREE.MeshPhysicalMaterial;
   private frameMat: THREE.MeshBasicMaterial;
   private plate: THREE.Mesh;
+  private mech: MechBase | null = null;
   private ledMats: THREE.MeshStandardMaterial[] = [];
   private warn: THREE.Sprite;
   private outline: THREE.MeshBasicMaterial;
@@ -158,27 +161,35 @@ export class UnitCard {
     const sideCol = C.side[spec.side];
     this.root.add(this.body);
 
-    // ---- PCB 载板 ----
-    const carrier = new THREE.Mesh(new RoundedBoxGeometry(CARRIER.w, CARRIER.t, CARRIER.d, 2, 0.03), matPcb);
-    carrier.position.y = CARRIER.t / 2;
-    this.body.add(carrier);
-    for (let i = 0; i < 16; i++) {
-      const f = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.006, 0.13), matGold);
-      f.position.set(-0.9 + i * 0.12, CARRIER.t + 0.003, CARRIER.d / 2 - 0.08);
-      this.body.add(f);
+    if (STYLE === "neo") {
+      // ---- 义体底座（攻壳机动队式机械质感）----
+      this.mech = buildMechBase(CARRIER.w, CARRIER.d, CARRIER.t, CARD.w, sideCol, seed);
+      this.body.add(this.mech.group);
+      this.root.add(buildMechPlinth(CARRIER.w, CARRIER.d, LIFT, sideCol));
+    } else {
+      // ---- PCB 载板 ----
+      const carrier = new THREE.Mesh(new RoundedBoxGeometry(CARRIER.w, CARRIER.t, CARRIER.d, 2, 0.03), matPcb);
+      carrier.position.y = CARRIER.t / 2;
+      this.body.add(carrier);
+      for (let i = 0; i < 16; i++) {
+        const f = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.006, 0.13), matGold);
+        f.position.set(-0.9 + i * 0.12, CARRIER.t + 0.003, CARRIER.d / 2 - 0.08);
+        this.body.add(f);
+      }
+      const mx = (CARD.w + CARRIER.w) / 4;
+      for (let i = 0; i < 3; i++) {
+        const tr = transistor();
+        tr.position.set(-mx, CARRIER.t, -0.7 + i * 0.2);
+        this.body.add(tr);
+      }
+      const c1 = capacitor(0.2), c2 = capacitor(0.14);
+      c1.position.set(mx, CARRIER.t, -0.7);
+      c2.position.set(mx, CARRIER.t, -0.47);
+      const ic = chip(0.15);
+      ic.position.set(mx, CARRIER.t, -0.15);
+      this.body.add(c1, c2, ic);
+
     }
-    const mx = (CARD.w + CARRIER.w) / 4;
-    for (let i = 0; i < 3; i++) {
-      const tr = transistor();
-      tr.position.set(-mx, CARRIER.t, -0.7 + i * 0.2);
-      this.body.add(tr);
-    }
-    const c1 = capacitor(0.2), c2 = capacitor(0.14);
-    c1.position.set(mx, CARRIER.t, -0.7);
-    c2.position.set(mx, CARRIER.t, -0.47);
-    const ic = chip(0.15);
-    ic.position.set(mx, CARRIER.t, -0.15);
-    this.body.add(c1, c2, ic);
 
     // ---- 信息栏（玻璃下面）----
     this.plate = flat(new THREE.Mesh(geoPlane, new THREE.MeshBasicMaterial({ toneMapped: false })), CARRIER.t + 0.02);
@@ -205,7 +216,7 @@ export class UnitCard {
     const u = 512 / CARD.w, v = 768 / CARD.d;
     const er = EMIT.r + 0.08;
     const clear: [number, number, number, number] = [(CARD.w / 2 - er) * u, (CARD.d / 2 + EMIT.z - er) * v, er * 2 * u, er * 2 * v];
-    this.circuit = circuitMaterial(cardCircuitTexture(seed * 13 + 3, clear), sideCol, 0.06, 0.35);
+    this.circuit = circuitMaterial(STYLE === "neo" ? hudPanelTexture(seed * 13 + 3, clear) : cardCircuitTexture(seed * 13 + 3, clear), sideCol, 0.06, 0.35);
     const circ = flat(new THREE.Mesh(geoPlane, this.circuit), TOP + 0.002);
     circ.scale.set(CARD.w - 0.06, CARD.d - 0.06, 1);
     circ.renderOrder = 4;
@@ -361,7 +372,7 @@ export class UnitCard {
     this.ko += (this.koTarget - this.ko) * (1 - Math.exp(-dt * 3));
     this.glitch = Math.max(0, this.glitch - dt * 1.5);
 
-    this.body.position.y = (this.selected ? 0.08 : 0) + this.hover * 0.08;
+    this.body.position.y = LIFT + (this.selected ? 0.08 : 0) + this.hover * 0.08;
     // 人物：竖直，只绕竖轴转向镜头；被击倒时像全息影像一样塌回卡里
     const wp = this.figure.getWorldPosition(new THREE.Vector3());
     // 立绘和镜头同朝向：屏幕上永远是原图比例，透视由立绘自己画
@@ -377,6 +388,7 @@ export class UnitCard {
     this.beam.uniforms.uAmp.value = (0.75 + this.hover * 0.35 + this.glitch * 0.6) * (1 - this.ko);
     this.emitMat.opacity = (0.38 + 0.06 * Math.sin(t * 2.5) + this.hover * 0.15) * (1 - this.ko * 0.7);
     this.circuit.uniforms.uTime.value = t;
+    this.mech?.update(t);
     this.circuit.uniforms.uPulse.value = 0.35 * (1 - this.ko) + this.glitch * 0.6;
     this.glassMat.opacity = 0.14 + this.ko * 0.4;
     this.glassMat.color.setHex(this.ko > 0.5 ? 0x2a3533 : C.glass);
