@@ -1,26 +1,21 @@
 .intro-root { position: absolute; inset: 0; z-index: 9999; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none; cursor: pointer; font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif; }
 .intro-stage { position: relative; overflow: hidden; background: #000; }
 .intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.intro-hud { transition: opacity .6s; }
-.intro-hud .hud-readout { font-size: .8em; }
-.intro-locks { position: absolute; inset: 0; pointer-events: none; font-size: 1em; }
 .intro-title { position: absolute; left: 0; right: 0; top: 33%; text-align: center; font-size: 8em; font-weight: 700; letter-spacing: .3em; color: #fff; pointer-events: none; opacity: 0; text-indent: .3em;
   text-shadow: 0 0 .15em #19e6ff, 0 0 .5em #19e6ff, 0 0 1em #ff2fa0; }
 .intro-title.show { animation: intro-title 3.4s both; }
-@keyframes intro-title { 0% { opacity: 0; transform: scale(1.12); letter-spacing: .6em; filter: blur(8px); } 12% { opacity: 1; transform: none; letter-spacing: .3em; filter: none; }
-  18% { opacity: .5; } 22% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
-.intro-sub { position: absolute; left: 17%; right: 17%; bottom: 11%; text-align: center; font-size: 2.1em; line-height: 1.5; color: #fff; pointer-events: none; opacity: 0;
-  text-shadow: 0 0 .3em rgba(0,0,0,.9), 0 .08em .2em #000, 0 0 .9em rgba(25,230,255,.45); }
-.intro-sub::before { content: ""; position: absolute; left: -8%; right: -8%; top: -.5em; bottom: -.5em; z-index: -1; background: linear-gradient(180deg, rgba(2,0,10,0), rgba(2,0,10,.72) 40%, rgba(2,0,10,.72) 60%, rgba(2,0,10,0)); }
-.intro-sub.show { opacity: 1; animation: intro-sub .35s both; }
-@keyframes intro-sub { from { opacity: 0; transform: translateY(.4em); filter: blur(4px); } to { opacity: 1; transform: none; filter: none; } }
-.intro-who { display: inline-block; margin-right: .7em; padding: 0 .55em; font-size: .62em; vertical-align: .18em; letter-spacing: .1em; color: #04101a; background: #19e6ff; font-weight: 700; clip-path: polygon(0 0, 100% 0, calc(100% - .4em) 100%, 0 100%); }
-.intro-prog { position: absolute; left: 4.75em; right: 4.75em; bottom: 1.6em; display: flex; gap: 4px; height: 6px; pointer-events: none; }
-.intro-prog > i { position: relative; background: rgba(25,230,255,.2); overflow: hidden; flex-basis: 0; }
-.intro-prog > i > u { position: absolute; inset: 0; background: #19e6ff; box-shadow: 0 0 8px #19e6ff; transform-origin: left; transform: scaleX(0); }
-.intro-prog > i.cur { background: rgba(25,230,255,.38); }
-.intro-skip { position: absolute; left: 50%; transform: translateX(-50%); top: 1.1em; padding: .35em 1em; font: 700 .85em "Chakra Petch", "Noto Sans SC", sans-serif; letter-spacing: .12em; color: #19e6ff; background: rgba(4,16,30,.55); border: 1px solid rgba(25,230,255,.7); cursor: pointer; transition: background .15s, color .15s; }
-.intro-skip:hover { background: #19e6ff; color: #04101a; }
-.intro-hint { position: absolute; left: 0; right: 0; bottom: 2.9em; text-align: center; font-size: .72em; letter-spacing: .14em; color: rgba(160,235,255,.55); pointer-events: none; }
+@keyframes intro-title { 0% { opacity: 0; transform: scale(1.1); letter-spacing: .5em; filter: blur(8px); } 14% { opacity: 1; transform: none; letter-spacing: .3em; filter: none; }
+  85% { opacity: 1; } 100% { opacity: 0; } }
+.intro-sub { position: absolute; left: 10%; right: 10%; bottom: 7%; text-align: center; font-size: 1.9em; line-height: 1.5; color: #fff; pointer-events: none; opacity: 0; font-weight: 500; letter-spacing: .06em;
+  text-shadow: 0 0 .25em rgba(0,0,0,.95), 0 .06em .18em #000, 0 0 .6em rgba(0,0,0,.8); }
+.intro-sub.show { opacity: 1; animation: intro-sub .4s both; }
+@keyframes intro-sub { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }
+.intro-who { margin-right: .3em; font-weight: 700; color: #7be8ff; }
+.intro-who::after { content: "："; }
+.intro-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none; background: rgba(255,255,255,.08); }
+.intro-prog > u { position: absolute; inset: 0; background: rgba(255,255,255,.55); transform-origin: left; transform: scaleX(0); }
+.intro-skip { position: absolute; right: 1.4em; bottom: 1.1em; padding: .1em .5em; font: 500 .8em "Noto Sans SC", sans-serif; letter-spacing: .15em; color: rgba(255,255,255,.55); background: none; border: 0; cursor: pointer; transition: color .15s; }
+.intro-skip::after { content: " ›"; }
+.intro-skip:hover { color: #fff; }
 .intro-fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
-.intro-loading { position: absolute; color: #19e6ff; font: 500 14px "Chakra Petch", monospace; letter-spacing: .3em; }
+.intro-loading { position: absolute; color: rgba(255,255,255,.5); font-size: 20px; letter-spacing: .3em; }

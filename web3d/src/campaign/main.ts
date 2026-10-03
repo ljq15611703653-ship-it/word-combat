@@ -13,6 +13,7 @@ import { SentencePanel } from "../sentencePanel";
 import "../style.css";
 import { CampaignUI } from "./ui";
 import { Game, uidOfCard } from "../game";
+import { playIntroIfFirst, playIntro } from "../intro";
 
 // 0-2 = 对手（上排，红），3-5 = 我方（下排，蓝）；关卡开始时按关卡数据换名字、换立绘
 const SEATS: UnitSpec[] = [
@@ -193,8 +194,9 @@ async function main() {
     return [((v.x + 1) / 2) * app.clientWidth, ((1 - v.y) / 2) * app.clientHeight];
   };
   const game = new Game({ cards, panels, onChange: renderTimeline, onToggle: () => requestAnimationFrame(resize) });
-  const ui = new CampaignUI({ cards, panels, game, onLevel: () => requestAnimationFrame(resize), anchor });
+  const ui = new CampaignUI({ cards, panels, game, onLevel: () => requestAnimationFrame(resize), anchor, onReplayIntro: () => void playIntro(document.body) });
   ui.showMenu();
+  await playIntroIfFirst(document.body);   // 首次进入：先看开场；之后不再自动播放
   (window as unknown as { __cg: CampaignUI }).__cg = ui;   // 调试 / 自动化用
 
   function placePanels(w: number) {

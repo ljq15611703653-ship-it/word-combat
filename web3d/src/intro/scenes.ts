@@ -14,9 +14,6 @@ export interface Env {
   portrait: HTMLImageElement | null; portraitGlow: Cv | null;
 }
 export interface Sign { x: number; y: number; w: number; h: number; color: string; seed: number }
-/** 场景返回：glitch 0~1 故障强度；cut = 这一帧整屏黑（硬切） */
-export interface Out { glitch: number; cut?: boolean }
-
 // ---------- 小工具 ----------
 function rng(seed: number) {
   let a = seed >>> 0;
@@ -202,35 +199,7 @@ const POOL = ["选择", "造成", "恢复", "友方", "敌方", "减伤", "重�
 const POOLC = [COL.cyan, COL.magenta, COL.amber, COL.green, COL.violet];
 
 // ---------- 各场景 ----------
-type Draw = (c: Ctx, ts: number, dur: number, e: Env) => Out;
-
-/** S0 开机自检：黑屏，自检文字逐行出现，随后画面从中心亮开 */
-const boot: Draw = (c, ts, _d, e) => {
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
-  const open = easeInOut((ts - 3.0) / 1.8);
-  if (open > 0) {
-    c.save(); c.beginPath(); c.arc(W / 2, H / 2, open * 900, 0, 6.283); c.clip();
-    drawBg(c, e.bgNormal, 1.16, 0, 18); flicker(c, e.signs, ts, 1.16, 0, 18, 1); rain(c, ts, 1); dim(c, 0.2 * (1 - open));
-    c.restore();
-    c.save(); c.strokeStyle = hexA(COL.cyan, (1 - open) * 0.9); c.lineWidth = 3; c.shadowColor = COL.cyan; c.shadowBlur = 16; c.beginPath(); c.arc(W / 2, H / 2, open * 900, 0, 6.283); c.stroke(); c.restore();
-  }
-  const rows: [string, string][] = [["WC-LENS 智能眼镜  固件 2.0", ""], ["光学模块 ............ ", "OK"], ["语法环 .............. ", "OK"], ["词库连接 ............ ", "OK"], ["定位  夜城 · 雨 · 22:47", ""]];
-  const fade = 1 - clamp((ts - 2.8) / 0.6);
-  c.save(); c.globalAlpha = fade; c.font = `500 22px ${FONT}`; c.textAlign = "left"; c.textBaseline = "middle";
-  rows.forEach(([a, ok], i) => {
-    const q = (ts - 0.3 - i * 0.55) * 34; if (q <= 0) return;
-    const n = Math.min(a.length, Math.floor(q)); const y = 250 + i * 40;
-    c.shadowColor = COL.cyan; c.shadowBlur = 8; c.fillStyle = i === 0 ? "#fff" : COL.cyan; c.fillText(a.slice(0, n), 380, y);
-    if (n >= a.length && ok) { const w = c.measureText(a).width; c.fillStyle = COL.green; c.shadowColor = COL.green; c.fillText(`[ ${ok} ]`, 380 + w + 6, y); }
-    if (n < a.length && Math.sin(ts * 20) > 0) c.fillRect(380 + c.measureText(a.slice(0, n)).width + 2, y - 10, 10, 20);
-  });
-  const pr = clamp((ts - 0.3) / 2.5);
-  c.shadowBlur = 0; c.strokeStyle = hexA(COL.cyan, 0.5); c.lineWidth = 1; c.strokeRect(380, 480, 520, 14);
-  c.fillStyle = COL.cyan; c.fillRect(383, 483, 514 * easeOut(pr), 8);
-  c.font = `500 14px ${FONT}`; c.fillStyle = COL.cyan; c.fillText(`系统载入 ${Math.round(easeOut(pr) * 100)}%`, 380, 515);
-  c.restore();
-  return { glitch: pulse(ts, 3.0, 0.3) * 0.5 };
-};
+type Draw = (c: Ctx, ts: number, dur: number, e: Env) => void;
 
 /** S1 夜城：雨、霓虹、缓慢推进 */
 const city: Draw = (c, ts, dur, e) => {
@@ -242,7 +211,6 @@ const city: Draw = (c, ts, dur, e) => {
   const vx = ((ts * 70 + 200) % 1500) - 100;
   c.save(); c.globalCompositeOperation = "lighter"; glow(c, vx, 190 + Math.sin(ts) * 6, 26, COL.cyan, 0.9); c.fillStyle = hexA(COL.red, 0.9); c.fillRect(vx + 7, 188, 3, 3); glow(c, vx - 40, 192, 70, COL.cyan, 0.12); c.restore();
   ripples(c, ts); rain(c, ts, 1);
-  return { glitch: pulse(ts, 0.8, 0.35) * 0.35 };
 };
 
 /** S2 词牌升空：行人头顶飞出词牌，天空里漂满发光的词 */
@@ -279,7 +247,6 @@ const words: Draw = (c, ts, dur, e) => {
   c.restore();
   ripples(c, ts); rain(c, ts, 1); fog(c, ts, COL.cyan, 0.5);
   dim(c, lerp(0.05, 0.25, p));
-  return { glitch: Math.max(pulse(ts, 0.3, 0.5) * 0.5, pulse(ts, 5, 0.6) * 0.6, 0.05) };
 };
 
 /** S3 黑客立绘 + 词牌拼成一句 */
@@ -312,12 +279,11 @@ const hacker: Draw = (c, ts, dur, e) => {
   if (ts > 6.6) { const q = clamp((ts - 6.6) / 1.2); const x = lerp(550, 820, q), y = lerp(490, 430, q); c.save(); c.globalCompositeOperation = "lighter"; glow(c, x, y, 120, COL.white, 0.5 * (1 - q * 0.5)); c.restore(); }
   ripples(c, ts); rain(c, ts, 0.9);
   dim(c, 0.12);
-  return { glitch: Math.max(pulse(ts, 1.2, 0.2), pulse(ts, 2.4, 0.2), pulse(ts, 3.6, 0.2), pulse(ts, 6.6, 0.3)) * 0.25 };
 };
 
 /** S4 暗巷训练场：稻草人，词师阿词的全息影像 */
 const mentor: Draw = (c, ts) => {
-  const wake = 5.2;
+  const wake = 5.0;
   c.fillStyle = "#020008"; c.fillRect(0, 0, W, H);
   const near = easeInOut(ts / 5.0), back = easeInOut((ts - 5.4) / 2.2), z = 1 + (lerp(0, 0.45, near)) * (1 - back);
   const fx = lerp(640, 380, near * (1 - back)), fy = lerp(360, 380, near * (1 - back));
@@ -349,31 +315,29 @@ const mentor: Draw = (c, ts) => {
   text(c, "HP 2", 600, 212, 20, COL.green, 0.9, 8, 500);
   c.restore();
   c.restore();
-  // 阿词：全息环 + 「词」
-  if (ts > wake) {
-    const q = ts - wake, a = clamp(q / 0.6), x = 880, y = 300 + Math.sin(ts * 2) * 6;
-    const rise = easeOut(q / 1.2);
-    for (let i = 0; i < 3; i++) { const r = (q * 280 - i * 100); if (r > 0 && r < 620) { c.strokeStyle = hexA(COL.cyan, clamp(1 - r / 620) * 0.7); c.lineWidth = 3; c.beginPath(); c.arc(x, y, r, 0, 6.283); c.stroke(); } }
-    c.save(); c.globalAlpha = a; c.globalCompositeOperation = "lighter";
-    glow(c, x, y, 220 * rise, COL.cyan, 0.32);
-    c.strokeStyle = COL.cyan; c.lineWidth = 2; c.shadowColor = COL.cyan; c.shadowBlur = 14;
-    c.beginPath(); c.arc(x, y, (60 + 60 * rise) + Math.sin(ts * 3) * 3, 0, 6.283); c.stroke();
-    c.setLineDash([10, 12]); c.beginPath(); c.arc(x, y, 150 * rise, ts, ts + 4.4); c.stroke(); c.setLineDash([]);
+  // 阿词：披斗篷的词师，从巷口的阴影里走进霓虹光里
+  if (ts > 5.0) {
+    const q = ts - 5.0, walk = easeOut(q / 2.6), x = lerp(1180, 900, walk), a = clamp(q / 0.8);
+    const step = walk < 0.98 ? Math.abs(Math.sin(q * 5.5)) * 5 : Math.sin(ts * 1.4) * 1.5, y = 596 - step;
+    c.save(); c.globalAlpha = a; c.translate(x, y);
+    c.save(); c.fillStyle = "rgba(0,0,0,.5)"; c.beginPath(); c.ellipse(0, 4, 78, 12, 0, 0, 6.283); c.fill(); c.restore();
+    c.fillStyle = "#07031a"; c.strokeStyle = hexA(COL.cyan, 0.7); c.lineWidth = 3; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(-74, 0); c.quadraticCurveTo(-54, -150, -36, -250); c.lineTo(36, -250); c.quadraticCurveTo(56, -150, 76, 0); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-40, -250); c.quadraticCurveTo(0, -330, 40, -250); c.closePath(); c.fill(); c.stroke();
+    c.beginPath(); c.arc(0, -282, 30, 0, 6.283); c.fill(); c.stroke();
+    c.beginPath(); c.moveTo(-52, -296); c.quadraticCurveTo(0, -352, 52, -296); c.quadraticCurveTo(0, -318, -52, -296); c.fill(); c.stroke();
+    c.save(); c.shadowColor = COL.cyan; c.shadowBlur = 14; c.fillStyle = COL.cyan; c.fillRect(-14, -280, 10, 4); c.fillRect(6, -280, 10, 4); c.restore();
+    c.strokeStyle = hexA(COL.amber, 0.9); c.lineWidth = 5; c.lineCap = "round"; c.beginPath(); c.moveTo(-96, 4); c.lineTo(-92, -300); c.stroke();
     c.restore();
-    text(c, "词", x, y, 128, COL.cyan, a * (Math.sin(ts * 41) > 0.95 ? 0.5 : 1), 26);
-    c.save(); c.globalAlpha = a * 0.25; c.fillStyle = COL.cyan;
-    for (let yy = y - 130; yy < y + 130; yy += 6) c.fillRect(x - 130, yy + ((ts * 40) % 6), 260, 1);
-    c.restore();
+    c.save(); c.globalCompositeOperation = "lighter"; glow(c, x + 96, y - 190, 150, COL.cyan, 0.3 * a); c.restore();
+    blit(c, tileSprite("词", COL.cyan, true), x + 96, y - 190 + Math.sin(ts * 2.2) * 8, 0.8, 0.12, a);
   }
   rain(c, ts, 0.6); fog(c, ts, COL.magenta, 0.6);
-  const flash = pulse(ts, wake, 0.5);
-  if (flash > 0) { c.fillStyle = `rgba(190,245,255,${flash * 0.7})`; c.fillRect(0, 0, W, H); }
   dim(c, 0.1 * (1 - clamp((ts - wake) / 1)));
-  return { glitch: Math.max(pulse(ts, wake, 0.9), pulse(ts, 8.4, 0.4) * 0.4, 0.05) };
 };
 
 /** S5 时间轴：双方每秒各说一句，先出手的先落下 */
-const timeline: Draw = (c, ts, dur, e) => {
+const timeline: Draw = (c, ts, _dur, e) => {
   c.fillStyle = "#000"; c.fillRect(0, 0, W, H);
   drawBg(c, e.bgNormal, 1.0); dim(c, 0.8);
   flicker(c, e.signs, ts, 1, 0, 0, 0.25);
@@ -414,8 +378,6 @@ const timeline: Draw = (c, ts, dur, e) => {
   }
   rain(c, ts, 0.4);
   let gl = 0.04; for (const [sec] of ev) gl = Math.max(gl, pulse(ts, 0.8 + (sec - 0.5) / 10 * 6.6, 0.2) * 0.5);
-  void dur;
-  return { glitch: gl };
 };
 
 const FAM: [string, string, string, string][] = [["并", COL.cyan, "把句子接长", "并流"], ["续", COL.green, "让效果持续", "续流"], ["择", COL.amber, "目标事后再定", "择流"], ["血", COL.red, "以血换行动", "血流"]];
@@ -447,7 +409,6 @@ const families: Draw = (c, ts, _dur, e) => {
   });
   if (ts > 4.1) for (let i = 0; i < 3; i++) beam(c, xs[i] + 112, 330, xs[i + 1] - 112, 330, COL.violet, ts + i * 0.3, clamp((ts - 4.1) / 0.5));
   rain(c, ts, 0.4);
-  return { glitch: Math.max(...[0.6, 1.6, 2.6, 3.6].map((t) => pulse(ts, t, 0.2))) * 0.3 };
 };
 
 /** S7 拼出第一句「选择 1 敌方 造成 1」，标题《词战》 */
@@ -476,7 +437,6 @@ const assemble: Draw = (c, ts, dur, e) => {
     const q = ts - 5.1;
     c.save(); c.globalCompositeOperation = "lighter";
     glow(c, 640, 300, 420 + Math.sin(ts * 2) * 20, COL.magenta, 0.2); glow(c, 640, 300, 300, COL.cyan, 0.16);
-    for (let i = 0; i < 2; i++) { const r = (q * 420 - i * 200) % 800; if (q * 420 - i * 200 > 0) { c.strokeStyle = hexA(i ? COL.cyan : COL.magenta, clamp(1 - r / 800) * 0.6); c.lineWidth = 2; c.beginPath(); c.arc(640, 300, r, 0, 6.283); c.stroke(); } }
     c.restore();
     c.save(); c.globalAlpha = clamp((q - 0.8) / 0.6); c.font = `700 24px ${FONT}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = COL.cyan; c.shadowColor = COL.cyan; c.shadowBlur = 14;
     if ("letterSpacing" in c) (c as unknown as { letterSpacing: string }).letterSpacing = "14px";
@@ -485,10 +445,9 @@ const assemble: Draw = (c, ts, dur, e) => {
     const L = 220 * easeOut((q - 1) / 0.8); c.beginPath(); c.moveTo(640 - L, 480); c.lineTo(640 + L, 480); c.stroke(); c.restore();
   }
   rain(c, ts, 0.5);
-  return { glitch: Math.max(fl * 0.9, pulse(ts, 5.6, 0.3) * 0.5, ...seq.map(([, , t0]) => pulse(ts, t0 + 0.4, 0.15) * 0.25)) };
 };
 
-export const SCENES: Record<SceneId, Draw> = { boot, city, words, hacker, mentor, timeline, families, assemble };
+export const SCENES: Record<SceneId, Draw> = { city, words, hacker, mentor, timeline, families, assemble };
 
 // ---------- 环境构建（一次） ----------
 export async function buildEnv(portraitUrl: string | null): Promise<Env> {
