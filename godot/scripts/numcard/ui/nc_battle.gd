@@ -678,7 +678,7 @@ func _event_text(ev: Dictionary, decl: Array) -> String:
 		"cont_set":
 			return "    [color=#d89a2a]→ 挂上续：以后 %d 轮每轮同一秒再来一次[/color]" % int(ev.rounds)
 		"chain":
-			return "[color=#2fb8c8]%s 连段：兑现 %s，得 %d 分%s[/color]" % [MARK[mini(int(ev.ord), MARK.size() - 1)], "、".join(ev.kinds), int(ev.points), ("（整句全中 +%d）" % (int(ev.points) - (ev.kinds as Array).size())) if bool(ev.all) else ""]
+			return "[color=#2fb8c8]%s 连段：兑现 %d 段（%s），得 %d 分%s[/color]" % [MARK[mini(int(ev.ord), MARK.size() - 1)], int(ev.landed), "、".join(ev.kinds), int(ev.points), "（整句全中）" if bool(ev.all) else ""]
 		"hit":
 			var parts: Dictionary = ev.parts
 			var ex: Array = []

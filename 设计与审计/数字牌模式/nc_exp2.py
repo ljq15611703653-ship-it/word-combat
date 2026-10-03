@@ -23,7 +23,8 @@ def tune(over, n=480, it=5, want=8.0):
 if __name__ == "__main__":
     name = sys.argv[1]
     over = dict(x.split("=", 1) for x in sys.argv[2:])
-    t = tune(over)
+    it = int(over.pop("_it", 5))
+    t = tune(over, it=it)
     o = dict(over); o.update(t)
     cfg, res, secs = S.run(1200, 11, o)
     rep = S.report(cfg, res, secs)

@@ -699,7 +699,7 @@ def singles(G, s, uid, declared, res, cp):
                     if not hurt and ct == 1:
                         continue
                     out.append([cl_of("heal", "ally", None if late else tg, n, n_=a, rep=1, cont=ct)])
-    if enemy_acts or cp["slots"] > 0:
+    if enemy_acts or cp["slots"] > 0 or cp.get("once"):
         for n in copts:
             if n > len(F):
                 continue
@@ -715,7 +715,7 @@ def singles(G, s, uid, declared, res, cp):
             for d in opts:
                 for tg in tsets(E, n):
                     out.append([cl_of("st", "enemy", tg, n, st=nm, n_=d)])
-    if res["words"]["转移"] > 0 and enemy_acts:
+    if res["words"]["转移"] > 0 and (enemy_acts or cp.get("once")):
         for n in copts:
             if n > len(F):
                 continue

@@ -433,10 +433,11 @@ static func resolve(R: Dictionary, acts_in: Array, rnd: int) -> void:
 					kname = str(c5.st)
 				kinds[{"atk": "伤害", "heal": "恢复", "mit": "减伤", "st": "状态", "redirect": "转移", "delay": "延后", "remove": "移除"}.get(kname, kname)] = true
 		var allin: bool = landed == (a5.cl as Array).size()
-		var pts: int = kinds.size() + ((NR.B_BONUS + NR.B_LEN * maxi(0, (a5.cl as Array).size() - 2)) if allin else 0)
+		var base_pts: int = landed if NR.B_MODE == "count" else kinds.size()
+		var pts: int = base_pts + ((NR.B_BONUS + NR.B_LEN * maxi(0, (a5.cl as Array).size() - 2)) if allin else 0)
 		if pts > 0:
 			_credit(R, s, "chain", pts)
-			_ev(R, {"t": NR.TIMELINE + 1, "type": "chain", "ord": int(a5.ord), "uid": int(a5.uid), "kinds": kinds.keys(), "points": pts, "all": landed == (a5.cl as Array).size()})
+			_ev(R, {"t": NR.TIMELINE + 1, "type": "chain", "ord": int(a5.ord), "uid": int(a5.uid), "kinds": kinds.keys(), "landed": landed, "points": pts, "all": landed == (a5.cl as Array).size()})
 
 # ---------------------------------------------------------------- 句子的花费、起手、数字
 static func clause_words(c: Dictionary) -> Array:
@@ -465,20 +466,21 @@ static func _cnt(c: Dictionary) -> int:
 		return int(c.count)
 	return (c.get("tg", []) as Array).size()
 
-# 一句话用到的数字（>1 的才要牌）
-static func action_numbers(cls: Array) -> Array:
+# 一句话用到的数字（>1 的才要牌）。freecount：择流的“选几个”不要牌
+static func action_numbers(cls: Array, freecount: bool = false) -> Array:
 	var out: Array = []
 	for c in cls:
+		var cnt: int = 1 if (freecount and str(c.get("tmode", "")) == "late") else _cnt(c)
 		match str(c.k):
 			"atk", "heal":
-				out.append(_cnt(c))
+				out.append(cnt)
 				out.append(int(c.n))
 				out.append(int(c.get("rep", 1)))
 			"mit", "st":
-				out.append(_cnt(c))
+				out.append(cnt)
 				out.append(int(c.n))
 			"redirect":
-				out.append(_cnt(c))
+				out.append(cnt)
 			"delay":
 				out.append(int(c.n))
 		if int(c.get("cont", 1)) > 1:
@@ -503,6 +505,29 @@ static func is_def(cls: Array) -> bool:
 		if not (str(c.k) in ["mit", "redirect", "heal"]):
 			return false
 	return true
+
+# 一段的动作词（并流“同一个词一句只用一次”看的就是它）
+static func clause_word(c: Dictionary) -> String:
+	if str(c.k) == "st":
+		return str(c.st)
+	return {"atk": "造成", "heal": "恢复", "mit": "减伤", "redirect": "转移", "delay": "延后", "remove": "移除"}.get(str(c.k), str(c.k))
+
+# 职业的用词限制（输入端）：违反了返回原因，空串 = 可以
+static func word_rule_problem(cls: Array, cp: Dictionary) -> String:
+	if bool(cp.get("once", false)):
+		var seen := {}
+		for c in cls:
+			var w := clause_word(c)
+			if seen.has(w):
+				return "并流：一句里【%s】只能用一次（换一个词接上去）" % w
+			seen[w] = true
+	if bool(cp.get("cont_single", false)) and cls.size() > 1 and cont_count(cls) > 0:
+		return "续流：带【持续】的句子只能一段，不能接【并】"
+	if bool(cp.get("norep", false)):
+		for c2 in cls:
+			if int(c2.get("rep", 1)) > 1:
+				return "择流：句子里不能用【重复】"
+	return ""
 
 static func cont_count(cls: Array) -> int:
 	var n := 0

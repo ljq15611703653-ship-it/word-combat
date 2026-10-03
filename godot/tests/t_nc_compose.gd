@@ -50,17 +50,39 @@ func _init() -> void:
 			check(str(pop.parse(pop.tokens).clauses[0].tmode) == "late", "择流：选择的目标是待定")
 			check(pop.draft_text(pop.tokens).find("待定") >= 0, "择流：人话里写待定 → " + pop.draft_text(pop.tokens))
 		if cls == "并":
+			# 每一段换一个动作词（并流开了“同一个词一句只用一次”时也能拼长）
+			var plan: Array = [["敌方", "易伤"], ["敌方", "衰弱"], ["友方", "恢复", 1], ["友方", "减伤", 1], ["敌方", "灼烧"], ["友方", "转移"]]
 			var n := 1
-			while n < NR.B_CLAUSES:
+			for step in plan:
+				if n >= NR.B_CLAUSES:
+					break
 				pop.add_word("并")
-				for w in ["选择"]:
-					pop.add_word(w)
+				pop.add_word("选择")
 				pop.add_number(1)
-				for w2 in ["敌方", "造成"]:
-					pop.add_word(w2)
-				pop.add_number(1)
+				pop.add_word(step[0])
+				pop.add_word(step[1])
+				if step.size() > 2:
+					pop.add_number(int(step[2]))
 				n += 1
-			check((pop.parse(pop.tokens).clauses as Array).size() == NR.B_CLAUSES, "并流：能拼到 %d 段" % NR.B_CLAUSES)
+			var got: int = (pop.parse(pop.tokens).clauses as Array).size()
+			check(got == mini(NR.B_CLAUSES, plan.size() + 1), "并流：能拼到 %d 段" % got)
+			if NR.B_ONCE:
+				pop.tokens = []
+				for w3 in ["选择"]:
+					pop.add_word(w3)
+				pop.add_number(1)
+				pop.add_word("敌方")
+				pop.add_word("造成")
+				pop.add_number(1)
+				pop.add_word("并")
+				pop.add_word("选择")
+				pop.add_number(1)
+				pop.add_word("敌方")
+				var blocked := false
+				for it0 in pop.options().words:
+					if str(it0[0]) == "造成" and not bool(it0[1]):
+						blocked = true
+				check(blocked, "并流：同一句第二次用【造成】会变灰")
 		# 辅助轮
 		var sug: Array = pop.NAI.suggest(m, 0, pop.uid, 3)
 		check(not sug.is_empty(), "辅助轮有建议（%d 条）" % sug.size())

@@ -120,6 +120,7 @@ static func singles(M, s: int, uid: int, cp: Dictionary) -> Array:
 	var opts: Array = [1]
 	for i in mini(2, vals.size()):
 		opts.append(int(vals[i]))
+	var copts: Array = [1, 2, 3] if bool(cp.freecount) else opts
 	var enemy_acts: Array = []
 	for a in M.declared:
 		if int(a.side) != s:
@@ -150,12 +151,12 @@ static func singles(M, s: int, uid: int, cp: Dictionary) -> Array:
 	var out: Array = []
 	# 攻击：几个目标 × 几点 × 几次 ×（续几轮）
 	if not E.is_empty():
-		for n in opts:
+		for n in copts:
 			if int(n) > E.size():
 				continue
 			for d in opts:
 				var reps: Array = [1]
-				if not vals.is_empty() and int(vals[0]) > 1 and int(vals[0]) <= REP_MAX:
+				if not bool(cp.norep) and not vals.is_empty() and int(vals[0]) > 1 and int(vals[0]) <= REP_MAX:
 					reps.append(int(vals[0]))
 				for r in reps:
 					for tg in _tsets(E, int(n), late):
@@ -168,7 +169,7 @@ static func singles(M, s: int, uid: int, cp: Dictionary) -> Array:
 			hurt.append(u3)
 	hurt.sort_custom(func(a, b): return int(a.hp) - int(a.mx) < int(b.hp) - int(b.mx))
 	if not hurt.is_empty() or int(cp.slots) > 0:
-		for n2 in opts:
+		for n2 in copts:
 			if int(n2) > F.size():
 				continue
 			for amt in opts:
@@ -184,8 +185,8 @@ static func singles(M, s: int, uid: int, cp: Dictionary) -> Array:
 						continue
 					out.append([[_cl("heal", "ally", null if late else tg2, int(n2), {"n": int(amt), "rep": 1, "cont": int(ct2)})], -1])
 	# 减伤
-	if not enemy_acts.is_empty() or int(cp.slots) > 0:
-		for n3 in opts:
+	if not enemy_acts.is_empty() or int(cp.slots) > 0 or bool(cp.once):
+		for n3 in copts:
 			if int(n3) > F.size():
 				continue
 			for amt2 in opts:
@@ -195,15 +196,15 @@ static func singles(M, s: int, uid: int, cp: Dictionary) -> Array:
 	for nm in NR.ENEMY_ST:
 		if int(words.get(nm, 0)) <= 0 or E.is_empty():
 			continue
-		for n4 in opts:
+		for n4 in copts:
 			if int(n4) > E.size():
 				continue
 			for dur in opts:
 				for tg3 in _tsets(E, int(n4), late):
 					out.append([[_cl("st", "enemy", tg3, int(n4), {"st": nm, "n": int(dur)})], -1])
 	# 转移
-	if int(words.get("转移", 0)) > 0 and not enemy_acts.is_empty():
-		for n5 in opts:
+	if int(words.get("转移", 0)) > 0 and (not enemy_acts.is_empty() or bool(cp.once)):
+		for n5 in copts:
 			if int(n5) > F.size():
 				continue
 			out.append([[_cl("redirect", "ally", null if late else threat_order.slice(0, int(n5)), int(n5), {})], -1])

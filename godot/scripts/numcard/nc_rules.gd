@@ -16,15 +16,15 @@ const CLASS_NAME := {"并": "并流", "续": "续流", "择": "择流", "血": "
 const CLASS_WORD := {"并": "并", "续": "持续", "择": "选择", "血": "自身"}
 const METRIC := {"并": "chain", "续": "cont", "择": "pick", "血": "blood"}
 const METRIC_NAME := {"并": "连段", "续": "续出", "择": "命中", "血": "血债"}
-const TARGET := {"并": 25, "续": 37, "择": 41, "血": 100}
+const TARGET := {"并": 34, "续": 60, "择": 63, "血": 79}
 const CLASS_TALENT := {
-	"并": "一句最多 %d 段（别人 3 段），每多一段只加 %d 行动点（别人 2），而且起手不因为段多变晚（别人每多一段晚 1 秒）",
-	"续": "【持续】能接在 造成伤害、恢复、减伤 后面：这一段以后每轮同一秒自动再来一次（不花行动点）。同时最多挂 %d 个续（得分到 25%%、70%% 各 +1）。出手的随从倒下或被【移除】，它的续就断了",
-	"择": "【选择】的目标宣告时不定（对手只看到“待定”），等双方宣告全部结束再定；定好的目标出手前倒下了，自动换一个",
-	"血": "行动点不够时，可以用出手随从的生命来付（1 点生命顶 1 点行动点，至少留 1 血；一句最多付 %d 点，得分到 25%%、70%% 时上限变 %d、%d）。血契护体：付了几点血，这个随从本轮每下就少受几点。用血付的句子里不能有【恢复】",
+	"并": "上限：一句最多 %d 段（别人 3 段），每多一段只加 %d 行动点（别人 2），起手不因为段多变晚。限制：一句里同一个动作词（造成、恢复、减伤、易伤、灼烧、衰弱、转移、延后、移除）只能用一次",
+	"续": "上限：【持续】能接在 造成、恢复、减伤 后面，这一段以后每轮同一秒自动再来一次（不花行动点），同时能挂 %d 个续。限制：带【持续】的这句只能一段，不能接【并】。出手的随从倒下或被【移除】，它的续就断了",
+	"择": "上限：【选择】几个目标不用数字牌，想选几个选几个；目标宣告时不定（对手只看到“待定”），双方宣告完再定，定好的人倒了自动换人。限制：句子里不能用【重复】",
+	"血": "上限：行动点不够时，用出手随从的生命来付，想付多少付多少（1 点生命顶 1 点行动点，至少留 1 血）。限制：用血付的句子里不能有【恢复】【减伤】【转移】",
 }
 const CLASS_GOAL := {
-	"并": "连段分：两段以上的句子里，兑现了几种不同的效果就得几分（伤害、恢复、减伤、状态、转移、延后、移除各算一种；易伤灼烧衰弱都算“状态”）；整句每段都兑现，再加 1 分，超过两段的每一段再 +1",
+	"并": "连段分：两段以上的句子里，兑现了几段就得几分；整句每段都兑现再 +1",
 	"续": "续出来的效果：续自动再来的那几次打出的伤害、回的血、挡下的伤害，加上你上的灼烧烧掉的、易伤多打的、衰弱让对方少打的",
 	"择": "命中：对敌人实际打掉的血（打空、被挡掉的不算）",
 	"血": "血债：用生命付掉的点数，加上用血付的句子对敌人打掉的血",
@@ -54,19 +54,27 @@ const DICE_COUNT := 2
 const FLOOR := {3: 2, 5: 3, 7: 4}     # 保底数字：第几轮开始时双方各得一张（可反复用）
 
 # 职业天赋的数值
-const B_CLAUSES := 5
+const B_CLAUSES := 7
 const B_AND := 1
 const B_BONUS := 1
+const B_MODE := "count"              # 并流得分：count = 兑现的段数；kinds = 兑现的效果种类
 const B_STKIND := true                # 易伤、灼烧、衰弱合起来只算一种效果
 const B_WIND := 0                     # 并流每多一段起手晚几秒（别人 1）
-const B_LEN := 1                      # 并流整句全中时，超过两段的每一段再 +几分
-const X_SLOTS := 1
-const X_SLOTS_UP := [0.25, 0.70]
+const B_LEN := 0                      # 并流整句全中时，超过两段的每一段再 +几分
+const X_SLOTS := 3
+const X_SLOTS_UP := []
 const Z_HEAL := false
-const Y_CAP := 2
-const Y_CAP_UP := [[0.25, 3], [0.70, 5]]
-const Y_GUARD := 1.0                  # 血契护体：用血付了几点，那个随从本轮就多几点保护
+const Y_CAP := 99
+const Y_CAP_UP := []
+const Y_GUARD := 0.0                  # 血契护体：用血付了几点，那个随从本轮就多几点保护
 const Y_SHIELD := false               # true：这几点是一层护盾（本轮一共挡这么多）；false：是减伤（每下少受这么多）
+# 职业的用词限制（输入端：拼的时候哪些词不能这么用，不改结算）
+const B_ONCE := true                 # 并流：一句里同一个动作词（造成、恢复、减伤、易伤、灼烧、衰弱、转移、延后、移除）只能用一次
+const X_SINGLE := true               # 续流：带【持续】（续）的句子只能一段，不能接【并】
+const Z_FREE := true                 # 择流：【选择】几个目标不用数字牌（上限提高）
+const Z_NOREP := true                # 择流：句子里不能用【重复】
+const Y_NOHEAL := true                # 血流：用血付的句子里不能有【恢复】
+const Y_NODEF := true                # 血流：用血付的句子里不能有【减伤】【转移】
 const Y_DICE := true                  # 用血付的生命也算进“一轮掉的血”（挫折骰子）
 
 const DECK_SIZE := 10
@@ -105,32 +113,37 @@ static func talent_text(cls: String) -> String:
 			return CLASS_TALENT["并"] % [B_CLAUSES, B_AND]
 		"续":
 			return CLASS_TALENT["续"] % X_SLOTS
-		"血":
-			return CLASS_TALENT["血"] % [Y_CAP, int(Y_CAP_UP[0][1]), int(Y_CAP_UP[1][1])]
 	return str(CLASS_TALENT.get(cls, ""))
 
 # 这一方现在的职业上限（会随职业得分涨）
 static func caps(cls: String, p: float) -> Dictionary:
-	var out := {"clauses": CLAUSE_MAX, "and": AND_COST, "slots": 0, "blood": 0, "late": false, "wind": 1}
+	var out := {"clauses": CLAUSE_MAX, "and": AND_COST, "slots": 0, "blood": 0, "late": false, "wind": 1,
+		"once": false, "cont_single": false, "freecount": false, "norep": false, "noheal": false, "nodef": false}
 	match cls:
 		"并":
 			out.clauses = B_CLAUSES
 			out["and"] = B_AND
 			out["wind"] = B_WIND
+			out.once = B_ONCE
 		"续":
 			var n := X_SLOTS
 			for t in X_SLOTS_UP:
 				if p >= float(t):
 					n += 1
 			out.slots = n
+			out.cont_single = X_SINGLE
 		"择":
 			out.late = true
+			out.freecount = Z_FREE
+			out.norep = Z_NOREP
 		"血":
 			var b := Y_CAP
 			for pr in Y_CAP_UP:
 				if p >= float(pr[0]):
 					b = int(pr[1])
 			out.blood = b
+			out.noheal = Y_NOHEAL
+			out.nodef = Y_NODEF
 	return out
 
 static func deck_size(words: Dictionary) -> int:

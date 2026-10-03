@@ -246,7 +246,7 @@ func _clean(c: Dictionary) -> Dictionary:
 func _used_values() -> Dictionary:
 	var out := {}
 	for t in tokens:
-		if str(t.t) == "n" and int(t.v) > 1:
+		if str(t.t) == "n" and int(t.v) > 1 and not bool(t.get("free", false)):
 			out[int(t.v)] = int(out.get(int(t.v), 0)) + 1
 	return out
 
@@ -314,8 +314,37 @@ func options() -> Dictionary:
 					var room := _cont_room()
 					ws.append(["持续", room > 0, "" if room > 0 else "续挂满了（同时最多 %d 个）" % int(cp.slots)])
 	if e == "end" and nclauses + 1 < int(cp.clauses):
-		ws.append(["并", true, ""])
+		var ok_and := true
+		var why_and := ""
+		if bool(cp.cont_single):
+			var has_cont: bool = int(cur.get("cont", 1)) > 1 or bool(cur.get("dur_set", false)) and str(cur.get("k", "")) != "st"
+			for d0 in pr.done:
+				if int(d0.get("cont", 1)) > 1:
+					has_cont = true
+			if has_cont:
+				ok_and = false
+				why_and = "续流：带【持续】的句子只能一段"
+		ws.append(["并", ok_and, why_and])
+	# 职业的用词限制（输入端）：这句里不能再用的词变灰，并写清楚为什么
+	var used_w := {}
+	for d1 in pr.done:
+		used_w[NE.clause_word(d1)] = true
+	for item in ws:
+		var w: String = str(item[0])
+		if bool(cp.once) and used_w.has(w) and bool(item[1]):
+			item[1] = false
+			item[2] = "并流：一句里【%s】只能用一次" % w
+		if w == "重复" and bool(cp.norep):
+			item[1] = false
+			item[2] = "择流：句子里不能用【重复】"
+		if w == "持续" and bool(cp.cont_single) and nclauses > 0 and str(cur.get("k", "")) != "st":
+			item[1] = false
+			item[2] = "续流：带【持续】的句子只能一段"
 	return {"words": ws, "num": need_num, "parsed": pr}
+
+# 择流选几个目标不要牌（上限提高）
+func _free_count() -> bool:
+	return bool(cp.freecount) and str(parse(tokens).get("expect", "")) == "count"
 
 func _any_status() -> bool:
 	for nm in NR.ENEMY_ST:
@@ -374,11 +403,12 @@ func add_number(n: int) -> void:
 	var op := options()
 	if not bool(op.num):
 		return
-	if n > 1:
+	var free := _free_count()
+	if n > 1 and not free:
 		var have: int = int(M.usable_values(0).get(n, 0))
 		if int(_used_values().get(n, 0)) >= have:
 			return
-	tokens.append({"t": "n", "v": n})
+	tokens.append({"t": "n", "v": n, "free": free})
 	Sfx.play("stamp")
 	_refresh()
 
@@ -578,6 +608,16 @@ func _refresh() -> void:
 		_hover(b1, pv1)
 	b1.pressed.connect(func(): add_number(1))
 	num_flow.add_child(b1)
+	if _free_count():
+		for fv in [2, 3]:
+			var bf := K.button("%d（择流免费）" % fv, "primary", 22)
+			bf.custom_minimum_size = Vector2(150, 56)
+			var pvf := _preview_with({"t": "n", "v": fv, "free": true})
+			bf.tooltip_text = "择流选几个目标不用数字牌\n接上以后：" + pvf
+			_hover(bf, pvf)
+			var fvv: int = fv
+			bf.pressed.connect(func(): add_number(fvv))
+			num_flow.add_child(bf)
 	var vals: Array = have.keys()
 	vals.sort()
 	for v in vals:
@@ -605,16 +645,16 @@ func _refresh() -> void:
 		var ms := NE.action_windup(cl, int(cp.wind))
 		var ap: int = int(M.res[0].ap)
 		var blood: int = maxi(0, cost - ap)
-		info_label.text = "花 %d 行动点（还剩 %d）· 最早第 %d 秒起效 · 用数字牌 %s" % [cost, ap, ms, str(NE.action_numbers(cl)) if not NE.action_numbers(cl).is_empty() else "无（全是 1）"]
+		info_label.text = "花 %d 行动点（还剩 %d）· 最早第 %d 秒起效 · 用数字牌 %s" % [cost, ap, ms, str(NE.action_numbers(cl, bool(cp.freecount))) if not NE.action_numbers(cl, bool(cp.freecount)).is_empty() else "无（全是 1）"]
 		var bad := false
 		if blood > 0:
 			if int(cp.blood) > 0:
 				var has_heal := false
 				for c3 in cl:
-					if str(c3.k) == "heal":
+					if (bool(cp.noheal) and str(c3.k) == "heal") or (bool(cp.nodef) and str(c3.k) in ["mit", "redirect"]):
 						has_heal = true
 				if has_heal:
-					info_label.text += "  —— 行动点不够；用血付的句子不能有【恢复】"
+					info_label.text += "  —— 行动点不够要用血付；用血付的句子不能有【恢复】【减伤】【转移】"
 					bad = true
 				elif blood > M.blood_room(0, uid):
 					info_label.text += "  —— 差 %d 点，这个随从最多只能付 %d 血" % [blood, M.blood_room(0, uid)]

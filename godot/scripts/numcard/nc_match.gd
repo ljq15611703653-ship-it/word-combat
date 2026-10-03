@@ -197,6 +197,9 @@ func build_action(s: int, uid: int, cls: Array, start: int) -> Dictionary:
 	var u: Dictionary = R.U[uid]
 	if int(u.side) != s or int(u.down) != -1:
 		return {"err": "这个随从现在不能出手"}
+	var rule := NE.word_rule_problem(cls, cp)
+	if rule != "":
+		return {"err": rule}
 	var words := NE.action_words(cls)
 	var need := {}
 	for w in words:
@@ -213,15 +216,17 @@ func build_action(s: int, uid: int, cls: Array, start: int) -> Dictionary:
 		if blood > blood_room(s, uid):
 			return {"err": "行动点不够，用血也付不起（差 %d，这个随从最多能付 %d 血）" % [blood, blood_room(s, uid)]}
 		for c0 in cls:
-			if str(c0.k) == "heal":
+			if bool(cp.noheal) and str(c0.k) == "heal":
 				return {"err": "用血付的句子里不能有【恢复】"}
+			if bool(cp.nodef) and str(c0.k) in ["mit", "redirect"]:
+				return {"err": "用血付的句子里不能有【减伤】【转移】"}
 	var nc := NE.cont_count(cls)
 	if nc > 0:
 		if int(cp.slots) <= 0:
 			return {"err": "只有续流能把【持续】接在伤害、恢复、减伤后面"}
 		if conts_of(s).size() + int(res[s].conts) + nc > int(cp.slots):
 			return {"err": "续挂满了（同时最多 %d 个）" % int(cp.slots)}
-	var nums := NE.action_numbers(cls)
+	var nums := NE.action_numbers(cls, bool(cp.freecount))
 	var cards = pick_cards(s, nums)
 	if cards == null:
 		return {"err": "数字牌不够：这句要用 %s" % str(nums)}
