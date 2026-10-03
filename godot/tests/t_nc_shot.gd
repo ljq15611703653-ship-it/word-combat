@@ -31,10 +31,8 @@ func _init() -> void:
 	pop.add_word("选择")
 	pop.add_number(1)
 	pop.add_word("敌方")
-	pop.add_word("随从")
 	pop.add_word("造成")
 	pop.add_number(1)
-	pop.add_word("伤害")
 	await shot("compose")
 	pop._ok()
 	await create_timer(0.3).timeout

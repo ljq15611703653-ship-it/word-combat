@@ -20,6 +20,7 @@ from multiprocessing import Pool
 CLASSES = ["并", "续", "择", "血"]
 METRIC = {"并": "chain", "续": "cont", "择": "pick", "血": "blood"}
 ENEMY_ST = ("易伤", "灼烧", "衰弱")
+WORDKEY = {"atk": "造成", "heal": "恢复", "mit": "减伤", "redirect": "转移", "delay": "延后", "remove": "移除"}
 PRICE = {"易伤": 1, "灼烧": 1, "衰弱": 1, "转移": 2, "延后": 1, "移除": 1}
 
 BASE = dict(
@@ -45,6 +46,7 @@ BASE = dict(
     pass_gain=0.3, ko_look=0.5, danger_hp=4, danger_w=0.0, combo_k=6, smart_late=1, cont_look=0.6,
     rep_max=3,
     off="",
+    b_once=0, x_single=0, z_free=0, z_norep=0, y_nodef=0, y_single=0,
 )
 
 PRESET = {
@@ -118,17 +120,23 @@ def caps(G, s):
     if c == "并":
         out["clauses"] = cfg["b_cap"] + sum(1 for t in cfg["b_cap_up_l"] if p >= t)
         out["and"] = cfg["b_and"]
+        out["once"] = bool(cfg["b_once"])
         out["wind"] = cfg["b_wind"]
     elif c == "续":
         out["slots"] = cfg["x_slots"] + sum(1 for t in cfg["x_slots_up_l"] if p >= t)
+        out["cont_single"] = bool(cfg["x_single"])
     elif c == "择":
         out["late"] = True
+        out["freecount"] = bool(cfg["z_free"])
+        out["norep"] = bool(cfg["z_norep"])
     elif c == "血":
         b = cfg["y_cap"]
         for t, v in cfg["y_cap_up_l"]:
             if p >= t:
                 b = v
         out["blood"] = b
+        out["nodef"] = bool(cfg["y_nodef"])
+        out["blood_single"] = bool(cfg["y_single"])
     return out
 
 
@@ -540,17 +548,18 @@ def clause_words(cl):
     return []
 
 
-def clause_nums(cl):
+def clause_nums(cl, freecount=False):
     k = cl["k"]
     out = []
+    cnt = 1 if (freecount and cl.get("late")) else cl.get("count", 1)
     if k in ("atk", "heal"):
-        out += [cl["count"], cl["n"], cl["rep"]]
+        out += [cnt, cl["n"], cl["rep"]]
     elif k == "mit":
-        out += [cl["count"], cl["n"]]
+        out += [cnt, cl["n"]]
     elif k == "st":
-        out += [cl["count"], cl["n"]]
+        out += [cnt, cl["n"]]
     elif k == "redirect":
-        out += [cl["count"]]
+        out += [cnt]
     elif k == "delay":
         out += [cl["n"]]
     if cl.get("cont", 1) > 1:
@@ -577,6 +586,17 @@ def make_act(G, s, uid, cl_list, res, cp, start=None):
     cfg = G["cfg"]
     if len(cl_list) > cp["clauses"]:
         return None
+    # 职业的用词限制（输入端）
+    if cp.get("once"):
+        ws = [WORDKEY[c["k"]] if c["k"] != "st" else c["st"] for c in cl_list]
+        if len(ws) != len(set(ws)):
+            return None
+    if cp.get("cont_single") and len(cl_list) > 1 and any(c.get("cont", 1) > 1 for c in cl_list):
+        return None
+    if cp.get("norep") and any(c.get("rep", 1) > 1 for c in cl_list):
+        return None
+    if cp.get("nostatus_cont") and any(c.get("cont", 1) > 1 and c["k"] == "st" for c in cl_list):
+        return None
     cost, words = act_cost(cl_list, cp)
     need = Counter(words)
     for w, n in need.items():
@@ -592,12 +612,16 @@ def make_act(G, s, uid, cl_list, res, cp, start=None):
             return None
         if any(c["k"] == "heal" for c in cl_list):
             return None
+        if cp.get("nodef") and any(c["k"] in ("mit", "redirect") for c in cl_list):
+            return None
+        if cp.get("blood_single") and len(cl_list) > 1:
+            return None
     nconts = sum(1 for c in cl_list if c.get("cont", 1) > 1)
     if nconts:
         active = sum(1 for c in G["R"]["conts"] if c["side"] == s) + res["conts"]
         if active + nconts > cp["slots"]:
             return None
-    nums = [v for cl in cl_list for v in clause_nums(cl)]
+    nums = [v for cl in cl_list for v in clause_nums(cl, cp.get("freecount", False))]
     avail_idx = usable_cards(G, s, res["cards"])
     cards = pick_cards(G, s, avail_idx, nums)
     if cards is None:
@@ -620,6 +644,7 @@ def singles(G, s, uid, declared, res, cp):
     avail_idx = usable_cards(G, s, res["cards"])
     vals = sorted({G["sides"][s]["cards"][i]["v"] for i in avail_idx}, reverse=True)
     opts = [1] + vals[:2]
+    copts = [1, 2, 3] if cp.get("freecount") else opts
     enemy_acts = [a for a in declared if a["side"] != s]
     thr = Counter()
     for a in enemy_acts:
@@ -653,18 +678,18 @@ def singles(G, s, uid, declared, res, cp):
         d.update(kw)
         return d
 
-    for n in opts:
+    for n in copts:
         if n > len(E) or not E:
             continue
         for d in opts:
-            reps = [1] + [v for v in vals[:1] if 1 < v <= cfg["rep_max"]]
+            reps = [1] if cp.get("norep") else [1] + [v for v in vals[:1] if 1 < v <= cfg["rep_max"]]
             for r in reps:
                 for tg in tsets(E, n):
                     for ct in conts:
                         out.append([cl_of("atk", "enemy", tg, n, n_=d, rep=r, cont=ct)])
     hurt = sorted([u for u in F if u["hp"] < u["mx"]], key=lambda u: u["hp"] - u["mx"])
     if hurt or cp["slots"] > 0:
-        for n in opts:
+        for n in copts:
             if n > len(F):
                 continue
             for a in opts:
@@ -675,7 +700,7 @@ def singles(G, s, uid, declared, res, cp):
                         continue
                     out.append([cl_of("heal", "ally", None if late else tg, n, n_=a, rep=1, cont=ct)])
     if enemy_acts or cp["slots"] > 0:
-        for n in opts:
+        for n in copts:
             if n > len(F):
                 continue
             for a in opts:
@@ -684,14 +709,14 @@ def singles(G, s, uid, declared, res, cp):
     for nm in ENEMY_ST:
         if res["words"][nm] <= 0 or not E:
             continue
-        for n in opts:
+        for n in copts:
             if n > len(E):
                 continue
             for d in opts:
                 for tg in tsets(E, n):
                     out.append([cl_of("st", "enemy", tg, n, st=nm, n_=d)])
     if res["words"]["转移"] > 0 and enemy_acts:
-        for n in opts:
+        for n in copts:
             if n > len(F):
                 continue
             out.append([cl_of("redirect", "ally", None if late else threat_order[:n], n)])

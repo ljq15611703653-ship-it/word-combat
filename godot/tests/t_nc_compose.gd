@@ -31,15 +31,14 @@ func _init() -> void:
 		check(pop.draft_text(pop.tokens).find("几个") >= 0, "只放了【选择】：人话里目标数写成“几个” → " + pop.draft_text(pop.tokens))
 		pop.add_number(2 if m.usable_values(0).has(2) else 1)
 		pop.add_word("敌方")
-		pop.add_word("随从")
 		pop.add_word("造成")
 		var d: String = pop.draft_text(pop.tokens)
 		check(d.find("几 点伤害") >= 0, "放到【造成】：伤害写成“几 点” → " + d)
 		var pv: String = pop._preview_with({"t": "n", "v": 1})
 		check(pv.find("1 点伤害") >= 0, "数字 1 的预览 → " + pv)
 		pop.add_number(1)
-		pop.add_word("伤害")
-		check(bool(pop.parse(pop.tokens).complete), "选择 N 敌方 随从 造成 1 伤害 能拼好")
+		check(bool(pop.parse(pop.tokens).complete), "选择 N 敌方 造成 1 能拼好（随从、伤害 不用拼）")
+		check(pop.draft_text(pop.tokens).find("1 点伤害") >= 0, "不拼“伤害”也读作“几点伤害” → " + pop.draft_text(pop.tokens))
 		if cls == "续":
 			var names: Array = []
 			for it in pop.options().words:
@@ -57,10 +56,9 @@ func _init() -> void:
 				for w in ["选择"]:
 					pop.add_word(w)
 				pop.add_number(1)
-				for w2 in ["敌方", "随从", "造成"]:
+				for w2 in ["敌方", "造成"]:
 					pop.add_word(w2)
 				pop.add_number(1)
-				pop.add_word("伤害")
 				n += 1
 			check((pop.parse(pop.tokens).clauses as Array).size() == NR.B_CLAUSES, "并流：能拼到 %d 段" % NR.B_CLAUSES)
 		# 辅助轮

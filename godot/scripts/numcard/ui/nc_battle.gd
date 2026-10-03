@@ -871,13 +871,12 @@ func _auto_play() -> void:
 			for w in ["选择"]:
 				pop.add_word(w)
 			pop.add_number(1)
-			for w2 in ["敌方", "随从", "造成"]:
+			for w2 in ["敌方", "造成"]:
 				pop.add_word(w2)
 			var big := 1
 			for v in M.usable_values(0):
 				big = maxi(big, int(v))
 			pop.add_number(big)
-			pop.add_word("伤害")
 			var pr: Dictionary = pop.parse(pop.tokens)
 			pop.queue_free()
 			if not bool(pr.complete):

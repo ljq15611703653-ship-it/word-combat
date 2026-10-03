@@ -18,11 +18,10 @@ signal cancelled()
 const BASIC_DESC := {
 	"选择": "选几个目标：后面放一张数字牌（几个），再说敌方还是友方",
 	"自身": "目标是出手的这个随从自己",
-	"敌方": "对方的随从", "友方": "自己这边的随从", "随从": "随从",
-	"造成": "打伤害：后面放数字牌（几点）", "伤害": "伤害",
-	"恢复": "回血：后面放数字牌（几点）", "生命": "生命",
+	"敌方": "对方的随从", "友方": "自己这边的随从",
+	"造成": "打伤害：后面放数字牌（几点）",
+	"恢复": "回血：后面放数字牌（几点）",
 	"减伤": "本轮每次少受几点伤害：后面放数字牌",
-	"施加": "上一个状态（要卡组里的状态词）",
 	"持续": "撑几轮：后面放数字牌",
 	"重复": "再来几次：后面放数字牌（一共几次）",
 	"并": "接着说下一段",
@@ -131,7 +130,8 @@ func setup(match_obj, unit_id: int, init_tokens: Array = []) -> void:
 	_refresh()
 
 # ---------------------------------------------------------------- 语法：一边读一边建段落
-# 状态（expect）：start → count → side → unit → action → 数值 → 单位词 → end（可接 重复 / 持续 / 并）
+# 状态（expect）：start → count → side → action → 数值 → end（可接 重复 / 持续 / 并）
+# “随从”“伤害”“生命”“施加”这些不带意思的词不用拼：数字就是牌，拼句台自动补成人话的连接字
 func parse(toks: Array) -> Dictionary:
 	var clauses: Array = []
 	var cur = null
@@ -166,10 +166,8 @@ func parse(toks: Array) -> Dictionary:
 				g = "个"
 			"side":
 				cur["side"] = "enemy" if w == "敌方" else "ally"
-				expect = "unit"
-			"unit":
 				expect = "action"
-				g = "，"
+				g = "随从，"
 			"action":
 				match w:
 					"造成":
@@ -181,34 +179,29 @@ func parse(toks: Array) -> Dictionary:
 					"减伤":
 						cur["k"] = "mit"
 						expect = "mit_n"
-					"施加":
+					"易伤", "灼烧", "衰弱":
 						cur["k"] = "st"
-						expect = "st_name"
+						cur["st"] = w
+						cur["n"] = 1
+						expect = "end"
+						g = "（状态）"
 					"转移":
 						cur["k"] = "redirect"
 						expect = "end"
 			"atk_n":
 				cur["n"] = n
-				expect = "atk_dmg"
-				g = "点"
-			"atk_dmg":
 				cur["rep"] = 1
 				expect = "end"
+				g = "点伤害"
 			"heal_n":
 				cur["n"] = n
-				expect = "heal_hp"
-				g = "点"
-			"heal_hp":
 				cur["rep"] = 1
 				expect = "end"
+				g = "点生命"
 			"mit_n":
 				cur["n"] = n
 				expect = "end"
 				g = "点"
-			"st_name":
-				cur["st"] = w
-				cur["n"] = 1
-				expect = "end"
 			"rep_n":
 				cur["rep"] = n
 				cur["rep_set"] = true
@@ -302,21 +295,14 @@ func options() -> Dictionary:
 			var cnt: int = int(cur.get("count", 1))
 			ws = [["敌方", _alive("enemy") >= cnt or str(cur.get("tmode", "")) == "late", "" if _alive("enemy") >= cnt else "对面只剩 %d 个随从" % _alive("enemy")],
 				["友方", _alive("ally") >= cnt or str(cur.get("tmode", "")) == "late", "" if _alive("ally") >= cnt else "你只剩 %d 个随从" % _alive("ally")]]
-		"unit":
-			ws = [["随从", true, ""]]
 		"action":
 			if str(cur.get("side", "enemy")) == "enemy":
-				ws = [["造成", true, ""], ["施加", _any_status(), "" if _any_status() else "卡组里没有能用的易伤/灼烧/衰弱"]]
+				ws = [["造成", true, ""]]
+				for nm0 in NR.ENEMY_ST:
+					ws.append([nm0, word_left(nm0) > 0, "" if word_left(nm0) > 0 else "卡组里的【%s】用完了或在冷却" % nm0])
 			else:
 				ws = [["恢复", true, ""], ["减伤", true, ""], ["造成", true, "（打自己人）"],
 					["转移", word_left("转移") > 0, "" if word_left("转移") > 0 else "【转移】用完了或在冷却"]]
-		"atk_dmg":
-			ws = [["伤害", true, ""]]
-		"heal_hp":
-			ws = [["生命", true, ""]]
-		"st_name":
-			for nm in NR.ENEMY_ST:
-				ws.append([nm, word_left(nm) > 0, "" if word_left(nm) > 0 else "用完了或在冷却"])
 		"end":
 			var k: String = str(cur.get("k", ""))
 			if k in ["atk", "heal"] and not bool(cur.get("rep_set", false)):
@@ -440,21 +426,17 @@ static func clause_tokens(c: Dictionary) -> Array:
 		W.call("选择")
 		N.call(int(c.get("count", 1)))
 		W.call("敌方" if str(c.get("side", "enemy")) == "enemy" else "友方")
-		W.call("随从")
 	match k:
 		"atk":
 			W.call("造成")
 			N.call(int(c.n))
-			W.call("伤害")
 		"heal":
 			W.call("恢复")
 			N.call(int(c.n))
-			W.call("生命")
 		"mit":
 			W.call("减伤")
 			N.call(int(c.n))
 		"st":
-			W.call("施加")
 			W.call(str(c.st))
 			if int(c.n) > 1:
 				W.call("持续")
@@ -663,18 +645,14 @@ func _help(e: String) -> String:
 			return "选几个目标？放一张数字牌：1 免费；2、3 要用手里的牌。"
 		"side":
 			return "选敌方还是友方？"
-		"unit":
-			return "接【随从】。"
 		"action":
-			return "要做什么？"
+			return "要做什么？（对敌方：造成伤害，或者直接放一个状态词；对友方：恢复、减伤、转移）"
 		"atk_n":
 			return "打几点？放一张数字牌。"
 		"heal_n":
 			return "回几点血？放一张数字牌。"
 		"mit_n":
 			return "本轮每次少受几点？放一张数字牌。"
-		"st_name":
-			return "上哪个状态？"
 		"rep_n":
 			return "一共打几次？放一张数字牌。"
 		"dur_n":
