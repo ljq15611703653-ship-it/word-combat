@@ -290,6 +290,18 @@ export class UnitCard {
 
   /** 装备的词在立绘周围长出的半透明外壳（立绘本身不变）。 */
   setLoadout(l: Loadout) { this.armor.set(l); }
+  /** 剧情关卡：换名字、换立绘（占位图）、不上场的随从整张卡隐藏。 */
+  setName(name: string) { if (this.spec.name !== name) { this.spec.name = name; this.refreshHp(); } }
+  setArt(art: string, flip = false) {
+    if (this.spec.art === art && !!this.spec.flip === flip) return;
+    this.spec.art = art; this.spec.flip = flip;
+    const map = loader.load(`${import.meta.env.BASE_URL}portraits/${art}.png`);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.anisotropy = 8;
+    this.pMat.uniforms.map.value = map;
+    this.pMat.uniforms.uRect.value.set(...(flip ? [1, 0, -1, 1] : [0, 0, 1, 1]) as [number, number, number, number]);
+  }
+  setActive(on: boolean) { this.root.visible = on; }
   setSelected(v: boolean) { this.selected = v; }
   setHover(v: boolean) { this.hoverTarget = v ? 1 : 0; }
   setDistort(v: number) { this.distortSaved = v; if (this.fxOn) this.pMat.uniforms.uDistort.value = v; }

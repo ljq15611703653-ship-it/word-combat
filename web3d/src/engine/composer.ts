@@ -40,7 +40,9 @@ export class Composer {
   tokens: Tok[] = [];
   cp: NR.Caps;
   sugg: { act: any; tokens: Tok[] } | null = null;
-  constructor(public M: any, public uid: number, public side = 0) { this.cp = M.caps(side); }
+  /** 剧情关卡：只有这些词能用（没教到的词不出现） */
+  allow: Set<string> | null = null;
+  constructor(public M: any, public uid: number, public side = 0, allow?: string[]) { this.cp = M.caps(side); if (allow) this.allow = new Set(allow); }
 
   parse(toks: Tok[] = this.tokens): Parsed {
     const clauses: any[] = [];
@@ -170,6 +172,7 @@ export class Composer {
       if (it.w === "重复" && cp.norep) { it.ok = false; it.why = "择流：句子里不能用【重复】"; }
       if (it.w === "持续" && cp.cont_single && ncl > 0 && cur?.k !== "st") { it.ok = false; it.why = "续流：带【持续】的句子只能一段"; }
     }
+    if (this.allow) ws = ws.filter((it) => this.allow!.has(it.w));
     return { words: ws, num: needNum, parsed: pr };
   }
 

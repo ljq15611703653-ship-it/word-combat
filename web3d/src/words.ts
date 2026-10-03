@@ -31,7 +31,7 @@ export const WORDS: Record<string, [Cat, 1 | 2 | 3, number]> = {
 export type Tok =
   | { k: "word"; w: string; auto?: boolean }
   | { k: "side"; side: "r" | "b"; auto?: boolean }
-  | { k: "unit"; name: string }
+  | { k: "unit"; name: string; side?: "r" | "b" }
   | { k: "num"; v: number }
   | { k: "time"; sec: number; side: "r" | "b" };
 
