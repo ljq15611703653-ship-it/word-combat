@@ -107,7 +107,7 @@ export class OnlineGame extends Game {
     this.net.leave();
     this.mode = "idle"; this.active = false;
     this.overlay.hidden = true;
-    document.body.classList.remove("game");
+    this.leaveBody();
     this.onCancel();
   }
 
@@ -139,7 +139,7 @@ export class OnlineGame extends Game {
     }
     if (code === "bad_deck" && this.mode === "matching") {
       this.mode = "idle"; this.active = false; this.net.leave();
-      this.overlay.hidden = true; document.body.classList.remove("game");
+      this.overlay.hidden = true; this.leaveBody();
       this.onCancel(`卡组被服务器拒绝：${msg}`);
       return;
     }
@@ -195,7 +195,7 @@ export class OnlineGame extends Game {
     this.view = v;
     this.foeName = v.sides[1 - v.you].name;
     this.root.hidden = false;
-    document.body.classList.add("game");
+    this.enterBody();
     this.refreshAll(true);
     const M = this.mm;
     if (v.phase !== "over") this.overlay.hidden = true;
@@ -231,7 +231,7 @@ export class OnlineGame extends Game {
     const hadView = !!this.view && this.mode === "playing";
     this.mode = "playing";
     this.busy = false; this.overlay.hidden = true; this.root.hidden = false;
-    document.body.classList.add("game");
+    this.enterBody();
     this.lastPhase = v.phase; this.lastRnd = v.round;
     M.apply(v);
     this.view = v;
@@ -297,7 +297,7 @@ export class OnlineGame extends Game {
   protected renderTop() {
     super.renderTop();
     const el = this.elTop, v = this.view;
-    if (!v) return;
+    if (!v || !this.mm.sides.length) return;
     const opp = v.sides[1 - v.you];
     const rd = el.querySelector(".gm-round") ?? el.firstElementChild;
     const heat = rd?.querySelector(".heat");     // 横版顶栏里的「过热」小标要留着

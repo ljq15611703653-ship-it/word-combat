@@ -1,5 +1,7 @@
 // 技能演出截帧：headless Chrome + CDP（不装依赖）。window.__cast.pauseAt 让演出在各关键时刻冻结，逐个截图。
 // 用法：npm run dev -- --port 5191；node scripts/castshots.mjs <输出目录> <端口> [职业下标 0-3 …]
+// 注意：别在截帧时改 src（Vite 会整页刷新，__cast 没了）；最稳是先 vite build 再用静态服务器。
+// 在 Linux 容器里跑：CHROME=/opt/pw-browsers/chromium-1194/chrome-linux/chrome，并给 spawn 的参数加 --no-sandbox。
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -37,10 +39,10 @@ window.__declare = async (prefs) => {
   while (gm.ui === 'pick_unit' || gm.ui === 'foe') {
     if (gm.ui === 'foe') { await __sleep(300); continue; }
     if (!gm.M.remaining[0].length) break;
-    if (gm.M.res[0].ap <= 0) { __btn('它这轮不出手').click(); await __sleep(200); i++; continue; }
-    __btn('给【').click(); await __sleep(120); __btn('辅助轮').click(); await __sleep(120);
+    if (gm.M.res[0].ap <= 0) { __btn('不出手').click(); await __sleep(200); i++; continue; }
+    gm.cardClicked(gm.M.remaining[0][0]); await __sleep(150); __btn('辅助轮').click(); await __sleep(120);
     const all = [...document.querySelectorAll('.sugg .sug')];
-    if (!all.length) { __btn('取消').click(); await __sleep(150); __btn('它这轮不出手').click(); await __sleep(200); i++; continue; }
+    if (!all.length) { __btn('取消').click(); await __sleep(150); __btn('不出手').click(); await __sleep(200); i++; continue; }
     const rx = prefs[i] ? new RegExp(prefs[i]) : null;
     (all.find((b) => rx && rx.test(b.textContent)) || all[0]).click(); await __sleep(120);
     __btn('拼好了').click(); await __sleep(120);
@@ -48,6 +50,13 @@ window.__declare = async (prefs) => {
     while (gm.ui === 'target' && g++ < 6) { const c = gm.pending[gm.pendI]; const pool = gm.M.R.U.filter((u) => u.down === -1 && ((u.side === 1) === ((c.side ?? 'enemy') === 'enemy'))).map((u) => u.uid); gm.cardClicked(pool.find((x) => !c.tg.includes(x))); await __sleep(80); }
     if (gm.ui === 'timing') { (document.querySelector('.opts .w.primary') || document.querySelector('.opts .w')).click(); await __sleep(300); }
     i++;
+  }
+  // 择流要等双方宣告完再定目标；剩下没宣告的随从让它不出手，这样这一轮才会结算
+  for (let k = 0; k < 40; k++) {
+    if (gm.ui === 'assign') { const b = __btn('剩下的全部用建议'); if (b) b.click(); }
+    else if (gm.ui === 'pick_unit' && gm.M.remaining[0].length) { __btn('不出手')?.click(); }
+    else if (gm.ui !== 'foe') break;
+    await __sleep(400);
   }
 };
 window.__fps = { n: 0, on: false };

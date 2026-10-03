@@ -147,11 +147,13 @@ export class Game {
   }
 
   // ------------------------------------------------------------ 进出
+  /** 进入 / 离开对局界面时给 body 打标记（横版布局再多一个 gm-top：去掉右栏占的宽度） */
+  protected enterBody() { document.body.classList.add("game"); document.body.classList.toggle("gm-top", this.topLayout); }
+  protected leaveBody() { document.body.classList.remove("game", "gm-top"); }
   open() {
     this.hooks = null;
     this.active = true;
-    document.body.classList.add("game");
-    document.body.classList.toggle("gm-top", this.topLayout);
+    this.enterBody();
     this.root.hidden = false;
     this.ctx.onToggle(true);
     this.showSetup();
@@ -358,6 +360,7 @@ export class Game {
   /** 横版布局的顶部一小块：回合 + 双方（生命 / 存活 / 成长 / 行动点）+ 我方数字牌 + 小工具 */
   protected renderTopHud() {
     const M = this.M, el = this.elTop, wipe = !!M.opts.wipe;
+    if (!M.sides.length || !M.R) return;       // 联机：对手刚进房间、第一份快照还没到
     el.innerHTML = "";
     const first = M.firstSide();
     const mid = h("div", "gm-round", `第 ${M.rnd} / ${NR.MAX_ROUNDS} 轮 · 本轮先宣告：${first === 0 ? "你" : this.foeName}`);
@@ -395,6 +398,7 @@ export class Game {
   protected renderTop() {
     if (this.topLayout) { this.renderTopHud(); return; }
     const M = this.M, el = this.elTop;
+    if (!M.sides.length || !M.R) return;
     el.innerHTML = "";
     const first = M.firstSide();
     el.append(h("div", "gm-round", `第 ${M.rnd} / ${NR.MAX_ROUNDS} 轮 · 本轮先宣告：${first === 0 ? "你" : this.foeName}`));
@@ -974,7 +978,7 @@ export class Game {
     hd.innerHTML = "";
     const sh = this.shown[u.uid] ?? [u.hp, u.down !== -1];
     const title = h("div", "pp-title");
-    title.append(h("b", "", `${u.side === 0 ? "你的" : "对手的"}${u.name}`), h("span", `chip ${sh[1] ? "gray" : u.side === 0 ? "" : "red"}`, sh[1] ? "倒下·休整中" : `生命 ${sh[0]}/${u.mx}`), h("span", "chip", `【${u.kw}】${u.kws ? "本轮已用" : ""}`));
+    title.append(h("b", "", `${u.side === 0 ? "你的" : "对手的"}${u.name}`), h("span", `chip ${sh[1] ? "gray" : u.side === 0 ? "" : "red"}`, sh[1] ? (M.opts.wipe ? "已倒下" : "倒下·休整中") : `生命 ${sh[0]}/${u.mx}`), h("span", "chip", `【${u.kw}】${u.kws ? "本轮已用" : ""}`));
     title.append(h("span", "sp"), btn(this.popMax ? "恢复" : "最大化", "ghost pp-max", () => { this.popMax = !this.popMax; this.renderPop(); }), btn("✕", "ghost pp-x", () => this.dismissPop()));
     hd.append(title);
     const bar = h("div", `pp-hp${u.side === 0 ? "" : " foe"}`), fill = h("i");

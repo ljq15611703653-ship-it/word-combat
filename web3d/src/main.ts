@@ -466,11 +466,12 @@ async function main() {
 
   // ---------- 顶部时间轴 ----------
   const tlTicks = document.getElementById("tl-ticks")!, tlMarks = document.getElementById("tl-marks")!;
-  for (let sec = 0; sec <= 20; sec++) {
+  const TL = SIDE ? 10 : 20;                           // 横版：时间轴就是规则里的 0~10 秒；旧布局保持原来的 20 秒刻度
+  for (let sec = 0; sec <= TL; sec++) {
     const t = document.createElement("i");
     t.className = sec % 5 === 0 ? "big" : "";
-    t.style.left = `${(sec / 20) * 100}%`;
-    if (sec % 5 === 0) t.dataset.label = sec === 20 ? "20s" : String(sec);
+    t.style.left = `${(sec / TL) * 100}%`;
+    if (sec % 5 === 0) t.dataset.label = sec === TL ? `${TL}s` : String(sec);
     tlTicks.appendChild(t);
   }
   function renderTimeline() {
@@ -480,7 +481,7 @@ async function main() {
       const s = START[i].spec;
       const m = document.createElement("span");
       m.className = `tl-mark ${s.side}`;
-      m.style.left = `${(p.time / 20) * 100}%`;
+      m.style.left = `${(p.time / TL) * 100}%`;
       m.innerHTML = `<b></b><em>${s.name} · ${p.time}s</em>`;
       m.addEventListener("mouseenter", () => { cards[i].setHover(true); p.setFocus(true); });
       m.addEventListener("mouseleave", () => { cards[i].setHover(false); p.setFocus(false); });
