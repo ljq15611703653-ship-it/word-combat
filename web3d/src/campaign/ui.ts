@@ -37,6 +37,8 @@ export interface UiCtx {
   onLevel: (lv: Level | null) => void;
   /** 随从卡在屏幕上的位置（像素） */
   anchor: (uid: number) => [number, number];
+  /** 菜单「重看开场」 */
+  onReplayIntro?: () => void;
 }
 
 export class CampaignUI {
@@ -94,7 +96,7 @@ export class CampaignUI {
       grid!.append(b);
     }
     const foot = h("div", "foot");
-    foot.append(btn("清除通关记录", "", () => { if (confirm("清除全部通关记录？")) { this.prog = { done: {} }; saveProgress(this.prog); this.showMenu(); } }),
+    foot.append(btn("重看开场", "", () => this.ctx.onReplayIntro?.()), btn("清除通关记录", "", () => { if (confirm("清除全部通关记录？")) { this.prog = { done: {} }; saveProgress(this.prog); this.showMenu(); } }),
       btn("解锁全部（跳关）", "", () => { LEVELS.forEach((l) => { if (!this.prog.done[l.id]) this.prog.done[l.id] = { rounds: 0, at: Date.now() }; }); this.showMenu(); }));
     m.append(foot);
   }
@@ -192,7 +194,8 @@ export class CampaignUI {
     p.innerHTML = "";
     p.append(btn("规则速查", "ghost", () => { p.hidden = true; this.showRules(); }),
       btn("重来本关", "ghost", () => { p.hidden = true; this.start(this.lv.id); }),
-      btn("关卡选择", "ghost", () => { p.hidden = true; this.showMenu(); }));
+      btn("关卡选择", "ghost", () => { p.hidden = true; this.showMenu(); }),
+      btn("重看开场", "ghost", () => { p.hidden = true; this.ctx.onReplayIntro?.(); }));
   }
 
   private showRules() {

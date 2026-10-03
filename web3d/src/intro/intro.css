@@ -1,0 +1,21 @@
+.intro-root { position: absolute; inset: 0; z-index: 9999; background: #000; display: flex; align-items: center; justify-content: center; overflow: hidden; user-select: none; cursor: pointer; font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif; }
+.intro-stage { position: relative; overflow: hidden; background: #000; }
+.intro-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.intro-title { position: absolute; left: 0; right: 0; top: 33%; text-align: center; font-size: 8em; font-weight: 700; letter-spacing: .3em; color: #fff; pointer-events: none; opacity: 0; text-indent: .3em;
+  text-shadow: 0 0 .15em #19e6ff, 0 0 .5em #19e6ff, 0 0 1em #ff2fa0; }
+.intro-title.show { animation: intro-title 3.4s both; }
+@keyframes intro-title { 0% { opacity: 0; transform: scale(1.1); letter-spacing: .5em; filter: blur(8px); } 14% { opacity: 1; transform: none; letter-spacing: .3em; filter: none; }
+  85% { opacity: 1; } 100% { opacity: 0; } }
+.intro-sub { position: absolute; left: 10%; right: 10%; bottom: 7%; text-align: center; font-size: 1.9em; line-height: 1.5; color: #fff; pointer-events: none; opacity: 0; font-weight: 500; letter-spacing: .06em;
+  text-shadow: 0 0 .25em rgba(0,0,0,.95), 0 .06em .18em #000, 0 0 .6em rgba(0,0,0,.8); }
+.intro-sub.show { opacity: 1; animation: intro-sub .4s both; }
+@keyframes intro-sub { from { opacity: 0; transform: translateY(.3em); } to { opacity: 1; transform: none; } }
+.intro-who { margin-right: .3em; font-weight: 700; color: #7be8ff; }
+.intro-who::after { content: "："; }
+.intro-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; pointer-events: none; background: rgba(255,255,255,.08); }
+.intro-prog > u { position: absolute; inset: 0; background: rgba(255,255,255,.55); transform-origin: left; transform: scaleX(0); }
+.intro-skip { position: absolute; right: 1.4em; bottom: 1.1em; padding: .1em .5em; font: 500 .8em "Noto Sans SC", sans-serif; letter-spacing: .15em; color: rgba(255,255,255,.55); background: none; border: 0; cursor: pointer; transition: color .15s; }
+.intro-skip::after { content: " ›"; }
+.intro-skip:hover { color: #fff; }
+.intro-fade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+.intro-loading { position: absolute; color: rgba(255,255,255,.5); font-size: 20px; letter-spacing: .3em; }

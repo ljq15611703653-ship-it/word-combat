@@ -13,6 +13,8 @@ import { SentencePanel } from "../sentencePanel";
 import "../style.css";
 import { CampaignUI } from "./ui";
 import { Game, uidOfCard } from "../game";
+import { playIntroIfFirst, playIntro } from "../intro";
+import { CastShow } from "../fx/castShow";
 
 // 0-2 = 对手（上排，红），3-5 = 我方（下排，蓝）；关卡开始时按关卡数据换名字、换立绘
 const SEATS: UnitSpec[] = [
@@ -92,6 +94,8 @@ async function main() {
     if (p.x > 0) FRAME.push(figPoint(p.x, p.z, FIG.h * 0.5, COL_X * 0.58));
   });
   const shot = { look: look.clone(), dist: 18, offY: 0, offX: 0 };
+  const goal = { look: look.clone(), dist: 18, offY: 0, offX: 0 };   // [技能演出] 镜头目标：平时 = 默认取景
+  const home = { look: look.clone(), dist: 18, offY: 0, offX: 0 };
   const probe = new THREE.PerspectiveCamera();
   const v = new THREE.Vector3();
   function solve(pts: THREE.Vector3[], topPx: number, botPx: number) {
@@ -132,6 +136,8 @@ async function main() {
     camera.updateProjectionMatrix();
     const r = solve(FRAME, header.offsetHeight + tlEl.offsetHeight + 6, 50);
     shot.look.copy(r.look); shot.dist = r.dist; shot.offY = r.offY; shot.offX = r.offX;
+    home.look.copy(r.look); home.dist = r.dist; home.offY = r.offY; home.offX = r.offX;
+    goal.look.copy(r.look); goal.dist = r.dist; goal.offY = r.offY; goal.offX = r.offX;
   }
   new ResizeObserver(resize).observe(app);
 
@@ -192,9 +198,15 @@ async function main() {
     v.set(p.x, 1.1, p.z).project(camera);
     return [((v.x + 1) / 2) * app.clientWidth, ((1 - v.y) / 2) * app.clientHeight];
   };
-  const game = new Game({ cards, panels, onChange: renderTimeline, onToggle: () => requestAnimationFrame(resize) });
-  const ui = new CampaignUI({ cards, panels, game, onLevel: () => requestAnimationFrame(resize), anchor });
+  const cast = new CastShow({
+    camera, app, cards, panels, goal,
+    solve: (pts) => solve(pts, header.offsetHeight + tlEl.offsetHeight + 6, 50),
+    release: () => { goal.look.copy(home.look); goal.dist = home.dist; goal.offY = home.offY; goal.offX = home.offX; },
+  });
+  const game = new Game({ cast, cards, panels, onChange: renderTimeline, onToggle: () => requestAnimationFrame(resize) });
+  const ui = new CampaignUI({ cards, panels, game, onLevel: () => requestAnimationFrame(resize), anchor, onReplayIntro: () => void playIntro(document.body) });
   ui.showMenu();
+  await playIntroIfFirst(document.body);   // 首次进入：先看开场；之后不再自动播放
   (window as unknown as { __cg: CampaignUI }).__cg = ui;   // 调试 / 自动化用
 
   function placePanels(w: number) {
@@ -224,6 +236,8 @@ async function main() {
     hovered?.setHover(true);
     panels.forEach((p, i) => { p.setFocus(cards[i] === hovered); p.setDead(cards[i].spec.hp <= 0); });
     renderer.domElement.style.cursor = hovered ? "pointer" : "default";
+    const kf = 1 - Math.exp(-dt * 6);
+    shot.look.lerp(goal.look, kf); shot.dist += (goal.dist - shot.dist) * kf; shot.offY += (goal.offY - shot.offY) * kf; shot.offX += (goal.offX - shot.offX) * kf;
     camera.position.copy(shot.look).addScaledVector(camDir, shot.dist);
     fog.near = shot.dist * 1.05;
     fog.far = shot.dist * 2.2;
