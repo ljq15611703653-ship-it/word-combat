@@ -1,7 +1,7 @@
 # web3d 交接说明（给接手的 Claude / 同伴）
 
 > 维护规则（用户要求）：**每次推送到主分支，都要同步更新并一起推送本文件。** 改完后把「当前状态」「待办」「分支表」更新到最新。
-> 最近更新：2026-10-04（会话额度将尽时写的）。
+> 最近更新：2026-10-04（云端会话接手：四个分支已合进 main，网页版发布到 Pages /3d/，局域网联机版打成 zip）。
 
 ## 1. 这是什么
 词战（Word Combat）的 3D 网页版，在仓库 `ljq15611703653-ship-it/word-combat` 的 `web3d/` 目录（Vite + TypeScript + three.js，联机服务端 Node + ws）。
@@ -24,7 +24,14 @@
 意难平：第 8 关小剑抱住炮口牺牲；第 14 关阿词的话「我当年——」没说完。结尾零把小剑的词核装进第四个槽，说「砍」。
 第 9 关起玩家随从由「小剑」改名「零」。第 14 关对手单位叫 阿词/句号/旧部（仍是 AI 对打）。
 
+## 3.5 发布（新增）
+- 一条命令：`sh scripts/release.sh` → `build/pages/`（静态网页版：打电脑 + 新手教程，`VITE_STATIC=1` 时「打真人」改成提示下载联机版）+ `build/pages/lan/ci-zhan-lan.zip`（局域网联机版：`dist/` + esbuild 打包好的 `server/server.mjs` + `start.bat` / `start.sh` / `开放防火墙.ps1` / `联机说明.txt`，房主只要装 Node.js，不用 npm install）。
+- 网页版发布在 gh-pages 分支的 `3d/` 子目录：https://ljq15611703653-ship-it.github.io/word-combat/3d/ （旧的 2D 版在根目录，不动）。
+- 主菜单加了「新手教程」按钮（跳 campaign.html）。
+- 云端机器装依赖：package-lock.json 里的地址是 repo.huaweicloud.com（云端被拦），临时把 lock 里的地址换成 registry.npmjs.org 再 `npm ci`，装完把 lock 还原。
+
 ## 4. 进行中 / 未合并的分支（全部在 origin 上）
+> 2026-10-04：street-bg、glass-ui、intro、cast-fx 已全部合进 main（cast-fx 的 WIP 一并合入：结构完整，能跑完整个回放；演出时非相关随从的读数面板会淡出）。下表保留作历史。
 | 分支 | 内容 | 状态 | 注意 |
 |---|---|---|---|
 | `claude/web3d-cast-fx` | 技能演出：镜头拉近到出手随从 → 词牌飞到透明盔甲壳旁与动作绑定一起演（并流=机械拼装；续/择/血各有演出；基础攻击按职业略有区别）→ 词牌归位 → 镜头拉回；伤害/血条与命中同步；可跳过/加速 | **助手写了约 840 行 `src/fx/castShow.ts`，尚未提交**（工作目录 `C:/Users/27654/AppData/Local/Temp/nc_cast`） | 审美任务，必须逐帧截图审查。新代码放 `src/fx/`，最小侵入接入结算回放（game.ts/live.ts/armor.ts） |

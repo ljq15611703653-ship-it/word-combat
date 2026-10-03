@@ -78,6 +78,7 @@ function injectCss() {
   const s = document.createElement("style");
   s.textContent = `
 .cs-layer { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.ro.cs-dim { opacity: 0.18; transition: opacity 0.25s; }
 .cs-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .cs-chip { position: absolute; left: 0; top: 0; will-change: transform, opacity; transform-style: preserve-3d; font: 700 18px "Noto Sans SC", "PingFang SC", sans-serif; }
 .cs-chip .f, .cs-chip .b { padding: 3px 10px 4px; border-radius: 6px; white-space: nowrap; backface-visibility: hidden; -webkit-backface-visibility: hidden;
@@ -207,6 +208,9 @@ export class CastShow {
     return pts;
   }
   private frame(uids: number[], panelOf?: number) {
+    // 演出时只留出手的人和目标的读数面板，其余的淡下去，免得几块面板压在动作上
+    const keep = new Set(uids.map((u) => cardIndex(u)));
+    this.env.panels.forEach((p, i) => p.el.classList.toggle("cs-dim", !keep.has(i)));
     const pts: THREE.Vector3[] = [];
     for (const u of uids) pts.push(...this.cardPts(u, u === panelOf));
     const r = this.env.solve(pts);
@@ -423,7 +427,9 @@ export class CastShow {
     }
   }
 
+  private undim() { for (const p of this.env.panels) p.el.classList.remove("cs-dim"); }
   private cleanup() {
+    this.undim();
     for (const c of this.chips) { if (c.home) c.home.style.visibility = ""; c.el.remove(); }
     this.chips = []; this.parts = []; this.layers = [];
     for (const [c] of this.fxActive) { c.armor.fx.k = 0; c.armor.fx.swing = 0; c.armor.fx.kind = ""; }
@@ -444,6 +450,7 @@ export class CastShow {
       this.popup(x, y - 30, `-${ev.dealt}`, "并", col, { small: "灼烧" });
       await this.wait(620);
       this.env.release();
+      this.undim();
       await this.wait(200);
       return;
     }
@@ -558,6 +565,7 @@ export class CastShow {
     await this.hold("return");
     fxs.k = 0; fxs.swing = 0;
     this.env.release();
+    this.undim();
     for (const c of chips) this.flipTo(c, 0, 200);
     await Promise.all(chips.map((c, i) => this.wait(i * 18).then(() => this.move(c, this.homeFn(c), 430, { e: ease.io, arc: 22 }))));
     for (const c of chips) { if (c.home) c.home.style.visibility = ""; c.el.remove(); }

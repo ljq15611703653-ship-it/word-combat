@@ -27,6 +27,8 @@ const store = {
   set(k: string, v: unknown) { try { localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); } catch { /* 没有存储也能用 */ } },
 };
 
+const STATIC_MSG = "网页版没有联机服务器。联机请下载「局域网联机版」：房主电脑解压后双击 start.bat，朋友在同一个局域网里用浏览器打开房主显示的地址。";
+
 export function mountMenu(game: Game, online: OnlineGame) {
   const menu = h("div", "mn");
   const deckLayer = h("div", "gm-overlay mn-deck-layer");
@@ -51,14 +53,25 @@ export function mountMenu(game: Game, online: OnlineGame) {
     const box = h("div", "mn-box");
     box.append(h("div", "mn-logo", "词 战"), h("div", "mn-sub", "用词拼句，用句子决斗"));
     const list = h("div", "mn-list");
+    // 静态网页版（GitHub Pages）没有联机服务：打真人改成提示去下载局域网联机版
+    const STATIC = import.meta.env.VITE_STATIC === "1";
     list.append(
       btn("打电脑", "mn-btn", () => { menu.hidden = true; game.open(); }),
-      btn("打真人", "mn-btn", () => showDeck()),
+      btn("打真人", "mn-btn", () => (STATIC ? show(STATIC_MSG) : showDeck())),
+      btn("新手教程", "mn-btn", () => { location.href = `${import.meta.env.BASE_URL}campaign.html`; }),
       btn("原型演示台", "mn-btn small", () => { menu.hidden = true; home.hidden = false; }),
     );
     box.append(list);
     if (msg) box.append(h("div", "mn-msg", msg));
-    box.append(h("div", "mn-foot", "打真人：局域网内，两个人都点「开始匹配」就自动配对开打，不用房间号"));
+    if (msg === STATIC_MSG) {
+      const a = h("a", "mn-btn small", "下载局域网联机版（zip）");
+      a.setAttribute("href", `${import.meta.env.BASE_URL}lan/ci-zhan-lan.zip`);
+      a.setAttribute("download", "");
+      box.append(a);
+    }
+    box.append(h("div", "mn-foot", STATIC
+      ? "这是网页版：打电脑、新手教程随便玩。和朋友联机请用局域网联机版（房主电脑运行，朋友用浏览器打开房主的地址）"
+      : "打真人：局域网内，两个人都点「开始匹配」就自动配对开打，不用房间号"));
     menu.append(box);
   }
 
