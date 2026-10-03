@@ -11,6 +11,9 @@ const NUM = ["一", "二", "三"];
 /** 引擎的随从编号 → 场景里卡的下标（场景：0-2 红上排，3-5 蓝下排；引擎：0 方 = 蓝，1 方 = 红） */
 export const cardIndex = (uid: number) => (uid < 3 ? 3 + uid : uid - 3);
 export const unitLabel = (uid: number) => (uid < 3 ? "蓝" : "红") + NUM[uid % 3];
+/** [campaign hook] 剧情关卡里随从有自己的名字：设置后句子里的目标用它。默认 null = 原来的「蓝一 / 红二」 */
+export let labelOverride: ((M: Match, uid: number) => string | null) | null = null;
+export const setLabelOverride = (f: typeof labelOverride) => { labelOverride = f; };
 
 function targetToks(M: Match, c: any, owner: number, viewer: number): Tok[] {
   const toks: Tok[] = [{ k: "word", w: "选择" }];
@@ -20,8 +23,8 @@ function targetToks(M: Match, c: any, owner: number, viewer: number): Tok[] {
     return toks;
   }
   toks.push({ k: "side", side: side === 0 ? "b" : "r" }, { k: "word", w: "随从" });
-  for (const t of c.tg ?? []) toks.push({ k: "unit", name: unitLabel(t) });
-  void M;
+  for (const t of c.tg ?? []) toks.push({ k: "unit", name: labelOverride?.(M, t) ?? unitLabel(t), side: t < 3 ? "b" : "r" });
+
   return toks;
 }
 

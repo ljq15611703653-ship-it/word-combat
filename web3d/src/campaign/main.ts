@@ -12,6 +12,7 @@ import { CARD, EMIT, FIG, UnitCard, type UnitSpec } from "../unitCard";
 import { SentencePanel } from "../sentencePanel";
 import "../style.css";
 import { CampaignUI } from "./ui";
+import { Game, uidOfCard } from "../game";
 
 // 0-2 = 对手（上排，红），3-5 = 我方（下排，蓝）；关卡开始时按关卡数据换名字、换立绘
 const SEATS: UnitSpec[] = [
@@ -23,7 +24,6 @@ const SEATS: UnitSpec[] = [
   { id: "b3", art: "hacker", name: "蓝三", side: "b", hp: 5, max: 5 },
 ];
 const COL_X = 4.9, ENEMY_Z = -3.9, MINE_Z = 1.4, LINE_Z = -1.2;
-const uidOfCard = (i: number) => (i >= 3 ? i - 3 : i + 3);
 
 async function main() {
   await Promise.all([
@@ -101,7 +101,7 @@ async function main() {
     c.divideScalar(pts.length).setY(0.7);
     probe.copy(camera);
     probe.clearViewOffset();
-    const xL = -0.97, xR = 0.97;
+    const xL = -0.97 + (2 * 170) / W, xR = 0.97;
     const usableH = (2 * (h - topPx - botPx)) / h, usableW = xR - xL;
     const extents = (d: number) => {
       probe.position.copy(c).addScaledVector(camDir, d);
@@ -130,7 +130,7 @@ async function main() {
     composer.setSize(w, h);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
-    const r = solve(FRAME, header.offsetHeight + tlEl.offsetHeight + 6, 16);
+    const r = solve(FRAME, header.offsetHeight + tlEl.offsetHeight + 6, 50);
     shot.look.copy(r.look); shot.dist = r.dist; shot.offY = r.offY; shot.offX = r.offX;
   }
   new ResizeObserver(resize).observe(app);
@@ -186,10 +186,33 @@ async function main() {
     });
   }
 
-  const ui = new CampaignUI({ cards, panels, onChange: renderTimeline, onLevel: () => requestAnimationFrame(resize) });
-  document.getElementById("cg-levels")!.addEventListener("click", () => ui.showMenu());
+  const anchor = (uid: number): [number, number] => {
+    const c = cards[uid < 3 ? 3 + uid : uid - 3], p = c.root.position;
+    camera.updateMatrixWorld();
+    v.set(p.x, 1.1, p.z).project(camera);
+    return [((v.x + 1) / 2) * app.clientWidth, ((1 - v.y) / 2) * app.clientHeight];
+  };
+  const game = new Game({ cards, panels, onChange: renderTimeline, onToggle: () => requestAnimationFrame(resize) });
+  const ui = new CampaignUI({ cards, panels, game, onLevel: () => requestAnimationFrame(resize), anchor });
   ui.showMenu();
   (window as unknown as { __cg: CampaignUI }).__cg = ui;   // 调试 / 自动化用
+
+  // 截图 / 演示用：地址后加 #shot=关卡,步数 → 自动开这一关，点掉对话，再替玩家点「步数」次发光的按钮后停住（步数 -1 = 停在第一段对话）
+  const demo = /shot=(\d+),(-?\d+)/.exec(location.hash);
+  if (demo) {
+    ui.start(+demo[1]);
+    let left = +demo[2];
+    const tick = () => {
+      if (left < 0) return;
+      const say = document.querySelector(".cg-backdrop:not([hidden]) .cg-say button:last-child") as HTMLElement | null;
+      if (say) { say.click(); setTimeout(tick, 150); return; }
+      if (left === 0) return;
+      const hl = document.querySelector(".gm .hl") as HTMLElement | null;
+      if (hl) { hl.click(); left--; } else if (game.hlCards.length) { ui.cardClicked(game.hlCards[0]); left--; }
+      setTimeout(tick, 250);
+    };
+    setTimeout(tick, 600);
+  }
 
   function placePanels(w: number) {
     camera.updateMatrixWorld();
