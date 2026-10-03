@@ -4,6 +4,7 @@
 import { createServer, get as httpGet, type Server } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { networkInterfaces } from "node:os";
+import { createSocket } from "node:dgram";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, type WebSocket } from "ws";
@@ -160,18 +161,43 @@ export function startServer(opts: { port?: number; host?: string; dist?: string 
   });
 }
 
-/** 局域网地址：家用路由器常见的 192.168 / 10 / 172.16-31 排前面；虚拟网卡（WSL、Hyper-V、VMware、VirtualBox、Docker）标出来 */
-function lanAddrs(): { ip: string; name: string; virt: boolean }[] {
-  const out: { ip: string; name: string; virt: boolean; rank: number }[] = [];
-  for (const [name, list] of Object.entries(networkInterfaces())) {
-    for (const i of list ?? []) {
-      if (i.family !== "IPv4" || i.internal) continue;
-      const a = i.address, virt = /vEthernet|WSL|Hyper-V|VMware|VirtualBox|Docker|br-|docker|veth/i.test(name);
-      const rank = virt ? 3 : a.startsWith("192.168.") ? 0 : a.startsWith("10.") || /^172\.(1[6-9]|2\d|3[01])\./.test(a) ? 1 : 2;
-      out.push({ ip: a, name, virt, rank });
-    }
+export interface Addr { ip: string; name: string; rank: number; note: string }
+// 虚拟网卡的 MAC 前缀：VirtualBox、VMware、Hyper-V、Docker、Parallels、Xen、QEMU。
+// 中文 Windows 上这些网卡的名字常常就叫「以太网 2」，光看名字认不出来（比如 VirtualBox 的 192.168.56.1）。
+const VIRT_MAC = ["08:00:27", "0a:00:27", "00:50:56", "00:0c:29", "00:05:69", "00:1c:14", "00:15:5d", "02:42:", "00:1c:42", "00:16:3e", "52:54:00"];
+const isPrivate = (a: string) => a.startsWith("192.168.") || a.startsWith("10.") || /^172\.(1[6-9]|2\d|3[01])\./.test(a);
+/** 把网卡地址排好序并加说明：primary = 系统默认路由走的那块网卡（真正连着 Wi-Fi / 路由器的） */
+export function classifyAddrs(list: { ip: string; name: string; mac: string }[], primary: string): Addr[] {
+  const out: Addr[] = [];
+  for (const { ip, name, mac } of list) {
+    const m = mac.toLowerCase();
+    const virt = VIRT_MAC.some((p) => m.startsWith(p)) || /vEthernet|WSL|Hyper-V|VMware|VirtualBox|Docker|VMnet|br-|docker|veth/i.test(name)
+      || /^198\.1[89]\./.test(ip); // 198.18/15：Clash 等代理的 TUN 虚拟网卡
+    const mesh = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(ip) || /ZeroTier|Tailscale|蒲公英|Radmin|Hamachi/i.test(name);
+    if (virt) out.push({ ip, name, rank: 4, note: "虚拟网卡，不是这个" });
+    else if (mesh) out.push({ ip, name, rank: 3, note: "组网工具的地址：不在同一个 Wi-Fi 的朋友用这个" });
+    else if (ip === primary) out.push({ ip, name, rank: 0, note: "← 发这个给朋友" });
+    else if (ip.startsWith("192.168.137.")) out.push({ ip, name, rank: 1, note: "这台电脑开的移动热点：连这个热点的朋友用它" });
+    else out.push({ ip, name, rank: isPrivate(ip) ? 1 : 2, note: "" });
   }
-  return out.sort((x, y) => x.rank - y.rank);
+  out.sort((x, y) => x.rank - y.rank);
+  // 默认路由认不出来（没联网、或者开着代理的 TUN 模式）时，标出最像的那一个
+  if (!out.some((x) => x.rank === 0)) { const best = out.find((x) => x.rank === 1 && !x.ip.startsWith("192.168.137.")); if (best) best.note = "← 多半是这个"; }
+  return out;
+}
+/** 默认路由走哪块网卡：UDP「连接」一个公网地址只做路由查询，不会真的发包 */
+function primaryIp(): Promise<string> {
+  return new Promise((ok) => {
+    const s = createSocket("udp4");
+    const done = (ip: string) => { try { s.close(); } catch { /* 已关闭 */ } ok(ip); };
+    s.on("error", () => done(""));
+    try { s.connect(53, "223.5.5.5", () => { try { done(s.address().address); } catch { done(""); } }); } catch { done(""); }
+  });
+}
+async function lanAddrs(): Promise<Addr[]> {
+  const list: { ip: string; name: string; mac: string }[] = [];
+  for (const [name, l] of Object.entries(networkInterfaces())) for (const i of l ?? []) if (i.family === "IPv4" && !i.internal) list.push({ ip: i.address, name, mac: i.mac });
+  return classifyAddrs(list, await primaryIp());
 }
 
 function fetchText(port: number, path: string): Promise<string> {
@@ -192,18 +218,32 @@ async function whoIsOn(port: number): Promise<"ours" | "old" | "other"> {
   return /词战|word-combat|ci-zhan/i.test(await fetchText(port, "/")) ? "old" : "other";
 }
 
-function printHowTo(port: number) {
+function printAddrs(port: number, addrs: Addr[]) {
+  if (!addrs.length) { console.log("没找到局域网地址：这台电脑好像没连 Wi-Fi / 网线。连上以后这里会自动显示新地址。"); return; }
+  console.log("朋友（和房主连同一个 Wi-Fi / 路由器）打开：");
+  for (const a of addrs) console.log(`    http://${a.ip}:${port}/    [${a.name}]${a.note ? "  " + a.note : ""}`);
+}
+async function printHowTo(port: number) {
   const L = (s = "") => console.log(s);
   L("房主：用浏览器打开   http://localhost:" + port + "/");
-  const addrs = lanAddrs();
-  if (addrs.length) {
-    L("朋友（和房主连同一个 Wi-Fi / 路由器）打开：");
-    for (const a of addrs) L(`    http://${a.ip}:${port}/    [${a.name}]${a.virt ? "  ← 虚拟网卡，一般不是这个" : ""}`);
-    if (addrs.length > 1) L("  （有好几行时，通常是 192.168 开头、网卡名是 WLAN / 以太网 的那一行）");
-  } else L("没找到局域网地址：这台电脑好像没连 Wi-Fi / 网线。");
+  printAddrs(port, await lanAddrs());
   L();
   L("两个人都在主菜单点「打真人」→ 选卡组 →「开始匹配」，两个人都点了就自动开打。");
   L("朋友连不上：双击「开放防火墙.bat」，或看「联机说明.txt」第五节。");
+}
+/** 换了 Wi-Fi / 插拔网线后地址会变：每 5 秒看一眼，变了就把新地址再打一遍 */
+function watchAddrs(port: number) {
+  let last = "";
+  const key = (a: Addr[]) => a.map((x) => `${x.ip}/${x.rank}`).join(",");
+  void lanAddrs().then((a) => { last = key(a); });
+  setInterval(async () => {
+    const a = await lanAddrs(), k = key(a);
+    if (k === last) return;
+    last = k;
+    console.log();
+    console.log(`—— 网络变了（换了 Wi-Fi？）${new Date().toLocaleTimeString()}，新的地址 ——`);
+    printAddrs(port, a);
+  }, 5000).unref();
 }
 
 async function main() {
@@ -216,7 +256,8 @@ async function main() {
       if (port !== want) console.log(`（端口 ${want} 被占着，这次改用 ${port}，下面的地址就是新版的地址）`);
       console.log(`服务器已启动，端口 ${r.port}。这个窗口别关，关了服务器就停了。`);
       console.log();
-      printHowTo(r.port);
+      await printHowTo(r.port);
+      watchAddrs(r.port);
       return;
     } catch (e: any) {
       if (e?.code !== "EADDRINUSE") { console.error("启动失败：", e?.message ?? e); process.exit(1); }
@@ -225,7 +266,7 @@ async function main() {
         console.log(`已经有一个词战服务器在运行了（端口 ${port}），不用再开第二个。`);
         console.log("直接用下面的地址；要重开的话，先把之前那个服务器窗口关掉再双击 start.bat。");
         console.log();
-        printHowTo(port);
+        await printHowTo(port);
         process.exit(0);
       }
       if (who === "old") {
