@@ -1,0 +1,29 @@
+/* 主菜单 / 选卡组 / 匹配中 / 联机提示 */
+.mn { position: fixed; inset: 0; z-index: 25; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 38%, rgba(8, 54, 46, 0.55), rgba(1, 8, 7, 0.93) 70%); }
+.mn[hidden], .mn-home[hidden], .mn-deck-layer[hidden] { display: none; }
+.mn-box { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 24px; text-align: center; }
+.mn-logo { font-size: clamp(56px, 11vw, 112px); font-weight: 700; letter-spacing: 0.35em; padding-left: 0.35em; color: #e8fff9;
+  text-shadow: 0 0 18px rgba(31, 214, 180, 0.8), 0 0 60px rgba(31, 214, 180, 0.4); font-family: "Chakra Petch", "Noto Sans SC", sans-serif; }
+.mn-sub { color: var(--dim); letter-spacing: 0.3em; margin-bottom: 18px; }
+.mn-list { display: flex; flex-direction: column; gap: 14px; width: min(360px, 82vw); }
+.mn-btn { padding: 18px 20px; font-size: 24px; letter-spacing: 0.4em; border: 1px solid rgba(31, 214, 180, 0.6); border-radius: 6px; color: #dffcf5; cursor: pointer;
+  background: linear-gradient(180deg, rgba(14, 78, 66, 0.85), rgba(6, 36, 31, 0.9)); box-shadow: inset 0 0 18px rgba(31, 214, 180, 0.15), 0 4px 18px rgba(0, 0, 0, 0.5); }
+.mn-btn:hover { border-color: #7ff5dd; box-shadow: inset 0 0 24px rgba(31, 214, 180, 0.3), 0 0 22px rgba(31, 214, 180, 0.35); transform: translateY(-1px); }
+.mn-btn.small { font-size: 14px; padding: 8px; letter-spacing: 0.2em; opacity: 0.7; background: transparent; }
+.mn-msg { color: #ffb0b8; margin-top: 8px; }
+.mn-foot { color: var(--dim); font-size: 12px; margin-top: 10px; }
+.mn-home { position: fixed; left: 12px; bottom: 12px; z-index: 6; padding: 6px 12px; border: 1px solid rgba(31, 214, 180, 0.5); background: rgba(6, 36, 31, 0.85); border-radius: 4px; cursor: pointer; }
+.mn-deck-layer { z-index: 26; }
+.mn-tabs { display: flex; gap: 8px; margin: 6px 0 10px; }
+.mn-tabs button { min-width: 120px; }
+.mn-body { max-height: 56vh; overflow-y: auto; padding-right: 4px; }
+.mn-foot2 { flex-wrap: wrap; }
+.mn-name { background: #06110f; color: var(--ink); border: 1px solid var(--teal); padding: 7px 10px; width: 130px; border-radius: 4px; }
+.mn-cur { color: #c9b27a; font-size: 13px; }
+.mm-box { text-align: center; }
+.mm-box .foot { justify-content: center; }
+.mm-spin { width: 38px; height: 38px; margin: 12px auto; border-radius: 50%; border: 3px solid rgba(31, 214, 180, 0.25); border-top-color: var(--hud); animation: mm-rot 0.9s linear infinite; }
+@keyframes mm-rot { to { transform: rotate(360deg); } }
+.gm .gm-warn { color: #ffb0b8; background: rgba(122, 31, 42, 0.45); padding: 4px 8px; border-radius: 3px; }
+.gm .gm-count { min-height: 1.2em; font-size: 12px; }

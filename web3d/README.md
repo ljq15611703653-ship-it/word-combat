@@ -44,3 +44,7 @@ npm run build    # 类型检查 + 打包到 dist/
 | `uGlitch` | 瞬时撕裂强度，受击时由 `UnitCard.hit()` 拉到 1.4 再衰减 |
 | `uMix` | 绿色荧光的混合比例，默认 0.15 |
 | `uTint` | 荧光颜色，默认 `#39ff9c` |
+
+## 联机（打真人）
+
+主菜单「打真人」= 局域网匹配：两个人在同一服务器上都点「开始匹配」就自动配对开打，不用房间号。启动和使用见 [ONLINE.md](ONLINE.md)（Windows 双击 `start-online.bat`）。

@@ -11,6 +11,8 @@ import { SentencePanel } from "./sentencePanel";
 import { CAT_COLOR, WORDS, parse, type Tok } from "./words";
 import { Live } from "./live";
 import { Game, uidOfCard } from "./game";
+import { OnlineGame } from "./online/netGame";
+import { mountMenu } from "./online/menu";
 import "./style.css";
 
 // 演示局面：红一第 2 秒打蓝方全部各 12；红二第 0 秒给蓝三易伤；蓝一第 3 秒打红二 12。
@@ -41,6 +43,7 @@ function tokText(t: Tok) {
 }
 
 let game: Game;
+let online: OnlineGame;
 
 async function main() {
   await Promise.all([
@@ -92,7 +95,7 @@ async function main() {
     cards.push(c);
     // 句子读数面板：屏幕空间，顶边对齐卡的前沿
     const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句",
-      enemy ? undefined : () => { if (game?.active) return; if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); } });
+      enemy ? undefined : () => { if (game?.active || online?.active) return; if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); } });
     if (seat.sentence) panel.set(parse(seat.sentence), seat.sec ?? 0);
     layer.appendChild(panel.el);
     panels.push(panel);
@@ -290,6 +293,7 @@ async function main() {
     hovered = pick(e);
     if (!hovered) return;
     if (game.active) { game.cardClicked(uidOfCard(cards.indexOf(hovered))); return; }
+    if (online.active) { online.cardClicked(uidOfCard(cards.indexOf(hovered))); return; }
     const i = cards.indexOf(hovered);
     // 拼句时点任何一张卡 = 把它作为目标放进句子
     if (editing >= 0) {
@@ -326,10 +330,16 @@ async function main() {
   // ---------- 完整对局：真人对电脑 ----------
   game = new Game({
     cards, panels, onChange: () => { renderTimeline(); },
+    onToggle: (on) => { live.stop(); requestAnimationFrame(() => { resize(); }); if (!on) menu?.show(); },
+  });
+  // 联机：同一个 3D 场景、同一套拼句界面，对手和结算由服务端驱动
+  online = new OnlineGame({
+    cards, panels, onChange: () => { renderTimeline(); },
     onToggle: () => { live.stop(); requestAnimationFrame(() => { resize(); }); },
   });
   $("fullgame").addEventListener("click", () => { closeKb(); live.stop(); game.open(); });
 
+  let menu: { show: (msg?: string) => void } | undefined;
   // ---------- 规则引擎：电脑对电脑 ----------
   const logEl = document.getElementById("live-log");
   const live = new Live({
@@ -403,6 +413,8 @@ async function main() {
     });
   }
   renderTimeline();
+  // 主菜单：打电脑 / 打真人（打电脑 = 原来的本地对局，原样保留）
+  menu = mountMenu(game, online);
 
   const clock = new THREE.Clock();
   renderer.setAnimationLoop(() => {
