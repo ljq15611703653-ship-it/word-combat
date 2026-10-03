@@ -11,6 +11,7 @@ import { Composer, BASIC_DESC, actTokens, type Tok } from "./engine/composer";
 import { suggest, suggestLate, assignLate, PASS_GAIN } from "./engine/ai";
 import { loadoutOf } from "./engine/loadout";
 import { actionToks, cardIndex } from "./live";
+import type { CastShow } from "./fx/castShow";
 import "./game.css";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -39,6 +40,8 @@ export interface GameCtx {
   panels: SentencePanel[];
   onChange: () => void;     // 时间轴等要重画
   onToggle: (on: boolean) => void;
+  /** 技能演出（可选）：结算回放时每一句演一遍；不传 = 原来的逐事件回放 */
+  cast?: CastShow;
 }
 
 // ---- [campaign hook] 可选钩子：教程盖在正常对局上用。不传 hooks 时行为和原来完全一样。
@@ -618,15 +621,26 @@ export class Game {
     this.shown = before;
     this.elLog.innerHTML = "";
     this.log(`—— 第 ${M.rnd} 轮结算 ——`, "gold");
-    for (const ev of events) {
-      const line = this.eventText(ev, declCopy);
-      if (line) this.log(line.text, line.cls);
-      this.applyShown(ev);
-      if (!this.fast) await sleep(350);
-      if (tk !== this.token) return;
-    }
+    if (!(await this.playEvents(events, declCopy, tk))) return;
     this.refreshAll(true);
     this.roundSummary(progBefore);
+  }
+
+  /** 播放一轮结算事件：有技能演出就交给它（它在命中的那一刻才调用 step），否则逐事件 + 停顿。返回 false = 中途退出了 */
+  protected async playEvents(events: any[], decl: any[], tk: number): Promise<boolean> {
+    const step = (ev: any) => {
+      const line = this.eventText(ev, decl);
+      if (line) this.log(line.text, line.cls);
+      this.applyShown(ev);
+    };
+    const cast = this.ctx.cast;
+    if (cast) return cast.playRound({ M: this.M, events, decl, step, alive: () => tk === this.token, fast: () => this.fast });
+    for (const ev of events) {
+      step(ev);
+      if (!this.fast) await sleep(350);
+      if (tk !== this.token) return false;
+    }
+    return true;
   }
 
   protected applyShown(ev: any) {
@@ -782,7 +796,7 @@ export class Game {
         break;
       }
       case "resolving":
-        el.append(h("h3", "gold", "结算中……"), btn("跳过动画", "ghost", () => { this.fast = true; }));
+        el.append(h("h3", "gold", "结算中……"), btn("跳过动画", "ghost", () => { this.fast = true; this.ctx.cast?.skip(); }));
         break;
     }
   }

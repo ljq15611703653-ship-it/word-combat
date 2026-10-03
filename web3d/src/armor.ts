@@ -125,6 +125,9 @@ export class Armor {
   private sig = "";
   private ld: Loadout = EMPTY_LOADOUT;
   private bladeLen = 1; private shieldSize = 0.5;
+  /** [技能演出] 结算回放时由 fx/castShow 驱动：kind = 本句的效果，k = 0~1 的亢奋度，swing = 刃的挥动 */
+  readonly fx = { kind: "", k: 0, swing: 0, col: "#ffffff" };
+  private chestPt = new THREE.Object3D();
 
   constructor(figH: number) {
     this.h = figH;
@@ -142,6 +145,8 @@ export class Armor {
     this.core = plane(coreTex(), "#ffffff", 0); this.core.position.set(0, h * 0.58, 0); this.core.scale.setScalar(0.6);
     this.shellL = plane(shellTex(), "#bfeaff", 0); this.shellL.position.set(-h * 0.24, h * 0.72, 0); this.shellL.scale.setScalar(0.5);
     this.shellR = plane(shellTex(), "#bfeaff", 0); this.shellR.position.set(h * 0.24, h * 0.72, 0); this.shellR.scale.set(-0.5, 0.5, 1);
+    this.chestPt.position.set(0, h * 0.55, 0);
+    this.root.add(this.chestPt);
     this.tags.position.set(0, h * 0.55, -0.02);
     this.orbit.position.set(0, h * 0.4, 0);
     const mk = (col: string, g: string) => plane(chipTex(g, 0), col, 0);
@@ -149,6 +154,12 @@ export class Armor {
     for (const m of [this.healMark, this.redirMark, this.delayMark]) m.visible = false;
     this.root.add(this.blade, this.bladeNum, this.shield, this.shieldRing, this.shieldNum, this.halo, this.gauge, this.gaugeFill,
       this.core, this.shellL, this.shellR, this.tags, this.orbit);
+  }
+
+  /** [技能演出] 盔甲壳上某个部位的世界坐标（词牌飞过去、绑在上面用） */
+  anchorWorld(kind: "blade" | "shield" | "halo" | "gauge" | "chest", out: THREE.Vector3) {
+    const o = kind === "blade" ? this.blade : kind === "shield" ? this.shield : kind === "halo" ? this.halo : kind === "gauge" ? this.gauge : this.chestPt;
+    return o.getWorldPosition(out);
   }
 
   set(ld: Loadout) {
@@ -212,17 +223,20 @@ export class Armor {
     for (const key of Object.keys(this.cur) as (keyof typeof this.cur)[]) this.cur[key] += (this.goal[key] - this.cur[key]) * k;
     const c = this.cur;
     const bob = Math.sin(t * 1.6) * 0.02;
-    // 刃
-    this.blade.visible = c.blade > 0.02;
-    this.blade.scale.set(0.2 * c.blade, this.bladeLen * c.blade, 1);
-    this.blade.position.y = h * 0.28 + (this.bladeLen * c.blade) / 2 + bob;
-    this.blade.rotation.z = -0.12;
+    const fx = this.fx, fk = fx.k;
+    // 刃（演出时即使没装备也亮起，挥动和词牌绑在一起）
+    const cb = Math.max(c.blade, fx.kind === "atk" ? fk : 0), cs = Math.max(c.shield, fx.kind === "mit" ? fk : 0);
+    this.blade.visible = cb > 0.02;
+    this.blade.scale.set(0.2 * cb * (1 + 0.7 * fk * (fx.kind === "atk" ? 1 : 0)), this.bladeLen * cb, 1);
+    this.blade.position.y = h * 0.28 + (this.bladeLen * cb) / 2 + bob;
+    this.blade.rotation.z = -0.12 - (fx.kind === "atk" ? fx.swing * 1.25 : 0);
+    (this.blade.material as THREE.MeshBasicMaterial).opacity = 0.8 + 0.2 * (fx.kind === "atk" ? fk : 0);
     this.bladeNum.visible = this.blade.visible;
     this.bladeNum.position.set(this.blade.position.x + 0.02, this.blade.position.y + (this.bladeLen * c.blade) / 2 + 0.12, 0);
-    (this.bladeNum.material as THREE.MeshBasicMaterial).opacity = c.blade;
+    (this.bladeNum.material as THREE.MeshBasicMaterial).opacity = cb;
     // 盾（首挡关键词再加一层环）
-    this.shield.visible = c.shield > 0.02;
-    const ss = this.shieldSize * c.shield;
+    this.shield.visible = cs > 0.02;
+    const ss = this.shieldSize * cs * (1 + 0.55 * (fx.kind === "mit" ? fk : 0));
     this.shield.scale.setScalar(ss);
     this.shield.position.y = h * 0.42 + bob;
     this.shield.rotation.z = Math.sin(t * 0.8) * 0.04;
@@ -232,7 +246,7 @@ export class Armor {
     this.shieldRing.rotation.z = t * 0.4;
     this.shieldNum.visible = this.shield.visible;
     this.shieldNum.position.set(this.shield.position.x, this.shield.position.y - ss * 0.62 - 0.08, 0);
-    (this.shieldNum.material as THREE.MeshBasicMaterial).opacity = c.shield;
+    (this.shieldNum.material as THREE.MeshBasicMaterial).opacity = cs;
     // 光环
     this.halo.visible = c.halo > 0.02;
     this.halo.rotation.z = 0;
@@ -251,7 +265,14 @@ export class Armor {
     // 胸口核心（不屈）、肩甲（首挡）
     const cm = this.core.material as THREE.MeshBasicMaterial;
     cm.opacity = 0.55 * c.core * (0.7 + 0.3 * Math.sin(t * 3.2));
-    this.core.visible = c.core > 0.02;
+    // 演出：治疗 / 状态 / 转移 / 延后 / 移除等没有固定部位，胸口核心按效果着色亮起
+    const generic = fk > 0.01 && fx.kind !== "atk" && fx.kind !== "mit";
+    if (generic) {
+      cm.color.set(fx.col);
+      cm.opacity = Math.max(cm.opacity, 0.95 * fk);
+      this.core.scale.setScalar(0.6 + 1.3 * fk);
+    } else { cm.color.set("#ffffff"); this.core.scale.setScalar(0.6); }
+    this.core.visible = c.core > 0.02 || generic;
     for (const s of [this.shellL, this.shellR]) {
       (s.material as THREE.MeshBasicMaterial).opacity = 0.7 * c.shells;
       s.visible = c.shells > 0.02;

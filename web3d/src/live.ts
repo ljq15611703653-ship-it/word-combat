@@ -5,6 +5,7 @@ import type { Tok } from "./words";
 import { Match } from "./engine/match";
 import { presetDeck, type Cls } from "./engine/rules";
 import { loadoutOf } from "./engine/loadout";
+import type { CastShow } from "./fx/castShow";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const NUM = ["一", "二", "三"];
@@ -72,6 +73,8 @@ export interface LiveCtx {
   panels: SentencePanel[];
   onChange?: () => void;
   say?: (msg: string) => void;
+  /** 技能演出（可选） */
+  cast?: CastShow;
 }
 
 export class Live {
@@ -135,7 +138,22 @@ export class Live {
   private resolve() {
     const M = this.M;
     this.busy = true;
+    const decl = [...M.declared];
     const evs = M.resolveRound();
+    const cast = this.ctx.cast;
+    if (cast) {
+      // 技能演出：命中的那一刻才受击；演完同步血量
+      void cast.playRound({
+        M, events: evs, decl, alive: () => true, fast: () => false,
+        step: (e: any) => { if (e.type === "hit" && e.dealt > 0) this.ctx.cards[cardIndex(e.tgt)].hit(0); },
+      }).then(() => {
+        this.syncAll(false);
+        this.ctx.say?.(`完成度 蓝 ${(M.progress(0) * 100).toFixed(0)}% · 红 ${(M.progress(1) * 100).toFixed(0)}%`);
+        if (M.phase === "over") this.ctx.say?.(M.winner === -2 ? "平局" : `${["蓝", "红"][M.winner]}方获胜`);
+        this.busy = false;
+      });
+      return;
+    }
     // 受击动画：按事件的秒数错开
     let i = 0;
     for (const e of evs) {

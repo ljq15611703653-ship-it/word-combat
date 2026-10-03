@@ -5,7 +5,7 @@ import { CAT_COLOR, WORDS, type Tok } from "./words";
 
 const SIDE = { r: "#ff5a6e", b: "#2fd8ff" } as const;
 
-function tokEl(t: Tok, fresh: boolean): HTMLElement {
+export function tokEl(t: Tok, fresh: boolean): HTMLElement {
   const el = document.createElement("span");
   el.className = "w";
   if (fresh) el.classList.add("fresh");

@@ -11,6 +11,7 @@ import { SentencePanel } from "./sentencePanel";
 import { CAT_COLOR, WORDS, parse, type Tok } from "./words";
 import { Live } from "./live";
 import { Game, uidOfCard } from "./game";
+import { CastShow } from "./fx/castShow";
 import { OnlineGame } from "./online/netGame";
 import { mountMenu } from "./online/menu";
 import "./style.css";
@@ -327,22 +328,28 @@ async function main() {
     renderTimeline();
   });
 
+  // ---------- 技能演出：镜头拉近出手随从 → 词牌飞到盔甲壳 → 命中 → 归位拉回（只借用取景，不碰场景） ----------
+  const cast = new CastShow({ camera, app, cards, panels, goal, release: reframe, solve: (pts) => solve(pts, header.offsetHeight + tlEl.offsetHeight + 6, 16) });
   // ---------- 完整对局：真人对电脑 ----------
   game = new Game({
+    cast,
     cards, panels, onChange: () => { renderTimeline(); },
     onToggle: (on) => { live.stop(); requestAnimationFrame(() => { resize(); }); if (!on) menu?.show(); },
   });
   // 联机：同一个 3D 场景、同一套拼句界面，对手和结算由服务端驱动
   online = new OnlineGame({
+    cast,
     cards, panels, onChange: () => { renderTimeline(); },
     onToggle: () => { live.stop(); requestAnimationFrame(() => { resize(); }); },
   });
+  (window as any).__gm = game; (window as any).__cards = cards;
   $("fullgame").addEventListener("click", () => { closeKb(); live.stop(); game.open(); });
 
   let menu: { show: (msg?: string) => void } | undefined;
   // ---------- 规则引擎：电脑对电脑 ----------
   const logEl = document.getElementById("live-log");
   const live = new Live({
+    cast,
     cards, panels, onChange: () => renderTimeline(),
     say: (m) => { if (logEl) logEl.textContent = m; },
   });
@@ -431,7 +438,7 @@ async function main() {
     renderer.domElement.style.cursor = clickable ? "pointer" : "default";
 
     // 镜头平滑地追向目标取景（拼句时切到「只看我方一排」）
-    const f = 1 - Math.exp(-dt * 6);
+    const f = (window as any).__cast?.snap ? 1 : 1 - Math.exp(-dt * 6);   // snap：截图自动化用，镜头直接到位
     shot.look.lerp(goal.look, f);
     shot.dist += (goal.dist - shot.dist) * f;
     shot.offY += (goal.offY - shot.offY) * f;
