@@ -27,42 +27,51 @@ function ctex(c: HTMLCanvasElement, srgb = true) {
 export const NEON = { cyan: "#38c8ff", ice: "#bfeaff", magenta: "#ff3f8e", amber: "#ffb347", violet: "#8a6bff" };
 const HORIZON = 0x16203f;
 
-const ROAD_W = 16.6;          // 车行道 + 人行道总宽
-const FACE_X = 8.3;        // 楼的内立面
+const ROAD_W = 16;          // 车行道 + 人行道总宽
+const FACE_X = 8;        // 楼的内立面
 const Z_NEAR = 34, Z_FAR = -110;
 
-/** 楼立面：暗色板块 + 一格格窗，亮灯的做进自发光贴图。 */
+/** 楼立面：分层窗带（每层一条连续玻璃带，成段亮灯）+ 竖向柱 + 层间裙板与管线。 */
 function facadeTextures(seed: number, palette: string[]): [THREE.Texture, THREE.Texture] {
-  const W = 256, H = 512, cw = 16, ch = 22;
+  const W = 512, H = 512, floors = 8, fh = H / floors;
   const [c, x] = cv(W, H);
   const [e, ex] = cv(W, H);
   const r = rng(seed);
-  x.fillStyle = "#0b1020"; x.fillRect(0, 0, W, H);
+  x.fillStyle = "#26324f"; x.fillRect(0, 0, W, H);
   ex.fillStyle = "#000"; ex.fillRect(0, 0, W, H);
-  // 外墙板缝
-  x.fillStyle = "#121a30";
-  for (let i = 0; i < H; i += 128) x.fillRect(0, i, W, 3);
-  for (let i = 0; i < W; i += 64) { x.fillStyle = "#0e1527"; x.fillRect(i, 0, 2, H); }
-  const cols = Math.floor(W / cw), rows = Math.floor(H / ch);
-  for (let j = 1; j < rows - 1; j++) {
-    // 每层一个主色，层内成片亮灯，比逐格随机更像真的楼
-    const rowLit = r() < 0.5;
-    const rowCol = palette[Math.floor(r() * palette.length)];
-    for (let i = 1; i < cols - 1; i++) {
-      const px = i * cw + 2, py = j * ch + 3, w = cw - 5, h = ch - 8;
-      x.fillStyle = "#05070f"; x.fillRect(px, py, w, h);
-      if (rowLit && r() < 0.5) {
-        ex.fillStyle = r() < 0.05 ? palette[Math.floor(r() * palette.length)] : rowCol;
-        ex.globalAlpha = 0.35 + r() * 0.65;
-        ex.fillRect(px, py, w, h);
+  for (let j = 0; j < floors; j++) {
+    const y0 = j * fh;
+    // 裙板：亮一点的金属，带细高光线和管线
+    x.fillStyle = "#3a4768"; x.fillRect(0, y0, W, fh * 0.26);
+    x.fillStyle = "#566386"; x.fillRect(0, y0, W, 2);
+    x.fillStyle = "#1a2238"; x.fillRect(0, y0 + fh * 0.26 - 2, W, 2);
+    if (r() < 0.5) { x.fillStyle = "#4a5a80"; x.fillRect(0, y0 + 6 + r() * 10, W, 4); }
+    // 玻璃带
+    const gy = y0 + fh * 0.3, gh = fh * 0.62;
+    x.fillStyle = "#0a1224"; x.fillRect(0, gy, W, gh);
+    // 成段亮灯：一段一段连续的，而不是零星点
+    let px = 0;
+    while (px < W) {
+      const len = 24 + r() * 120;
+      const lit = r() < 0.6;
+      if (lit) {
+        const col = r() < 0.12 ? palette[Math.floor(r() * palette.length)] : palette[Math.floor(r() * 2) % palette.length];
+        ex.globalAlpha = 0.45 + r() * 0.55;
+        ex.fillStyle = col;
+        ex.fillRect(px, gy + 2, len, gh - 4);
         ex.globalAlpha = 1;
+        // 窗格竖线（压暗）
+        x.fillStyle = "rgba(0,0,0,0.5)";
+        for (let k = px; k < px + len; k += 16) x.fillRect(k, gy, 2, gh);
       }
+      px += len + 6 + r() * 30;
     }
   }
-  // 空调外机 / 管线（暗处的细节）
-  for (let k = 0; k < 10; k++) {
-    x.fillStyle = "#1b2440";
-    x.fillRect(Math.floor(r() * cols) * cw, Math.floor(r() * rows) * ch + 4, cw * 1.6, 8);
+  // 竖向柱 / 竖向灯带
+  for (let i = 0; i < 8; i++) {
+    const cx = i * (W / 8);
+    x.fillStyle = "#2f3b5c"; x.fillRect(cx, 0, 6, H);
+    if (i % 3 === 1) { ex.fillStyle = palette[(i + 1) % palette.length]; ex.globalAlpha = 0.9; ex.fillRect(cx + 1, 0, 3, H); ex.globalAlpha = 1; }
   }
   const t1 = ctex(c), t2 = ctex(e);
   for (const t of [t1, t2]) t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -201,6 +210,7 @@ export class Street {
 
     this.buildRoad();
     this.buildFurniture();
+    this.buildOverhead();
     this.buildAtmosphere();
     this.buildRain();
 
@@ -219,53 +229,84 @@ export class Street {
   private buildBuildings(parent: THREE.Group) {
     const palettes = [
       [NEON.ice, NEON.cyan, NEON.cyan, NEON.cyan],
-      [NEON.cyan, NEON.ice, NEON.cyan, NEON.cyan, NEON.amber],
-      [NEON.ice, NEON.cyan, NEON.cyan, NEON.violet],
-      [NEON.cyan, NEON.cyan, NEON.ice, NEON.magenta],
+      [NEON.cyan, NEON.amber, NEON.cyan, NEON.ice],
+      [NEON.ice, NEON.magenta, NEON.cyan, NEON.violet],
+      [NEON.cyan, NEON.magenta, NEON.ice, NEON.magenta],
     ];
     const mats = palettes.map((p, i) => {
       const [map, emi] = facadeTextures(10 + i * 7, p);
       return new THREE.MeshStandardMaterial({
-        map, emissiveMap: emi, emissive: new THREE.Color(0xffffff), emissiveIntensity: 0.85,
-        roughness: 0.55, metalness: 0.5,
+        map, emissiveMap: emi, emissive: new THREE.Color(0xffffff), emissiveIntensity: 1.1,
+        roughness: 0.5, metalness: 0.5, color: 0xbac6e6,
       });
     });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x0a0f1d, roughness: 0.7, metalness: 0.4 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x1a2340, roughness: 0.6, metalness: 0.5 });
+    const pipeMat = new THREE.MeshStandardMaterial({ color: 0x3a4768, roughness: 0.4, metalness: 0.8 });
+    const stripCols = [NEON.cyan, NEON.magenta, NEON.amber, NEON.violet];
     const r = rng(2024);
+    const textured = (w: number, h: number, d: number, mat: THREE.Material) => {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const uv = geo.attributes.uv as THREE.BufferAttribute;
+      // 沿街的两面（±x）横向铺 d，竖向铺 h；前后面铺 w
+      const n = geo.attributes.normal as THREE.BufferAttribute;
+      for (let i = 0; i < uv.count; i++) {
+        const side = Math.abs(n.getX(i)) > 0.5;
+        const su = Math.max(1, Math.round((side ? d : w) / 4.5)), sv = Math.max(1, Math.round(h / 6));
+        uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+      }
+      return new THREE.Mesh(geo, [mat, mat, roofMat, roofMat, mat, mat]);
+    };
     for (const side of [-1, 1]) {
       let z = Z_NEAR;
       while (z > Z_FAR) {
-        const d = 7 + r() * 9;                  // 沿街宽度
-        const depth = 8 + r() * 10;             // 进深
-        const h = 22 + r() * 46 + (Z_NEAR - z) * 0.12;
-        const setback = r() < 0.35 ? r() * 1.8 : 0;
-        const cx = side * (FACE_X + setback + depth / 2);
+        const d = 9 + r() * 8;                  // 沿街宽度
+        const depth = 12;
         const mat = mats[Math.floor(r() * mats.length)];
-        // 分层退台：越往上越收窄，剪影更像赛博朋克巨构
-        const tiers = r() < 0.55 ? 2 : 1;
-        let th = h, tw = depth, ty = 0;
-        for (let t = 0; t < tiers; t++) {
-          const hh = t === 0 ? h * (tiers === 2 ? 0.62 : 1) : th * 0.46;
-          const geo = new THREE.BoxGeometry(tw, hh, d - t * 1.2);
-          const uv = geo.attributes.uv as THREE.BufferAttribute;
-          const su = Math.max(1, Math.round(d / 4.2)), sv = Math.max(1, Math.round(hh / 7));
-          for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
-          const m = new THREE.Mesh(geo, [mat, mat, roofMat, roofMat, mat, mat]);
-          m.position.set(cx + (t ? side * (r() * 0.8) : 0), ty + hh / 2, z - d / 2);
-          parent.add(m);
-          ty += hh; th = hh; tw = tw * 0.78;
+        const podH = 8 + r() * 6, towH = 28 + r() * 44 + (Z_NEAR - z) * 0.1, crownH = 4 + r() * 10;
+        const faceX = FACE_X;
+        // 裙楼：贴街，宽
+        const pod = textured(depth, podH, d, mat);
+        pod.position.set(side * (faceX + depth / 2), podH / 2, z - d / 2);
+        parent.add(pod);
+        // 塔楼：向后退台，更窄
+        const so = 1.2 + r() * 1.4, tw = depth - 2, td = d - 2.2;
+        const tow = textured(tw, towH, td, mats[Math.floor(r() * mats.length)]);
+        tow.position.set(side * (faceX + so + tw / 2), podH + towH / 2, z - d / 2);
+        parent.add(tow);
+        // 顶冠
+        const cr = textured(tw - 3, crownH, td - 2.5, mat);
+        cr.position.set(side * (faceX + so + 1.5 + (tw - 3) / 2), podH + towH + crownH / 2, z - d / 2);
+        parent.add(cr);
+        const topY = podH + towH + crownH;
+        // 塔楼立面上的竖向霓虹灯带 + 管线
+        const nStrips = 1 + Math.floor(r() * 3);
+        for (let k = 0; k < nStrips; k++) {
+          const col = new THREE.Color(stripCols[Math.floor(r() * stripCols.length)]);
+          const sh = towH * (0.5 + r() * 0.5);
+          const strip = new THREE.Mesh(new THREE.BoxGeometry(0.18, sh, 0.28), new THREE.MeshBasicMaterial({ color: col, toneMapped: false }));
+          strip.position.set(side * (faceX + so - 0.1), podH + sh / 2 + r() * (towH - sh), z - 1.2 - r() * (d - 2.4));
+          parent.add(strip);
         }
-        // 楼顶天线
-        if (r() < 0.6) {
-          const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 3 + r() * 5, 5), roofMat);
-          ant.position.set(cx, ty + 2, z - d / 2);
+        for (let k = 0; k < 2; k++) {
+          const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, towH * 0.9, 8), pipeMat);
+          pipe.position.set(side * (faceX + so - 0.2), podH + towH * 0.45, z - 0.8 - r() * (d - 1.6));
+          parent.add(pipe);
+        }
+        // 裙楼顶沿的横向灯带
+        const lip = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, d - 0.6), new THREE.MeshBasicMaterial({ color: stripCols[Math.floor(r() * stripCols.length)], toneMapped: false }));
+        lip.position.set(side * (faceX - 0.05), podH, z - d / 2);
+        parent.add(lip);
+        // 楼顶天线 + 航空灯
+        if (r() < 0.8) {
+          const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.1, 5 + r() * 8, 5), roofMat);
+          ant.position.set(side * (faceX + so + tw / 2), topY + 3, z - d / 2);
           parent.add(ant);
-          const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3f4e, toneMapped: false }));
-          lamp.position.set(cx, ty + 3.5 + r() * 3, z - d / 2);
+          const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3f4e, toneMapped: false }));
+          lamp.position.set(ant.position.x, topY + 3 + 3 + r() * 4, ant.position.z);
           parent.add(lamp);
           this.blinkers.push({ mat: lamp.material as THREE.MeshBasicMaterial, phase: r() * 6, rate: 1.2 + r() });
         }
-        z -= d + (r() < 0.2 ? 1.5 : 0.2);
+        z -= d + 0.3;
       }
     }
   }
@@ -278,7 +319,7 @@ export class Street {
     let n = 0;
     for (const side of [-1, 1]) {
       // 竖招牌：从楼壁伸出，成排按街深分布，越近越稀疏
-      for (let z = -30; z > -95; z -= 5 + r() * 5) {
+      for (let z = -12; z > -95; z -= 5 + r() * 5) {
         const word = words[Math.floor(r() * words.length)], col = cols[Math.floor(r() * cols.length)];
         const vertical = r() < 0.6 && /[一-龥]/.test(word);
         const w = vertical ? 1.5 : 4.4, h = vertical ? 1.7 + word.length * 1.5 : 1.5;
@@ -308,7 +349,7 @@ export class Street {
       }
       // 大广告牌：贴在楼壁高处
       for (let i = 0; i < 6; i++) {
-        const z = -8 - i * 17 - r() * 6;
+        const z = 2 - i * 14 - r() * 4;
         const pal: [string, string][] = [["#ff3f8e", "#5b1f7a"], ["#38c8ff", "#274a9a"], ["#ffb347", "#a8321f"], ["#8a6bff", "#18306e"]];
         const [a, b] = pal[(i + (side > 0 ? 2 : 0)) % pal.length];
         const txt = ["词战", "全息", "夜之城", "重装", "新世代", "漫游"][(i + (side > 0 ? 3 : 0)) % 6];
@@ -329,8 +370,8 @@ export class Street {
   private buildRoad() {
     const { map, alpha, rough } = roadTextures();
     const mat = new THREE.MeshStandardMaterial({
-      map, roughness: 0.28, roughnessMap: rough, metalness: 0.15, color: 0x8d97b0,
-      transparent: true, alphaMap: alpha, opacity: 0.9, envMapIntensity: 0.6,
+      map, roughness: 0.28, roughnessMap: rough, metalness: 0.15, color: 0x9aa6c8, emissive: 0x070d1c, emissiveIntensity: 1,
+      transparent: true, alphaMap: alpha, opacity: 1, envMapIntensity: 0.9,
     });
     const g = new THREE.PlaneGeometry(ROAD_W + 2, Z_NEAR - Z_FAR);
     const road = new THREE.Mesh(g, mat);
@@ -339,10 +380,71 @@ export class Street {
     road.renderOrder = -5;
     this.root.add(road);
     // 路面以外：楼脚下的黑地，防止漏底
-    const under = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: 0x03050b }));
+    const under = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshBasicMaterial({ color: 0x0a1226 }));
     under.rotation.x = -Math.PI / 2;
     under.position.y = -0.08;
     this.root.add(under);
+  }
+
+  // ------------------------------------------------------------------ 头顶线缆 / 灯串 / 摊位 / 蒸汽
+  private buildOverhead() {
+    const r = rng(77);
+    const dark = new THREE.MeshStandardMaterial({ color: 0x0b0f1a, roughness: 0.6, metalness: 0.5 });
+    const warm = [0xffb347, 0xff6fa5, 0xffd27a];
+    for (let z = -5; z > -70; z -= 5 + r() * 4) {
+      for (let k = 0; k < 2; k++) {
+        const y0 = 10 + r() * 7, sag = 1.2 + r() * 1.4;
+        const pts: THREE.Vector3[] = [];
+        for (let i = 0; i <= 12; i++) {
+          const u = i / 12;
+          pts.push(new THREE.Vector3(-FACE_X + 0.5 + u * (FACE_X * 2 - 1), y0 - Math.sin(u * Math.PI) * sag, z - k * 0.6 + Math.sin(u * 6) * 0.1));
+        }
+        const curve = new THREE.CatmullRomCurve3(pts);
+        this.root.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 30, k ? 0.05 : 0.09, 5, false), dark));
+        if (k === 0 && r() < 0.8) {      // 暖色灯串
+          for (let i = 1; i < 12; i += 1) {
+            const p = curve.getPoint(i / 12);
+            const b = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 5), new THREE.MeshBasicMaterial({ color: warm[i % 3], toneMapped: false }));
+            b.position.copy(p).y -= 0.18;
+            this.root.add(b);
+          }
+        }
+      }
+    }
+    // 摊位 + 蒸汽口
+    const steamTex = glowTexture("200,215,235", 128);
+    const metal = new THREE.MeshStandardMaterial({ color: 0x2a3552, metalness: 0.7, roughness: 0.5 });
+    for (const side of [-1, 1]) {
+      for (let z = -13, i = 0; z > -55; z -= 8 + r() * 5, i++) {
+        const x = side * (FACE_X - 1.4);
+        const col = [0xff5f9a, 0xffb347, 0x38c8ff][(i + (side > 0 ? 1 : 0)) % 3];
+        const stall = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.2, 1.6), metal);
+        stall.position.set(x, 0.6, z);
+        this.root.add(stall);
+        const awn = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.08, 1.9), new THREE.MeshBasicMaterial({ color: new THREE.Color(col).multiplyScalar(0.7), toneMapped: false }));
+        awn.position.set(x, 2.2, z);
+        this.root.add(awn);
+        for (const dx of [-0.9, 0.9]) {
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 5), metal);
+          post.position.set(x + dx, 1.1, z + 0.8);
+          this.root.add(post);
+        }
+        const pool = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshBasicMaterial({
+          map: glowTexture(col === 0xff5f9a ? "255,95,154" : col === 0xffb347 ? "255,179,71" : "56,200,255"),
+          transparent: true, opacity: 0.16, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false,
+        }));
+        pool.rotation.x = -Math.PI / 2; pool.position.set(x - side * 1.5, 0.04, z);
+        this.root.add(pool);
+        // 蒸汽
+        const sx = side * (FACE_X - 3.6), sz = z - 3.5;
+        for (let k = 0; k < 3; k++) {
+          const st = new THREE.Sprite(new THREE.SpriteMaterial({ map: steamTex, color: 0xaab8d8, transparent: true, opacity: 0.22, depthWrite: false, toneMapped: false }));
+          st.position.set(sx, 0.8 + k * 1.1, sz);
+          st.scale.setScalar(2.4 + k * 0.6);
+          this.root.add(st);
+        }
+      }
+    }
   }
 
   // ------------------------------------------------------------------ 街边设施

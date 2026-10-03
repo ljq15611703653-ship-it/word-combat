@@ -94,6 +94,28 @@ export function hudPanelTexture(seed: number, clear?: [number, number, number, n
   return t;
 }
 
+
+/** 立在街面上的基座：下沉的深色底座 + 支撑脚 + 阵营色缝隙灯，托起上面的平台。lift = 平台抬高的高度。 */
+export function buildMechPlinth(w: number, d: number, lift: number, sideColor: number) {
+  const sh = shared();
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new RoundedBoxGeometry(w - 0.3, lift - 0.04, d - 0.3, 2, 0.03), sh.dark);
+  core.position.y = (lift - 0.04) / 2 + 0.02;
+  g.add(core);
+  const groove = new THREE.Mesh(new THREE.BoxGeometry(w - 0.22, 0.02, d - 0.22), new THREE.MeshBasicMaterial({ color: sideColor, toneMapped: false }));
+  groove.position.y = lift * 0.55;
+  g.add(groove);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, lift + 0.02, 10), sh.steel);
+    foot.position.set(sx * (w / 2 - 0.2), (lift + 0.02) / 2, sz * (d / 2 - 0.2));
+    g.add(foot);
+    const pad = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.03, 10), sh.chrome);
+    pad.position.set(sx * (w / 2 - 0.2), 0.015, sz * (d / 2 - 0.2));
+    g.add(pad);
+  }
+  return g;
+}
+
 export interface MechBase {
   group: THREE.Group;
   lights: THREE.MeshBasicMaterial[];
@@ -185,6 +207,26 @@ export function buildMechBase(w: number, d: number, t: number, cardW: number, si
     const s = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.008, d - 0.7), stripe);
     s.position.set(sx * (w / 2 - 0.08), t + 0.07, -0.02);
     g.add(s);
+  }
+
+
+  // 侧翼装甲块：凸起的块体 + 散热片 + 肩部接口
+  for (const sx of [-1, 1]) {
+    const wing = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.2, d * 0.5, 2, 0.03), sh.paint);
+    wing.position.set(sx * (w / 2 + 0.06), t / 2 + 0.02, 0.1);
+    g.add(wing);
+    for (let i = 0; i < 6; i++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.15, 0.025), sh.steel);
+      fin.position.set(sx * (w / 2 + 0.18), t / 2 + 0.03, -0.25 + i * 0.1 + 0.12);
+      g.add(fin);
+    }
+    const sock = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.1, 12), sh.dark);
+    sock.rotation.z = Math.PI / 2;
+    sock.position.set(sx * (w / 2 + 0.17), t / 2 + 0.1, 0.55);
+    g.add(sock);
+    const ringL = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, d * 0.4), stripe);
+    ringL.position.set(sx * (w / 2 + 0.165), t / 2 + 0.1, 0.1);
+    g.add(ringL);
   }
 
   // 前沿：接口排（深色槽 + 冷光点），代替旧的金手指

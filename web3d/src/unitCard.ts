@@ -5,7 +5,7 @@
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { C, STYLE } from "./theme";
-import { buildMechBase, hudPanelTexture, type MechBase } from "./scene/mech";
+import { buildMechBase, buildMechPlinth, hudPanelTexture, type MechBase } from "./scene/mech";
 import { cardCircuitTexture, plateTexture, warnTexture } from "./textures";
 import { circuitMaterial, portraitMaterial } from "./shaders";
 import { Armor, type Loadout } from "./armor";
@@ -25,6 +25,7 @@ export interface UnitSpec {
 
 export const CARD = { w: 2.2, d: 1.75, t: 0.12 };
 const CARRIER = STYLE === "neo" ? { w: 2.9, d: 2.15, t: 0.06 } : { w: 2.62, d: 2.05, t: 0.06 };
+const LIFT = STYLE === "neo" ? 0.2 : 0;
 export const FIG = { h: 2.3 };                 // 人物全息像的高度
 export const EMIT = { z: -0.18, r: 0.62 };     // 投影环的位置和半径
 const SEG_HP = 2;
@@ -164,6 +165,7 @@ export class UnitCard {
       // ---- 义体底座（攻壳机动队式机械质感）----
       this.mech = buildMechBase(CARRIER.w, CARRIER.d, CARRIER.t, CARD.w, sideCol, seed);
       this.body.add(this.mech.group);
+      this.root.add(buildMechPlinth(CARRIER.w, CARRIER.d, LIFT, sideCol));
     } else {
       // ---- PCB 载板 ----
       const carrier = new THREE.Mesh(new RoundedBoxGeometry(CARRIER.w, CARRIER.t, CARRIER.d, 2, 0.03), matPcb);
@@ -370,7 +372,7 @@ export class UnitCard {
     this.ko += (this.koTarget - this.ko) * (1 - Math.exp(-dt * 3));
     this.glitch = Math.max(0, this.glitch - dt * 1.5);
 
-    this.body.position.y = (this.selected ? 0.08 : 0) + this.hover * 0.08;
+    this.body.position.y = LIFT + (this.selected ? 0.08 : 0) + this.hover * 0.08;
     // 人物：竖直，只绕竖轴转向镜头；被击倒时像全息影像一样塌回卡里
     const wp = this.figure.getWorldPosition(new THREE.Vector3());
     // 立绘和镜头同朝向：屏幕上永远是原图比例，透视由立绘自己画
