@@ -62,7 +62,7 @@ BASE = dict(
     # 电脑
     pass_gain=0.3, ko_look=0.5, danger_hp=4, danger_w=0.0, combo_k=6, smart_late=1, cont_look=0.6,
     rep_max=3,
-    off="", st_cap=99, blk_hp=0, blk_dice=1,
+    off="", st_cap=99, st_grow=1, blk_hp=0, blk_dice=1,
     b_once=0, x_single=0, z_free=0, z_norep=0, y_nodef=0, y_single=0,
 )
 
@@ -1161,7 +1161,7 @@ def begin_round(G):
                 e = u["st"][nm]
                 if r > e[1]:
                     del u["st"][nm]
-                else:
+                elif cfg["st_grow"]:
                     e[0] = min(e[0] + 1, cfg["st_cap"])
     for s in range(2):
         sd = G["sides"][s]
