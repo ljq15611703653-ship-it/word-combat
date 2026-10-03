@@ -306,7 +306,7 @@ html:not(.classic) {
   .gm.pl .gm-tools button.on { border-color: var(--g-line-hi); background: rgba(74, 163, 255, 0.2); }
   /* 窄条底部的操作卡：内容多了窄条会滚动，操作卡始终贴底可见 */
   .gm.pl .gm-dock { position: sticky; bottom: 0; margin-top: auto; flex: none; z-index: 1; }
-  .gm.pl .gm-dock:empty, .gm.pl .gm-dock[hidden] { display: none; }
+  .gm.pl .gm-dock:empty, .gm.pl .gm-dock[hidden], .gm.pl .gm-dock:has(> .gm-act:empty) { display: none; }
   .gm.pl .gm-dock .gm-act { background: var(--ticks), rgba(9, 18, 36, 0.86); gap: 5px; }
   .gm.pl .gm-dock .gm-act h3 { font-size: 14px; margin: 0; }
   .gm.pl .gm-dock .gm-act p, .gm.pl .gm-dock .gm-act small { font-size: 12px; margin: 0; }

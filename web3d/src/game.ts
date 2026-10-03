@@ -116,6 +116,7 @@ export class Game {
     if (this.pl) {
       this.root.classList.add("pl");
       this.elDock.append(this.elAct);
+      this.elDock.hidden = true;
       this.root.append(this.elTop, this.elUnits, this.elHand, this.elDock);
       this.elPop.append(this.elPopHead, this.elPopBody);
       this.elPop.hidden = true;
