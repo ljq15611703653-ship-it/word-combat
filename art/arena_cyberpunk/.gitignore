@@ -1,0 +1,5 @@
+# 视频抽帧和抠图的中间产物，可从同目录的 mp4 重新生成
+**/raw/
+**/keyed/
+.DS_Store
+.tts-cache/

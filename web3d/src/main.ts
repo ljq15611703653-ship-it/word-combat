@@ -24,8 +24,8 @@ const START: Seat[] = [
   { spec: { id: "r2", art: "firepower_master", flip: true, name: "红二", side: "r", hp: 12, max: 22, incoming: 12 }, sec: 0, sentence: "选择 一个 蓝方 随从 @蓝三 施加 易伤" },
   { spec: { id: "r3", art: "hacker", flip: true, name: "红三", side: "r", hp: 19, max: 19 } },
   { spec: { id: "b1", art: "hacker", name: "蓝一", side: "b", hp: 20, max: 22, incoming: 12 }, sec: 3, sentence: "选择 一个 红方 随从 @红二 造成 #12 伤害" },
-  { spec: { id: "b2", art: "support", name: "蓝二", side: "b", hp: 10, max: 22, incoming: 12 } },
-  { spec: { id: "b3", art: "firepower_master", name: "蓝三", side: "b", hp: 22, max: 22, incoming: 12 } },
+  { spec: { id: "b2", art: "medic_chibi_cast", name: "蓝二", side: "b", hp: 10, max: 22, incoming: 12 } },
+  { spec: { id: "b3", art: "medic_full_cast", name: "蓝三", side: "b", hp: 22, max: 22, incoming: 12 } },
 ];
 // 自上而下：对手人物/卡 → 对手句子 → 时间轴 → 我方人物/卡 → 我方句子
 // 句子是屏幕空间的标注，浮在每个人物右侧的空位里

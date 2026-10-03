@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>词战 · 横版 3v3 原型</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+</head>
+<body class="sv">
+  <div id="app"></div>
+  <div id="plates"></div>
+  <header class="sv-top">
+    <div class="sv-team b"><span class="sv-team-name">蓝方</span><span class="sv-team-hp" id="hp-b"></span></div>
+    <div class="sv-clock"><span class="sv-round">第 1 轮</span><span class="sv-time" id="clock">0.0s</span></div>
+    <div class="sv-team r"><span class="sv-team-hp" id="hp-r"></span><span class="sv-team-name">红方</span></div>
+  </header>
+  <div class="sv-tl"><div class="sv-tl-track"></div><div class="sv-tl-head" id="tl-head"></div><div id="tl-marks"></div></div>
+  <footer class="sv-bar">
+    <div class="sv-who" id="who">点一个随从</div>
+    <div class="sv-dbg">
+      <label>医疗兵站位
+        <select id="dbg-medic"><option value="r">右队（原图朝左）</option><option value="b">左队（镜像）</option></select>
+      </label>
+      <label><input type="checkbox" id="dbg-fx" checked> 全息屏幕效果</label>
+      <label><input type="checkbox" id="dbg-loop"> 动作循环播放</label>
+    </div>
+    <div class="sv-acts">
+      <button id="act-play">播放动作</button>
+      <button id="act-hit">受击</button>
+      <button id="act-ko">击倒 / 复位</button>
+    </div>
+  </footer>
+  <script type="module" src="/src/side/main.ts"></script>
+</body>
+</html>

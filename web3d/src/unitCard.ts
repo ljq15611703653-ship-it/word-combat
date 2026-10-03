@@ -4,6 +4,7 @@
 // 人物：竖直立在投影环上的立绘（轻度屏幕效果），身后一道阵营色的光柱。
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { FLIPBOOKS, artUrl, frameRect } from "./flipbook";
 import { C, STYLE } from "./theme";
 import { buildMechBase, buildMechPlinth, hudPanelTexture, type MechBase } from "./scene/mech";
 import { cardCircuitTexture, plateTexture, warnTexture } from "./textures";
@@ -263,7 +264,7 @@ export class UnitCard {
     beam.renderOrder = 6;
     this.figure.add(beam);
 
-    const map = loader.load(`${import.meta.env.BASE_URL}portraits/${spec.art}.png`);
+    const map = loader.load(artUrl(spec.art));
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
     this.pMat = portraitMaterial(map, seed);
@@ -306,7 +307,7 @@ export class UnitCard {
   setArt(art: string, flip = false) {
     if (this.spec.art === art && !!this.spec.flip === flip) return;
     this.spec.art = art; this.spec.flip = flip;
-    const map = loader.load(`${import.meta.env.BASE_URL}portraits/${art}.png`);
+    const map = loader.load(artUrl(art));
     map.colorSpace = THREE.SRGBColorSpace;
     map.anisotropy = 8;
     this.pMat.uniforms.map.value = map;
@@ -382,6 +383,13 @@ export class UnitCard {
 
     this.armor.update(t, dt);
     this.pMat.uniforms.uTime.value = t;
+    const fb = FLIPBOOKS[this.spec.art];
+    if (fb) {
+      const len = fb.frames / fb.fps;
+      const ph = (t + wp.x * 0.37) % (len + fb.hold);
+      const f = ph < len ? Math.min(fb.frames - 1, Math.floor(ph * fb.fps)) : 0;
+      this.pMat.uniforms.uRect.value.set(...frameRect(fb, f, !!this.spec.flip));
+    }
     this.pMat.uniforms.uGlitch.value = this.fxOn ? this.glitch + this.ko * 0.6 : 0;
     this.pMat.uniforms.uOpacity.value = 1 - this.ko * 0.6;
     this.beam.uniforms.uTime.value = t;
