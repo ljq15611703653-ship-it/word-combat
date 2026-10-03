@@ -46,6 +46,7 @@ BASE = dict(
     pass_gain=0.3, ko_look=0.5, danger_hp=4, danger_w=0.0, combo_k=6, smart_late=1, cont_look=0.6,
     rep_max=3,
     off="",
+    rand_deck=0, look=0, look_n=4, w_hp=0.8, w_st=0.6, w_cost=0.6, w_once=0.5, w_reuse=0.25,
     b_once=0, x_single=0, z_free=0, z_norep=0, y_nodef=0, y_single=0,
 )
 
@@ -63,6 +64,8 @@ def cfg_from(over):
     for k, v in over.items():
         if k in BASE and not isinstance(BASE[k], str):
             c[k] = type(BASE[k])(float(v)) if isinstance(BASE[k], int) else type(BASE[k])(v)
+        elif k.startswith("s0_") or k.startswith("s1_"):
+            c[k] = float(v)
         else:
             c[k] = v
     c["target"] = {"并": c["t_chain"], "续": c["t_cont"], "择": c["t_pick"], "血": c["t_blood"]}
@@ -82,7 +85,16 @@ def new_game(cfg, c0, c1, rng):
                   "talent": [Counter(), Counter()], "clauses": [Counter(), Counter()], "words": [Counter(), Counter()]}}
     U = []
     for s, c in enumerate((c0, c1)):
-        G["sides"].append({"cls": c, "ap": cfg["ap_start"], "deck": dict(PRESET[c]), "used": Counter(),
+        deck = dict(PRESET[c])
+        if cfg["rand_deck"]:
+            deck = Counter()
+            ws = list(PRICE)
+            while sum(deck.values()) < 10:
+                w = rng.choice(ws)
+                if deck[w] < 2:
+                    deck[w] += 1
+            deck = dict(deck)
+        G["sides"].append({"cls": c, "ap": cfg["ap_start"], "deck": deck, "used": Counter(),
                            "prev": Counter(), "cards": [], "lad": set()})
         for i in range(3):
             U.append({"uid": s * 3 + i, "side": s, "hp": 7, "mx": 7, "down": -1, "st": {}, "kw": KWS[c][i],
@@ -491,18 +503,19 @@ def util(R, s, G):
     u = 100.0 * (ps - po)
     hs = sum(x["hp"] for x in R["U"] if x["side"] == s and x["down"] == -1)
     ho = sum(x["hp"] for x in R["U"] if x["side"] != s and x["down"] == -1)
-    u += 0.8 * (hs - ho)
-    u += 0.6 * (stat_value(R, s) - stat_value(R, 1 - s))
+    W = lambda k: cfg.get("s%d_%s" % (s, k), cfg[k])
+    u += W("w_hp") * (hs - ho)
+    u += W("w_st") * (stat_value(R, s) - stat_value(R, 1 - s))
     cv0 = cont_value(R, s, G)
     cv1 = cont_value(R, 1 - s, G)
     u += cv0 * (100.0 / cfg["target"][c0] if c0 == "续" else 0.5) - cv1 * (100.0 / cfg["target"][c1] if c1 == "续" else 0.5)
-    kp = cfg["ko_pct"] * 100.0 * cfg["ko_look"]
+    kp = cfg["ko_pct"] * 100.0 * W("ko_look")
     if kp > 0:
         for x in R["U"]:
             if x["down"] == -1:
                 frac = 1.0 - x["hp"] / float(x["mx"])
                 # 残血的随从下一轮很容易被收掉：额外算一份风险
-                danger = max(0.0, (cfg["danger_hp"] - x["hp"]) / float(cfg["danger_hp"])) * cfg["danger_w"]
+                danger = max(0.0, (cfg["danger_hp"] - x["hp"]) / float(cfg["danger_hp"])) * W("danger_w")
                 u += kp * (frac + danger) if x["side"] != s else -kp * (frac + danger)
     if ps >= 1.0 or po >= 1.0:
         u += 500 if ps > po else (-500 if po > ps else 0)
@@ -745,19 +758,35 @@ def choose(G, s, declared, remaining, res):
     cls2 = [G["sides"][0]["cls"], G["sides"][1]["cls"]]
     R0 = G["R"]
     cp = caps(G, s)
+    # 预判：对方还没宣告的随从，假设它们会打我方血最少的一个（第 2 秒，打 对方手里最大的数字）
+    proxy = []
+    look = cfg["look"] == 2 or cfg["look"] == (s + 1)
+    if look:
+        orem = G.get("_rem", {}).get(1 - s, [])
+        mine = [u for u in R0["U"] if u["side"] == s and u["down"] == -1]
+        if mine:
+            vals = [c["v"] for c in G["sides"][1 - s]["cards"]] + [1]
+            big = min(max(vals), cfg["look_n"])
+            for k, ou in enumerate(orem):
+                if R0["U"][ou]["down"] != -1:
+                    continue
+                tgt = min(mine, key=lambda u: u["hp"])
+                proxy.append({"side": 1 - s, "uid": ou, "start": 2, "cl": [{"k": "atk", "side": "enemy", "count": 1, "tg": [tgt["uid"]], "n": big, "rep": 1}],
+                              "cost": 0, "blood": 0, "def": False, "ord": 500 + k})
     base_R = clone_R(R0)
-    resolve(base_R, declared, cfg, cls2, G["round"])
+    resolve(base_R, declared + proxy, cfg, cls2, G["round"])
     u0 = util(base_R, s, G)
     cards = G["sides"][s]["cards"]
+    Wc = lambda k: cfg.get("s%d_%s" % (s, k), cfg[k])
     enemy_starts = sorted({a["start"] for a in declared if a["side"] != s})
 
     def evaluate(act):
         act["ord"] = len(declared)
         R = clone_R(R0)
-        resolve(R, declared + [act], cfg, cls2, G["round"])
-        v = util(R, s, G) - 0.6 * act["cost"]
+        resolve(R, declared + [act] + proxy, cfg, cls2, G["round"])
+        v = util(R, s, G) - Wc("w_cost") * act["cost"]
         for i in act["cards"]:
-            v -= (0.5 if cards[i]["once"] else 0.25) * cards[i]["v"]
+            v -= (Wc("w_once") if cards[i]["once"] else Wc("w_reuse")) * cards[i]["v"]
         return v + G["rng"].random() * 0.3
 
     best = None
@@ -830,7 +859,7 @@ def choose(G, s, declared, remaining, res):
         g = lb - u0
         if g < worst_gain:
             worst_gain, worst_uid = g, uid
-    if best is None or best_v - u0 < cfg["pass_gain"]:
+    if best is None or best_v - u0 < Wc("pass_gain"):
         return (worst_uid if worst_uid is not None else remaining[0]), None
     return best["uid"], best
 
@@ -907,6 +936,7 @@ def play_round(G):
             words[w] = n - sd["prev"][w]
         res[s] = {"ap": sd["ap"], "words": words, "cards": set(), "conts": 0}
     declared = []
+    G["_rem"] = remaining
     turn = first
     while remaining[0] or remaining[1]:
         s = turn if remaining[turn] else 1 - turn

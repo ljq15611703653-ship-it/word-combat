@@ -1,0 +1,1 @@
+danger_w=1 z_heal=0 b_stkind=1 b_wind=0 b_cap=7 b_once=1 b_mode=count b_len=0 x_slots=3 x_slots_up= x_single=1 z_free=1 z_norep=1 y_cap=99 y_cap_up= y_nodef=1 y_guard=0 t_chain=34 t_cont=60 t_pick=63 t_blood=81

@@ -1,0 +1,8 @@
+[s0_w_cost=0.3] side0 胜 43.0% (1199局)
+[s0_w_cost=1.0] side0 胜 50.6% (1200局)
+[s0_pass_gain=0] side0 胜 50.8% (1200局)
+[s0_pass_gain=2] side0 胜 46.2% (1200局)
+[s0_w_once=0.2 s0_w_reuse=0.1] side0 胜 54.4% (1199局)
+[s0_w_hp=1.2] side0 胜 50.6% (1200局)
+[s0_w_st=0.3] side0 胜 49.7% (1199局)
+[base] side0 胜 51.3% (1200局)
