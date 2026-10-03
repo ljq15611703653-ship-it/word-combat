@@ -4,7 +4,8 @@ import * as NE from "./engine";
 import type { Act, Clause, RState } from "./engine";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const PASS_GAIN = 0.3, KO_LOOK = 0.5, DANGER_HP = 4, DANGER_W = 1.0, CONT_LOOK = 0.6, COMBO_K = 6, REP_MAX = 3;
+export const PASS_GAIN = 0.3;
+const KO_LOOK = 0.5, DANGER_HP = 4, DANGER_W = 1.0, CONT_LOOK = 0.6, COMBO_K = 6, REP_MAX = 3;
 
 export function statValue(R: RState, s: number): number {
   let v = 0;

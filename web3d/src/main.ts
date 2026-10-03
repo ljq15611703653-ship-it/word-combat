@@ -10,6 +10,7 @@ import { CARD, EMIT, FIG, UnitCard, type UnitSpec } from "./unitCard";
 import { SentencePanel } from "./sentencePanel";
 import { CAT_COLOR, WORDS, parse, type Tok } from "./words";
 import { Live } from "./live";
+import { Game, uidOfCard } from "./game";
 import "./style.css";
 
 // 演示局面：红一第 2 秒打蓝方全部各 12；红二第 0 秒给蓝三易伤；蓝一第 3 秒打红二 12。
@@ -38,6 +39,8 @@ const CANDS = [
 function tokText(t: Tok) {
   return t.k === "word" ? t.w : t.k === "side" ? (t.side === "r" ? "红方" : "蓝方") : t.k === "unit" ? t.name : t.k === "num" ? String(t.v) : `${t.sec}秒`;
 }
+
+let game: Game;
 
 async function main() {
   await Promise.all([
@@ -89,7 +92,7 @@ async function main() {
     cards.push(c);
     // 句子读数面板：屏幕空间，顶边对齐卡的前沿
     const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句",
-      enemy ? undefined : () => { if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); } });
+      enemy ? undefined : () => { if (game?.active) return; if (c.spec.hp > 0) { cards.forEach((o) => o.setSelected(o === c)); openKb(i); } });
     if (seat.sentence) panel.set(parse(seat.sentence), seat.sec ?? 0);
     layer.appendChild(panel.el);
     panels.push(panel);
@@ -286,6 +289,7 @@ async function main() {
   renderer.domElement.addEventListener("click", (e) => {
     hovered = pick(e);
     if (!hovered) return;
+    if (game.active) { game.cardClicked(uidOfCard(cards.indexOf(hovered))); return; }
     const i = cards.indexOf(hovered);
     // 拼句时点任何一张卡 = 把它作为目标放进句子
     if (editing >= 0) {
@@ -318,6 +322,13 @@ async function main() {
     });
     renderTimeline();
   });
+
+  // ---------- 完整对局：真人对电脑 ----------
+  game = new Game({
+    cards, panels, onChange: () => { renderTimeline(); },
+    onToggle: () => { live.stop(); requestAnimationFrame(() => { resize(); }); },
+  });
+  $("fullgame").addEventListener("click", () => { closeKb(); live.stop(); game.open(); });
 
   // ---------- 规则引擎：电脑对电脑 ----------
   const logEl = document.getElementById("live-log");
