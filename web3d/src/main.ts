@@ -4,7 +4,8 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
-import { C } from "./theme";
+import { C, STYLE } from "./theme";
+import { Street } from "./scene/street";
 import { Board } from "./board";
 import { CARD, EMIT, FIG, UnitCard, type UnitSpec } from "./unitCard";
 import { SentencePanel } from "./sentencePanel";
@@ -45,6 +46,7 @@ function tokText(t: Tok) {
 let game: Game;
 let online: OnlineGame;
 
+const BGONLY = typeof location !== "undefined" && new URLSearchParams(location.search).has("bgonly");   // 仅供截图审查背景
 async function main() {
   await Promise.all([
     document.fonts.load('700 64px "Chakra Petch"'),
@@ -71,17 +73,26 @@ async function main() {
   scene.environmentIntensity = 0.3;
 
   // 视角收窄：远近两排的大小差更小，对方的句子不会被透视缩得太小
-  const camera = new THREE.PerspectiveCamera(20, 1, 0.1, 200);
-  const camBase = new THREE.Vector3(0, 11.6, 11.2);
+  const camera = new THREE.PerspectiveCamera(20, 1, 0.1, 300);
+  // 新风格：镜头压低一些，才看得见街两侧的楼；旧风格保持俯拍
+  const camBase = STYLE === "neo" ? new THREE.Vector3(0, 11.4, 11.5) : new THREE.Vector3(0, 11.6, 11.2);
   const look = new THREE.Vector3(0, 0.7, -1.1);
 
-  scene.add(new THREE.HemisphereLight(0x9ff8e8, 0x020d0c, 0.6));
-  const key = new THREE.DirectionalLight(0xe0fff8, 1.4);
-  key.position.set(-5, 12, 6);
-  scene.add(key);
-
-  const board = new Board([], LINE_Z);
-  scene.add(board.root);
+  // 对局背景：新风格 = 赛博朋克街道（src/scene/street.ts），旧风格 = 电路板
+  let street: Street | null = null;
+  let board: Board | null = null;
+  if (STYLE === "neo") {
+    street = new Street(scene);
+    fog.color.copy(street.fogColor);
+    scene.environmentIntensity = 0.5;
+  } else {
+    scene.add(new THREE.HemisphereLight(0x9ff8e8, 0x020d0c, 0.6));
+    const key = new THREE.DirectionalLight(0xe0fff8, 1.4);
+    key.position.set(-5, 12, 6);
+    scene.add(key);
+    board = new Board([], LINE_Z);
+    scene.add(board.root);
+  }
 
   const cards: UnitCard[] = [];
   const panels: SentencePanel[] = [];
@@ -158,10 +169,11 @@ async function main() {
       }
       return { x0, x1, y0, y1 };
     };
+    const shrink = STYLE === "neo" ? 0.84 : 1;   // 新风格：构图往后收，上下多留些街道
     let lo = 6, hi = 120;
     for (let i = 0; i < 24; i++) {
       const mid = (lo + hi) / 2, e = extents(mid);
-      if (e.x1 - e.x0 <= usableW && e.y1 - e.y0 <= usableH * 0.96) hi = mid; else lo = mid;
+      if (e.x1 - e.x0 <= usableW * shrink && e.y1 - e.y0 <= usableH * 0.96 * shrink) hi = mid; else lo = mid;
     }
     const e = extents(hi);
     // 内容中心（NDC）应落在可用区中心；差多少就用 viewOffset 平移多少像素
@@ -437,14 +449,15 @@ async function main() {
     shot.offY += (goal.offY - shot.offY) * f;
     shot.offX += (goal.offX - shot.offX) * f;
     camera.position.copy(shot.look).addScaledVector(camDir, shot.dist);
-    fog.near = shot.dist * 1.05;
-    fog.far = shot.dist * 2.2;
+    fog.near = shot.dist * (street ? 2.2 : 1.05);
+    fog.far = shot.dist * (street ? 5.2 : 2.2);
     camera.lookAt(shot.look);
     const w = app.clientWidth, h = app.clientHeight;
     camera.setViewOffset(w, h, shot.offX, -shot.offY, w, h);
 
-    board.update(t);
-    for (const c of cards) c.update(t, dt, camera);
+    board?.update(t);
+    street?.update(t);
+    for (const c of cards) { c.update(t, dt, camera); if (BGONLY) c.root.visible = false; }
     composer.render();
     placePanels(w);
   });
