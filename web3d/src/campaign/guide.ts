@@ -85,6 +85,9 @@ export class GuideTracker {
     return "";
   }
 
+  /** 说明文字开头如果又写了「【词】：」就去掉（标题里已经有词名） */
+  private body(w: string | number | undefined, s: string): string { return s.replace(new RegExp("^【" + String(w) + "】[：:]?\s*"), ""); }
+
   /** 气泡里的「为什么点它」 */
   hint(c: GameClick): string {
     const e = this.expect(c), g = this.cur;
@@ -93,7 +96,7 @@ export class GuideTracker {
     switch (e.kind) {
       case "unit": return `<b>先点它：${this.nm(e.uid!)}</b><br>让它出手，给它拼一句。${tip}`;
       case "pass": return `<b>点它：${this.nm(e.uid!)}</b><br>这个随从这一轮不出手（引导里没有它的句子）。${tip}`;
-      case "word": return `<b>【${e.value}】</b><br>${g?.notes?.[c.tokens] ?? WORDS[String(e.value)]?.desc ?? BASIC_DESC[String(e.value)] ?? ""}`;
+      case "word": return `<b>【${e.value}】</b><br>${this.body(e.value, g?.notes?.[c.tokens] ?? WORDS[String(e.value)]?.desc ?? BASIC_DESC[String(e.value)] ?? "")}`;
       case "num": return `<b>数字牌 ${e.value}</b><br>${g?.notes?.[c.tokens] ?? (e.value === 1 ? "1 是免费的。" : "2 以上要用手里的数字牌。")}`;
       case "done": return `<b>拼完了</b><br>点这里确认这一句。`;
       case "target": return `<b>点目标：${this.nm(e.uid!)}</b><br>${g?.targetNote ?? "直接点场上发光的那张卡，或右边列表。"}`;

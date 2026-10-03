@@ -197,23 +197,6 @@ async function main() {
   ui.showMenu();
   (window as unknown as { __cg: CampaignUI }).__cg = ui;   // 调试 / 自动化用
 
-  // 截图 / 演示用：地址后加 #shot=关卡,步数 → 自动开这一关，点掉对话，再替玩家点「步数」次发光的按钮后停住（步数 -1 = 停在第一段对话）
-  const demo = /shot=(\d+),(-?\d+)/.exec(location.hash);
-  if (demo) {
-    ui.start(+demo[1]);
-    let left = +demo[2];
-    const tick = () => {
-      if (left < 0) return;
-      const say = document.querySelector(".cg-backdrop:not([hidden]) .cg-say button:last-child") as HTMLElement | null;
-      if (say) { say.click(); setTimeout(tick, 150); return; }
-      if (left === 0) return;
-      const hl = document.querySelector(".gm .hl") as HTMLElement | null;
-      if (hl) { hl.click(); left--; } else if (game.hlCards.length) { ui.cardClicked(game.hlCards[0]); left--; }
-      setTimeout(tick, 250);
-    };
-    setTimeout(tick, 600);
-  }
-
   function placePanels(w: number) {
     camera.updateMatrixWorld();
     const h = app.clientHeight;
