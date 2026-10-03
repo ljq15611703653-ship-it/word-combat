@@ -62,7 +62,7 @@ BASE = dict(
     # 电脑
     pass_gain=0.3, ko_look=0.5, danger_hp=4, danger_w=0.0, combo_k=6, smart_late=1, cont_look=0.6,
     rep_max=3,
-    off="",
+    off="", st_cap=99, blk_hp=0, blk_dice=1,
     b_once=0, x_single=0, z_free=0, z_norep=0, y_nodef=0, y_single=0,
 )
 
@@ -199,6 +199,7 @@ def hit(R, cfg, cls, s, cu, tu, base, a, ci, cont, pierce=False):
         r = min(tu["mit"], amt)
         amt -= r
         if enemy:
+            R.setdefault("blk", [0, 0])[o] += r
             for key in tu["msrc"]:
                 R["eff"].add(key)
             if cls[o] == "续" and tu["mitc"] > 0:
@@ -207,14 +208,17 @@ def hit(R, cfg, cls, s, cu, tu, base, a, ci, cont, pierce=False):
         r = min(tu["shield"], amt)
         tu["shield"] -= r
         amt -= r
+        R.setdefault("blk", [0, 0])[o] += r
     if amt > 0 and enemy and tu["kw"] == "首挡" and not tu["kws"] and not pierce:
         tu["kws"] = True
+        R.setdefault("blk", [0, 0])[o] += amt
         amt = 0
     back = 0
     if amt > 0 and enemy and not pierce:
         for l in tu["lis"]:
             if l["k"] == "redirect":
                 back = amt
+                R.setdefault("blk", [0, 0])[o] += amt
                 amt = 0
                 R["eff"].add(l["src"])
                 break
@@ -397,7 +401,7 @@ def fire(R, cfg, cls, a, acts, rnd, t):
                     continue
                 e = tu["st"].get(nm)
                 if e:
-                    e[0] += 1
+                    e[0] = min(e[0] + 1, cfg["st_cap"])
                     e[1] = max(e[1], rnd + cl["n"] - 1)
                 else:
                     tu["st"][nm] = [1, rnd + cl["n"] - 1, s]
@@ -1158,7 +1162,7 @@ def begin_round(G):
                 if r > e[1]:
                     del u["st"][nm]
                 else:
-                    e[0] += 1
+                    e[0] = min(e[0] + 1, cfg["st_cap"])
     for s in range(2):
         sd = G["sides"][s]
         if sd.get("store"):
@@ -1223,6 +1227,7 @@ def play_round(G):
     G["_decl"] = declared
     R = G["R"]
     R["kos"] = [0, 0]
+    R["blk"] = [0, 0]
     R["lost"] = [0, 0]
     R["fz"] = [0, 0]
     R["maxhit"] = 0
@@ -1276,6 +1281,12 @@ def play_round(G):
     for s in range(2):
         sd = G["sides"][s]
         lost = R["lost"][s] + (sum(a.get("blood", 0) for a in declared if a["side"] == s) if cfg["y_dice"] else 0)
+        blk = R.get("blk", [0, 0])[s]
+        if cfg["blk_hp"] and blk >= cfg["blk_hp"]:
+            for _ in range(cfg["blk_dice"]):
+                v = G["rng"].randint(1, 6)
+                if v > 1:
+                    sd["cards"].append({"v": v, "once": True, "last": -9})
         if lost >= cfg["dice_hp"] or R["kos"][s] > 0:
             for _ in range(cfg["dice_count"]):
                 v = G["rng"].randint(1, 6)
