@@ -1,0 +1,38 @@
+/* 技能演出：覆盖层在 .cam 里，随镜头缩放。只用 transform/opacity 做动画 */
+.cam { position: absolute; inset: 0; transform-origin: 0 0; will-change: transform; }
+.vx-layer { position: absolute; inset: 0; pointer-events: none; z-index: 40; }
+.vx-layer > *, .vx-grp > * { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+.vx-grp { position: absolute; inset: 0; }
+.vx-lift { opacity: .18; transition: opacity .15s; }
+.vx-shell { transform-origin: 50% 100%; }
+.vx-shell-svg { display: block; filter: drop-shadow(0 0 8px currentColor); }
+.vx-tok { padding: 2px 8px; font-size: 14px; font-weight: 800; line-height: 20px; color: #fff; background: rgba(11, 6, 20, .92); border: 1.5px solid var(--c, #fff); white-space: nowrap; box-shadow: 0 0 10px -2px var(--c, #fff); clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px)); }
+.vx-layer .vx-tok { border-color: #ffffffcc; }
+.vx-tok.s-bing { border-color: #ff2d95; background: #2a0a1f; } .vx-tok.s-bing.snap { background: #ff2d95; color: #14031c; }
+.vx-tok.s-yin { border-color: #00e5ff; border-style: dashed; border-radius: 12px; clip-path: none; background: #04222a; } .vx-tok.s-yin.lit { background: #00e5ff; color: #04222a; }
+.vx-tok.s-xian { border-color: #b388ff; border-width: 2px; background: #1c1034; clip-path: none; } .vx-tok.s-xian.locked { border-color: #ff2d95; box-shadow: 0 0 0 2px #1c1034, 0 0 0 4px #ff2d95; }
+.vx-tok.s-zhuang { border-color: #ffd23f; border-radius: 10px 10px 14px 6px; clip-path: none; background: #2a2208; }
+.vx-tok.ghost { opacity: 0; } .vx-tok.fired { opacity: .35; } .vx-tok.pulse { background: #fff; color: #111; }
+.vx-tok.trig { border-color: #ffd23f; color: #ffd23f; } .vx-tok.victim { border-color: #ff5c7a; color: #ff9fb0; }
+.vx-pushtag { font-weight: 900; font-size: 14px; text-shadow: 0 0 6px #000; white-space: nowrap; }
+.vx-scan { width: 14px; background: linear-gradient(90deg, transparent, #fff, transparent); mix-blend-mode: screen; }
+.vx-sp { width: 8px; height: 8px; background: var(--c); } .vx-sp.sq { transform-origin: center; } .vx-sp.blob { border-radius: 50%; }
+.vx-sp.x, .vx-sp.plus, .vx-sp.bit { background: none; color: var(--c); font: 900 14px/8px monospace; text-shadow: 0 0 6px var(--c); }
+.vx-drop { width: 6px; height: 9px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: var(--c); }
+.vx-ring { width: var(--sz, 60px); height: var(--sz, 60px); border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 14px currentColor; }
+.vx-blade { width: 54px; height: 10px; background: linear-gradient(90deg, transparent, var(--c) 40%, #fff); clip-path: polygon(0 40%, 80% 0, 100% 50%, 80% 100%, 0 60%); filter: drop-shadow(0 0 6px var(--c)); }
+.vx-blade.needle { height: 5px; width: 70px; background: linear-gradient(90deg, transparent, #fff); }
+.vx-bit { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 8px var(--c); }
+.vx-whip { height: 4px; transform-origin: 0 50%; background: repeating-linear-gradient(90deg, var(--c) 0 8px, transparent 8px 12px); filter: drop-shadow(0 0 4px var(--c)); }
+.vx-spike { width: 14px; height: 16px; background: var(--c); clip-path: polygon(0 0, 100% 50%, 0 100%, 25% 50%); filter: drop-shadow(0 0 5px var(--c)); }
+.vx-glob { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, var(--c2), var(--c)); box-shadow: 0 0 12px var(--c); }
+.vx-mote { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+.vx-hex { width: 14px; height: 14px; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%); }
+.vx-dome { border-radius: 50%; border: 3px solid var(--c); background: radial-gradient(circle, transparent 50%, color-mix(in srgb, var(--c) 35%, transparent)); box-shadow: 0 0 20px var(--c), inset 0 0 20px var(--c); }
+.vx-orb { width: 36px; height: 36px; border-radius: 50%; background: radial-gradient(circle, #fff, var(--oc) 55%, transparent 72%); box-shadow: 0 0 22px var(--oc2); }
+.vx-reflect svg, .vx-crack svg { display: block; }
+.vx-ghostnum { font: 800 12px monospace; color: #00e5ff; text-shadow: 0 0 6px #00e5ff; }
+.vx-lock svg { display: block; filter: drop-shadow(0 0 5px #000); }
+.vx-heat { inset: 0; width: 100%; height: 100%; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 60, 40, .8)); }
+.vx-trig { animation: vxtrig .7s; } @keyframes vxtrig { 30% { background: #ffd23f55; color: #fff; filter: brightness(1.6); } }
+.acts .skip { border-color: var(--ye); color: var(--ye); }

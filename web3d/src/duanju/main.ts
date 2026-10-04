@@ -28,7 +28,7 @@ function play() {
   battle?.destroy();
   dj.state = "battle"; root.className = "dj-root battle";
   const b = new Battle(root, st, {
-    auto: AUTO_GAMES > 0, fast: FAST,
+    auto: AUTO_GAMES > 0, fast: FAST && q.get("speed") === null, speed: q.get("speed") === null ? undefined : +q.get("speed")!,
     onExit: setup,
     onEnd: ({ match, won }) => {
       dj.games.push(won); dj.state = "end"; root.className = "dj-root end";

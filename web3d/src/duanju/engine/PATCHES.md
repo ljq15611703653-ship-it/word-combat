@@ -24,3 +24,6 @@
 
 原因：Ev 日志里受伤/恢复/倒下没有「目标随从」和「第几秒」，只靠日志无法还原回放。
 engine/api.ts 的 Match.resolve() 用 setTrace 收集，再按 sec 稳定排序，过热展开成逐随从的 hit。
+
+## V1（VFX 分支，改的是手写的 api.ts，不是同步拷贝）
+- `ReplayEvent` 增加可选字段 `kinds / start / ptgt / pn`（仅 fire 事件）：结算前拷贝 `s.decl`，`clauseKinds()` 列出这句话的动作种类，供 `vfx/` 选演出；延后的目标随从按「对方宣告序第 ord 个」推测。引擎本体与 sync 脚本不变。
