@@ -1,0 +1,125 @@
+// 《断·句》故事模式入口：序章漫画 → 选关页 → 每关（标题卡 → 关前漫画 → 对话 → 教学战斗 → 对话 → 关后漫画）。
+import "../ui.css";
+import "./story.css";
+import { backgroundFor } from "../art";
+import { loadComicData, playSegment, type ComicData } from "./comic";
+import { playDialog, type Line } from "./dialog/dialog";
+import { runTeachBattle, type LevelDialog } from "./teach/battleRun";
+import { TeachSession, type Curriculum } from "./teach/session";
+
+const BASE: string = (import.meta as any).env?.BASE_URL ?? "/";
+const root = document.getElementById("app")!;
+const q = new URLSearchParams(location.search);
+const sj: { errors: string[]; state: string; beat: number } = { errors: [], state: "init", beat: 0 };
+(window as any).__dj = sj;
+(globalThis as any).__storyErr = (e: string) => sj.errors.push(e);
+addEventListener("error", (e) => sj.errors.push(String(e.message)));
+addEventListener("unhandledrejection", (e) => sj.errors.push(String((e as PromiseRejectionEvent).reason)));
+
+interface Progress { prologue: boolean; done: number[] }
+const KEY = "duanju.story.v1";
+const loadP = (): Progress => { try { const j = JSON.parse(localStorage.getItem(KEY) ?? "null"); if (j) return { prologue: !!j.prologue, done: j.done ?? [] }; } catch { /* */ } return { prologue: false, done: [] }; };
+const saveP = (p: Progress) => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* */ } };
+let prog = loadP();
+const fast = q.get("fast") === "1";
+let skipStory = q.get("skip") === "1";
+
+let cur: Curriculum, dialogs: LevelDialog[], comic: ComicData;
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+const unlocked = (n: number) => q.get("unlock") === "all" || n === 1 || prog.done.includes(n - 1);
+
+function layer(cls: string): HTMLElement { const d = document.createElement("div"); d.className = cls; root.appendChild(d); return d; }
+async function comicSeg(level: number, when: "pre" | "post") {
+  if (skipStory) return;
+  const l = layer("st-comic");
+  const { done } = playSegment(l, comic, level, when, { auto: false });
+  await done; l.remove();
+}
+async function dialogSeg(lines: Line[] | undefined, hist: Line[], n = 0) {
+  if (skipStory || !lines?.length) return;
+  const l = layer("st-dlg"); if (n) l.style.backgroundImage = `linear-gradient(180deg, rgba(8,3,18,.35), rgba(8,3,18,.7)), url(${backgroundFor(n)})`;
+  await playDialog(l, lines, { history: hist, onSkipAll: () => { skipStory = true; }, speed: fast ? 0 : 1 });
+  l.remove();
+}
+async function titleCard(n: number, name: string, teach: string[]) {
+  const l = layer("st-title");
+  l.innerHTML = `<div class="tt"><small>节拍 ${String(n).padStart(2, "0")}</small><h1>${esc(name)}</h1><p>${teach.map((t) => `<i>${esc(t)}</i>`).join("")}</p></div>`;
+  await Promise.race([sleep(fast ? 50 : 1900), new Promise<void>((r) => l.addEventListener("click", () => r()))]);
+  l.remove();
+}
+function retryPrompt(): Promise<"retry" | "quit"> {
+  return new Promise((res) => {
+    const l = layer("st-retry");
+    l.innerHTML = `<div class="box"><h2>没打赢</h2><p>没关系，这一关可以重来。想想高亮的提示。</p><div><button class="bt go" data-r="retry">再来一次</button><button class="bt" data-r="quit">回选关页</button></div></div>`;
+    l.addEventListener("click", (e) => { const r = (e.target as HTMLElement).closest<HTMLElement>("[data-r]")?.dataset.r; if (r) { l.remove(); res(r as "retry" | "quit"); } });
+  });
+}
+
+async function playLevel(n: number) {
+  const beat = cur.beats.find((b) => b.beat === n)!;
+  const dlg = dialogs.find((d) => d.level === n);
+  const hist: Line[] = [];
+  sj.state = "level"; sj.beat = n;
+  skipStory = q.get("skip") === "1";
+  root.className = "dj-root story";
+  await titleCard(n, beat.name, beat.teach);
+  await comicSeg(n, "pre");
+  await dialogSeg(dlg?.intro, hist, n);
+  for (;;) {
+    sj.state = "battle";
+    const ses = new TeachSession(beat, cur);
+    const host = layer("st-battle");
+    const r = await runTeachBattle(host, ses, skipStory ? undefined : dlg, hist, { onSkipAll: () => { skipStory = true; }, fast });
+    host.remove();
+    if (r === "exit") return selectPage();
+    if (r === "win") break;
+    const a = await retryPrompt();
+    if (a === "quit") return selectPage();
+  }
+  sj.state = "after";
+  await dialogSeg(dlg?.outro, hist, n);
+  await comicSeg(n, "post");
+  if (!prog.done.includes(n)) { prog.done.push(n); saveP(prog); }
+  selectPage(n);
+}
+
+function selectPage(justDone?: number) {
+  sj.state = "select"; root.className = "dj-root story select"; root.innerHTML = "";
+  const el = document.createElement("div"); el.className = "st-select"; root.appendChild(el);
+  const nextN = cur.beats.find((b) => !prog.done.includes(b.beat))?.beat;
+  el.innerHTML = `<header><h1><span>断</span>·句 <small>余烬</small></h1><p>十四次“模拟实验”。每一关教一个新东西。</p>
+    <div class="st-tools"><button class="bt" data-a="prologue">重看序章</button><button class="bt" data-a="reset">清除进度</button></div></header>
+    <div class="st-grid">${cur.beats.map((b) => {
+      const done = prog.done.includes(b.beat), open = unlocked(b.beat), now = b.beat === nextN;
+      return `<button class="st-card${done ? " done" : ""}${open ? "" : " lock"}${now ? " now" : ""}${b.beat === justDone ? " just" : ""}" data-n="${b.beat}" ${open ? "" : "disabled"}>
+        <span class="no">${String(b.beat).padStart(2, "0")}</span><b>${esc(b.name)}</b><span class="tg">${b.teach.map((t) => `<i>${esc(t)}</i>`).join("")}</span>
+        <em>${done ? "已通关 ✓" : open ? (now ? "下一关 ▶" : "可重玩") : "未解锁"}</em></button>`;
+    }).join("")}</div>`;
+  el.addEventListener("click", async (e) => {
+    const t = e.target as HTMLElement;
+    const c = t.closest<HTMLElement>(".st-card");
+    if (c && !c.hasAttribute("disabled")) { root.innerHTML = ""; await playLevel(+c.dataset.n!); return; }
+    const a = t.closest<HTMLElement>("[data-a]")?.dataset.a;
+    if (a === "prologue") { root.innerHTML = ""; await comicSeg(0, "pre"); selectPage(); }
+    else if (a === "reset" && confirm("清除所有进度？")) { prog = { prologue: false, done: [] }; saveP(prog); selectPage(); }
+  });
+}
+
+async function boot() {
+  [cur, dialogs, comic] = await Promise.all([
+    fetch(`${BASE}duanju/story/curriculum.json`).then((r) => r.json()),
+    fetch(`${BASE}duanju/story/dialog.json`).then((r) => r.json()),
+    loadComicData(),
+  ]);
+  const jump = +(q.get("beat") ?? 0);
+  if (q.get("unlock") === "all") { /* 调试：全部解锁 */ }
+  if (!prog.prologue && !skipStory && !jump) {
+    root.className = "dj-root story";
+    await comicSeg(0, "pre");
+    prog.prologue = true; saveP(prog);
+  }
+  if (jump) { await playLevel(jump); return; }
+  selectPage();
+}
+boot().catch((e) => { sj.errors.push(String(e?.stack ?? e)); console.error(e); });

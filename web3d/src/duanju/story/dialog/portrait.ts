@@ -17,7 +17,7 @@ function draw(who: string, expr: string): string {
   const W = 360, H = 520, c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d")!, col = colorOf(who), dk = darkOf(who), h = hash(who);
   // 背景光晕
-  const gr = g.createRadialGradient(W / 2, H * 0.45, 20, W / 2, H * 0.45, 260); gr.addColorStop(0, col + "44"); gr.addColorStop(1, col + "00");
+  const gr = g.createRadialGradient(W / 2, H * 0.42, 10, W / 2, H * 0.42, 175); gr.addColorStop(0, col + "44"); gr.addColorStop(1, col + "00");
   g.fillStyle = gr; g.fillRect(0, 0, W, H);
   // 肩与身体
   g.fillStyle = "#120a22"; g.beginPath(); g.moveTo(20, H); g.quadraticCurveTo(30, 330, 130, 300); g.lineTo(230, 300); g.quadraticCurveTo(330, 330, 340, H); g.closePath(); g.fill();

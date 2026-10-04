@@ -1,0 +1,84 @@
+/* 故事模式样式：沿用 ui.css 的变量与斜切语言，克制统一 */
+.dj-root.story { background: var(--ink); }
+.st-battle, .st-comic, .st-dlg, .st-title, .st-retry { position: fixed; inset: 0; }
+.st-comic { z-index: 30; background: #0e0c14; }
+.st-dlg { z-index: 20; background: linear-gradient(160deg, #1a0a33, #0b0614 60%, #10122a) center bottom / cover; }
+.st-title { z-index: 40; background: radial-gradient(90% 90% at 50% 40%, #241046, #07030f); display: grid; place-items: center; text-align: center; cursor: pointer; animation: stIn .35s ease-out; }
+.st-title .tt small { display: block; color: var(--cy); letter-spacing: 6px; font-size: 14px; }
+.st-title h1 { margin: 6px 0 14px; font-size: clamp(54px, 12vw, 110px); letter-spacing: 14px; padding-left: 14px; background: var(--mag); color: var(--ink); display: inline-block; transform: skewX(-8deg); padding: 0 .3em; }
+.st-title p { margin: 0; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.st-title p i { font-style: normal; border: 1px solid var(--line); padding: 3px 12px; color: var(--ye); background: rgba(21, 10, 38, .7); }
+@keyframes stIn { from { opacity: 0; transform: scale(1.04); } }
+.st-retry { z-index: 45; background: rgba(5, 2, 12, .72); display: grid; place-items: center; }
+.st-retry .box { background: var(--ink2); border: 1px solid var(--line); border-left: 4px solid var(--bad); padding: 18px 26px; max-width: 360px; clip-path: var(--cut); text-align: center; }
+.st-retry h2 { margin: 0 0 6px; } .st-retry p { color: var(--dim); margin: 0 0 14px; }
+.st-retry .box div { display: flex; gap: 10px; justify-content: center; }
+.bt.go { background: var(--mag); color: var(--ink); border-color: var(--mag); font-weight: 700; }
+
+/* ---------- 选关页 ---------- */
+.dj-root.story.select { overflow-y: auto; background: linear-gradient(160deg, #1a0a33, #0b0614 55%, #10122a); }
+.st-select { position: relative; max-width: 1040px; margin: 0 auto; padding: 22px 18px 40px; }
+.st-select header { text-align: center; margin-bottom: 14px; }
+.st-select h1 { margin: 0; font-size: 46px; letter-spacing: 6px; display: inline-flex; gap: 6px; align-items: baseline; }
+.st-select h1 span { background: var(--mag); color: var(--ink); padding: 0 12px; transform: skewX(-8deg); display: inline-block; }
+.st-select h1 small { font-size: 18px; color: var(--ye); letter-spacing: 4px; }
+.st-select header p { margin: 4px 0 8px; color: var(--dim); }
+.st-tools { display: flex; gap: 8px; justify-content: center; }
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.st-card { position: relative; text-align: left; background: rgba(21, 10, 38, .85); border: 1px solid var(--line); border-left: 4px solid var(--cy); padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; clip-path: var(--cut); min-height: 112px; }
+.st-card .no { position: absolute; right: 10px; top: 4px; font-size: 34px; font-weight: 800; color: rgba(255, 255, 255, .08); }
+.st-card b { font-size: 20px; letter-spacing: 3px; }
+.st-card .tg { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-card .tg i { font-style: normal; font-size: 11px; color: var(--dim); border: 1px solid #2d1a4d; padding: 0 6px; }
+.st-card em { margin-top: auto; font-style: normal; font-size: 12px; color: var(--cy); }
+.st-card:hover:not(:disabled) { border-color: var(--cy); background: #1c0f33; }
+.st-card.done { border-left-color: var(--ok); } .st-card.done em { color: var(--ok); }
+.st-card.now { border-left-color: var(--mag); box-shadow: 0 0 22px -8px var(--mag); } .st-card.now em { color: var(--mag); font-weight: 700; }
+.st-card.lock { opacity: .6; border-left-color: #3a2a55; } .st-card.lock em { color: var(--dim); }
+.st-card.just { animation: stIn .5s; }
+
+/* ---------- 对话框 ---------- */
+.sd-root { position: absolute; inset: 0; z-index: 60; background: linear-gradient(0deg, rgba(5, 2, 12, .78), rgba(5, 2, 12, 0) 55%); cursor: pointer; outline: none; }
+.st-dlg .sd-root { background: linear-gradient(0deg, rgba(5, 2, 12, .5), transparent 60%); }
+.sd-stage { position: absolute; inset: 0; pointer-events: none; }
+.sd-pt { position: absolute; bottom: 12%; height: min(66vh, 78vw); aspect-ratio: 360/520; opacity: 0; transform: translateY(14px); transition: opacity .2s, transform .2s, filter .2s; filter: brightness(.55) saturate(.6); }
+.sd-pt.left { left: 5%; } .sd-pt.right { right: 5%; }
+.sd-pt img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: block; }
+.sd-pt.on { opacity: 1; transform: none; filter: none; }
+.sd-pt.pop.on { animation: sdPop .22s ease-out; }
+@keyframes sdPop { from { transform: translateY(10px) scale(.97); } }
+.sd-box { position: absolute; left: 50%; bottom: 3.5%; transform: translateX(-50%); width: min(900px, 94vw); min-height: 112px; background: rgba(14, 7, 28, .92); border: 1px solid var(--line); border-top: 3px solid var(--c, var(--cy)); padding: 22px 26px 16px; border-radius: 4px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
+.sd-name { position: absolute; left: 22px; top: -17px; background: var(--c, var(--cy)); color: var(--ink); font-weight: 800; padding: 2px 16px; letter-spacing: 2px; transform: skewX(-8deg); }
+.sd-text { font-size: clamp(16px, 2.2vw, 21px); line-height: 1.7; min-height: 3.4em; }
+.sd-box.paren .sd-text { color: var(--dim); font-style: italic; }
+.sd-box.narr .sd-text { text-align: center; color: #cfc6e6; }
+.sd-next { position: absolute; right: 18px; bottom: 8px; color: var(--c, var(--cy)); opacity: 0; animation: sdBlink 1s infinite; }
+.sd-box.full .sd-next { opacity: 1; }
+@keyframes sdBlink { 50% { transform: translateY(3px); } }
+.sd-bar { position: absolute; right: 12px; top: 12px; display: flex; gap: 6px; }
+.sd-bar button, .sd-logbox button { background: rgba(21, 10, 38, .85); border: 1px solid var(--line); padding: 4px 12px; font-size: 13px; }
+.sd-bar button:hover { border-color: var(--cy); color: var(--cy); }
+.sd-log { position: absolute; inset: 0; background: rgba(5, 2, 12, .8); display: grid; place-items: center; z-index: 5; cursor: default; }
+.sd-logbox { width: min(640px, 92vw); max-height: 78vh; background: var(--ink2); border: 1px solid var(--line); border-left: 4px solid var(--cy); padding: 12px 16px; display: flex; flex-direction: column; }
+.sd-logbox h3 { margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.sd-logl { overflow-y: auto; } .sd-logl p { margin: 0 0 8px; } .sd-logl b { margin-right: 10px; }
+
+/* ---------- 教学战斗 ---------- */
+.story-battle .unit.absent { display: none; }
+.dj-stage.teach .pop [data-a="auto"], .dj-stage.teach .pop [data-a="rules"] { display: none; }
+.tb-bubble { position: absolute; z-index: 50; background: var(--ye); color: #1a1030; padding: 9px 13px; font-weight: 600; font-size: 14px; line-height: 1.5; clip-path: var(--cut); pointer-events: none; box-shadow: 0 6px 22px rgba(0, 0, 0, .45); transition: left .2s, top .2s; }
+.tb-bubble.warn { background: var(--bad); color: #fff; }
+.tb-bubble::after { content: ""; position: absolute; width: 0; height: 0; border: 8px solid transparent; display: none; }
+.tb-bubble[data-arrow="down"]::after { display: block; left: calc(50% - 8px); top: 100%; border-top-color: var(--ye); }
+.tb-bubble[data-arrow="up"]::after { display: block; left: calc(50% - 8px); bottom: 100%; border-bottom-color: var(--ye); }
+.tb-bubble[data-arrow="right"]::after { display: block; left: 100%; top: 14px; border-left-color: var(--ye); }
+.tb-bubble[data-arrow="left"]::after { display: block; right: 100%; top: 14px; border-right-color: var(--ye); }
+.tb-bubble.warn[data-arrow]::after { filter: hue-rotate(0); }
+.guide-hl { animation: gHl 1.1s ease-in-out infinite; }
+.unit.guide-hl .panel { outline: 2px solid var(--ye); outline-offset: 2px; }
+button.guide-hl { box-shadow: 0 0 0 2px var(--ye), 0 0 18px var(--ye); }
+@keyframes gHl { 50% { filter: brightness(1.25); } }
+.dj-menu.guided .mn-row.guide { outline: 2px solid var(--ye); background: rgba(255, 210, 63, .14); animation: gHl 1.1s ease-in-out infinite; }
+.bt.undo { margin-right: 6px; }
+.tb-bubble { clip-path: none; border-radius: 8px; }
+.dj-menu.guided .mn-deck, .dj-menu.guided .mn-q { display: none; }
