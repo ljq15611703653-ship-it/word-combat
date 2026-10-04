@@ -76,7 +76,7 @@ export class DeckBoard {
     o.host.appendChild(this.el);
     this.refreshWords(true);
     this.bind();
-    this.ro = new ResizeObserver(() => this.fit());
+    this.ro = new ResizeObserver(() => { cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(() => this.fit()); });
     this.ro.observe(this.q(".dk-main"));
     this.renderAll(false);
     this.fit();
@@ -122,7 +122,8 @@ export class DeckBoard {
 
   /* ---------- 内部 ---------- */
   private on(t: EventTarget, n: string, f: (e: any) => void) { t.addEventListener(n, f as EventListener); this.listeners.push([t, n, f as EventListener]); }
-  private alive() { if (this.dead) return false; if (!this.el.isConnected) { this.destroy(); return false; } return true; }
+  private seen = false; private raf = 0;
+  private alive() { if (this.dead) return false; if (this.el.isConnected) { this.seen = true; return true; } if (this.seen) this.destroy(); return false; }
   private toast(msg: string) {
     const t = this.q(".dk-toast"); t.textContent = msg; t.classList.add("show");
     clearTimeout(this.toastT); this.toastT = window.setTimeout(() => t.classList.remove("show"), 1900);
@@ -182,7 +183,7 @@ export class DeckBoard {
     el.innerHTML = `<div class="dn"><b>${w.name}</b><span class="tag">${c?.name ?? ""}</span></div>
       <p>${esc(w.desc)}</p><div class="ex">示例　${esc(w.example)}</div>
       <div class="meta"><span>${this.shapeHTML(w, sb ? sb.rot : false)} <b>${d.h}×${d.w}</b>（${area(w)} 格）</span><span>×<b>${k}</b> / 最多 <b>${w.max}</b></span></div>
-      ${sb ? '<div class="acts"><button type="button" class="dk-btn" data-a="rot">旋转 R</button><button type="button" class="dk-btn on" data-a="del">移除</button></div>' : ""}`;
+      ${sb ? '<div class="dk-acts"><button type="button" class="dk-btn" data-a="rot">旋转 R</button><button type="button" class="dk-btn on" data-a="del">移除</button></div>' : ""}`;
   }
   private renderSummary() {
     const cnt = counts(this.blocks), used = usedArea(this.blocks), CAP = this.cols * this.rows;
