@@ -358,6 +358,7 @@ function completeBest(prefix: Token[], ctx: Ctx): { ast: Sentence | null; reason
           for (const v of numVals(sp, ctx)) { if (budget <= 0) return null; const x = rec([...t, v]); if (x) return x; }
           return null;
         }
+        if (sp.c === "NTH") { for (const d of ctx.s.decl.filter((x) => x.side !== ctx.side)) { const x = rec([...t, `第${d.ord + 1}句`]); if (x) return x; } return null; }
         const list = [...expand([sp], ctx, U)];
         const live = sp.c === "TGT" ? list.filter((x) => !isUnitTok(x) || alive(ctx.s, +x[1])) : list;
         if (sp.c === "OBJ") pick = live.includes("类:atk") ? "类:atk" : live[0] ?? null;
