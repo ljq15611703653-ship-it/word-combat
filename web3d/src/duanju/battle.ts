@@ -17,6 +17,33 @@ function posTip(i: number): string {
   if (i === 1) return `数位：用数字牌时牌面 +${P2.POS_NUM}（数字 ≤${P2.POS_NUM + 1} 免牌）${P2.POS_NUM_ONE ? "，只作用于最大的数字" : ""}`;
   return P2.POS3 === "speed" ? `速位：起手最早时间提前 ${P2.POS_SPEED} 秒` : "引用位：引用词不冷却，「全程」半价";
 }
+/** 教学/剧情钩子（story/ 用）。全部可选；不传则行为与原来完全一致 */
+export interface BattleHooks {
+  /** 自定义风格（随从名字/配色）：替代随机的 foe 风格 */
+  styles?: { me: StyleDef; foe: StyleDef };
+  foeDeck?: Record<string, number>;
+  /** Match 建好后调用（改血量/行动点/数字牌/让随从缺席） */
+  setup?(m: Match): void;
+  /** 不上场的随从（隐藏） */
+  absent?: number[];
+  /** 输入方式（替换菜单） */
+  input?: InputMode;
+  /** 脚本化电脑：返回 null 则走默认 AI */
+  foeMove?(m: Match): { unit: number; passed: boolean; text: string; start: number } | null;
+  onMount?(b: Battle): void;
+  /** 每轮宣告开始前 / 结算演出之后（可 await 对话） */
+  onRoundStart?(b: Battle): Promise<void> | void;
+  onRoundEnd?(b: Battle): Promise<void> | void;
+  /** 玩家点「宣告」：返回字符串 = 拒绝并显示提示 */
+  beforeDeclare?(u: number, cl: import("./engine/api").Sentence, start: number, m: Match): string | null;
+  afterDeclare?(u: number, m: Match): void;
+  /** 点「结束宣告」：返回字符串 = 拒绝 */
+  beforeEnd?(m: Match): string | null;
+  /** 允许「撤回」按钮 */
+  undo?: boolean;
+  /** 速度默认值 0..3 */
+  onTick?(b: Battle): void;
+}
 export interface BattleResult { match: Match; won: "win" | "lose" | "draw" }
 
 export class Battle {
@@ -34,23 +61,29 @@ export class Battle {
   private openUnit = -1;
   private waitHuman: ((a: "act" | "end") => void) | null = null;
   private waitBtn: ((v: void) => void) | null = null;
+  hooks?: BattleHooks;
+  private snaps: unknown[] = [];
   private busy = false;
   private aborted = false;
   private collapsed = new Set<number>();
   auto: boolean;
   onEnd: (r: BattleResult) => void;
   onExit: () => void;
-  constructor(root: HTMLElement, st: Settings, opts: { auto?: boolean; fast?: boolean; onEnd: (r: BattleResult) => void; onExit: () => void; seed?: number }) {
+  constructor(root: HTMLElement, st: Settings, opts: { auto?: boolean; fast?: boolean; onEnd: (r: BattleResult) => void; onExit: () => void; seed?: number; hooks?: BattleHooks }) {
+    this.hooks = opts.hooks;
+    if (opts.hooks?.input) this.input = opts.hooks.input;
     this.root = root; this.onEnd = opts.onEnd; this.onExit = opts.onExit; this.auto = !!opts.auto;
     if (opts.fast) this.speedIdx = 3;
     configureRules(st.rules, st.customRules);
     const first = st.first === "random" ? (Math.random() < 0.5 ? 0 : 1) : st.first === "me" ? 0 : 1;
     this.myStyle = styleOf(st.styleId);
     const others = STYLES.filter((s) => s.id !== st.styleId);
-    this.foeStyle = others[Math.floor(Math.random() * others.length)];
+    this.foeStyle = opts.hooks?.styles?.foe ?? others[Math.floor(Math.random() * others.length)];
+    if (opts.hooks?.styles) this.myStyle = opts.hooks.styles.me;
     setUnitNames(this.myStyle.names, this.foeStyle.names);
     const kws = (st.kws ?? []).map((k) => (k === "首挡" || k === "不屈" ? k : ["首挡", "不屈"][Math.floor(Math.random() * 2)]));
-    this.m = new Match({ first, myDeck: st.deck, tier: st.tier, seed: opts.seed, kws: kws.length === 3 ? kws : null });
+    this.m = new Match({ first, myDeck: st.deck, tier: st.tier, seed: opts.seed, kws: kws.length === 3 ? kws : null, foeDeck: opts.hooks?.foeDeck });
+    opts.hooks?.setup?.(this.m);
     this.m.rulesKind = st.rules;
     this.hp0 = Math.max(...this.m.s.hp);
     for (let u = 0; u < 6; u++) { this.disp.hp[u] = this.m.s.hp[u]; this.disp.sh[u] = this.m.s.sh[u]; }
@@ -61,13 +94,13 @@ export class Battle {
   private styleFor(u: number) { return u < 3 ? this.myStyle : this.foeStyle; }
   mount() {
     const r = this.root; r.innerHTML = "";
-    const st = document.createElement("div"); st.className = "dj-stage"; this.stage = st;
+    const st = document.createElement("div"); st.className = "dj-stage"; this.stage = st; if (this.hooks) st.classList.add("teach");
     st.style.setProperty("--me", this.myStyle.accent); st.style.setProperty("--foe", this.foeStyle.accent);
     st.innerHTML = `<div class="bg"></div><div class="vig"></div>
       <div class="col me"></div><div class="col foe"></div>
       <div class="center"><div class="clock" hidden></div><div class="banner" hidden><b></b><span></span></div></div>
       <div class="hud"></div>
-      <div class="acts"><button class="bt skip" data-a="skip" hidden>跳过动画 ⏭</button><button class="bt main" data-a="main"></button><div class="menuwrap"><button class="bt" data-a="menu">菜单 ☰</button><div class="pop" hidden>
+      <div class="acts"><button class="bt undo" data-a="undo" hidden>撤回 ↶</button><button class="bt skip" data-a="skip" hidden>跳过动画 ⏭</button><button class="bt main" data-a="main"></button><div class="menuwrap"><button class="bt" data-a="menu">菜单 ☰</button><div class="pop" hidden>
         <button data-a="speed">动画速度：<b class="spd"></b></button><button data-a="auto">电脑代打：<b class="autov"></b></button><button data-a="rules">规则说明</button><button data-a="exit">退出对局</button></div></div></div>
       <div class="status" aria-live="polite"></div>`;
     r.appendChild(st);
@@ -88,6 +121,7 @@ export class Battle {
     [0, 1, 2, 3, 4, 5].forEach(mk);
     st.addEventListener("click", (e) => { const a = (e.target as HTMLElement).closest<HTMLElement>("[data-a]")?.dataset.a; if (a) this.onAct(a); else st.querySelector<HTMLElement>(".pop")!.hidden = true; });
     this.render();
+    this.hooks?.onMount?.(this);
   }
   render() {
     const m = this.m;
@@ -95,6 +129,7 @@ export class Battle {
       const el = this.unitEls[u], v = m.unitView(u), side = u < 3 ? 0 : 1;
       const hp = this.disp.hp[u], sh = this.disp.sh[u];
       const mx = Math.max(this.hp0, hp);
+      el.classList.toggle("absent", !!this.hooks?.absent?.includes(u));
       el.classList.toggle("dead", hp <= 0 && !v.alive);
       el.querySelector<HTMLElement>(".hpfill")!.style.width = `${Math.max(0, Math.min(100, (hp / mx) * 100))}%`;
       const shEl = el.querySelector<HTMLElement>(".shfill")!; shEl.style.width = `${Math.min(100, (sh / mx) * 100)}%`;
@@ -130,6 +165,7 @@ export class Battle {
     const b = this.stage.querySelector<HTMLButtonElement>('[data-a="main"]')!;
     const labels = { none: "…", end: "结束宣告", resolve: "结算 ▶", next: "下一轮 ▶", wait: "电脑出手中…" } as const;
     b.textContent = labels[this.mainState]; b.disabled = this.mainState === "none" || this.mainState === "wait"; b.classList.toggle("go", this.mainState === "resolve" || this.mainState === "next");
+    this.stage.querySelector<HTMLElement>('[data-a="undo"]')!.hidden = !(this.hooks?.undo && this.snaps.length && this.mainState === "end");
     this.stage.querySelector<HTMLElement>(".spd")!.textContent = ["慢", "正常", "快", "极速"][this.speedIdx];
     this.stage.querySelector<HTMLElement>(".autov")!.textContent = this.auto ? "开" : "关";
   }
@@ -162,21 +198,33 @@ export class Battle {
     this.openUnit = u; this.render();
     this.input.open({
       match: this.m, unit: u, label: `${this.styleFor(u).names[u % 3]}${P2.POS ? "·" + POS_NAME[u % 3] : ""}`, anchor: this.unitEls[u].querySelector(".panel")!, host: this.stage,
-      onDeclare: (cl, start) => { this.closeInput(); if (this.m.declare(u, cl, start)) { this.render(); this.waitHuman?.("act"); } else this.setStatus("这句现在说不了"); },
+      onDeclare: (cl, start) => {
+        const err = this.hooks?.beforeDeclare?.(u, cl, start, this.m);
+        if (err) { this.closeInput(); this.setStatus(err); this.hooks?.onTick?.(this); return; }
+        const snap = this.hooks?.undo ? this.m.snap() : null;
+        this.closeInput();
+        if (this.m.declare(u, cl, start)) { if (snap) this.snaps.push(snap); this.hooks?.afterDeclare?.(u, this.m); this.render(); this.waitHuman?.("act"); } else this.setStatus("这句现在说不了");
+      },
       onPass: () => { this.closeInput(); this.m.pass(u); this.render(); this.waitHuman?.("act"); },
       onCancel: () => this.closeInput(),
     });
   }
   private closeInput() { this.input.close(); this.openUnit = -1; this.render(); }
+  /** 撤回最近一句（只在宣告阶段、电脑没动之前） */
+  undo() {
+    const sn = this.snaps.pop(); if (!sn || this.mainState !== "end") return;
+    this.closeInput(); this.m.restore(sn); this.render(); this.waitHuman?.("act");
+  }
   private onAct(a: string) {
     const pop = this.stage.querySelector<HTMLElement>(".pop")!;
     if (a !== "menu") pop.hidden = true;
     if (a === "menu") pop.hidden = !pop.hidden;
     else if (a === "main") {
-      if (this.mainState === "end") { this.closeInput(); this.m.passRest(); this.render(); this.waitHuman?.("end"); }
+      if (this.mainState === "end") { const err = this.hooks?.beforeEnd?.(this.m); if (err) { this.setStatus(err); this.hooks?.onTick?.(this); return; } this.closeInput(); this.m.passRest(); this.render(); this.waitHuman?.("end"); }
       else if (this.mainState === "resolve" || this.mainState === "next") this.waitBtn?.();
     }
     else if (a === "skip") this.cast.skip();
+    else if (a === "undo") this.undo();
     else if (a === "speed") { this.speedIdx = (this.speedIdx + 1) % 4; this.renderMain(); }
     else if (a === "auto") { this.auto = !this.auto; this.renderMain(); if (this.auto) { this.closeInput(); this.waitHuman?.("act"); } }
     else if (a === "rules") this.showRules();
@@ -230,6 +278,8 @@ export class Battle {
     this.hp0 = Math.max(...m.s.hp);
     this.render();
     while (!this.aborted) {
+      this.snaps.length = 0;
+      if (this.hooks?.onRoundStart) { this.mainState = "none"; this.render(); await this.hooks.onRoundStart(this); if (this.aborted) return; }
       // ---- 宣告阶段 ----
       for (let g = 0; g < 40 && !this.aborted; g++) {
         const w = m.who(); if (w === -1) break;
@@ -237,7 +287,8 @@ export class Battle {
           this.mainState = "wait"; this.setStatus("电脑在想…"); this.render();
           this.busy = true;
           await sleep(this.speedIdx === 3 ? 0 : 380 / this.view.speed());
-          const mv = m.aiMove();
+          this.snaps.length = 0;
+          const mv = this.hooks?.foeMove?.(m) ?? m.aiMove();
           if (mv.passed) { this.render(); await sleep(this.speedIdx === 3 ? 0 : 260 / this.view.speed()); }
           else { await this.typeInto(mv.unit, mv.text); await sleep(this.speedIdx === 3 ? 0 : 220 / this.view.speed()); }
           this.busy = false;
@@ -264,6 +315,7 @@ export class Battle {
       for (let u = 0; u < 6; u++) { this.disp.hp[u] = Math.max(0, m.s.hp[u]); this.disp.sh[u] = m.s.sh[u]; }
       this.unitEls.forEach((el, u) => el.classList.toggle("fall", !m.unitAlive(u)));
       this.busy = false; this.render();
+      if (this.hooks?.onRoundEnd) { await this.hooks.onRoundEnd(this); if (this.aborted) return; }
       if (m.over()) {
         this.mainState = "none"; this.render();
         await sleep(this.speedIdx === 3 ? 0 : 1100);
