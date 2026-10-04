@@ -94,7 +94,7 @@
     {
       "beat": 7, "name": "屋顶", "teach": ["「转移」"],
       "foeNames": ["模拟体甲", "模拟体乙", "模拟体丙"], "first": "foe", "seed": 17,
-      "me": { "units": [0, 1], "hp": { "0": 2 }, "deck": { "转移": 1 } }, "foe": { "units": [3], "hp": { "3": 4 }, "deck": {} },
+      "me": { "units": [0, 1], "hp": { "0": 2 }, "deck": { "转移": 1 } }, "foe": { "units": [3], "hp": { "3": 6 }, "deck": {} },
       "allow": { "verbs": ["dmg"], "kinds": ["redirect"], "maxN": 3, "tgs": [0, 1, 3] },
       "rounds": [
         { "foe": [{ "unit": 3, "s": [{ "verb": "dmg", "n": 3, "tg": 0 }], "start": 4 }], "steps": [
@@ -131,13 +131,13 @@
           { "unit": 0, "want": [{ "verb": "dmg", "n": 1, "tg": 3 }], "startMin": 3, "say": { "unit": "补最后一下。", "menu": "「受伤1」。", "wrong": "选「受伤1」。", "start": "起手秒 ≥ 3。" } }] }
       ]
     },
-    { "beat": 10, "name": "双生", "teach": ["并流：一句多段"], "foeNames": ["双生甲", "双生乙", "双生丙"], "first": "me", "seed": 21, "tier": "入门", "foeHp": 4, "rules": "default", "meDeck": "newbie", "foeDeck": "newbie", "hintKind": "chain",
+    { "beat": 10, "name": "双生", "teach": ["并流：一句多段"], "foeNames": ["双生甲", "双生乙", "双生丙"], "first": "me", "seed": 21, "tier": "入门", "foeHp": 3, "rules": "default", "meDeck": "newbie", "foeDeck": "newbie", "hintKind": "chain",
       "intro": "「并」可以让一句话接好几段。试着说一句带「并 / 若成功」的长句。" },
-    { "beat": 11, "name": "长明", "teach": ["状态流：长期状态"], "foeNames": ["长明甲", "长明乙", "长明丙"], "first": "me", "seed": 22, "tier": "入门", "foeHp": 4, "rules": "default", "meDeck": "state", "foeDeck": "state", "hintKind": "standing",
+    { "beat": 11, "name": "长明", "teach": ["状态流：长期状态"], "foeNames": ["长明甲", "长明乙", "长明丙"], "first": "me", "seed": 22, "tier": "入门", "foeHp": 3, "rules": "default", "meDeck": "state", "foeDeck": "state", "hintKind": "standing",
       "intro": "长期的句子会挂在场上，之后每轮触发。试着说一句「每当 以后N轮」。" },
-    { "beat": 12, "name": "待定", "teach": ["限制流：不得 / 设伏"], "foeNames": ["待定甲", "待定乙", "待定丙"], "first": "me", "seed": 23, "tier": "入门", "foeHp": 4, "rules": "default", "meDeck": "forbid", "foeDeck": "forbid", "hintKind": "forbid",
+    { "beat": 12, "name": "待定", "teach": ["限制流：不得 / 设伏"], "foeNames": ["待定甲", "待定乙", "待定丙"], "first": "me", "seed": 23, "tier": "入门", "foeHp": 3, "rules": "default", "meDeck": "forbid", "foeDeck": "forbid", "hintKind": "forbid",
       "intro": "「不得」：对手做了这件事就要受罚。试着说一句带「不得」的话。" },
-    { "beat": 13, "name": "赤心", "teach": ["引用流：读历史 / 引用量词 / 全程"], "foeNames": ["赤心甲", "赤心乙", "赤心丙"], "first": "me", "seed": 24, "tier": "入门", "foeHp": 4, "rules": "default", "meDeck": "quote", "foeDeck": "quote", "hintKind": "quote",
+    { "beat": 13, "name": "赤心", "teach": ["引用流：读历史 / 引用量词 / 全程"], "foeNames": ["赤心甲", "赤心乙", "赤心丙"], "first": "me", "seed": 24, "tier": "入门", "foeHp": 3, "rules": "default", "meDeck": "quote", "foeDeck": "quote", "hintKind": "quote",
       "intro": "把前几轮发生的事当数字用：试着说一句数字里带「累计 / 次数」的话。" },
     { "beat": 14, "name": "毕业", "teach": ["完整规则对打"], "foeNames": ["叶晴", "宋伯", "阿豆"], "first": "me", "seed": 25, "tier": "普通", "rules": "default", "meDeck": "newbie", "foeDeck": "quote", "hintKind": null,
       "intro": "没有引导了。把学到的全用上。" }

@@ -45,7 +45,7 @@
 .sd-pt.left { left: 5%; } .sd-pt.right { right: 5%; }
 .sd-pt img { width: 100%; height: 100%; object-fit: contain; object-position: bottom; display: block; }
 .sd-pt.on { opacity: 1; transform: none; filter: none; }
-.sd-pt.pop.on { animation: sdPop .22s ease-out; }
+.sd-pt.enter.on { animation: sdPop .22s ease-out; }
 @keyframes sdPop { from { transform: translateY(10px) scale(.97); } }
 .sd-box { position: absolute; left: 50%; bottom: 3.5%; transform: translateX(-50%); width: min(900px, 94vw); min-height: 112px; background: rgba(14, 7, 28, .92); border: 1px solid var(--line); border-top: 3px solid var(--c, var(--cy)); padding: 22px 26px 16px; border-radius: 4px; box-shadow: 0 8px 30px rgba(0,0,0,.5); }
 .sd-name { position: absolute; left: 22px; top: -17px; background: var(--c, var(--cy)); color: var(--ink); font-weight: 800; padding: 2px 16px; letter-spacing: 2px; transform: skewX(-8deg); }

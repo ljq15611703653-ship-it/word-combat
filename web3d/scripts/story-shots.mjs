@@ -53,16 +53,16 @@ const STEP = `(()=>{
 const VIEWS = [["1440x810", 1440, 810, false], ["390x844", 390, 844, true]].filter((v) => !only || v[0] === only);
 for (const [name, w, h, mobile] of VIEWS) {
   await cdp("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: mobile ? 2 : 1, mobile });
-  const url = (qs) => `http://127.0.0.1:${PORT}/duanju-story.html?${qs}`;
+  const url = (qs) => `http://127.0.0.1:${PORT}/duanju-story.html?${qs || process.env.QS || ""}`;
   await cdp("Page.navigate", { url: url("") }); await sleep(800);
   await ev("localStorage.clear()");
   await cdp("Page.navigate", { url: url("") }); await sleep(1200);
-  // 序章漫画
+  if (process.env.QS) { await until("!!document.querySelector('.st-select')"); } else {
   await until("!!document.querySelector('.wc-root')");
   for (let i = 0; i < 4; i++) { await ev("document.querySelector('.wc-view')?.click()"); await sleep(900); }
   await sleep(700); await shot(`${name}_1_comic`);
   await until("(()=>{ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); return !!document.querySelector('.st-select'); })()");
-  await sleep(500); await shot(`${name}_2_select`);
+  await sleep(500); await shot(`${name}_2_select`); }
   for (const n of BEATS) {
     await clickEl(`.st-card[data-n="${n}"]`);
     await until("!!document.querySelector('.st-title')"); await sleep(500); if (n === BEATS[0]) await shot(`${name}_3_title`);
@@ -71,7 +71,7 @@ for (const [name, w, h, mobile] of VIEWS) {
     let steps = 0, last = "", shotDlg = false, shotGuide = false, shotMenu = false, shotAfter = false, shotRes = false, sawBattle = false;
     const t0 = Date.now();
     while (Date.now() - t0 < 240000) {
-      const r = await ev(STEP);
+      const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
       if (r === "SELECT") break;
       if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${name}_FAIL_${n}`); break; }
       if (r === "NOROW") { console.log("!! 菜单无句子"); await shot(`${name}_NOROW_${n}`); break; }
