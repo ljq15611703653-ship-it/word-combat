@@ -1,0 +1,43 @@
+# composer2：逐词拼句（InputMode 第 2 版）
+
+点随从 -> 随从旁出现句子条；底部手牌条按「此刻合法」列出可点的词（不合法的变灰，悬停/点按显示原因）。
+`SwitchInput`（composerInput.ts）包含逐词版与原菜单版，战斗菜单里「输入方式」可切换；逐词版里的「推荐句」按钮 = 从 gen 候选里挑一句并展开成词。
+键盘：Backspace 退格、Enter 确认、Esc 关闭。点场上随从 = 选目标（目标词亮虚线框）。
+
+## 文件
+- `grammar.ts`：词语言。`astToTokens(cl)`、`tokensToAst(tokens)`、`parseTokens`、`nextLegal(prefix, {s, side, unit})`、`diagnose`（与 canAfford 对应的人话原因）、`normAst`（规范化比较）、`tokenLabel`。
+- `composerInput.ts`：UI（`ComposerInput`、`SwitchInput`），`composer.css`。
+- 测试：`scripts/composer-roundtrip.ts`（逻辑）、`scripts/composer-smoke.mjs`（CDP 真点）、`scripts/composer-shots.mjs`（截图）。
+
+## 教学接口
+`InputMode.setGuide(g | null)`（types.ts 的 `Guide`）：
+- `allowed?(cl)`：整句过滤；不满足时「确认宣告」灰掉并显示 `denyText`。
+- `hint?: Token[]`：期望整句词序；当前前缀吻合时，下一个词在手牌条里黄色脉冲高亮。
+- `lockWords?: string[]`：白名单（含目标词 `@3`、数字 `"2"`）；其它词灰掉，原因 = `denyText`。
+- `ComposerInput` 另有 `push(token)`、`confirm()`、`tokens`，可程序化演示。通过 `(battle.input as SwitchInput).composer` 取得。
+
+## 词（Token）表
+词是字符串。句子 = 子句 (`并` 子句 | `若成功/若失败` 动作)*
+| 子句 | 写法 |
+|---|---|
+| 动作 | `造成/恢复/减伤` 数 目标 [`重复` n] [`无视`]（数 = 数字 或 引用量） |
+| 状态 | `灼烧/易伤/衰弱` 目标 [级别（STAUTO 关时）] 持续轮数 |
+| 每当/若 | `每当|若` (N\|`全程`) (`轮`\|`句`) `我方|对方` `存在|不存在` [`累计/词数/段数`] 对象 [`收紧` n] `则` 动作… (`且` 动作)* [`至多` n]；每当=以后窗口，若=之前窗口 |
+| 不得 | `不得` N 对象 `罚` P [`至多` n] |
+| 定时 | `定时` N 动作 (`且` 动作)* |
+| 其它 | `无视` N；`兑现`；`移除` 对象（旧）或 `移除` 敌方随从；`转移` 我方随从；`延后` `第k句` n |
+- 引用量：`累计|次数|词数|段数` `之前|以后` (N\|`全程`) `轮|句` `我方|对方` 对象 [`收紧` n] [`×` m]
+- 目标：`@u`（0-2 我方，3-5 敌方）、`选择` n `@a @b…`（n 个，数字占牌）、`来源`（仅每当里）；旧写法 `最低血敌/最低血我/我方全体/敌方全体/选择 n 敌方最低`（TGT_AT_DECL 开时不给）
+- 对象：`类:atk` `事:hurt` `词:造成` `第k句` `先后 词:a 词:b`
+
+## nextLegal
+同一个递归下降解析器同时给出「语法上接下来能写什么」(`struct`) 与可行性：对每个候选词，把前缀补成完整句（数字位从小到大试，其余取最便宜默认），用 `diagnose` 判行动点/卡组张数/自指词冷却/数字牌/目标倒下/延后对象/起手超时间轴；不行就给原因。`canEnd` 与引擎 `canAfford`（再加时间轴）一致。
+
+## 测试
+```
+node node_modules/tsx/dist/cli.mjs scripts/composer-roundtrip.ts 400   # 往返 + nextLegal 对拍（默认/REAL 规则交替）
+node scripts/composer-smoke.mjs 5181 10                                 # 先起 dev：node node_modules/vite/bin/vite.js --port 5181
+node scripts/composer-shots.mjs 5181 D:/wc/composer_shots
+```
+## 未覆盖
+见汇报；`when` 里 agg 非 count 与 `rep` 在 `减伤` 上等不合法形态由 `legal()` 拒绝。玩家拼不出来的：`以后全程`、数字非正整数的引用倍率。

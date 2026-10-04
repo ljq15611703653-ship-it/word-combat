@@ -1,0 +1,42 @@
+/* 逐词拼句：句子条（随从面板旁）+ 底部手牌条（唯一的底部元素，用完即收） */
+.cp-bar { position: absolute; z-index: 20; width: min(400px, 92vw); display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: rgba(14, 6, 28, .96); border: 1px solid var(--me); box-shadow: 0 0 0 1px #000, 0 10px 36px #000c, 0 0 22px -8px var(--me); clip-path: var(--cut); color: #e8e0ff; font-size: 13px; }
+.cp-head { display: flex; align-items: center; gap: 8px; } .cp-head b { color: var(--ye); font-size: 14px; } .cp-head .ap { margin-left: auto; color: var(--cy); }
+.cp-x { background: none; border: 1px solid #ffffff30; color: #c8bfe8; padding: 2px 8px; cursor: pointer; font: inherit; font-size: 12px; } .cp-x:hover { border-color: var(--cy); color: var(--cy); }
+.cp-sent { min-height: 44px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 6px; background: #00000066; border: 1px dashed #ffffff30; }
+.cp-sent.empty::before { content: "点下面的词，一个个拼成一句话"; color: #8a7fb0; }
+.cp-tk { padding: 3px 7px; background: #2a1450; border: 1px solid var(--vio); color: #fff; animation: cpIn .16s ease-out; }
+.cp-tk.num { border-color: var(--ye); color: var(--ye); } .cp-tk.tgt { border-color: var(--cy); color: var(--cy); } .cp-tk.adv { border-color: var(--mag); color: #ff8cc4; }
+@keyframes cpIn { from { transform: translateY(6px) scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+.cp-caret { width: 8px; height: 18px; background: var(--cy); animation: cpBlink 1s steps(2) infinite; } @keyframes cpBlink { 50% { opacity: 0; } }
+.cp-read { color: #fff; line-height: 1.5; min-height: 20px; } .cp-read.warn { color: #ff8a9a; }
+.cp-meta { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; min-height: 20px; } .cp-meta em { font-style: normal; padding: 1px 6px; border: 1px solid #ffffff30; color: #b9aedf; } .cp-meta .cost { color: var(--ye); border-color: var(--ye); } .cp-meta .bad { color: #ff8a9a; border-color: #ff8a9a; }
+.cp-start { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; }
+.cp-start input { width: 100%; accent-color: var(--cy); }
+.cp-tl { grid-column: 1 / -1; height: 14px; display: flex; gap: 1px; } .cp-tl i { flex: 1; background: #ffffff14; } .cp-tl i.early { background: #ff2d9533; } .cp-tl i.me { background: var(--cy); } .cp-tl i.d0 { box-shadow: inset 0 -4px 0 var(--mag); } .cp-tl i.d1 { box-shadow: inset 0 4px 0 var(--ye); }
+.cp-btns { display: flex; gap: 6px; } .cp-btns button { flex: 1; padding: 7px 4px; font: inherit; cursor: pointer; background: #1a0b33; color: #fff; border: 1px solid #ffffff40; }
+.cp-btns .go { background: var(--mag); border-color: var(--mag); font-weight: 700; flex: 1.6; } .cp-btns button:disabled { opacity: .35; cursor: not-allowed; } .cp-btns button:hover:not(:disabled) { border-color: var(--cy); }
+.cp-sug { max-height: 120px; overflow: auto; display: flex; flex-direction: column; gap: 2px; } .cp-sug button { text-align: left; background: #ffffff0d; border: 0; color: #d6ccf5; padding: 3px 6px; cursor: pointer; font: inherit; font-size: 12px; } .cp-sug button:hover { background: #ffffff22; color: var(--cy); }
+.cp-hand { position: absolute; left: 0; right: 262px; bottom: 0; z-index: 25; background: linear-gradient(#0a0516cc, #0a0516f5); border-top: 1px solid var(--me); padding: 6px 10px calc(8px + env(safe-area-inset-bottom)); max-height: 30%; overflow-y: auto; animation: cpUp .18s ease-out; }
+@keyframes cpUp { from { transform: translateY(100%); } to { transform: none; } }
+.cp-grp { display: flex; align-items: center; gap: 5px; overflow-x: auto; padding: 3px 0; scrollbar-width: none; } .cp-grp::-webkit-scrollbar { display: none; }
+.cp-grp > span { flex: none; font-size: 11px; color: #8a7fb0; width: 34px; }
+.cp-w { flex: none; position: relative; padding: 6px 10px; font: inherit; font-size: 14px; cursor: pointer; background: #22103f; color: #fff; border: 1px solid var(--vio); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); }
+.cp-w.num { border-color: var(--ye); color: var(--ye); } .cp-w.tgt { border-color: var(--cy); color: var(--cy); } .cp-w.adv { border-color: var(--mag); }
+.cp-w small { font-size: 10px; margin-left: 3px; color: #ffb3d9; } .cp-w:hover:not(.off) { background: #3a1c6b; }
+.cp-w.off { opacity: .32; filter: grayscale(.7); cursor: help; }
+.cp-w.hint { opacity: 1; filter: none; animation: cpPulse 1s infinite; box-shadow: 0 0 0 2px var(--ye), 0 0 14px var(--ye); z-index: 1; }
+@keyframes cpPulse { 50% { box-shadow: 0 0 0 3px var(--ye), 0 0 24px var(--ye); } }
+.cp-why { min-height: 18px; font-size: 12px; color: #ffb3c0; padding: 2px 0 4px; }
+.unit.cp-tgt { cursor: crosshair; } .unit.cp-tgt .fig::after { content: ""; position: absolute; inset: -4px; border: 2px dashed var(--cy); animation: cpBlink 1s steps(2) infinite; pointer-events: none; }
+.cp-why { display: flex; align-items: center; gap: 8px; } .cp-why .wt { flex: 1; } .cp-fold { background: none; border: 1px solid #ffffff30; color: #c8bfe8; cursor: pointer; padding: 0 8px; } .cp-hand.fold .cp-grp { display: none; }
+.cp-hand { position: absolute; } .cp-tip { position: absolute; z-index: 40; max-width: 300px; padding: 6px 9px; background: #1b0a35; border: 1px solid var(--ye); color: #fff; font-size: 12px; line-height: 1.4; box-shadow: 0 6px 18px #000c; pointer-events: none; }
+@media (max-width: 720px) {
+  .cp-bar { left: 6px !important; right: 6px; top: 44% !important; width: auto; clip-path: none; padding: 6px 8px; gap: 4px; max-height: 30%; overflow-y: auto; }
+  .cp-sent { min-height: 34px; } .cp-head b { font-size: 13px; } .cp-btns button { padding: 6px 2px; font-size: 12px; }
+  .cp-hand { right: 0; bottom: 54px; max-height: 24%; padding: 4px 8px; } .cp-w { padding: 5px 8px; font-size: 13px; }
+}
+.cp-tool { background: none; border: 1px solid #ffffff30; color: #c8bfe8; padding: 2px 8px; cursor: pointer; font: inherit; font-size: 12px; } .cp-head .ap { margin-left: auto; }
+.cp-why { min-height: 16px; font-size: 12px; color: #ffb3c0; display: block; padding: 0; }
+.cp-hand { display: flex; flex-wrap: wrap; gap: 2px 14px; padding-top: 4px; } .cp-hand.fold { display: none; }
+.cp-grp { padding: 2px 0; } .cp-grp > span { width: auto; margin-right: 2px; }
+.cp-tip { position: fixed; }

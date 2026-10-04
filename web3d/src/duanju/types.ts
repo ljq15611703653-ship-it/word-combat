@@ -24,7 +24,11 @@ export interface InputMode {
   open(ctx: InputCtx): void;
   close(): void;
   isOpen(): boolean;
+  /** 教学接口（逐词拼句版实现）：限制可用的词/句子并高亮下一个词；传 null 清除 */
+  setGuide?(g: Guide | null): void;
 }
+/** allowed：整句过滤（不满足不能确认宣告）；hint：期望的整句词序列，下一个该点的词会高亮；lockWords：只允许这些词（白名单，含 "@3" 目标词与数字）；denyText：不满足 allowed 时给玩家看的原因 */
+export interface Guide { allowed?: (cl: Sentence) => boolean; hint?: string[]; lockWords?: string[]; denyText?: string }
 
 /** 结算演出的画面接口：CastPlayer 只通过它改画面，不碰引擎 */
 export interface BattleView {
@@ -59,4 +63,6 @@ export interface Settings {
   /** 每个随从的关键词：random / 首挡 / 不屈 */
   kws: string[];
   customRules: string;
+  /** 对手卡组：random（每局 randDeck）/ preset（选一套推荐）/ custom（自定义 deck） */
+  foe: { mode: "random" | "preset" | "custom"; preset: string; deck: Record<string, number> };
 }
