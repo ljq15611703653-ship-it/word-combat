@@ -8,8 +8,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { OUT } from "./mineenv";
 import { MPool } from "./mpool";
-import { FEATS, evalCfgs } from "./minelib";
-import { sentenceText } from "../ast";
+import { FEATS, evalCfgs, fullText } from "./minelib";
 import { mulberry32 } from "../gen";
 
 const E = (k: string, d: number) => +(process.env[k] ?? d);
@@ -117,7 +116,7 @@ function condText(cs: Cond[]): string {
   }
   return parts.join("，且 ") || "任何局面";
 }
-const zhText = (j: string) => { try { return sentenceText(JSON.parse(j)); } catch { return j; } };
+const zhText = (j: string) => { try { return fullText(JSON.parse(j)); } catch { return j; } };
 interface Leaf { cond: string; conds: Cond[]; node: Node }
 function leaves(n: Node, path: Cond[] = []): Leaf[] {
   if (n.f === undefined) return [{ cond: condText(path), conds: path, node: n }];
@@ -128,7 +127,7 @@ const inLeaf = (l: Leaf, x: number[]) => l.conds.every((c) => (c.le ? x[c.f] <= 
 function topSentences(idx: number[], fam: string, k = 3): string[] {
   const cnt = new Map<string, number>();
   for (const i of idx) if (lab(decs[i].fam) === fam && decs[i].text) { const t = decs[i].name ? `【${decs[i].name}】` : zhText(decs[i].text); cnt.set(t, (cnt.get(t) ?? 0) + 1); }
-  return [...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, k).map(([t, c]) => `${t}×${c}`);
+  return [...cnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, k).map(([t, c]) => `${t}（${c}次）`);
 }
 const allLeaves = leaves(tree).map((l) => {
   const inTrain = trI.filter((i) => inLeaf(l, X[i])), inTest = teI.filter((i) => inLeaf(l, X[i]));

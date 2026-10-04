@@ -5,8 +5,8 @@ import { writeFileSync, createWriteStream } from "node:fs";
 import { OUT } from "./mineenv";
 import { playbookNamed } from "../playbook";
 import { genSentence, mulberry32, type Env } from "../gen";
-import { advWordsOf, sentenceCost, sentenceText, type Sentence, type Clause } from "../ast";
-import { family, fixup, mutate, crossover, normKey, playable, pick, jclone, deckPrice, refState, FAMILIES } from "./minelib";
+import { advWordsOf, sentenceCost, type Sentence, type Clause } from "../ast";
+import { family, fixup, mutate, crossover, normKey, playable, pick, jclone, deckPrice, refState, fullText, FAMILIES } from "./minelib";
 
 export interface SentRec { id: number; key: string; text: string; family: string; adv: string[]; cost: number; len: number; deck: number; src: string; cl: Sentence }
 
@@ -36,7 +36,7 @@ function tryAdd(cl0: Sentence | null, src: string): boolean {
   const fam = family(cl);
   const cap = (fam === "普通攻击" || fam === "自保") ? Math.max(20, Math.floor(N * PLAIN_CAP)) : Infinity;
   if ((byFam[fam]?.length ?? 0) >= cap) { invalid++; return false; }
-  const rec: SentRec = { id: lib.size, key, text: sentenceText(cl), family: fam, adv: advWordsOf(cl), cost: sentenceCost(cl, 1, -1), len: cl.length, deck: deckPrice(cl), src, cl };
+  const rec: SentRec = { id: lib.size, key, text: fullText(cl), family: fam, adv: advWordsOf(cl), cost: sentenceCost(cl, 1, -1), len: cl.length, deck: deckPrice(cl), src, cl };
   lib.set(key, rec); (byFam[fam] ??= []).push(rec);
   return true;
 }

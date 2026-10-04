@@ -10,7 +10,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { OUT } from "./mineenv";
 import { MPool } from "./mpool";
-import { evalCfgs, FAMILIES } from "./minelib";
+import { evalCfgs, FAMILIES, hasAoeRef } from "./minelib";
 import type { SentRec } from "./mine";
 import type { Point } from "./minelib";
 
@@ -82,6 +82,9 @@ const rows: Row[] = keep2.map((id) => {
 });
 rows.sort((a, b) => b.robust - a.robust || Math.min(...b.opt) - Math.min(...a.opt));
 const passRows = rows.filter((r) => r.pass);
+const isBoom = (r: { id: number }) => hasAoeRef(sents[r.id].cl);   // 含「全体×引用量」的句子：疑似一句话爆发型，单独成榜，不挤占总榜/位置榜
+const BOOM = "全体×引用量";
+const normalRows = passRows.filter((r) => !isBoom(r));
 log(`第3层：${keep2.length} → 复验通过 ${passRows.length}`);
 writeFileSync(`${OUT}/funnel.json`, JSON.stringify({
   meta: { sentences: sents.length, points: pts.length, cfgs, stages: { s1: [all.length, keep1.length, P1, D1], s2: [keep1.length, keep2.length, P2, D2], s3: [keep2.length, passRows.length, pts.length] }, robust: ROBUST, minApp: MINAPP, seconds: +((Date.now() - t0) / 1000).toFixed(0), rules: { LAB: process.env.LAB ?? "", LAB2: process.env.LAB2 ?? "" } },
@@ -103,7 +106,15 @@ let md = `# 句子挖掘排行榜\n\n规则 LAB=${process.env.LAB?.trim() ?? ""}
   `注意：边际价值是「电脑推演」的结论（对手和己方后续都按朴素默认策略代打、只看 ${cfgs.map((c) => c.depth).join("/")} 轮），对 ±噪声很敏感；局面只有 ${pts.length} 个，位置榜每个位置约 ${posN.join("/")} 个点。\n\n## 漏斗\n\n` +
   `| 层 | 输入 | 输出 | 局面数 | 推演深度 |\n|---|---|---|---|---|\n| 1 粗筛 | ${all.length} | ${keep1.length} | ${p1.length} | ${D1} |\n| 2 精筛 | ${keep1.length} | ${keep2.length} | ${p2.length} | ${D2} |\n| 3 复验(×${cfgs.length}配置) | ${keep2.length} | **${passRows.length}** | ${pts.length} | 各配置自带 |\n\n` +
   `## 家族概览\n\n| 家族 | 库内 | 过第1层 | 过第2层 | 通过复验 | 复验集最高(取各配置最小选项价值) | 中位 |\n|---|---|---|---|---|---|---|\n` + famSum.map((x) => `| ${x.f} | ${x.n0} | ${x.n1} | ${x.n2} | ${x.ps} | ${f2(x.topOpt)} | ${f2(x.medOpt)} |`).join("\n") +
-  `\n\n## 总榜（通过复验，按 robust 排序，前 30）\n\n${tbl(passRows.slice(0, 30))}\n\n## 按家族排行（每家族前 6，含未通过复验的也标出）\n\n`;
+  `\n\n## 总榜（通过复验，按 robust 排序，前 30；不含 ${BOOM}）
+
+${tbl(normalRows.slice(0, 30))}
+
+## 单列：${BOOM}（平均边际常在几百，约等于「一句话改写胜负」，疑似数值爆炸，需要设计上封顶；前 10）
+
+${tbl(passRows.filter(isBoom).slice(0, 10))}
+
+## 按家族排行（每家族前 6，含未通过复验的也标出）\n\n`;
 for (const x of famSum) {
   const rs = rows.filter((r) => r.family === x.f).sort((a, b) => Math.min(...b.opt) - Math.min(...a.opt)).slice(0, 6);
   if (rs.length) md += `### ${x.f}（复验集 ${rows.filter((r) => r.family === x.f).length}，通过 ${x.ps}）\n\n${tbl(rs)}\n\n`;
@@ -111,7 +122,7 @@ for (const x of famSum) {
 md += `## 按位置排行（词位=0 / 数位=1 / 第三位=2；每位置前 10；选项价值按该位置的局面计，三种配置取平均；该位置适用点数 ≥ ${Math.max(3, Math.floor(MINAPP / 2))}）\n\n`;
 const POSN = ["词位(0)", "数位(1)", "第三位(2)"];
 for (let k = 0; k < 3; k++) {
-  const rs = rows.filter((r) => r.posApp[k] >= Math.max(3, Math.floor(MINAPP / 2)) && r.pass).sort((a, b) => b.posOpt[k] - a.posOpt[k]).slice(0, 10);
+  const rs = rows.filter((r) => r.posApp[k] >= Math.max(3, Math.floor(MINAPP / 2)) && r.pass && !isBoom(r)).sort((a, b) => b.posOpt[k] - a.posOpt[k]).slice(0, 10);
   md += `### ${POSN[k]}（该位置局面 ${posN[k]} 个）\n\n${rs.length ? tbl(rs, k).replace("选项价值×配置", "该位置选项价值(三配置均值)") : "（无通过复验的句子在该位置有足够样本）"}\n\n`;
 }
 writeFileSync(`${OUT}/leaderboard.md`, md);

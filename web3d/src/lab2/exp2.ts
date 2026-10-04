@@ -22,6 +22,7 @@ const players: { name: string; deck: Deck; cfg: AiCfg }[] = [
   { name: "禁令", deck: { 不得: 2, 收紧: 2, 至多: 2, 移除: 1 }, cfg: cfg("playbook") },
   { name: "引用", deck: { 定时: 1, 次数: 1, 累计: 1, 收紧: 2, 移除: 1 }, cfg: cfg("playbook") },
   { name: "状态", deck: { 易伤: 2, 衰弱: 2, 灼烧: 2, 并: 2 }, cfg: cfg("playbook") },
+  { name: "累计", deck: { 累计: 2, 易伤: 2, 段数: 1, 定时: 1, 并: 1 }, cfg: cfg("playbook") },
   { name: "混合", deck: { 不得: 1, 并: 2, 易伤: 1, 定时: 1, 次数: 1, 移除: 1 }, cfg: cfg("playbook") },
 ];
 const pool = new Pool(16);

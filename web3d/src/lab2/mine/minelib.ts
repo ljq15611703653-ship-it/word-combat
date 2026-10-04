@@ -27,6 +27,8 @@ const allQ = (cl: Sentence): { q: ReturnType<typeof query>; inAmt: boolean }[] =
   for (const c of cl) { if (c.k === "when") { o.push({ q: c.q, inAmt: false }); c.effs.forEach((e) => am(e.n)); } else if (c.k === "delay") c.effs.forEach((e) => am(e.n)); else if (c.k === "act") am(c.eff.n); }
   return o;
 };
+/** 含「全体 × 引用量」的伤害（数值会随局势滚雪球，疑似一句话爆发型） */
+export const hasAoeRef = (cl: Sentence): boolean => cl.some((c) => effsOf(c).some((e) => e.verb === "dmg" && e.tg.t === "allFoe" && typeof e.n !== "number"));
 /** 句子的结构类别（主类别，按优先级；一句话只归一类） */
 export function family(cl: Sentence): Family {
   const qs = allQ(cl);
@@ -40,7 +42,7 @@ export function family(cl: Sentence): Family {
   if (hasSt && cl.some((c) => c.k === "act")) return "状态连击";
   if (hasSt) return "状态";
   if (cl.some((c) => c.k === "delay" || c.k === "cash")) return "定时兑现";
-  if (qs.some((x) => x.inAmt)) return cl.some((c) => effsOf(c).some((e) => e.verb === "dmg" && e.tg.t === "allFoe" && typeof e.n !== "number")) ? "全体引用量" : "引用量";
+  if (qs.some((x) => x.inAmt)) return hasAoeRef(cl) ? "全体引用量" : "引用量";
   const aft = cl.find((c) => c.k === "when" && c.q.win.dir === "after") as Extract<Clause, { k: "when" }> | undefined;
   if (aft && aft.judge === "absent") return "无人则";
   if (aft && aft.q.who === "foe") return "陷阱";
@@ -53,6 +55,31 @@ export function family(cl: Sentence): Family {
     return e.verb === "dmg" ? (typeof e.n === "number" && !e.ignore && e.tg.t !== "allFoe" ? "普通攻击" : "多段攻防") : "自保";
   }
   return "其他";
+}
+
+
+// ====================== 完整中文读法（ast.ts 的 sentenceText 省略了引用量的窗口，库里要区分，所以这里写全） ======================
+const OBJ_ZH: Record<string, string> = { atk: "攻击词", dmg: "伤害词", heal: "治疗词", hpchg: "生命变动", def: "防护词", guard: "防护", status: "状态词", struct: "结构词", any: "任意词", dealt: "打出的伤害", taken: "受到的伤害" };
+const oText = (o: Obj) => o.t === "word" ? `「${o.w}」` : o.t === "cat" ? (OBJ_ZH[o.c] ?? o.c) : o.t === "ev" ? ({ down: "倒下", hurt: "受到伤害", healed: "被恢复", decl: "宣告" }[o.e]) : o.t === "nth" ? `第${o.n}句` : `「${o.a}」先于「${o.b}」`;
+const wText = (w: { dir: string; n: number; unit: string }) => `${w.dir === "before" ? "之前" : "以后"}${w.n >= 99 ? "全程" : w.n}${w.unit === "round" ? "轮" : "句"}`;
+const whoZ = (w: string) => (w === "me" ? "我方" : "对方");
+const tgZ = (t: Eff["tg"]) => ({ unit: "指定随从", src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t]);
+const aggZ = { count: "次数", sum: "累计", len: "词数", segs: "段数" } as const;
+const amZ = (a: Amt) => (typeof a === "number" ? String(a) : `[${wText(a.q.win)}${whoZ(a.q.who)}${oText(a.q.obj)}${aggZ[a.q.agg]}]×${a.mult}`);
+const eZ = (e: Eff) => `${tgZ(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amZ(e.n)}${e.ignore ? "(无视减伤)" : ""}`;
+const KZ = { burn: "灼烧", vuln: "易伤", weak: "衰弱" };
+export function fullText(cl: Sentence): string {
+  return cl.map((c) => {
+    switch (c.k) {
+      case "act": return `${c.ifPrev ? (c.ifPrev === "ok" ? "若成功," : "若失败,") : ""}${eZ(c.eff)}`;
+      case "when": return `${c.forbid ? "不得:" : c.q.win.dir === "after" ? "每当" : "若"}${wText(c.q.win)}${whoZ(c.q.who)}${c.judge === "absent" ? "不存在" : "存在"}${oText(c.q.obj)}${(c.q.tight ?? 1) > 1 && !c.forbid ? `(收紧${c.q.tight})` : ""},则${c.effs.map(eZ).join("并")}${c.cap > 1 ? `(至多${c.cap}次)` : ""}`;
+      case "delay": return `${c.wait}轮后:${c.effs.map(eZ).join("并")}`;
+      case "status": return `${tgZ(c.tg)}${KZ[c.kind]}${c.lvl}级持续${c.dur}轮`;
+      case "ignore": return `无视长期句子${c.win}轮`;
+      case "cash": return "兑现";
+      case "remove": return `移除${oText(c.obj)}`;
+    }
+  }).join(" 并 ");
 }
 
 // ====================== 规范化与合法性 ======================
