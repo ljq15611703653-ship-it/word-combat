@@ -100,7 +100,7 @@ export function thr(q: Query): number {
   const base = q.agg === "count" ? (q.win.dir === "before" ? 0 : P.THR0) : q.agg === "sum" ? P2.THR_SUM : q.agg === "len" ? P2.THR_LEN : P2.THR_SEGS;
   return Math.max(0, base - ((q.tight ?? 1) - 1));
 }
-const amount = (s: St, a: Amt, c: Ctx) => (typeof a === "number" ? a : Math.floor(evalQ(s, a.q, c) * a.mult));
+const amount = (s: St, a: Amt, c: Ctx) => (typeof a === "number" ? a : Math.min(P2.QCAP, Math.floor(evalQ(s, a.q, c) * a.mult)));
 
 // ---------- 事件与触发 ----------
 function emit(s: St, e: Omit<Ev, "seq" | "rnd" | "rord" | "trig"> & { trig?: boolean; rord?: number }): Ev {

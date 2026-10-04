@@ -5,7 +5,8 @@ import { type St, windupFor, clone, declare, passUnit, nextSide, resolveRound, n
 import { candidates, type Rng } from "./gen";
 
 export interface AiCfg {
-  k: number; depth: number; w: number[]; passBias: number; mode?: "free" | "plain" | "playbook";
+  k: number; depth: number; w: number[]; passBias: number; mode?: "free" | "plain" | "playbook" | "basic";
+  blunder?: number;   // 失误率：以这个概率不选最优，而从前三名里随机挑一个（难度分级用）
   wAp: number;        // 留行动点的价值（每点）
   wCard: number;      // 留数字牌的价值（每点牌面；冷却中的算一半）
   recBonus: number;   // 「推荐」：复杂句子的估值加成（不强迫，只是轻推）
@@ -65,15 +66,18 @@ function rollout(s0: St, side: Side, unit: number, cl: Sentence | null, start: n
 export function think(s: St, side: Side, r: Rng, cfg: AiCfg = AI_DEFAULT): { unit: number; cl: Sentence | null; start: number } {
   const us = unitsOf(side).filter((x) => alive(s, x) && !s.done[x]);
   let best = { unit: us[0], cl: null as Sentence | null, start: 1 }, bestV = -Infinity;
+  const all: { v: number; m: { unit: number; cl: Sentence | null; start: number } }[] = [];
   // 每个未出手的随从各看一遍（候选里含「不出手」）
   for (const u of us) {
     const base = rollout(s, side, u, null, 1, cfg) + cfg.passBias;
+    all.push({ v: base, m: { unit: u, cl: null, start: 1 } });
     if (base > bestV) { bestV = base; best = { unit: u, cl: null, start: 1 }; }
     for (const cl of candidates(s, side, u, r, Math.ceil(cfg.k / us.length) + 1, cfg.mode ?? "free")) {
       const w = windupFor(cl, u);
       const starts = cfg.mode === "playbook" ? [...new Set([w, w + 3, 8, 12].filter((x) => x >= w && x <= P.TL))] : [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
-      for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg) + (fancy(cl) ? cfg.recBonus : 0); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
+      for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg) + (fancy(cl) ? cfg.recBonus : 0); all.push({ v, m: { unit: u, cl, start: st } }); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
     }
   }
+  if (cfg.blunder && r() < cfg.blunder && all.length > 1) { all.sort((a, b) => b.v - a.v); return all[Math.floor(r() * Math.min(3, all.length))].m; }
   return best;
 }

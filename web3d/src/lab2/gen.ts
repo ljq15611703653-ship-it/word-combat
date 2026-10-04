@@ -84,7 +84,7 @@ function basics(e: Env): Sentence[] {
   return out;
 }
 
-export type Mode = "free" | "plain" | "playbook";
+export type Mode = "free" | "plain" | "playbook" | "basic";
 export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode: Mode = "free"): Sentence[] {
   const foes = unitsOf((1 - side) as Side).filter((x) => alive(s, x));
   const mine = unitsOf(side).filter((x) => alive(s, x));
@@ -99,6 +99,7 @@ export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode
   const dup = (cl: Sentence) => cl.some((c) => (c.k === "ignore" || c.k === "when" || c.k === "delay") && (c.k === "ignore" ? s.stand.some((x) => x.owner === side && x.c.k === "ignore") || s.decl.some((d) => d.side === side && d.cl.some((z) => z.k === "ignore")) : mineStand.includes(JSON.stringify(c)) || pending.includes(JSON.stringify(c))));
   const add = (cl: Sentence) => { const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl, u)) { seen.add(key); out.push(cl); } };
   basics(e).forEach(add);
+  if (mode === "basic") return out;   // 入门：只会朴素的攻击/治疗/减伤
   if (mode === "playbook") playbook(e).forEach(add);
   else if (mode === "plain") playbook(e, "atkdef").forEach(add);
   for (let i = 0; i < k * 3 && out.length < k + 6; i++) add(genSentence(e, mode === "free"));
