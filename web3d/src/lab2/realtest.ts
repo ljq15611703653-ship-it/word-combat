@@ -8,6 +8,9 @@ import { P } from "../lab/rules";
 import { act, dmg, heal, shield, status, unit, redirect, postpone, strip, type Sentence, type StatusKind } from "./ast";
 import { newGame, declare, resolveRound, nextRound, canAfford, type St } from "./interp";
 import { applyRules, ADV_WORDS } from "./params";
+import { windupFor } from "./interp";
+import { query, win } from "./ast";
+import { forbid } from "./ast";
 import { whenever, cat } from "./ast";
 import { randDeck } from "./deck";
 import { candidates } from "./gen";
@@ -181,7 +184,7 @@ if (process.argv[1]?.replace(/\\/g, "/").endsWith("lab2/realtest.ts")) {
       const rc = toReal({ u: 0, start: 1, cl }, 0).cl;
       const sentence = toSentence(cl);
       const rCost = NE.actionCost(rc, NR.AND_COST), rWind = NE.actionWindup(rc, 1), rNums = NE.actionNumbers(rc, false).sort().join(",");
-      const lCost = sentenceCost(sentence), lWind = windup(sentence), lNums = sentence.flatMap(numsOf).filter((n) => n >= 2).sort().join(",");
+      const lCost = sentenceCost(sentence), lWind = windup(sentence), lNums = sentence.flatMap((c) => numsOf(c)).filter((n) => n >= 2).sort().join(",");
       const ok = rCost === lCost && rWind === lWind && rNums === lNums;
       if (!ok) { allOk = false; console.log("   不一致", JSON.stringify(cl), { rCost, lCost, rWind, lWind, rNums, lNums }); }
     }
@@ -273,6 +276,47 @@ if (process.argv[1]?.replace(/\\/g, "/").endsWith("lab2/realtest.ts")) {
     }
     check(nCand > 100 && nAlias === 0, `开关开：${nCand} 个候选句里没有任何别名目标（lowFoe 等）`, `（别名 ${nAlias}）`);
     check(postN > 0 && postBad === 0, `延后候选 ${postN} 条：N 都是刚好推出时间轴的最小值`);
+  }
+  // ===== 11d 职业（P2.CLASSES，草案）：天赋与限制 =====
+  {
+    P2.CLASSES = 1;
+    const mk = (c0: "并" | "引用" | "限制" | "状态" | null, c1: "并" | "引用" | "限制" | "状态" | null = null) => { const s = newGame(0, [null, null], false, [null, null], [c0, c1]); refill(s); return s; };
+    // 并流：多一段只加 1 点；起手不变晚；同一动作词不能重复；最多 7 段（其他 3 段，SEGCAP 开）
+    const three = [act(dmg(1, unit(3))), act(heal(1, unit(0))), act(shield(1, unit(0)))];
+    check(canAfford(mk("并"), 0, three, 0)!.cost === canAfford(mk("引用"), 0, three, 0)!.cost - 2, "并流：多一段只加 1 点行动点（其他职业加 2），3 段省 2 点");
+    { const s = mk("并"), o = mk("引用"); check(windupFor(three, 0, s) === windupFor(three, 0, o) - 2, "并流：起手不因段数变晚"); }
+    check(canAfford(mk("并"), 0, [act(dmg(1, unit(3))), act(dmg(1, unit(4)))], 0) === null && canAfford(mk("引用"), 0, [act(dmg(1, unit(3))), act(dmg(1, unit(4)))], 0) !== null, "并流：同一动作词（造成）一句里只能一次");
+    P2.SEGCAP = 1;
+    const seven = [status("vuln", 1, 2, unit(3)), status("weak", 1, 2, unit(4)), status("burn", 1, 2, unit(5)), act(dmg(1, unit(3))), act(heal(1, unit(0))), act(shield(1, unit(0))), redirect(unit(1))];
+    check(canAfford(mk("并"), 0, seven, 0) !== null && canAfford(mk("并"), 0, [...seven, strip(unit(3))], 0) === null && canAfford(mk("引用"), 0, seven.slice(0, 3), 0) !== null && canAfford(mk("引用"), 0, seven.slice(0, 4), 0) === null, "段数上限：并流 7 段，其他职业 3 段（SEGCAP）");
+    P2.SEGCAP = 0;
+    // 引用流：全程半价；自指词多 1 张且当轮用完下一轮立刻恢复；最多一个引用量词
+    { const all = [act(dmg({ q: query(win("before", 99), "me", cat("dealt"), "sum"), mult: 1 }, unit(3)))]; const a = mk("引用"), b = mk("限制"); a.rnd = b.rnd = 6;
+      check(canAfford(a, 0, all, 0)!.cost < canAfford(b, 0, all, 0)!.cost, "引用流：全程价格减半"); }
+    { const w = () => [whenever("foe", cat("atk"), 2, [dmg(1, { t: "src" })], 1, 2)]; const s = mk("引用"), o = mk("状态");
+      for (let i = 0; i < 3; i++) declare(s, 0, i, w(), 1 + i); for (let i = 0; i < 2; i++) declare(o, 0, i, w(), 1 + i);
+      check(canAfford(s, 0, w()) === null && canAfford(o, 0, w()) === null, "自指词：用完本轮就没了");
+      const s2 = mk("引用"); declare(s2, 0, 0, w(), 1); declare(s2, 0, 1, w(), 2); check(canAfford(s2, 0, w(), 2) !== null, "引用流：多带 1 张（别的职业 2 张用完）");
+      resolveRound(s); nextRound(s); resolveRound(o); nextRound(o);
+      check(canAfford(s, 0, w()) !== null && canAfford(o, 0, w()) === null, "引用流：下一轮立刻恢复（不进冷却），别的职业还在冷却"); }
+    { const q2 = [act(dmg({ q: query(win("before", 1), "me", cat("dealt"), "sum"), mult: 1 }, unit(3))), act(dmg({ q: query(win("before", 1), "me", cat("dealt"), "count"), mult: 1 }, unit(3)))];
+      const s = mk("引用"); check(canAfford(s, 0, q2, 0) === null, "引用流：一句最多一个引用量词"); }
+    // 限制流：窗口数字与至多不占牌；单次伤害 ≤3；不得惩罚 +1
+    { const f = [forbid(cat("atk"), 3, 1, 2)]; const a = mk("限制"), b = mk("状态"); a.side[0].cards = []; b.side[0].cards = [];
+      check(canAfford(a, 0, f, 0) !== null && canAfford(b, 0, f, 0) === null, "限制流：以后 3 轮、至多 2 次不占数字牌（没有数字牌也能写；其他职业写不出）"); }
+    { const a = mk("限制"); check(canAfford(a, 0, [act(dmg(4, unit(3)))], 0) === null && canAfford(a, 0, [act(dmg(3, unit(3)))], 0) !== null, "限制流：攻击句写出来的单次伤害 > 3 不合法");
+      declare(a, 0, 0, [act(dmg({ q: query(win("before", 1), "me", cat("dealt"), "sum"), mult: 3 }, unit(3)))], 6); a.log.push({ seq: 99, rnd: 0, sord: 0, rord: 0, side: 0, kind: "dealt", words: [], cats: ["dealt"], amt: 3, len: 0, segs: 0, src: 0, trig: false });
+      const b = mk("限制"); declare(b, 0, 0, [forbid(cat("atk"), 2, 2, 1)], 1); declare(b, 1, 3, [act(dmg(1, unit(0)))], 4); resolveRound(b);
+      check(b.hp[3] === P.HP - 3, "限制流：不得的惩罚 +1（写 2 点，实际 3 点）"); }
+    // 状态流：状态词行动点 −1；初始级别 +1；同一轮同一目标只能一种
+    { const st = [status("vuln", 1, 2, unit(3))]; check(canAfford(mk("状态"), 0, st, 0)!.cost === canAfford(mk("并"), 0, st, 0)!.cost - 1, "状态流：状态词行动点 −1");
+      const s = mk("状态"); declare(s, 0, 0, [status("vuln", 1, 2, unit(3))], 3); declare(s, 0, 1, [act(dmg(1, unit(3)))], 6); resolveRound(s);
+      check(s.sts[0].lvl === 2 && s.hp[3] === P.HP - 3, "状态流：状态初始级别 +1（1 点伤害吃 2 级易伤 = 3）");
+      const t = mk("状态"); declare(t, 0, 0, [status("vuln", 1, 2, unit(3))], 3);
+      check(canAfford(t, 0, [status("burn", 1, 2, unit(3))], 1) === null && canAfford(t, 0, [status("burn", 1, 2, unit(4))], 1) !== null && canAfford(t, 0, [status("vuln", 1, 2, unit(3))], 1) !== null, "状态流：同一轮同一目标只能挂一种状态（不同目标、同一种可以）"); }
+    P2.CLASSES = 0;
+    check(canAfford(mk("并"), 0, [act(dmg(1, unit(3))), act(dmg(1, unit(4)))], 0) !== null, "CLASSES 关：职业限制全部不起作用");
+    useReal();
   }
   // ===== 12 模糊对照：随机场景、三轮，逐轮比较血量/状态/胜负 =====
   const N = +(process.argv[2] ?? 400);

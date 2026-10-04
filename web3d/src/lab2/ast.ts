@@ -1,7 +1,7 @@
 // 句子即规则：共享语法树（AST）。原型解释器 interp.ts 直接解释它；之后真实引擎和界面也用同一份结构。
 // 设计依据：设计与审计/数字牌模式/交接-句子语言设计总览.md §1、§5
 import { P } from "../lab/rules";
-import { P2 } from "./params";
+import { P2, type Cls } from "./params";
 
 export type Side = 0 | 1;
 export type Who = "me" | "foe";
@@ -113,10 +113,11 @@ export const tgN = (t: Tg): number => (t.t === "units" ? Math.max(1, t.us.length
 const effNums = (e: Eff): number[] => [...amNums(e.n), tgN(e.tg), e.rep ?? 1];
 const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n >= 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
 /** 数字牌需求：所有 ≥2 的数字（Amt 引用量里的窗口 N、倍率也算） */
-export function numsOf(c: Clause): number[] {
+export function numsOf(c: Clause, cx?: Cls | null): number[] {
+  const lim = cx === "限制";   // 限制流：「以后 N 轮 / 之前 N 句」的窗口数字、「至多」次数不占数字牌（flatMap 会把下标塞进第二个参数，所以要判类型）
   switch (c.k) {
     case "act": return effNums(c.eff);
-    case "when": return [c.q.win.n === 99 ? 1 : c.q.win.n, c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap(effNums)];
+    case "when": return [lim ? 1 : c.q.win.n === 99 ? 1 : c.q.win.n, lim ? 1 : c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap(effNums)];
     case "delay": return [c.wait, ...c.effs.flatMap(effNums)];
     case "status": return P2.STAUTO ? [c.dur] : [c.lvl, c.dur];   // 真实：状态的数字只有持续轮数，级别每次施放 +1
     case "ignore": return [c.win];
@@ -125,13 +126,13 @@ export function numsOf(c: Clause): number[] {
     default: return [];
   }
 }
-export function clauseCost(c: Clause): number {
+export function clauseCost(c: Clause, cx?: Cls | null): number {
   const ec = (x: Eff) => (P2.COSTREAL ? (x.ignore ? P.PIERCE : 0) : x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (tgN(x.tg) > 1 ? P2.AOE * (tgN(x.tg) - 1) : 0);
   switch (c.k) {
     case "act": return ec(c.eff);
     case "when": return P.STAND + (c.q.obj.t === "cat" && c.q.obj.c === "any" ? P.ANYCLS : 0);
     case "delay": case "ignore": return P.STAND;
-    case "status": return P2.STATUS_AP;
+    case "status": return Math.max(0, P2.STATUS_AP - (cx === "状态" ? P2.ST_AP_MINUS : 0));
     case "cash": return P.CASH;
     case "remove": return c.obj.t === "cat" && c.obj.c === "any" ? P.REMOVE_ANY : P.REMOVE;
     case "redirect": return P2.AP_REDIR + (tgN(c.tg) > 1 ? P2.AOE * (tgN(c.tg) - 1) : 0);
@@ -186,17 +187,18 @@ export function advWordsOf(cl: Sentence): string[] {
   return out;
 }
 /** pos：随从位置（0 词位 / 1 数位 / 2 引用位），-1 = 不分位置 */
-export function sentenceCost(cl: Sentence, rnd = 1, pos = -1): number {
+export function sentenceCost(cl: Sentence, rnd = 1, pos = -1, cx: Cls | null = null): number {
   const ks = refKindsOf(cl);
-  const seg = (c: Clause) => { const x = isChain(c) ? P2.CHAINAP : P.AND; return pos === 0 ? Math.max(0, x - P2.POS_WORD) : x; };
-  const allCost = pos === 2 && P2.POS3 === "ref" ? Math.max(1, Math.ceil(Math.max(2, rnd) / 2)) : Math.max(2, rnd);
-  return (P2.COSTREAL ? P.BASE : 0) + cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * allCost;
+  // 优先级：职业先定「每多一段」的底价（并流 AND_BING），位置（词位）再在上面减；全程半价只算一次（引用流 或 引用位，不叠加）
+  const seg = (c: Clause) => { let x = isChain(c) ? P2.CHAINAP : P.AND; if (cx === "并") x = Math.min(x, P2.AND_BING); return pos === 0 ? Math.max(0, x - P2.POS_WORD) : x; };
+  const allCost = (pos === 2 && P2.POS3 === "ref") || cx === "引用" ? Math.max(1, Math.ceil(Math.max(2, rnd) / 2)) : Math.max(2, rnd);
+  return (P2.COSTREAL ? P.BASE : 0) + cl.reduce((t, c, i) => t + clauseCost(c, cx) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * allCost;
 }
 /** 起手时间：段越多、数字越大越晚 */
-export function windup(cl: Sentence, extra = 0): number {
-  const maxN = Math.max(1, extra, ...cl.flatMap(numsOf));
+export function windup(cl: Sentence, extra = 0, cx: Cls | null = null): number {
+  const maxN = Math.max(1, extra, ...cl.flatMap((c) => numsOf(c, cx)));
   const words = P2.WIND_WORD ? cl.filter((c) => c.k === "status" || c.k === "redirect" || c.k === "postpone" || c.k === "strip" || c.k === "remove").length * P2.WIND_WORD : 0;
-  return Math.min(P.TL, 1 + (cl.length - 1) * P.WIND_CL + Math.floor((maxN - 1) * P.WIND_N) + words);
+  return Math.min(P.TL, 1 + (cx === "并" ? 0 : (cl.length - 1) * P.WIND_CL) + Math.floor((maxN - 1) * P.WIND_N) + words);
 }
 
 // ---------- 读成中文 ----------
@@ -231,3 +233,30 @@ export function legal(cl: Sentence): boolean {
     && !((c.k === "act" && (c.eff.rep ?? 1) > 1 && !P2.REP) || (c.k === "act" && (c.eff.rep ?? 1) > 1 && c.eff.verb === "shield")));
 }
 export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");
+
+// ---------- 职业限制（只有 P2.CLASSES 开着、传了职业才会用到）----------
+/** 一个子句的「动作词」：并流一句里同一个动作词只能出现一次 */
+export function actionWordOf(c: Clause): string {
+  switch (c.k) {
+    case "act": return verbWord(c.eff);
+    case "status": return STATUS_WORD[c.kind];
+    case "redirect": return "转移";
+    case "postpone": return "延后";
+    case "remove": case "strip": return "移除";
+    case "ignore": return "无视";
+    case "cash": return "兑现";
+    case "delay": return "定时";
+    case "when": return c.forbid ? "不得" : c.q.win.dir === "after" ? (c.judge === "absent" ? "不存在" : "每当") : "若";
+  }
+}
+const QUANT_WORDS = ["累计", "次数", "词数", "段数"];
+/** 职业对句子的限制：返回拒绝原因（空串 = 通过） */
+export function classProblem(cl: Sentence, cx: Cls | null): string {
+  if (!P2.CLASSES || !cx) return "";
+  if (cx === "并") { const seen = new Set<string>(); for (const c of cl) { const w = actionWordOf(c); if (seen.has(w)) return "并流:同一动作词只能用一次"; seen.add(w); } }
+  else if (cx === "引用") { if (advWordsOf(cl).filter((w) => QUANT_WORDS.includes(w)).length > 1) return "引用流:最多一个引用量词"; }
+  else if (cx === "限制") { for (const c of cl) if (c.k === "act" && c.eff.verb === "dmg" && typeof c.eff.n === "number" && c.eff.n > P2.CAP_LIM) return "限制流:单次伤害不能超过上限"; }
+  return "";
+}
+/** 一句最多几段（SEGCAP 关 = 不限） */
+export const segCap = (cx: Cls | null): number => (!P2.SEGCAP ? Infinity : P2.CLASSES && cx === "并" ? P2.SEG_BING : P2.CLAUSE_MAX);
