@@ -35,7 +35,15 @@ export function configureRules(kind: RulesKind, custom = ""): string | null {
 }
 
 export type ReplayType = "hit" | "heal" | "shield" | "absorb" | "status" | "down" | "standing" | "fire" | "heat";
-export interface ReplayEvent { sec: number; type: ReplayType; src: number; tgt: number; amount: number; text: string }
+export interface ReplayEvent {
+  sec: number; type: ReplayType; src: number; tgt: number; amount: number; text: string;
+  /** 仅 fire：这句话含哪些动作（dmg/heal/shield/burn/vuln/weak/redirect/postpone/strip/nullify/delay/cash/forbid/standing/cond/quote） */
+  kinds?: string[];
+  /** 仅 fire：宣告的起手秒 */
+  start?: number;
+  /** 仅 fire 且含延后：被延后的那句的出手随从（猜测，按对方宣告序）与延后秒数 */
+  ptgt?: number; pn?: number;
+}
 
 export interface Candidate { cl: Sentence; text: string; kind: string; cost: number; nums: number[]; minStart: number; adv: string[] }
 export interface MatchOpts { kws?: string[] | null; first: 0 | 1; myDeck: Deck; foeDeck?: Deck; seed?: number; tier: string }
@@ -142,6 +150,7 @@ export class Match {
     const s = this.s;
     const pre = { hp: s.hp.slice() };
     const raw: any[] = []; let n = 0;
+    const decls = s.decl.map((d) => ({ unit: d.unit, side: d.side, cl: d.cl, start: d.start, ord: d.ord }));   // VFX：结算前拷贝，演出要知道每句的动作种类
     setTrace((e) => raw.push({ ...e, _i: n++ }));
     try { resolveRound(s); } finally { setTrace(null); }
     raw.sort((a, b) => a.sec - b.sec || a._i - b._i);
@@ -151,7 +160,18 @@ export class Match {
       switch (e.t) {
         case "fire": {
           const d = this.history.slice().reverse().find((h) => h.unit === e.u && h.rnd === s.rnd);
-          ev.push({ sec: e.sec, type: "fire", src: e.u, tgt: -1, amount: 0, text: d?.text ?? "" }); break;
+          const dc = decls.find((x) => x.unit === e.u);
+          const fe: ReplayEvent = { sec: e.sec, type: "fire", src: e.u, tgt: -1, amount: 0, text: d?.text ?? "" };
+          if (dc) {
+            fe.kinds = clauseKinds(dc.cl); fe.start = dc.start;
+            const pp = dc.cl.find((c: Clause) => c.k === "postpone") as any;
+            if (pp) {
+              const foes = decls.filter((x) => x.side !== dc.side).sort((a, b) => a.ord - b.ord);
+              const t = foes[Math.max(0, Math.min(foes.length - 1, (pp.ord ?? 1) - 1))];
+              if (t) { fe.ptgt = t.unit; fe.pn = pp.n; }
+            }
+          }
+          ev.push(fe); break;
         }
         case "hit": hp[e.u] = Math.max(0, hp[e.u] - e.amt); ev.push({ sec: e.sec, type: "hit", src: e.src, tgt: e.u, amount: e.amt, text: `-${e.amt}` }); break;
         case "heal": hp[e.u] += e.amt; ev.push({ sec: e.sec, type: "heal", src: e.src, tgt: e.u, amount: e.amt, text: `+${e.amt}` }); break;
@@ -194,6 +214,25 @@ export class Match {
   }
 }
 
+/** VFX 用：一句话里有哪些动作 */
+function clauseKinds(cl: Sentence): string[] {
+  const out: string[] = [];
+  const eff = (e: any) => { out.push(e.verb); if (typeof e.n !== "number") out.push("quote"); if (e.ignore) out.push("nullify"); };
+  for (const c of cl as any[]) {
+    switch (c.k) {
+      case "act": eff(c.eff); break;
+      case "when": out.push(c.forbid ? "forbid" : c.q.win.dir === "after" ? "standing" : "cond"); c.effs.forEach(eff); break;
+      case "delay": out.push("delay"); c.effs.forEach(eff); break;
+      case "status": out.push(c.kind); break;
+      case "ignore": out.push("nullify"); break;
+      case "cash": out.push("cash"); break;
+      case "remove": case "strip": out.push("strip"); break;
+      case "redirect": out.push("redirect"); break;
+      case "postpone": out.push("postpone"); break;
+    }
+  }
+  return [...new Set(out)];
+}
 function pickFoeDeck(r: Rng): Deck {
   const pool = DECK_WORDS.presets.map((p) => p.deck).filter((d) => deckOk(d));
   if (pool.length && r() < 0.7) return { ...pool[Math.floor(r() * pool.length)] };
