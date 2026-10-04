@@ -34,6 +34,12 @@ function genAmt(e: Env, hi: number): Amt {
   if (chance(e.r, 0.12)) return { q: query(win("before", 1 + Math.floor(e.r() * 2), chance(e.r, 0.3) ? "sent" : "round"), pick(e.r, ["me", "foe"] as const), cat(pick(e.r, ["dmg", "heal", "atk"])), pick(e.r, ["count", "sum"] as const)), mult: 1 };
   return num(e, hi);
 }
+/** 与「谁触发」相称的效果：对方的事 → 反击来源或我方防护；我方的事 → 追加进攻或自保 */
+function genEffFor(e: Env, who: "me" | "foe"): Eff {
+  const x = e.r();
+  if (who === "foe") return x < 0.45 ? dmg(genAmt(e, 3), { t: "src" }) : x < 0.75 ? heal(num(e, 3), { t: "allMe" }) : shield(num(e, 3), { t: "allMe" });
+  return x < 0.55 ? dmg(genAmt(e, 3), { t: "lowFoe" }, chance(e.r, 0.2) ? "shield" : undefined) : x < 0.8 ? heal(num(e, 3), { t: "lowMe" }) : shield(num(e, 3), { t: "lowMe" });
+}
 function genEff(e: Env, onSrc: boolean): Eff {
   const x = e.r();
   if (x < 0.5) return dmg(genAmt(e, 3), onSrc ? { t: "src" } : foeTg(e), chance(e.r, 0.1) ? "shield" : undefined);
@@ -50,11 +56,11 @@ function genClause(e: Env, allowStanding: boolean): Clause {
   if (x < 56) return status(pick(e.r, ["burn", "vuln", "weak"] as StatusKind[]), num(e, 3), 1 + Math.floor(e.r() * 3), foeTg(e));
   if (!allowStanding) return act(dmg(num(e, 3), foeTg(e)));
   if (x < 70) {            // 每当（长期）
-    const w = genWin(e, "after");
-    return { k: "when", q: query(w, pick(e.r, ["me", "foe", "foe"] as const), genObj(e), "count", 1 + Math.floor(e.r() * 3)), judge: "exist", effs: [genEff(e, chance(e.r, 0.5))], cap: 1 + Math.floor(e.r() * 2) };
+    const w = genWin(e, "after"), who = pick(e.r, ["me", "foe", "foe"] as const);
+    return { k: "when", q: query(w, who, genObj(e), "count", 1 + Math.floor(e.r() * 3)), judge: "exist", effs: [genEffFor(e, who)], cap: 1 + Math.floor(e.r() * 2) };
   }
-  if (x < 76) return { k: "when", q: query(genWin(e, "before"), pick(e.r, ["me", "foe"] as const), genObj(e), "count", 1 + Math.floor(e.r() * 3)), judge: pick(e.r, ["exist", "absent"] as const), effs: [genEff(e, false)], cap: 1 };
-  if (x < 80) return unless(pick(e.r, ["me", "foe"] as const), cat(pick(e.r, CATS)), 1 + Math.floor(e.r() * 3), [genEff(e, false)]);
+  if (x < 76) { const who = pick(e.r, ["me", "foe"] as const); return { k: "when", q: query(genWin(e, "before"), who, genObj(e), "count", 1 + Math.floor(e.r() * 3)), judge: pick(e.r, ["exist", "absent"] as const), effs: [genEffFor(e, who === "foe" ? "me" : "foe")], cap: 1 }; }
+  if (x < 80) { const who = pick(e.r, ["me", "foe"] as const); return unless(who, cat(pick(e.r, CATS)), 1 + Math.floor(e.r() * 3), [genEffFor(e, who === "foe" ? "foe" : "me")]); }
   if (x < 85) return timer(1 + Math.floor(e.r() * 3), cat(pick(e.r, ["atk", "dmg", "heal", "status"])), pick(e.r, ["me", "foe"] as const), 1 + Math.floor(e.r() * 2));
   if (x < 89) return forbid(cat(pick(e.r, ["atk", "heal", "def", "status"])), 1 + Math.floor(e.r() * 3), num(e, 3), 1 + Math.floor(e.r() * 2));
   if (x < 93) return { k: "remove", obj: chance(e.r, 0.4) ? cat("any") : genObj(e) };
