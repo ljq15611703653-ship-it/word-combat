@@ -59,4 +59,6 @@ export interface Settings {
   /** 每个随从的关键词：random / 首挡 / 不屈 */
   kws: string[];
   customRules: string;
+  /** 对手卡组：random（每局 randDeck）/ preset（选一套推荐）/ custom（自定义 deck） */
+  foe: { mode: "random" | "preset" | "custom"; preset: string; deck: Record<string, number> };
 }

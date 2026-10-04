@@ -7,10 +7,10 @@ export interface StyleDef {
   deckPreset: string;
 }
 export const STYLES: StyleDef[] = [
-  { id: "bing", name: "并流", tag: "一句话接几段，连环出手", accent: "#ff2d95", accent2: "#ffd23f", glyph: "并", artDir: "bing", names: ["连枝", "叠码", "疾并"], deckPreset: "newbie" },
-  { id: "yin", name: "引用流", tag: "把前几轮的量当数字用", accent: "#00e5ff", accent2: "#b388ff", glyph: "引", artDir: "yin", names: ["回声", "账本", "快读"], deckPreset: "quote" },
-  { id: "xian", name: "限制流", tag: "不得/收紧：做了就疼", accent: "#b388ff", accent2: "#ff2d95", glyph: "限", artDir: "xian", names: ["禁言", "封条", "断路"], deckPreset: "forbid" },
-  { id: "zhuang", name: "状态流", tag: "灼烧易伤衰弱，慢慢磨", accent: "#ffd23f", accent2: "#5eead4", glyph: "状", artDir: "zhuang", names: ["烛火", "裂纹", "迟滞"], deckPreset: "state" },
+  { id: "bing", name: "并流", tag: "一句话接几段，连环出手", accent: "#ff2d95", accent2: "#ffd23f", glyph: "并", artDir: "bing", names: ["连枝", "叠码", "疾并"], deckPreset: "cls-bing" },
+  { id: "yin", name: "引用流", tag: "把前几轮的量当数字用", accent: "#00e5ff", accent2: "#b388ff", glyph: "引", artDir: "yin", names: ["回声", "账本", "快读"], deckPreset: "cls-quote" },
+  { id: "xian", name: "限制流", tag: "不得/收紧：做了就疼", accent: "#b388ff", accent2: "#ff2d95", glyph: "限", artDir: "xian", names: ["禁言", "封条", "断路"], deckPreset: "cls-limit" },
+  { id: "zhuang", name: "状态流", tag: "灼烧易伤衰弱，慢慢磨", accent: "#ffd23f", accent2: "#5eead4", glyph: "状", artDir: "zhuang", names: ["烛火", "裂纹", "迟滞"], deckPreset: "cls-state" },
 ];
 export const styleOf = (id: string) => STYLES.find((s) => s.id === id) ?? STYLES[0];
 export const TIER_DESC: Record<string, string> = {

@@ -1,6 +1,9 @@
 // 战斗界面：简化版。所有信息放在随从旁边的面板里；右上角回合/行动点/数字牌；右下角操作按钮。只显示双方公开信息。
 import { Match, P2, configureRules, setUnitNames, type ReplayEvent } from "./engine/api";
 import { KW_TIP } from "./setup";
+import { randDeck } from "./engine/deck";
+import { deckOk } from "./engine/api";
+import { presetDeck } from "./deck/words";
 import { STYLES, styleOf, type StyleDef } from "./styles";
 import { loadArt } from "./art";
 import { MenuInput } from "./inputMenu";
@@ -50,7 +53,10 @@ export class Battle {
     this.foeStyle = others[Math.floor(Math.random() * others.length)];
     setUnitNames(this.myStyle.names, this.foeStyle.names);
     const kws = (st.kws ?? []).map((k) => (k === "首挡" || k === "不屈" ? k : ["首挡", "不屈"][Math.floor(Math.random() * 2)]));
-    this.m = new Match({ first, myDeck: st.deck, tier: st.tier, seed: opts.seed, kws: kws.length === 3 ? kws : null });
+    const foe = st.foe ?? { mode: "random", preset: "", deck: {} };
+    const pd = foe.mode === "preset" ? presetDeck(foe.preset) : null;
+    const foeDeck = foe.mode === "custom" ? foe.deck : pd && deckOk(pd) && Object.keys(pd).length ? pd : randDeck(Math.random);
+    this.m = new Match({ first, myDeck: st.deck, foeDeck, tier: st.tier, seed: opts.seed, kws: kws.length === 3 ? kws : null });
     this.m.rulesKind = st.rules;
     this.hp0 = Math.max(...this.m.s.hp);
     for (let u = 0; u < 6; u++) { this.disp.hp[u] = this.m.s.hp[u]; this.disp.sh[u] = this.m.s.sh[u]; }

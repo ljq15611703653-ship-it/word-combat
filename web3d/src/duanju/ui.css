@@ -198,3 +198,8 @@ button:disabled { cursor: default; opacity: .45; }
   .dj-menu { left: 0 !important; right: 0; top: auto !important; bottom: 0; width: 100%; max-height: 72%; clip-path: none; z-index: 30; }
   .pop { bottom: calc(100% + 4px); }
 }
+
+/* ---------- 开局页：载荷板 / 对手卡组 ---------- */
+.dj-setup { max-width: 1100px; }
+.su-sec.su-decksec { clip-path: none; }
+.su-chip.on { background: var(--accent); color: var(--ink); border-color: var(--accent); font-weight: 700; }
