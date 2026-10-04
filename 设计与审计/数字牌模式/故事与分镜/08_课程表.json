@@ -1,0 +1,75 @@
+{
+ "curriculum": [
+  {
+   "beat": 1,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 2,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 3,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 4,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 5,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 6,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 7,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 8,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 9,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 10,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 11,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 12,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 13,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  },
+  {
+   "beat": 14,
+   "teach": null,
+   "notes": "待定：等新引擎规则稳定后填"
+  }
+ ],
+ "rules": "由用户和引擎决定，可增减关数；故事层只引用 beat 编号"
+}
