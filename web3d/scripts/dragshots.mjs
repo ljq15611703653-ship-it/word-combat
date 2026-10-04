@@ -11,7 +11,7 @@ const ws=new WebSocket(tabs.find(t=>t.type==="page").webSocketDebuggerUrl); awai
 let id=0;const pend=new Map();ws.addEventListener("message",e=>{const m=JSON.parse(e.data);if(m.id&&pend.has(m.id)){pend.get(m.id)(m);pend.delete(m.id)}});
 const cdp=(method,params={})=>new Promise(res=>{const i=++id;pend.set(i,res);ws.send(JSON.stringify({id:i,method,params}))});
 const ev=async(x)=>{const r=await cdp("Runtime.evaluate",{expression:x,awaitPromise:true,returnByValue:true});if(r.result?.exceptionDetails)throw new Error(JSON.stringify(r.result.exceptionDetails).slice(0,400));return r.result?.result?.value};
-const shot=async(n)=>{const r=await cdp("Page.captureScreenshot",{format:"png"});writeFileSync(`"+(process.argv[3]??"dshots")+"/${n}.png`,Buffer.from(r.result.data,"base64"));console.log("shot",n)};
+const shot=async(n)=>{const r=await cdp("Page.captureScreenshot",{format:"png"});writeFileSync(`${process.argv[3] ?? "dshots"}/${n}.png`,Buffer.from(r.result.data,"base64"));console.log("shot",n)};
 const mouse=(type,x,y,extra={})=>cdp("Input.dispatchMouseEvent",{type,x,y,button:"left",buttons:type==="mouseReleased"?0:1,clickCount:1,...extra});
 await cdp("Emulation.setDeviceMetricsOverride",{width:1440,height:810,deviceScaleFactor:1,mobile:false});
 await cdp("Page.navigate",{url:`http://127.0.0.1:${PORT}/`});
