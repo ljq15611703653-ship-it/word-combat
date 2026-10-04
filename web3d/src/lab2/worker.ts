@@ -4,7 +4,7 @@ import { sentenceText, type Sentence } from "./ast";
 import type { Deck } from "./params";
 import { AI_DEFAULT, type AiCfg } from "./ai";
 
-export interface Task { id: number; a: Deck; b: Deck; seed: number; first: 0 | 1; rec?: boolean; cfg?: AiCfg }
+export interface Task { id: number; a: Deck; b: Deck; seed: number; first: 0 | 1; rec?: boolean; cfg?: AiCfg | [AiCfg, AiCfg] }
 export interface Out { id: number; win: -1 | 0 | 1 | 2; rounds: number; stats: Record<string, number>; shapes?: [Record<string, number>, Record<string, number>] }
 const shape = (cl: Sentence) => sentenceText(cl).replace(/\d+(?=级|轮|句|次|条)/g, "N").replace(/随从\d/g, "随从").replace(/\d+/g, "N");
 process.on("message", (m: { tasks: Task[] }) => {

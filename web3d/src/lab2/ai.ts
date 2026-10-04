@@ -5,8 +5,8 @@ import { windup } from "./ast";
 import { type St, clone, declare, passUnit, nextSide, resolveRound, nextRound, alive, unitsOf, total, nAlive, canAfford } from "./interp";
 import { candidates, type Rng } from "./gen";
 
-export interface AiCfg { k: number; depth: number; w: number[]; passBias: number }
-export const AI_DEFAULT: AiCfg = { k: 8, depth: 2, w: [1, 0.7, 0.5], passBias: 0 };
+export interface AiCfg { k: number; depth: number; w: number[]; passBias: number; mode?: "free" | "plain" | "playbook" }
+export const AI_DEFAULT: AiCfg = { k: 8, depth: 2, w: [1, 0.7, 0.5], passBias: 0, mode: "free" };
 
 /** 估值：站在 side 看，活着的随从差 + 总血量差；终局给大数 */
 export function evaluate(s: St, side: Side): number {
@@ -31,7 +31,7 @@ export function defaultMove(s: St, side: Side, u: number): boolean {
 }
 function playOutRound(s: St) {
   for (let g = 0; g < 12; g++) {
-    const sd = nextSide(s); if (sd < 0) break;
+    const sd = nextSide(s); if (sd === -1) break;
     const u = unitsOf(sd).find((x) => alive(s, x) && !s.done[x])!;
     if (!defaultMove(s, sd, u)) passUnit(s, u);
     s.turn = (1 - s.turn) as Side;
@@ -61,9 +61,9 @@ export function think(s: St, side: Side, r: Rng, cfg: AiCfg = AI_DEFAULT): { uni
   for (const u of us) {
     const base = rollout(s, side, u, null, 1, cfg) + cfg.passBias;
     if (base > bestV) { bestV = base; best = { unit: u, cl: null, start: 1 }; }
-    for (const cl of candidates(s, side, u, r, Math.ceil(cfg.k / us.length) + 1)) {
+    for (const cl of candidates(s, side, u, r, Math.ceil(cfg.k / us.length) + 1, cfg.mode ?? "free")) {
       const w = windup(cl);
-      const starts = [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
+      const starts = cfg.mode === "playbook" ? [...new Set([w, w + 3, 8, 12].filter((x) => x >= w && x <= P.TL))] : [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
       for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
     }
   }

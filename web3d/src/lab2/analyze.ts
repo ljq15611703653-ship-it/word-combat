@@ -2,7 +2,7 @@
 // 运行：node --import tsx src/lab2/analyze.ts   （环境变量 OUT GPP MAXDECKS）
 import { readFileSync, writeFileSync } from "node:fs";
 import { Pool } from "./pool";
-import { roundRobin, fitness } from "./evolve";
+import { roundRobin } from "./evolve";
 import { deckKey, DESC_NAMES, dist } from "./deck";
 import { ADV_WORDS, deckCost, type Deck } from "./params";
 import { mulberry32 } from "./gen";

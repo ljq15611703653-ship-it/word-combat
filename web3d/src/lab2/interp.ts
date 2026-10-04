@@ -12,6 +12,7 @@ export interface Ev {
   kind: "use" | "decl" | "hurt" | "down" | "healed";
   words: string[]; cats: string[]; amt: number; len: number; segs: number;
   src: number;                      // 造成它的随从（没有 = -1）
+  derived?: boolean;                // 数量来自「引用量」的效果产生的事件：不再被引用量查询统计（防止滚雪球）
   trig: boolean;                    // 由长期句子的效果产生（一层封顶：不再触发别的长期句子）
 }
 export interface Standing {
@@ -68,26 +69,28 @@ interface Ctx { owner: Side; sord: number; fromSeq?: number; fromRnd?: number }
 function match(e: Ev, o: Obj): boolean {
   switch (o.t) {
     case "word": return e.words.includes(o.w);
-    case "cat": return o.c === "any" ? e.kind === "use" : e.cats.includes(o.c);
+    case "cat": return e.kind !== "decl" && (o.c === "any" ? e.kind === "use" : e.cats.includes(o.c));
     case "ev": return e.kind === o.e;
     case "nth": return e.kind === "decl" && e.rord === o.n;
     case "order": { const a = e.words.indexOf(o.a), b = e.words.indexOf(o.b); return e.kind === "decl" && a >= 0 && b > a; }
   }
 }
+/** 查询是否命中事件：词在「句」窗口里看宣告的句子，在「轮」窗口里看实际使用；其余照 match */
+const matchQ = (e: Ev, q: Query) => (q.obj.t === "word" ? (q.win.unit === "sent" ? e.kind === "decl" : e.kind === "use") && match(e, q.obj) : match(e, q.obj));
 const value = (e: Ev, agg: Query["agg"]) => (agg === "count" ? 1 : agg === "sum" ? e.amt : e.kind === "decl" ? (agg === "len" ? e.len : e.segs) : 0);
 export function evalQ(s: St, q: Query, c: Ctx): number {
   const side = q.who === "me" ? c.owner : ((1 - c.owner) as Side);
   const w = q.win;
   let tot = 0;
   for (const e of s.log) {
-    if (e.side !== side) continue;
+    if (e.side !== side || e.derived) continue;
     if (w.dir === "before") {
       if (w.unit === "round" ? e.rnd <= s.rnd - w.n : e.sord >= c.sord || e.sord < c.sord - w.n) continue;
     } else {
       if (e.seq < (c.fromSeq ?? s.seq)) continue;
       if (w.unit === "round" ? e.rnd >= (c.fromRnd ?? s.rnd) + w.n : e.sord <= c.sord || e.sord > c.sord + w.n) continue;
     }
-    if (match(e, q.obj)) tot += value(e, q.agg);
+    if (matchQ(e, q)) tot += value(e, q.agg);
   }
   return tot;
 }
@@ -108,7 +111,7 @@ function emit(s: St, e: Omit<Ev, "seq" | "rnd" | "rord" | "trig"> & { trig?: boo
 function roundCount(s: St, st: Standing, q: Query): number {
   const side = q.who === "me" ? st.owner : ((1 - st.owner) as Side);
   let n = 0;
-  for (const e of s.log) if (e.rnd === s.rnd && e.seq >= st.rseq && e.side === side && match(e, q.obj)) n += value(e, q.agg);
+  for (const e of s.log) if (e.rnd === s.rnd && e.seq >= st.rseq && e.side === side && matchQ(e, q)) n += value(e, q.agg);
   return n;
 }
 const sctx = (st: Standing): Ctx => ({ owner: st.owner, sord: st.sord, fromSeq: st.fromSeq, fromRnd: st.fromRnd });
@@ -117,7 +120,7 @@ function fireStanding(s: St, st: Standing, ev: Ev) {
   if (c.k !== "when" || c.q.win.dir !== "after" || c.judge !== "exist" || !st.active) return;
   const q = c.q;
   const side = q.who === "me" ? st.owner : ((1 - st.owner) as Side);
-  if (ev.side !== side || !match(ev, q.obj)) return;
+  if (ev.side !== side || !matchQ(ev, q)) return;
   if (q.win.unit === "sent" && (ev.sord <= st.sord || ev.sord > st.sord + q.win.n)) return;
   const cnt = q.win.unit === "round" ? roundCount(s, st, q) : evalQ(s, q, sctx(st));
   if (cnt <= thr(q) || st.fired >= c.cap) return;
@@ -133,7 +136,7 @@ function lowest(s: St, side: Side): number {
 const shielded = (s: St, u: number) => s.stand.some((x) => x.c.k === "ignore" && x.owner === sideOf(u) && x.active && x.left > 0);
 const stLvl = (s: St, u: number, k: StatusKind) => s.sts.filter((x) => x.unit === u && x.kind === k).reduce((a, x) => Math.max(a, x.lvl), 0);
 
-interface Run { src: number; actor: number; sord: number; noTrig: boolean; ctx: Ctx }
+interface Run { src: number; actor: number; sord: number; noTrig: boolean; ctx: Ctx; derived?: boolean }
 function targets(s: St, owner: Side, verb: Eff["verb"] | "status", t: Tg, r: Run): number[] {
   const foe = (1 - owner) as Side, want = verb === "dmg" || verb === "status" ? foe : owner;
   const fix = (u: number) => (u >= 0 && alive(s, u) && sideOf(u) === want ? u : lowest(s, want));
@@ -150,9 +153,9 @@ function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
   const d = Math.min(s.hp[u], n - ab);
   if (d > 0) {
     s.hp[u] -= d;
-    emit(s, { sord: r.sord, side: sideOf(u), kind: "hurt", words: [], cats: ["dmg", "hpchg"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig });
+    emit(s, { sord: r.sord, side: sideOf(u), kind: "hurt", words: [], cats: ["dmg", "hpchg"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
     if (s.hp[u] <= 0) {
-      emit(s, { sord: r.sord, side: sideOf(u), kind: "down", words: [], cats: [], amt: 1, len: 0, segs: 0, src: r.actor, trig: r.noTrig });
+      emit(s, { sord: r.sord, side: sideOf(u), kind: "down", words: [], cats: [], amt: 1, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
       s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u));
       s.sts = s.sts.filter((x) => x.unit !== u);
     }
@@ -160,11 +163,12 @@ function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
   return d;
 }
 /** 执行一个效果，返回「成功」（真的发生了） */
-function exec(s: St, owner: Side, e: Eff, r: Run, emitUse = false): boolean {
+function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
+  const r: Run = typeof e.n === "number" ? r0 : { ...r0, derived: true };
   const base = amount(s, e.n, r.ctx);
   const tg = targets(s, owner, e.verb, e.tg, r);
   if (!tg.length) return false;
-  if (emitUse) emit(s, { sord: r.sord, side: owner, kind: "use", words: [e.verb === "dmg" ? "造成" : e.verb === "heal" ? "恢复" : "减伤"], cats: e.verb === "dmg" ? ["atk", "dmg", "hpchg"] : e.verb === "heal" ? ["heal", "hpchg"] : ["def", "guard"], amt: base, len: 0, segs: 0, src: r.actor, trig: r.noTrig });
+  if (emitUse) emit(s, { sord: r.sord, side: owner, kind: "use", words: [e.verb === "dmg" ? "造成" : e.verb === "heal" ? "恢复" : "减伤"], cats: e.verb === "dmg" ? ["atk", "dmg", "hpchg"] : e.verb === "heal" ? ["heal", "hpchg"] : ["def", "guard"], amt: base, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
   let ok = false;
   for (const u of tg) {
     if (e.verb === "dmg") {
@@ -177,7 +181,7 @@ function exec(s: St, owner: Side, e: Eff, r: Run, emitUse = false): boolean {
     } else if (e.verb === "heal") {
       const d = Math.max(0, Math.min(base - P.HEALPEN, P.HP - s.hp[u]));
       s.hp[u] += d;
-      if (d > 0) { ok = true; stat(s, `s${owner}:healed`, d); emit(s, { sord: r.sord, side: sideOf(u), kind: "healed", words: [], cats: ["heal", "hpchg"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig }); }
+      if (d > 0) { ok = true; stat(s, `s${owner}:healed`, d); emit(s, { sord: r.sord, side: sideOf(u), kind: "healed", words: [], cats: ["heal", "hpchg"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived }); }
     } else { s.sh[u] += base; ok = true; }
   }
   return ok;
@@ -236,7 +240,7 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
   emit(s, { sord, rord: ord + 1, side, kind: "decl", words, cats, amt: a.cost, len: words.length, segs: cl.length, src: unit });
   for (const c of cl) {
     if (isStanding(c)) {
-      s.stand.push({ owner: side, unit, c, sord, words: wordsOf(c), cats: catsOf(c), active: false, from: start, fromSeq: 0, rseq: 0, fromRnd: s.rnd, age: 0, fired: 0, left: c.k === "when" ? (c.q.win.unit === "round" ? c.q.win.n : 99) : c.k === "delay" ? c.wait : c.win });
+      s.stand.push({ owner: side, unit, c, sord, words: wordsOf(c), cats: catsOf(c), active: false, from: start, fromSeq: 0, rseq: 0, fromRnd: s.rnd, age: 0, fired: 0, left: c.k === "when" ? (c.q.win.unit === "round" ? c.q.win.n : 99) : c.k === "delay" ? c.wait : c.k === "ignore" ? c.win : 1 });
     }
     stat(s, `s${side}:${c.k}`);
   }
@@ -274,6 +278,7 @@ function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }) {
     const yes = c.judge === "exist" ? cnt > thr(c.q) : cnt === 0;
     if (yes) { stat(s, `s${me}:fire`); for (const e of c.effs) exec(s, me, e, r, false); }
   } else if (c.k === "remove") {
+    emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: false });
     if (c.obj.t === "cat" && c.obj.c === "status") { const n = s.sts.filter((x) => sideOf(x.unit) === me).length; s.sts = s.sts.filter((x) => sideOf(x.unit) !== me); stat(s, n ? `s${me}:removed` : `s${me}:removeMiss`); return; }
     const cand = s.stand.filter((x) => x.owner === foe && standingMatches(x, c.obj)).sort((a, b) => b.left - a.left)[0];
     if (cand) { s.stand = s.stand.filter((x) => x !== cand); stat(s, `s${me}:removed`); } else stat(s, `s${me}:removeMiss`);

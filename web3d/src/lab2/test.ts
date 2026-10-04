@@ -81,6 +81,10 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
 { const run = (cap: number) => { const s = fresh(); say(s, 0, [whenever("foe", cat("atk"), 2, [dmg(1, { t: "src" })], cap, 2)]); say(s, 3, [act(dmg(1, unit(1)))], 5); say(s, 4, [act(dmg(1, unit(2)))], 6); resolveRound(s); return s.stats["s0:fire"] ?? 0; };
   check(run(1) === 1 && run(3) === 2, "至多 N 次：cap 1 触发 1 次、cap 3 触发 2 次"); }
 
+// 18 引用量不滚雪球：两句「造成 我方累计伤害」只数真正的伤害
+{ const s = fresh(); const snow = () => [act(dmg({ q: query(win("before", 1, "round"), "me", cat("dmg"), "sum"), mult: 1 }, { t: "lowFoe" }))];
+  say(s, 0, [act(dmg(2, unit(3)))], 1); say(s, 1, snow(), 3); say(s, 2, snow(), 5); resolveRound(s);
+  check(total(s, 1) === 3 * P.HP - 2 - 2 - 2, "引用量只统计非引用产生的伤害：2 → 2 → 2，不翻倍"); }
 // 随机试玩：不崩、能打完
 function rnd(n: number) { return Math.floor(Math.random() * n); }
 function randSentence(s: St, u: number): Sentence {
@@ -105,7 +109,7 @@ for (let g = 0; g < 300; g++) {
   let guard = 0;
   while (s.win < 0 && guard++ < 200) {
     for (;;) {
-      const sd = nextSide(s); if (sd < 0) break;
+      const sd = nextSide(s); if (sd === -1) break;
       const us = (sd === 0 ? [0, 1, 2] : [3, 4, 5]).filter((u) => alive(s, u) && !s.done[u]);
       const u = us[rnd(us.length)];
       let ok = false;
