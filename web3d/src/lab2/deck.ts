@@ -12,6 +12,9 @@ export function fill(d: Deck, r: Rng): Deck {
   return d;
 }
 export const randDeck = (r: Rng): Deck => fill({}, r);
+/** 关键词（真实规则：每个随从 1 个，首挡 / 不屈）。P2.KW 没开返回 null（不带，旧行为） */
+export const KEYWORDS = ["首挡", "不屈"];
+export const randKws = (r: Rng): string[] | null => (P2.KW ? [0, 1, 2].map(() => pick(r, KEYWORDS)) : null);
 export function mutate(d: Deck, r: Rng): Deck {
   const n: Deck = { ...d };
   const removes = 1 + Math.floor(r() * 4);

@@ -1,7 +1,7 @@
 // 从语法自动生成候选句子（不再手写模板）。只生成「现在真的说得出口」的句子：行动点、数字牌、卡组、自指词都够。
 import { P } from "../lab/rules";
 import {
-  act, dmg, heal, shield, status, unit, win, cat, word, ev, query, unless, forbid, timer,
+  act, dmg, heal, shield, status, unit, win, cat, word, ev, query, unless, forbid, timer, redirect, postpone, strip,
   type Sentence, type Clause, type Eff, type Obj, type Tg, type Amt, type StatusKind,
 } from "./ast";
 import { type St, alive, unitsOf, canAfford } from "./interp";
@@ -44,8 +44,15 @@ function genEffFor(e: Env, who: "me" | "foe"): Eff {
 }
 function genWin(e: Env, dir: "before" | "after") { return win(dir, 1 + Math.floor(e.r() * 3), chance(e.r, dir === "after" ? 0.15 : 0.4) ? "sent" : "round"); }
 
+const REALGEN = () => P2.REDIR || P2.RMREAL || P2.REP;
 function genClause(e: Env, allowStanding: boolean): Clause {
   const x = e.r() * 100;
+  if (REALGEN()) {   // 真实规则的词（开关没开时一次随机数都不多抽，旧实验的随机序列不变）
+    const y = e.r();
+    if (P2.REDIR && y < 0.08) return redirect(mineTg(e));
+    if (P2.RMREAL && y >= 0.08 && y < 0.16) return strip(foeTg(e));
+    if (P2.REP && x < 30 && y >= 0.16 && y < 0.4) return act(dmg(num(e, 2), foeTg(e), undefined, 2 + Math.floor(e.r() * Math.max(1, Math.min(2, e.maxN - 1)))));
+  }
   if (x < 30) return act(dmg(genAmt(e, 3), foeTg(e), chance(e.r, 0.15) ? "shield" : undefined));
   if (x < 38) return act(heal(num(e, 3), mineTg(e)));
   if (x < 46) return act(shield(num(e, 3), mineTg(e)));
@@ -59,7 +66,7 @@ function genClause(e: Env, allowStanding: boolean): Clause {
   if (x < 80) { const who = pick(e.r, ["me", "foe"] as const); return unless(who, cat(pick(e.r, CATS)), 1 + Math.floor(e.r() * 3), [genEffFor(e, who === "foe" ? "foe" : "me")]); }
   if (x < 85) return timer(1 + Math.floor(e.r() * 3), cat(pick(e.r, ["atk", "dmg", "heal", "status"])), pick(e.r, ["me", "foe"] as const), 1 + Math.floor(e.r() * 2));
   if (x < 89) return forbid(cat(pick(e.r, ["atk", "heal", "def", "status"])), 1 + Math.floor(e.r() * 3), num(e, 3), 1 + Math.floor(e.r() * 2));
-  if (x < 93) return { k: "remove", obj: chance(e.r, 0.4) ? cat("any") : genObj(e) };
+  if (x < 93) return P2.RMREAL ? strip(foeTg(e)) : { k: "remove", obj: chance(e.r, 0.4) ? cat("any") : genObj(e) };
   if (x < 96) return { k: "ignore", cat: "stand", win: 1 + Math.floor(e.r() * 3) };
   return { k: "cash" };
 }
@@ -84,6 +91,17 @@ function basics(e: Env): Sentence[] {
   return out;
 }
 
+/** 真实引擎的词：转移（保护）、延后（把对方已宣告的一句推后）、移除（拆敌人的保护） */
+function realBasics(e: Env): Sentence[] {
+  const out: Sentence[] = [];
+  if (P2.POSTPONE) for (const d of e.s.decl.filter((x) => x.side !== e.side)) for (const n of new Set([P.TL - d.start + 1, 1, 2, 3])) if (n >= 1) out.push([postpone(d.ord, n)]);
+  if (P2.REDIR) for (const m of e.mine) out.push([redirect(unit(m))]);
+  if (P2.RMREAL) for (const f of e.foes) out.push([strip(unit(f))]);
+  return out;
+}
+/** STAUTO：状态的级别不再是数字（每次施放 +1 级），统一写 1，免得同一句因为级别不同重复出现 */
+const normStatus = (cl: Sentence): Sentence => (P2.STAUTO && cl.some((c) => c.k === "status" && c.lvl !== 1) ? cl.map((c) => (c.k === "status" ? { ...c, lvl: 1 } : c)) : cl);
+
 export type Mode = "free" | "plain" | "playbook" | "basic";
 export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode: Mode = "free"): Sentence[] {
   const foes = unitsOf((1 - side) as Side).filter((x) => alive(s, x));
@@ -97,9 +115,10 @@ export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode
   const mineStand = s.stand.filter((x) => x.owner === side).map((x) => JSON.stringify(x.c));
   const pending = s.decl.filter((d) => d.side === side).flatMap((d) => d.cl).map((c) => JSON.stringify(c));
   const dup = (cl: Sentence) => cl.some((c) => (c.k === "ignore" || c.k === "when" || c.k === "delay") && (c.k === "ignore" ? s.stand.some((x) => x.owner === side && x.c.k === "ignore") || s.decl.some((d) => d.side === side && d.cl.some((z) => z.k === "ignore")) : mineStand.includes(JSON.stringify(c)) || pending.includes(JSON.stringify(c))));
-  const add = (cl: Sentence) => { const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl, u)) { seen.add(key); out.push(cl); } };
+  const add = (cl0: Sentence) => { const cl = normStatus(cl0); const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl, u)) { seen.add(key); out.push(cl); } };
   basics(e).forEach(add);
   if (mode === "basic") return out;   // 入门：只会朴素的攻击/治疗/减伤
+  realBasics(e).forEach(add);
   if (mode === "playbook") playbook(e).forEach(add);
   else if (mode === "plain") playbook(e, "atkdef").forEach(add);
   for (let i = 0; i < k * 3 && out.length < k + 6; i++) add(genSentence(e, mode === "free"));

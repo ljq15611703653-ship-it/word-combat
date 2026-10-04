@@ -6,9 +6,9 @@ import { mulberry32 } from "./gen";
 import type { Side } from "./ast";
 
 export interface GameResult { win: -1 | 0 | 1 | 2; rounds: number; stats: Record<string, number>; rec?: St["rec"]; hp: [number, number] }
-export function playGame(d0: Deck | null, d1: Deck | null, seed: number, first: Side = 0, cfg: AiCfg | [AiCfg, AiCfg] = AI_DEFAULT, record = false): GameResult {
+export function playGame(d0: Deck | null, d1: Deck | null, seed: number, first: Side = 0, cfg: AiCfg | [AiCfg, AiCfg] = AI_DEFAULT, record = false, kws?: [string[] | null, string[] | null]): GameResult {
   const r = mulberry32(seed);
-  const s = newGame(first, [d0, d1], record);
+  const s = newGame(first, [d0, d1], record, kws);
   let guard = 0;
   while (s.win < 0 && guard++ < 40) {
     for (let g = 0; g < 14; g++) {

@@ -32,7 +32,7 @@ export type Tg =
   | { t: "lowFoe" } | { t: "lowMe" } | { t: "some"; n: number; side: "me" | "foe" }   // 选择 n 个（血最低的 n 个）；n 是数字，要写出来、占数字牌
   | { t: "allMe" } | { t: "allFoe" };                                                   // 旧写法，等同于选择 3 个（三个随从）
 
-export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield" }
+export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield"; rep?: number }   // rep = 重复 M（真实引擎：打 M 次每次 N，数字占牌）
 export type StatusKind = "burn" | "vuln" | "weak";
 
 export type Clause =
@@ -43,17 +43,23 @@ export type Clause =
   | { k: "status"; kind: StatusKind; lvl: number; dur: number; tg: Tg }   // 灼烧：轮末掉 lvl；易伤：受伤 +lvl；衰弱：出手伤害 −lvl
   | { k: "ignore"; cat: "stand"; win: number }           // 无视：这几轮里对面长期句子的效果落不到我方
   | { k: "cash" }                                        // 兑现：提前结算我方定时句
-  | { k: "remove"; obj: Obj };                           // 移除一句带有某词/类别的话（any 更贵）；cat status = 清除我方身上的状态
+  | { k: "remove"; obj: Obj }                            // 移除一句带有某词/类别的话（any 更贵）；cat status = 清除我方身上的状态
+  | { k: "redirect"; tg: Tg }                            // 转移（真实）：本轮打向这个随从的敌方伤害，改打在出手的人自己身上
+  | { k: "postpone"; ord: number; n: number }            // 延后（真实）：把对方本轮第 ord 号宣告的那句往后推 n 秒
+  | { k: "strip"; tg: Tg };                              // 移除（真实）：拆掉一个敌人身上的减伤、转移，掐断它挂着的长期句子
 
 export type Sentence = Clause[];
 
 // ---------- 构造辅助 ----------
-export const dmg = (n: Amt, tg: Tg = { t: "lowFoe" }, ignore?: "shield"): Eff => ({ verb: "dmg", n, tg, ignore });
-export const heal = (n: Amt, tg: Tg = { t: "lowMe" }): Eff => ({ verb: "heal", n, tg });
+export const dmg = (n: Amt, tg: Tg = { t: "lowFoe" }, ignore?: "shield", rep?: number): Eff => (rep && rep > 1 ? { verb: "dmg", n, tg, ignore, rep } : { verb: "dmg", n, tg, ignore });
+export const heal = (n: Amt, tg: Tg = { t: "lowMe" }, rep?: number): Eff => (rep && rep > 1 ? { verb: "heal", n, tg, rep } : { verb: "heal", n, tg });
 export const shield = (n: Amt, tg: Tg = { t: "lowMe" }): Eff => ({ verb: "shield", n, tg });
 export const act = (eff: Eff, ifPrev?: "ok" | "fail"): Clause => ({ k: "act", eff, ifPrev });
 export const status = (kind: StatusKind, lvl: number, dur: number, tg: Tg = { t: "lowFoe" }): Clause => ({ k: "status", kind, lvl, dur, tg });
 export const unit = (u: number): Tg => ({ t: "unit", u });
+export const redirect = (tg: Tg): Clause => ({ k: "redirect", tg });
+export const postpone = (ord: number, n: number): Clause => ({ k: "postpone", ord, n });
+export const strip = (tg: Tg): Clause => ({ k: "strip", tg });
 export const win = (dir: Win["dir"], n: number, u: Win["unit"] = "round"): Win => ({ dir, n, unit: u });
 export const cat = (c: string): Obj => ({ t: "cat", c });
 export const word = (w: string): Obj => ({ t: "word", w });
@@ -86,7 +92,9 @@ export function wordsOf(c: Clause): string[] {
     case "status": return [STATUS_WORD[c.kind]];
     case "ignore": return ["无视"];
     case "cash": return ["兑现"];
-    case "remove": return ["移除"];
+    case "remove": case "strip": return ["移除"];
+    case "redirect": return ["转移"];
+    case "postpone": return ["延后"];
   }
 }
 export function catsOf(c: Clause): string[] {
@@ -94,12 +102,13 @@ export function catsOf(c: Clause): string[] {
   if (c.k === "act") verbCats(c.eff).forEach((k) => out.add(k));
   else if (c.k === "when" || c.k === "delay") { out.add("struct"); c.effs.forEach((e) => verbCats(e).forEach((k) => out.add(k))); }
   else if (c.k === "status") out.add("status");
+  else if (c.k === "redirect") { out.add("def"); out.add("guard"); }
   else out.add("struct");
   return [...out];
 }
 /** 目标个数：选择 n 个就是 n；旧「全体」= 3；其余 = 1（免费） */
 export const tgN = (t: Tg): number => (t.t === "some" ? t.n : t.t === "allMe" || t.t === "allFoe" ? 3 : 1);
-const effNums = (e: Eff): number[] => [...amNums(e.n), tgN(e.tg)];
+const effNums = (e: Eff): number[] => [...amNums(e.n), tgN(e.tg), e.rep ?? 1];
 const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n >= 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
 /** 数字牌需求：所有 ≥2 的数字（Amt 引用量里的窗口 N、倍率也算） */
 export function numsOf(c: Clause): number[] {
@@ -107,13 +116,15 @@ export function numsOf(c: Clause): number[] {
     case "act": return effNums(c.eff);
     case "when": return [c.q.win.n === 99 ? 1 : c.q.win.n, c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap(effNums)];
     case "delay": return [c.wait, ...c.effs.flatMap(effNums)];
-    case "status": return [c.lvl, c.dur];
+    case "status": return P2.STAUTO ? [c.dur] : [c.lvl, c.dur];   // 真实：状态的数字只有持续轮数，级别每次施放 +1
     case "ignore": return [c.win];
+    case "redirect": return [tgN(c.tg)];
+    case "postpone": return [c.n];
     default: return [];
   }
 }
 export function clauseCost(c: Clause): number {
-  const ec = (x: Eff) => (x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (tgN(x.tg) > 1 ? P2.AOE * (tgN(x.tg) - 1) : 0);
+  const ec = (x: Eff) => (P2.COSTREAL ? (x.ignore ? P.PIERCE : 0) : x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (tgN(x.tg) > 1 ? P2.AOE * (tgN(x.tg) - 1) : 0);
   switch (c.k) {
     case "act": return ec(c.eff);
     case "when": return P.STAND + (c.q.obj.t === "cat" && c.q.obj.c === "any" ? P.ANYCLS : 0);
@@ -121,8 +132,13 @@ export function clauseCost(c: Clause): number {
     case "status": return P2.STATUS_AP;
     case "cash": return P.CASH;
     case "remove": return c.obj.t === "cat" && c.obj.c === "any" ? P.REMOVE_ANY : P.REMOVE;
+    case "redirect": return P2.AP_REDIR + (tgN(c.tg) > 1 ? P2.AOE * (tgN(c.tg) - 1) : 0);
+    case "postpone": return P2.AP_POST;
+    case "strip": return P.REMOVE;
   }
 }
+/** 真实引擎里的「纯防御句」：每一段都是减伤 / 转移 / 恢复。同一秒里它们先生效 */
+export const isDefSentence = (cl: Sentence) => cl.every((c) => c.k === "redirect" || (c.k === "act" && c.eff.verb !== "dmg"));
 const isChain = (c: Clause) => c.k === "act" && !!c.ifPrev;
 const AGG_WORD = { count: "次数", sum: "累计", len: "词数", segs: "段数" } as const;
 /** 全程 = 之前窗口里的 99（只许「之前」）；价格 = 当前轮数，不低于 2 */
@@ -161,7 +177,9 @@ export function advWordsOf(cl: Sentence): string[] {
     else if (c.k === "status") out.push(STATUS_WORD[c.kind]);
     else if (c.k === "ignore") out.push("无视");
     else if (c.k === "cash") out.push("兑现");
-    else if (c.k === "remove") out.push("移除");
+    else if (c.k === "remove" || c.k === "strip") out.push("移除");
+    else if (c.k === "redirect") out.push("转移");
+    else if (c.k === "postpone") out.push("延后");
   });
   return out;
 }
@@ -170,12 +188,13 @@ export function sentenceCost(cl: Sentence, rnd = 1, pos = -1): number {
   const ks = refKindsOf(cl);
   const seg = (c: Clause) => { const x = isChain(c) ? P2.CHAINAP : P.AND; return pos === 0 ? Math.max(0, x - P2.POS_WORD) : x; };
   const allCost = pos === 2 && P2.POS3 === "ref" ? Math.max(1, Math.ceil(Math.max(2, rnd) / 2)) : Math.max(2, rnd);
-  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * allCost;
+  return (P2.COSTREAL ? P.BASE : 0) + cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * allCost;
 }
 /** 起手时间：段越多、数字越大越晚 */
-export function windup(cl: Sentence): number {
-  const maxN = Math.max(1, ...cl.flatMap(numsOf));
-  return Math.min(P.TL, 1 + (cl.length - 1) * P.WIND_CL + Math.floor((maxN - 1) * P.WIND_N));
+export function windup(cl: Sentence, extra = 0): number {
+  const maxN = Math.max(1, extra, ...cl.flatMap(numsOf));
+  const words = P2.WIND_WORD ? cl.filter((c) => c.k === "status" || c.k === "redirect" || c.k === "postpone" || c.k === "strip" || c.k === "remove").length * P2.WIND_WORD : 0;
+  return Math.min(P.TL, 1 + (cl.length - 1) * P.WIND_CL + Math.floor((maxN - 1) * P.WIND_N) + words);
 }
 
 // ---------- 读成中文 ----------
@@ -186,7 +205,7 @@ const winText = (w: Win) => `${w.dir === "before" ? "之前" : "以后"}${w.n ==
 const aggText = (a: Query["agg"]) => ({ count: "次数", sum: "累计", len: "词数", segs: "段数" }[a]);
 const tgText = (t: Tg) => t.t === "some" ? `选择${t.n}个${t.side === "foe" ? "敌方" : "我方"}随从` : t.t === "unit" ? `随从${t.u}` : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
 const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.who)}${objText(a.q.obj)}${aggText(a.q.agg)}×${a.mult}`);
-const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}`;
+const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `重复${e.rep}次` : ""}`;
 export function clauseText(c: Clause): string {
   switch (c.k) {
     case "act": return `${c.ifPrev ? (c.ifPrev === "ok" ? "若成功，" : "若失败，") : ""}${effText(c.eff)}`;
@@ -196,10 +215,15 @@ export function clauseText(c: Clause): string {
     case "ignore": return `无视 长期句子 ${c.win}轮`;
     case "cash": return "兑现";
     case "remove": return `移除 ${objText(c.obj)}`;
+    case "redirect": return `${tgText(c.tg)}转移`;
+    case "postpone": return `延后 第${c.ord + 1}句 ${c.n}秒`;
+    case "strip": return `移除 ${tgText(c.tg)}的减伤/转移/长期句`;
   }
 }
 /** 玩家拼不出来的句子：「全程」只能读已发生的事，不能写成「以后全程」（长期句子的窗口 ≥99、无视 ≥99 都不合法）；定时内部用的 99 不算 */
 export function legal(cl: Sentence): boolean {
-  return cl.every((c) => !(c.k === "when" && c.q.win.dir === "after" && c.q.win.n >= 99) && !(c.k === "ignore" && c.win >= 99) && !(c.k === "status" && c.dur >= 99));
+  return cl.every((c) => !(c.k === "when" && c.q.win.dir === "after" && c.q.win.n >= 99) && !(c.k === "ignore" && c.win >= 99) && !(c.k === "status" && c.dur >= 99)
+    && !(c.k === "redirect" && !P2.REDIR) && !(c.k === "postpone" && !P2.POSTPONE) && !(c.k === "strip" && !P2.RMREAL) && !(c.k === "remove" && P2.RMREAL)
+    && !((c.k === "act" && (c.eff.rep ?? 1) > 1 && !P2.REP) || (c.k === "act" && (c.eff.rep ?? 1) > 1 && c.eff.verb === "shield")));
 }
 export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");

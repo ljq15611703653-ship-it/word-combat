@@ -1,7 +1,10 @@
 // 「手册」：人写的、可能造成漂亮结果的句子与组合（限制 / 引用类）。
 // 它们大多依赖复杂决策（时机、读对手的上一句、几句话互相配合）——电脑只拿到「可以说的句子」，什么时候说由推演决定。
-import { act, dmg, shield, heal, status, forbid, whenever, unless, timer, query, win, cat, word, ev, type Sentence, type Tg, type Clause, type Obj } from "./ast";
+import { act, dmg, shield, heal, status, forbid, whenever, unless, timer, query, win, cat, word, ev, redirect, postpone, strip, unit, type Sentence, type Tg, type Clause, type Obj } from "./ast";
 import type { Env } from "./gen";
+import { P } from "../lab/rules";
+import { P2 } from "./params";
+import { sideOf, type Decl } from "./interp";
 
 export interface Named { name: string; cl: Sentence; group: "atkdef" | "other" }
 /** 普通进攻/防御也能用的复杂句（只用连环、并、减伤、无视这类攻防词，不需要限制/引用/状态类进阶词） */
@@ -109,7 +112,51 @@ export function playbookNamed(_e?: Env): Named[] {
   // 接力：读我方上一句（之前 2 句里我方说过什么）
   add("爽·接力追击", { k: "when", q: query(win("before", 2, "sent"), "me", word("造成"), "count", 1), judge: "exist", effs: [dmg(3, lowFoe, "shield")], cap: 1 });
   add("爽·接力防御", { k: "when", q: query(win("before", 2, "sent"), "me", word("造成"), "count", 1), judge: "exist", effs: [shield(3, allMe), heal(2, lowMe)], cap: 1 });
+  if (_e) realExtras(_e, add);
   return o;
+}
+/** 对方这一句里最大的单次伤害（只看写死数字的伤害，重复算在一起） */
+function bigHit(d: Decl): number { let m = 0; for (const c of d.cl) if (c.k === "act" && c.eff.verb === "dmg" && typeof c.eff.n === "number") m = Math.max(m, c.eff.n * (c.eff.rep ?? 1)); return m; }
+/** 真实引擎的词（开关打开才有）：转移反弹大单击、延后推出时间轴、关键词保护大招、拆保护、重复 */
+function realExtras(e: Env, add: (name: string, ...cl: Sentence) => void) {
+  const s = e.s, lowFoe: Tg = { t: "lowFoe" };
+  const foeDecl = s.decl.filter((d) => d.side !== e.side);
+  const lowMine = e.mine.reduce((b, x) => (s.hp[x] < s.hp[b] ? x : b), e.mine[0]);
+  for (const d of foeDecl) {
+    const big = bigHit(d);
+    if (big < 3) continue;
+    if (P2.REDIR) {   // 反弹大单击：对方这句打谁，就给谁转移（打「最低血」的按我方现在最低血的）
+      const tg = d.cl.flatMap((c) => (c.k === "act" && c.eff.verb === "dmg" ? [c.eff.tg] : []));
+      const ts = new Set<number>(); for (const g of tg) { if (g.t === "unit" && sideOf(g.u) === e.side) ts.add(g.u); else if (g.t === "lowFoe" || g.t === "lowMe") ts.add(lowMine); }
+      for (const u of ts) add("转移·反弹大单击", redirect(unit(u)));
+    }
+    if (P2.POSTPONE) {
+      const nOut = P.TL - d.start + 1;
+      add("延后·大招推出时间轴", postpone(d.ord, nOut));
+      add("延后·大招推出时间轴并打", postpone(d.ord, nOut), act(dmg(2, lowFoe)));
+      add("延后·大招推后一点", postpone(d.ord, Math.min(3, nOut)));
+    }
+  }
+  const kw = s.kw[e.unit];
+  if (P2.KW && kw === "不屈") {   // 不屈的随从倒不了（第一次），让它放压轴大招
+    add("不屈·压轴大招", act(dmg(3, lowFoe)));
+    if (P2.REP) add("不屈·压轴重复", act(dmg(2, lowFoe, undefined, 2)));
+  }
+  if (P2.KW && kw === "首挡") {   // 首挡 + 转移：第一击整下挡掉，后面的击打回去
+    if (P2.REDIR) add("首挡+转移·双保险", redirect(unit(e.unit)));
+    add("首挡·领头重击", act(dmg(3, lowFoe)));
+  }
+  if (P2.KW && P2.REDIR) for (const m of e.mine) if (s.kw[m] === "首挡" && !s.kwUsed[m] && m !== e.unit) add("给首挡的人转移（吃一击、挡一击、弹一击）", redirect(unit(m)));
+  if (P2.RMREAL) for (const f of e.foes) {
+    const protectedF = s.sh[f] > 0 || s.redir[f] || s.stand.some((x) => x.owner !== e.side && x.unit === f);
+    if (protectedF) { add("移除·拆保护", strip(unit(f))); add("移除·拆保护并重击", strip(unit(f)), act(dmg(3, unit(f)))); }
+  }
+  if (P2.REP) {
+    add("重复·三连", act(dmg(1, lowFoe, undefined, 3)));
+    add("重复·二连重击", act(dmg(2, lowFoe, undefined, 2)));
+    add("重复·易伤并三连", status("vuln", 1, 2, lowFoe), act(dmg(1, lowFoe, undefined, 3)));
+    add("重复·治疗二连", act(heal(2, { t: "lowMe" }, 2)));
+  }
 }
 /** 环境变量 PB_EXCLUDE='追击,吸血' 可以把名字里含这些字的手册句去掉（做对照实验用） */
 const EXC = (typeof process !== "undefined" && process.env.PB_EXCLUDE ? process.env.PB_EXCLUDE.split(",") : []).filter(Boolean);

@@ -1,7 +1,7 @@
 // 解释器行为测试：npx tsx src/lab2/test.ts
 import { P } from "../lab/rules";
 import { status, act, dmg, heal, shield, unit, cat, word, ev, win, query, whenever, unless, forbid, timer, type Sentence } from "./ast";
-import { newGame, declare, resolveRound, nextRound, passUnit, nextSide, alive, total, canAfford, type St } from "./interp";
+import { windupFor, newGame, declare, resolveRound, nextRound, passUnit, nextSide, alive, total, canAfford, type St } from "./interp";
 
 let bad = 0;
 const check = (ok: boolean, name: string) => { if (!ok) { bad++; console.log("✗", name); } else console.log("✓", name); };
@@ -116,6 +116,15 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
   const all = [act(dmg({ q: query(win("before", 99), "me", cat("dealt"), "sum"), mult: 1 }, { t: "lowFoe" }))]; const s6 = fresh(); s6.rnd = 6;
   check(canAfford(s6, 0, all, 2)!.cost < canAfford(s6, 0, all, 0)!.cost, "引用位：全程半价");
   P2.POS = oldPos; P.AND = oldAnd; }
+// 23 落空规则 + 大数字起手更晚
+{ const { P2 } = await import("./params"); const oF = P2.FIZZLE, oQ = P2.QWIND; P2.FIZZLE = 1; P2.QWIND = 1;
+  const s = fresh(); s.hp[0] = 2; say(s, 3, [act(dmg(3, unit(0)))], 1); say(s, 0, [act(dmg(3, unit(3)))], 5); resolveRound(s);
+  check(s.hp[3] === P.HP && s.hp[0] === 0, "落空：出手的随从第 1 秒被打倒，它第 5 秒的招不生效");
+  const s2 = fresh(); say(s2, 0, [act(dmg(3, unit(3)))], 1); resolveRound(s2); nextRound(s2);
+  const big = [act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 4 }, { t: "lowFoe" }))];
+  const w1 = windupFor(big, 0, s2), plain = windupFor([act(dmg(1, unit(3)))], 0, s2);
+  check(w1 > plain && w1 >= 10, `大数字起手更晚：引用量算出 12 点，最早第 ${w1} 秒（普通句第 ${plain} 秒）`);
+  P2.FIZZLE = oF; P2.QWIND = oQ; }
 // 随机试玩：不崩、能打完
 function rnd(n: number) { return Math.floor(Math.random() * n); }
 function randSentence(s: St, u: number): Sentence {
