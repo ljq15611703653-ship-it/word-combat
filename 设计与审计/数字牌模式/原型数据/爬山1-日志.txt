@@ -1,0 +1,39 @@
+  ↑ 新最优
+#0 loss 31.5 rounds 5.08 ATK无猎物
+#1 loss 31.5 rounds 5.08 ATK无猎物
+#2 loss 51 rounds 4.99 TRAP无猎物,BURST无天敌
+#3 loss 44 rounds 4.99 ATK无猎物,BURST无天敌
+#4 loss 50 rounds 5.06 ATK无猎物,TURTLE无天敌,TRAP无猎物,BURST无天敌
+#5 loss 73.1 rounds 4.88 TURTLE无天敌,TRAP无猎物,BURST无猎物,BURST无天敌
+#6 loss 59.6 rounds 5.17 ATK无猎物,ATK无天敌,TURTLE无猎物,TURTLE无天敌,TRAP无猎物,TRAP无天敌,BURST无猎物,BURST无天敌
+#7 loss 152.2 rounds 4.98 ATK无猎物,BURST无天敌
+#8 loss 50.8 rounds 5.11 ATK无猎物,TURTLE无天敌
+#9 loss 31.5 rounds 5.08 ATK无猎物
+#10 loss 66.3 rounds 5.09 ATK无猎物,TURTLE无天敌,TRAP无猎物,BURST无猎物,BURST无天敌
+#11 loss 34.5 rounds 5.05 ATK无猎物
+#12 loss 58.5 rounds 4.98 ATK无猎物,TURTLE无天敌,TRAP无天敌
+#13 loss 35 rounds 5.07 ATK无猎物
+#14 loss 142.4 rounds 4.97 ATK无猎物,TRAP无天敌
+#15 loss 72.4 rounds 4.92 ATK无猎物
+  ↑ 新最优
+#16 loss 30.5 rounds 5.03 ATK无猎物
+#17 loss 54.6 rounds 5.12 ATK无猎物
+#18 loss 190.3 rounds 5.35 TRAP无猎物,BURST无天敌
+#19 loss 30.5 rounds 5.03 ATK无猎物
+#20 loss 40.3 rounds 5.15 ATK无猎物
+#21 loss 30.5 rounds 5.03 ATK无猎物
+#22 loss 72.5 rounds 4.92 ATK无猎物,TRAP无猎物,BURST无天敌
+#23 loss 72.4 rounds 4.89 ATK无猎物
+#24 loss 62.3 rounds 4.99 ATK无猎物,TRAP无猎物,BURST无天敌
+#25 loss 51 rounds 5.01 ATK无猎物,BURST无天敌
+#26 loss 30.5 rounds 5.03 ATK无猎物
+  ↑ 新最优
+#27 loss 28.5 rounds 5.16 ATK无猎物
+#28 loss 44.5 rounds 5.20 ATK无猎物,TRAP无猎物,BURST无天敌
+#29 loss 28.8 rounds 5.15 ATK无猎物
+#30 loss 38.2 rounds 5.08 ATK无猎物
+#31 loss 184.4 rounds 5.15 TRAP无猎物,BURST无天敌
+#32 loss 40.3 rounds 5.23 ATK无猎物
+#33 loss 65.7 rounds 5.24 TURTLE无天敌,BURST无猎物
+#34 loss 36.5 rounds 5.03 ATK无猎物,TRAP无猎物,BURST无天敌
+#35 loss 76.9 rounds 5.02 ATK无猎物,TRAP无猎物,BURST无天敌

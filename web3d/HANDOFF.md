@@ -1,7 +1,7 @@
 # web3d 交接说明（给接手的 Claude / 同伴）
 
 > 维护规则（用户要求）：**每次推送到主分支，都要同步更新并一起推送本文件。** 改完后把「当前状态」「待办」「分支表」更新到最新。
-> 最近更新：2026-10-04（横版对战界面 + 底座外的半透明盔甲 + 全灭模式；上面一轮：四个分支已合进 main，网页版发布到 Pages /3d/，局域网联机版打成 zip）。
+> 最近更新：2026-10-04 晚（手牌条拼句、选目标撤回、时间限制接口、句子规则原型 lab、设计总览；上一版：横版对战界面 + 底座外的半透明盔甲 + 全灭模式；上面一轮：四个分支已合进 main，网页版发布到 Pages /3d/，局域网联机版打成 zip）。
 
 ## 1. 这是什么
 词战（Word Combat）的 3D 网页版，在仓库 `ljq15611703653-ship-it/word-combat` 的 `web3d/` 目录（Vite + TypeScript + three.js，联机服务端 Node + ws）。
@@ -86,8 +86,16 @@
 - 用户的本地仓库 `Documents/New project/word-combat-lab` 是另一条线（Godot 版 + 研究文件），分支 `word-combat-lab`，有大量未提交改动，不要碰。
 - 记忆文件在 `C:\Users\27654\.claude\projects\C--Users-27654-Documents-New-project\memory\`（含界面改版、技能演出、截图自检等条目）。
 
-## 拖拽拼句（横版对战 + 教程）
-- `src/drag/dragCompose.ts`：从我方随从按住拖到别的随从 = 填「选择 1 敌方/友方」（拖到自己或双击自己 = 「自身」）；面板开着时在人物外拖框 = 把**当前这一段**的目标改成框到的随从（要求全部合法、数字牌够用，否则 toast 原因）。拖的时候面板半透明不挡鼠标，选取框按随从在屏幕上的外接矩形算。
-- 规则在 `engine/composer.ts` 的 `dragTo / boxTargets / binds`，`Game.dragDrop / dragBox` 负责开面板和教程拦截（点击种类 `drag` / `box`）。
-- 教程：第 1 关第 1 轮用 `{kind:"drag"}` 教学（点随从再拼照样放行）；之后的引导里「选择 1 敌方/友方/自身」开头的句子都允许拖，框选在引导里一律拒绝。
-- 真鼠标测试：`scripts/dragshots.mjs`（静态包 + CDP）。
+## 3.7 手牌条拼句 + 句子规则原型（2026-10-04 后半，用户转本地继续前的状态）
+> 设计层面的完整交接见 `设计与审计/数字牌模式/交接-句子语言设计总览.md`（决策日志、词表、原型数据、下一步），这里只写代码层面。
+
+- **拼句界面已换掉**（横版对战；`?style=classic` 和教程页仍是旧的面板流程）：
+  - `src/handStrip.ts`：底部手牌条（词牌 + 数字牌 + 撤回 / 清空 / 取消 / 拼好了）。手势：从手牌拖到名牌上装配、点一下 = 装到最后一个合法位置、句子条里的牌拖出去 = 拿掉（依赖它的一起掉）、拖到别的缝 = 换位置；拖时合法位置在名牌上亮成「缝」。
+  - `src/sentencePanel.ts`：名牌 = 句子条。`setEdit(on, onTok)`、`showSlots(legal, hot, hide)`、`nearestSlot(x, y)`、`flash(i)`；`main.ts` 的 `placePanels` 拼句时把名牌放宽（`panels[i].editing`）。
+  - `src/engine/composer.ts` 编辑接口：`replay / slotsFor / insertAt / removeAt（返回掉下来的牌）/ slotsForMove / moveTok / whyNot`。规则仍由旧的 `parse()` 状态机决定合法性（逐张重放检验）。
+  - `src/game.ts`：`renderHandStrip / mirrorDraft / enterEdit / leaveEdit`；选目标时 `plateDraft`（名牌保留这句话 + 已选目标）、`undoTarget`、`backToCompose`；对手出招 `perform`（逐张落牌）；**时间限制接口** `setTimeLimit / armLimit / tickLimit / onTimeout`（开局设置里「每轮宣告的时间限制」，`Settings.limit`；联机版 `OnlineGame` 还没覆盖 `onTimeout`）。
+  - **已删除**：辅助轮（横版）、「随从拖到目标 / 框选」（`src/drag/`、`Composer.dragTo / boxTargets / binds`、`Game.dragDrop / dragBox`、教程里的拖拽教学）。教程里引导对 `assist` 的拦截还在，但横版没有这个按钮。
+  - 教程页（`campaign/`）仍是旧的点击流程，用户说之后改。
+- **测试脚本**：`scripts/handshots.mjs`（手牌条真鼠标）、`scripts/targetflow.mjs`（选目标 / 撤回 / 返回修改 / 限时；端口和路径写死在脚本里，按需改）。都要先 `vite build --outDir <目录>` 并起静态服务，Chromium 用 `/opt/pw-browsers/chromium --no-sandbox`，profile 路径必须是 ASCII。**注意**：后台有别的重任务时 swiftshader 很慢，限时会真的到点。
+- **句子规则原型** `src/lab/`（`rules.ts / sim.ts / ai.ts / run.ts / tune.ts / sweep.sh`）：只在模拟里跑，**不进游戏**。用法见设计总览 §4.1。它是手写模板版，用户已要求重做成「语言解释器 + 卡组自动进化」版（设计总览 §5）。
+- 重新发布 Pages / 局域网包：**还没做**（手牌条之后没发布过）。

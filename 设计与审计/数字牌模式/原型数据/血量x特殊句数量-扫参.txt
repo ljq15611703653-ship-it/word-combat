@@ -1,0 +1,21 @@
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":6,"SPEC":2}
+ATK        -     65%    79%    36%    44% TURTLE    35%     -     66%    58%    47% TRAP      21%    34%     -     48%    14% BURST     64%    42%    52%     -     46% FULL      56%    53%    86%    54%     -  
+   平均轮数 3.97，平局 13% 
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":6,"SPEC":4}
+ATK        -     65%    78%    39%    46% TURTLE    35%     -     74%    59%    49% TRAP      22%    26%     -     30%    22% BURST     61%    41%    70%     -     49% FULL      54%    51%    78%    51%     -  
+   平均轮数 4.07，平局 12% 
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":6,"SPEC":99}
+ATK        -     65%    75%    39%    45% TURTLE    35%     -     73%    59%    49% TRAP      25%    27%     -     42%    26% BURST     61%    41%    58%     -     51% FULL      55%    51%    74%    49%     -  
+   平均轮数 4.12，平局 13% 
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":8,"SPEC":2}
+ATK        -     39%    53%    55%    45% TURTLE    61%     -     67%    53%    52% TRAP      47%    33%     -     34%    43% BURST     45%    47%    66%     -     36% FULL      55%    48%    57%    64%     -  
+   平均轮数 4.75，平局 7% 
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":8,"SPEC":4}
+ATK        -     39%    42%    57%    35% TURTLE    61%     -     66%    54%    43% TRAP      58%    34%     -     39%    31% BURST     43%    46%    61%     -     35% FULL      65%    57%    69%    65%     -  
+   平均轮数 4.82，平局 8% 
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":8,"SPEC":99}
+ATK        -     39%    64%    57%    40% TURTLE    61%     -     65%    54%    47% TRAP      36%    35%     -     58%    25% BURST     43%    46%    42%     -     40% FULL      60%    53%    75%    60%     -  
+   平均轮数 4.87，平局 12% 
+== {"THR0":1,"EXACT":false,"HEALC":2,"SHC":2,"STAND":1,"HP":10,"SPEC":2}
+ATK        -     35%    56%    53%    39% TURTLE    65%     -     59%    53%    46% TRAP      44%    41%     -     44%    27% BURST     47%    47%    56%     -     42% FULL      61%    54%    73%    58%     -  
+   平均轮数 5.18，平局 7% 
