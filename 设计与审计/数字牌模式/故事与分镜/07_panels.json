@@ -1,0 +1,2215 @@
+[
+ {
+  "id": "P0-01",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P0-01.png",
+  "camera": {
+   "move": "pan-left",
+   "dur": 4.5
+  },
+  "lines": [],
+  "sfx": "雨声、低频嗡鸣"
+ },
+ {
+  "id": "P0-02",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P0-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "宋伯",
+    "text": "吃完再走。到了里面，别逞强。"
+   },
+   {
+    "who": "叶栖",
+    "text": "我只是去看看。看完就回来。"
+   }
+  ],
+  "sfx": "锅里的咕嘟声"
+ },
+ {
+  "id": "P0-03",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P0-03.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.0
+  },
+  "lines": [
+   {
+    "who": "叶晴",
+    "text": "线在，人就在。"
+   },
+   {
+    "who": "叶晴",
+    "text": "再接一句就好——别忘了，你总是这么说的。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P0-04",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "9:16",
+  "image": "P0-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖(内心)",
+    "text": "别暴露。练到够强，带着这些本事回去。"
+   }
+  ],
+  "sfx": "脚步踩水"
+ },
+ {
+  "id": "P0-05",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P0-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "欢迎来到言枢。接下来的一切，都只是模拟。"
+   }
+  ],
+  "sfx": "掌声(合成)"
+ },
+ {
+  "id": "P0-06",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P0-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "三十七号？差一点点你就迟到了。"
+   },
+   {
+    "who": "小满",
+    "text": "我叫陆小满。我喜欢数东西。你有几根手指？"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P0-07",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P0-07.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "我在档案馆待过。我记得所有被引用过的话。"
+   },
+   {
+    "who": "柯谦",
+    "text": "除了我自己说过的。"
+   }
+  ],
+  "sfx": "书页翻动"
+ },
+ {
+  "id": "P0-08",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P0-08.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "词位，数位，引用位。你们三个，是一个人的三个声部。"
+   }
+  ],
+  "sfx": "清脆的提示音"
+ },
+ {
+  "id": "P0-09",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P0-09.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "不疼的。语言模块只是让你的话，重一点。"
+   }
+  ],
+  "sfx": "仪器滴答"
+ },
+ {
+  "id": "P0-10",
+  "chapter": "序章",
+  "level": 0,
+  "when": "pre",
+  "ratio": "9:16",
+  "image": "P0-10.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶栖(内心)",
+    "text": "他们说的是模拟。那就当它是模拟。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P1-01",
+  "chapter": "第一章",
+  "level": 1,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P1-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验一：校准。请完成一次有效的话语输出。"
+   }
+  ],
+  "sfx": "合成提示音"
+ },
+ {
+  "id": "P1-02",
+  "chapter": "第一章",
+  "level": 1,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P1-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "一，免费！我最喜欢的数字。"
+   },
+   {
+    "who": "小满",
+    "text": "先动手的人先说话——别眨眼哦。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P1-03",
+  "chapter": "第一章",
+  "level": 1,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P1-03.png",
+  "camera": {
+   "move": "pan-right",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "若有若无的哼唱"
+ },
+ {
+  "id": "P1-04",
+  "chapter": "第一章",
+  "level": 1,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P1-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "炸裂声、玻璃碎响"
+ },
+ {
+  "id": "P1-05",
+  "chapter": "第一章",
+  "level": 1,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P1-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "靶体无语言能力。"
+   },
+   {
+    "who": "叶栖",
+    "text": "……你哼的什么调子？"
+   }
+  ],
+  "sfx": "哼唱渐弱"
+ },
+ {
+  "id": "P1-06",
+  "chapter": "第一章",
+  "level": 1,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P1-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "这调子……在哪听过。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P2-01",
+  "chapter": "第一章",
+  "level": 2,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P2-01.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "同一个词说三遍，第三遍最响。"
+   },
+   {
+    "who": "柯谦",
+    "text": "我引用过一句：说第三遍的人，通常是真的在怕。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P2-02",
+  "chapter": "第一章",
+  "level": 2,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P2-02.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验二：数与重复。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P2-03",
+  "chapter": "第一章",
+  "level": 2,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P2-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "差一点点就是三了。"
+   }
+  ],
+  "sfx": "嗡鸣升调"
+ },
+ {
+  "id": "P2-04",
+  "chapter": "第一章",
+  "level": 2,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P2-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "咚、咚、咚"
+ },
+ {
+  "id": "P2-05",
+  "chapter": "第一章",
+  "level": 2,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P2-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "轻敲声 嗒、嗒"
+ },
+ {
+  "id": "P2-06",
+  "chapter": "第一章",
+  "level": 2,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P2-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "你刚才，在跟她打招呼？"
+   },
+   {
+    "who": "叶栖",
+    "text": "……手滑。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P3-01",
+  "chapter": "第一章",
+  "level": 3,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P3-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "断联不疼，只是会忘掉几分钟。你们可以放心地倒下。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P3-02",
+  "chapter": "第一章",
+  "level": 3,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P3-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "我昨天的午饭吃了什么，我确定吃过，可我就是……没了。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P3-03",
+  "chapter": "第一章",
+  "level": 3,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P3-03.png",
+  "camera": {
+   "move": "pan-right",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验三：恢复。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P3-04",
+  "chapter": "第一章",
+  "level": 3,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P3-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "嗡——叮"
+ },
+ {
+  "id": "P3-05",
+  "chapter": "第一章",
+  "level": 3,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P3-05.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "我们……刚才赢了吗？我好像少了一段。"
+   },
+   {
+    "who": "小满",
+    "text": "一段而已。我替你数着。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P3-06",
+  "chapter": "第一章",
+  "level": 3,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P3-06.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "荔枝糖。整个下城，只有一个人的摊子在卖……"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P4-01",
+  "chapter": "第一章",
+  "level": 4,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P4-01.png",
+  "camera": {
+   "move": "pan-left",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "他们的话，像在守着什么。"
+   },
+   {
+    "who": "裴岚",
+    "text": "守着什么都好。守得住，才值钱。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P4-02",
+  "chapter": "第一章",
+  "level": 4,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P4-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "我是你们的导师，顾衡。叫我顾先生就好。"
+   },
+   {
+    "who": "顾衡",
+    "text": "你们的话很漂亮。不过，要学会承受。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P4-03",
+  "chapter": "第一章",
+  "level": 4,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P4-03.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验四：减伤。"
+   }
+  ],
+  "sfx": "盾面嗡鸣"
+ },
+ {
+  "id": "P4-04",
+  "chapter": "第一章",
+  "level": 4,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P4-04.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "玻璃碎裂声"
+ },
+ {
+  "id": "P4-05",
+  "chapter": "第一章",
+  "level": 4,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P4-05.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "你很会收着力。是怕伤到谁吗？"
+   },
+   {
+    "who": "叶栖",
+    "text": "……没有。"
+   }
+  ],
+  "sfx": "杯子轻碰"
+ },
+ {
+  "id": "P4-06",
+  "chapter": "第一章",
+  "level": 4,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P4-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "叶栖(内心)",
+    "text": "他看穿了多少？"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P5-01",
+  "chapter": "第二章",
+  "level": 5,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P5-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验五：状态。场景已更换为街道样本。"
+   }
+  ],
+  "sfx": "雨声（循环）"
+ },
+ {
+  "id": "P5-02",
+  "chapter": "第二章",
+  "level": 5,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P5-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "战前一瓣橘子，酸的人先赢。"
+   },
+   {
+    "who": "柯谦",
+    "text": "这个说法没有出处。"
+   },
+   {
+    "who": "小满",
+    "text": "现在有了。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P5-03",
+  "chapter": "第二章",
+  "level": 5,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P5-03.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "硬币清脆的转动声"
+ },
+ {
+  "id": "P5-04",
+  "chapter": "第二章",
+  "level": 5,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P5-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "噼啪的燃烧声"
+ },
+ {
+  "id": "P5-05",
+  "chapter": "第二章",
+  "level": 5,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P5-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "靶体",
+    "text": "……到时候再说。"
+   }
+  ],
+  "sfx": "硬币滚动、停下"
+ },
+ {
+  "id": "P5-06",
+  "chapter": "第二章",
+  "level": 5,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P5-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "这句话……不是模拟能编出来的。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P6-01",
+  "chapter": "第二章",
+  "level": 6,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P6-01.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "这局，三秒就够。我押三秒。"
+   },
+   {
+    "who": "柯谦",
+    "text": "我押两秒。我昨天……我是说，我感觉是两秒。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P6-02",
+  "chapter": "第二章",
+  "level": 6,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P6-02.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验六：先手。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P6-03",
+  "chapter": "第二章",
+  "level": 6,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P6-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 2.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "三。二。"
+   },
+   {
+    "who": "小满",
+    "text": "一！"
+   }
+  ],
+  "sfx": "滴、滴、滴"
+ },
+ {
+  "id": "P6-04",
+  "chapter": "第二章",
+  "level": 6,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P6-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "嗖！"
+ },
+ {
+  "id": "P6-05",
+  "chapter": "第二章",
+  "level": 6,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P6-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "靶体甲/乙(齐声)",
+    "text": "再来一次？"
+   }
+  ],
+  "sfx": "两个声音完美重叠"
+ },
+ {
+  "id": "P6-06",
+  "chapter": "第二章",
+  "level": 6,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P6-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "模拟体……也有双胞胎吗。"
+   },
+   {
+    "who": "回声",
+    "text": "样本抽取自历史语料。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P7-01",
+  "chapter": "第二章",
+  "level": 7,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P7-01.png",
+  "camera": {
+   "move": "pan-right",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "下城的灯，比这里暗，可是暖。"
+   },
+   {
+    "who": "叶栖",
+    "text": "……你怎么知道暖？"
+   }
+  ],
+  "sfx": "风声、远处雨声"
+ },
+ {
+  "id": "P7-02",
+  "chapter": "第二章",
+  "level": 7,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P7-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "我是说……窗户里的灯，看起来都暖。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P7-03",
+  "chapter": "第二章",
+  "level": 7,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P7-03.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验七：转移。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P7-04",
+  "chapter": "第二章",
+  "level": 7,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P7-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "轰！弹回"
+ },
+ {
+  "id": "P7-05",
+  "chapter": "第二章",
+  "level": 7,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P7-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": ""
+ },
+ {
+  "id": "P7-06",
+  "chapter": "第二章",
+  "level": 7,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P7-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "……你的礼，和我听说过的一样。"
+   },
+   {
+    "who": "小满",
+    "text": "我也有些事，没告诉你。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P8-01",
+  "chapter": "第三章",
+  "level": 8,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P8-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验八：延后。场景样本：下城旧厂。"
+   }
+  ],
+  "sfx": "铁链晃动"
+ },
+ {
+  "id": "P8-02",
+  "chapter": "第三章",
+  "level": 8,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P8-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "这个地方我没来过。可我知道墙上有道裂。"
+   },
+   {
+    "who": "柯谦",
+    "text": "……在左边。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P8-03",
+  "chapter": "第三章",
+  "level": 8,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P8-03.png",
+  "camera": {
+   "move": "pan-left",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "炉火噼啪"
+ },
+ {
+  "id": "P8-04",
+  "chapter": "第三章",
+  "level": 8,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P8-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "低沉的拖长音"
+ },
+ {
+  "id": "P8-05",
+  "chapter": "第三章",
+  "level": 8,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P8-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "靶体",
+    "text": "再接一句就好……"
+   },
+   {
+    "who": "靶体",
+    "text": "对吧，栖？"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P8-06",
+  "chapter": "第三章",
+  "level": 8,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P8-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "检测到语料污染。已清除。"
+   },
+   {
+    "who": "顾衡",
+    "text": "语料来自你们自己。你的词，本来就会被学走。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P9-01",
+  "chapter": "第三章",
+  "level": 9,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P9-01.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "拆掉别人的保护之前，要先看清那是什么保护。"
+   },
+   {
+    "who": "顾衡",
+    "text": "有的保护，是旧伤。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P9-02",
+  "chapter": "第三章",
+  "level": 9,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P9-02.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验九：移除。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P9-03",
+  "chapter": "第三章",
+  "level": 9,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P9-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "我好像……认得这种拆法。"
+   },
+   {
+    "who": "小满",
+    "text": "你认得就别说出来。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P9-04",
+  "chapter": "第三章",
+  "level": 9,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P9-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "撕裂声"
+ },
+ {
+  "id": "P9-05",
+  "chapter": "第三章",
+  "level": 9,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P9-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "靶体",
+    "text": "……账，要算清。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P9-06",
+  "chapter": "第三章",
+  "level": 9,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P9-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "如果有人对模拟产生了感情，请记得：那只是你的语言模块在拟合。"
+   },
+   {
+    "who": "裴岚",
+    "text": "拟合得越好，毕业越快。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P10-01",
+  "chapter": "第四章",
+  "level": 10,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P10-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "第四章：编队测试。实验十：并流。"
+   }
+  ],
+  "sfx": "回声叠加的混响"
+ },
+ {
+  "id": "P10-02",
+  "chapter": "第四章",
+  "level": 10,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P10-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "这回，他们不躲了。"
+   },
+   {
+    "who": "小满",
+    "text": "同时开口的人，我听过。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P10-03",
+  "chapter": "第四章",
+  "level": 10,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P10-03.png",
+  "camera": {
+   "move": "pan-right",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": ""
+ },
+ {
+  "id": "P10-04",
+  "chapter": "第四章",
+  "level": 10,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P10-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "双重爆鸣"
+ },
+ {
+  "id": "P10-05",
+  "chapter": "第四章",
+  "level": 10,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P10-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "鹿鸣。"
+   },
+   {
+    "who": "回声",
+    "text": "未识别。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P10-06",
+  "chapter": "第四章",
+  "level": 10,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P10-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "双胞胎都那样——同时说话。"
+   },
+   {
+    "who": "叶栖",
+    "text": "……嗯，都那样。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P11-01",
+  "chapter": "第四章",
+  "level": 11,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P11-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验十一：续流。"
+   }
+  ],
+  "sfx": "烛火的细响"
+ },
+ {
+  "id": "P11-02",
+  "chapter": "第四章",
+  "level": 11,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P11-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "这个味道……"
+   },
+   {
+    "who": "柯谦",
+    "text": "艾草。我记得，有个人总在腰上挂炉子。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P11-03",
+  "chapter": "第四章",
+  "level": 11,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P11-03.png",
+  "camera": {
+   "move": "pan-left",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": ""
+ },
+ {
+  "id": "P11-04",
+  "chapter": "第四章",
+  "level": 11,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P11-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "嘶——持续的燃烧声"
+ },
+ {
+  "id": "P11-05",
+  "chapter": "第四章",
+  "level": 11,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P11-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [],
+  "sfx": ""
+ },
+ {
+  "id": "P11-06",
+  "chapter": "第四章",
+  "level": 11,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P11-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "是样本。是复制品。"
+   },
+   {
+    "who": "小满",
+    "text": "对。是复制品。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P12-01",
+  "chapter": "第四章",
+  "level": 12,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P12-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "实验十二：择流。"
+   }
+  ],
+  "sfx": "骰子滚动"
+ },
+ {
+  "id": "P12-02",
+  "chapter": "第四章",
+  "level": 12,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P12-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [
+   {
+    "who": "靶体",
+    "text": "到时候再说。"
+   }
+  ],
+  "sfx": "硬币清响"
+ },
+ {
+  "id": "P12-03",
+  "chapter": "第四章",
+  "level": 12,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P12-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": ""
+ },
+ {
+  "id": "P12-04",
+  "chapter": "第四章",
+  "level": 12,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P12-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.0
+  },
+  "lines": [],
+  "sfx": "骰子落定的脆响"
+ },
+ {
+  "id": "P12-05",
+  "chapter": "第四章",
+  "level": 12,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P12-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "这枚硬币……是我的。"
+   }
+  ],
+  "sfx": "叮"
+ },
+ {
+  "id": "P12-06",
+  "chapter": "第四章",
+  "level": 12,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P12-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "他们的档案，被剪过三次。和我一样。"
+   },
+   {
+    "who": "叶栖",
+    "text": "……所以他们真的存在？"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P13-01",
+  "chapter": "第四章",
+  "level": 13,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P13-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "最后一场预赛。拿到这一分，你们就毕业了。"
+   }
+  ],
+  "sfx": "沉重的心跳声"
+ },
+ {
+  "id": "P13-02",
+  "chapter": "第四章",
+  "level": 13,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P13-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "靶体",
+    "text": "我的命，换你一个动作。"
+   },
+   {
+    "who": "叶栖",
+    "text": "别这样——"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P13-03",
+  "chapter": "第四章",
+  "level": 13,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P13-03.png",
+  "camera": {
+   "move": "pan-left",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": ""
+ },
+ {
+  "id": "P13-04",
+  "chapter": "第四章",
+  "level": 13,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P13-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "心跳、重击"
+ },
+ {
+  "id": "P13-05",
+  "chapter": "第四章",
+  "level": 13,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P13-05.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "莫问",
+    "text": "……你长高了。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P13-06",
+  "chapter": "第四章",
+  "level": 13,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P13-06.png",
+  "camera": {
+   "move": "hold",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "重置完成。他们不会记得。"
+   },
+   {
+    "who": "叶栖",
+    "text": "不会记得……什么？"
+   },
+   {
+    "who": "小满",
+    "text": "别看。再撑一下，就快结束了。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P14-01",
+  "chapter": "终章",
+  "level": 14,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P14-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "回声",
+    "text": "最终实验：毕业考。对手：最高保真样本。"
+   }
+  ],
+  "sfx": "钟声（合成）"
+ },
+ {
+  "id": "P14-02",
+  "chapter": "终章",
+  "level": 14,
+  "when": "pre",
+  "ratio": "4:3",
+  "image": "P14-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "……姐。"
+   },
+   {
+    "who": "小满",
+    "text": "是模拟。你自己说的。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P14-03",
+  "chapter": "终章",
+  "level": 14,
+  "when": "pre",
+  "ratio": "1:1",
+  "image": "P14-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶晴",
+    "text": "来吧，新兵。让我看看你学到了什么。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P14-04",
+  "chapter": "终章",
+  "level": 14,
+  "when": "pre",
+  "ratio": "16:9",
+  "image": "P14-04.png",
+  "camera": {
+   "move": "pan-right",
+   "dur": 3.5
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "他们的打法……是所有人的集合。"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P14-05",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "P14-05.png",
+  "camera": {
+   "move": "hold",
+   "dur": 3.5
+  },
+  "lines": [],
+  "sfx": "轰——寂静"
+ },
+ {
+  "id": "P14-06",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P14-06.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶晴",
+    "text": "再接一句就好……栖？"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "P14-07",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "P14-07.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "宋伯",
+    "text": "哎，这面……还没煮好呢。"
+   },
+   {
+    "who": "阿豆",
+    "text": "叶栖哥哥……？"
+   }
+  ],
+  "sfx": "哼唱渐弱"
+ },
+ {
+  "id": "P14-08",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "P14-08.png",
+  "camera": {
+   "move": "hold",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶晴",
+    "text": "你是谁？"
+   }
+  ],
+  "sfx": ""
+ },
+ {
+  "id": "PR-01",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "PR-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "这不是模拟。从来都不是。"
+   }
+  ],
+  "sfx": "低频轰鸣、舱壁剥落声",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-02",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PR-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "顾衡",
+    "text": "他们被告知，对手是我们的精锐样本。你们被告知，对手是模拟体。"
+   },
+   {
+    "who": "顾衡",
+    "text": "我们只是，把两边放进了同一个房间。"
+   }
+  ],
+  "sfx": "",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-03",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "PR-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [],
+  "sfx": "线断的细响",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-04",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PR-04.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "我也是。我也以为，自己藏得很好。"
+   },
+   {
+    "who": "叶栖",
+    "text": "……你一直都知道？"
+   }
+  ],
+  "sfx": "",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-05",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PR-05.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [
+   {
+    "who": "柯谦",
+    "text": "每次断联，他们剪掉一段。我记不住，可我知道有缺口。"
+   },
+   {
+    "who": "柯谦",
+    "text": "所以我一直在把重要的事，写在书页的背面。"
+   }
+  ],
+  "sfx": "",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-06",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "PR-06.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "你已经不能回头了。起义军的精锐，都在这里。记得的，只剩你。"
+   },
+   {
+    "who": "顾衡",
+    "text": "不如，做我们的狗。我们会给你的姐姐，一个好的活法。"
+   }
+  ],
+  "sfx": "",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-07",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "PR-07.png",
+  "camera": {
+   "move": "hold",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "……"
+   },
+   {
+    "who": "系统",
+    "text": "请选择。"
+   }
+  ],
+  "sfx": "三声提示音",
+  "section": "reveal"
+ },
+ {
+  "id": "PR-08",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "PR-08.png",
+  "camera": {
+   "move": "hold",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "再接一句就好。"
+   }
+  ],
+  "sfx": "",
+  "section": "reveal"
+ },
+ {
+  "id": "PA-01",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "PA-01.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "裴岚",
+    "text": "欢迎回家，叶栖。"
+   },
+   {
+    "who": "叶栖",
+    "text": "是。长官。"
+   }
+  ],
+  "sfx": "掌声(合成)",
+  "section": "ending_A"
+ },
+ {
+  "id": "PA-02",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PA-02.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶晴",
+    "text": "长官，您的茶。"
+   },
+   {
+    "who": "叶栖",
+    "text": "……谢谢。"
+   }
+  ],
+  "sfx": "",
+  "section": "ending_A"
+ },
+ {
+  "id": "PA-03",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "PA-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.5
+  },
+  "lines": [],
+  "sfx": "",
+  "section": "ending_A"
+ },
+ {
+  "id": "PA-04",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "PA-04.png",
+  "camera": {
+   "move": "pull-out",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶栖(内心)",
+    "text": "我带着本事回来了。可是，回哪儿呢。"
+   }
+  ],
+  "sfx": "雨声渐远",
+  "section": "ending_A"
+ },
+ {
+  "id": "PB-01",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PB-01.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "我愿意。我会成为很好用的一条狗。"
+   },
+   {
+    "who": "顾衡",
+    "text": "聪明的孩子。"
+   }
+  ],
+  "sfx": "",
+  "section": "ending_B"
+ },
+ {
+  "id": "PB-02",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "1:1",
+  "image": "PB-02.png",
+  "camera": {
+   "move": "push-in",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "线在，人就在。"
+   }
+  ],
+  "sfx": "线轻轻摩擦声",
+  "section": "ending_B"
+ },
+ {
+  "id": "PB-03",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PB-03.png",
+  "camera": {
+   "move": "hold",
+   "dur": 4.0
+  },
+  "lines": [
+   {
+    "who": "小满",
+    "text": "差一点点。"
+   },
+   {
+    "who": "柯谦",
+    "text": "我背面写了很多页。"
+   }
+  ],
+  "sfx": "嗒嗒声",
+  "section": "ending_B"
+ },
+ {
+  "id": "PB-04",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "4:3",
+  "image": "PB-04.png",
+  "camera": {
+   "move": "hold",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶栖",
+    "text": "(哼)……"
+   },
+   {
+    "who": "叶晴",
+    "text": "……这调子……？"
+   }
+  ],
+  "sfx": "哼唱",
+  "section": "ending_B"
+ },
+ {
+  "id": "PB-05",
+  "chapter": "终章",
+  "level": 14,
+  "when": "post",
+  "ratio": "16:9",
+  "image": "PB-05.png",
+  "camera": {
+   "move": "pull-out",
+   "dur": 5.0
+  },
+  "lines": [
+   {
+    "who": "叶栖(内心)",
+    "text": "再接一句就好。"
+   }
+  ],
+  "sfx": "远处的人声、雨声",
+  "section": "ending_B"
+ }
+]
