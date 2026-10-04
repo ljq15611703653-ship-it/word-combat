@@ -64,7 +64,7 @@ export class VfxCastPlayer implements CastPlayer {
     addEventListener("keydown", onKey); this.stage.addEventListener("pointerdown", onDown);
     try {
       const groups = this.group(this.segment(events));
-      const nominal = groups.length * 2100 + events.length * 70;
+      const nominal = groups.length * 3000 + events.length * 70;
       this.tf = mode === "fast" ? Math.min(0.4, 3000 / nominal) : Math.min(1, 8000 / nominal);
       this.tf = Math.max(0.2, this.tf);
       this.stats = { groups: groups.length, sentences: 0, ms: 0 };

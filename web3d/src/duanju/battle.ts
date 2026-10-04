@@ -270,6 +270,7 @@ export class Battle {
       this.stage.querySelectorAll<HTMLElement>('[data-a^="skip"]').forEach((b) => (b.hidden = false)); this.render();
       (this.view as any)._s = this.stage;
       await this.cast.play(events, this.view);
+      (window as any).__vfxCheck?.(this);
       this.stage.querySelectorAll<HTMLElement>('[data-a^="skip"]').forEach((b) => (b.hidden = true));
       for (let u = 0; u < 6; u++) { this.disp.hp[u] = Math.max(0, m.s.hp[u]); this.disp.sh[u] = m.s.sh[u]; }
       this.unitEls.forEach((el, u) => el.classList.toggle("fall", !m.unitAlive(u)));
