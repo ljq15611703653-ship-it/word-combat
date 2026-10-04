@@ -11,6 +11,7 @@ import { Composer, BASIC_DESC, actTokens, type Tok } from "./engine/composer";
 import { suggest, suggestLate, assignLate, PASS_GAIN } from "./engine/ai";
 import { loadoutOf } from "./engine/loadout";
 import { actionToks, cardIndex } from "./live";
+import type { Tok as PTok } from "./words";
 import type { CastShow } from "./fx/castShow";
 import "./game.css";
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -313,7 +314,37 @@ export class Game {
     void this.step();
   }
 
-  protected setUi(ui: string) { this.ui = ui; this.highlight(); }
+  /** 正在「现场拼」的随从（对手演出 / 我自己拼到一半）：名牌上的句子由逐张演出管，不被刷新覆盖 */
+  private staging = -1;
+  private draftN = 0;
+  protected setUi(ui: string) {
+    const was = this.ui;
+    this.ui = ui; this.highlight();
+    if (was === "compose" && ui !== "compose") { this.draftN = 0; if (this.M) this.syncCards(); }
+  }
+  /** 我拼的每一张牌同步落到随从头顶的名牌上（新加的那张带落下动画） */
+  private mirrorDraft() {
+    const cmp = this.cmp, panel = this.ctx.panels[cardIndex(this.selUid)];
+    if (!cmp || !panel) return;
+    const toks: PTok[] = cmp.tokens.map((t) => (t.t === "n" ? { k: "num" as const, v: Number(t.v) } : { k: "word" as const, w: String(t.v) }));
+    if (toks.length === this.draftN + 1 && panel.tokens.length === this.draftN) panel.push(toks[toks.length - 1]);
+    else panel.set(toks, null);
+    this.draftN = toks.length;
+  }
+  /** 对手的句子不是一下子出现，而是一张张落到名牌上（只在打电脑时用；联机由真实同步另做） */
+  private async perform(uid: number, a: any) {
+    const panel = this.ctx.panels[cardIndex(uid)], tk = this.token;
+    const toks = actionToks(this.M as any, a, 0);
+    this.staging = uid;
+    panel.set([], null);
+    for (const t of toks) {
+      if (tk !== this.token) break;
+      panel.push(t);
+      await sleep(this.fast ? 0 : 260);
+    }
+    if (tk === this.token && !this.fast) { panel.set(toks, a.start); await sleep(350); }
+    this.staging = -1;
+  }
 
   protected refreshAll(resetShown = false) {
     const M = this.M;
@@ -335,6 +366,7 @@ export class Game {
       if (this.topLayout) { panel.setName(u.name); card.setName(u.name); }   // 横版：名牌写真名（小剑/小盾/小咒），不是「蓝一」
       const list = M.phase === "declare" || M.phase === "assign" ? M.declared : M.lastDeclared;
       const a = list.find((x: any) => x.uid === u.uid);
+      if (u.uid === this.staging || (this.ui === "compose" && u.uid === this.selUid)) continue;
       if (a) panel.set(actionToks(M as any, a, 0), a.start);
       else panel.set([], null);
     }
@@ -479,7 +511,11 @@ export class Game {
     this.setUi("foe"); this.renderAct();
     await sleep(this.fast ? 50 : 600);
     if (tk !== this.token) return;
+    const before = M.declared.length;
     if (!this.hooks?.foeStep?.(M)) M.aiStep();
+    const na = M.declared.length > before ? M.declared[M.declared.length - 1] : null;
+    if (na && na.side === 1 && this.topLayout) await this.perform(na.uid, na);
+    if (tk !== this.token) return;
     this.refreshAll();
     void this.step();
   }
@@ -510,6 +546,7 @@ export class Game {
   protected renderComposer() {
     const el = this.elAct, M = this.M, cmp = this.cmp!;
     el.innerHTML = "";
+    if (this.topLayout) this.mirrorDraft();
     const op = cmp.options(), pr = op.parsed;
     const cls = M.clsOf(0), u = M.R.U[this.selUid];
     const head = h("div", "cmp-head");
