@@ -389,6 +389,7 @@ export class UnitCard {
     this.bill.scale.set(1 + this.ko * 0.15, Math.max(0.02, 1 - this.ko) * (1 + Math.sin(t * 1.4 + wp.x) * 0.006), 1);
     this.figure.position.y = TOP + 0.02 + Math.sin(t * 1.2 + wp.x) * 0.015;
 
+    this.armor.emph = this.hover;
     this.armor.update(t, dt);
     this.pMat.uniforms.uTime.value = t;
     const fb = FLIPBOOKS[this.spec.art];

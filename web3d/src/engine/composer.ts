@@ -40,6 +40,8 @@ export class Composer {
   tokens: Tok[] = [];
   cp: NR.Caps;
   sugg: { act: any; tokens: Tok[] } | null = null;
+  /** 拖拽 / 框选定下的目标：第几个分句 → 随从编号（只对「选择」那种当场定目标的分句有效） */
+  binds: Record<number, number[]> = {};
   /** 剧情关卡：只有这些词能用（没教到的词不出现） */
   allow: Set<string> | null = null;
   constructor(public M: any, public uid: number, public side = 0, allow?: string[]) { this.cp = M.caps(side); if (allow) this.allow = new Set(allow); }
@@ -221,14 +223,82 @@ export class Composer {
     this.tokens.push({ t: "n", v: n, free });
     return true;
   }
-  undo() { this.tokens.pop(); }
-  clear() { this.tokens = []; }
+  undo() { this.tokens.pop(); this.pruneBinds(); }
+  clear() { this.tokens = []; this.binds = {}; }
+
+  // ---------------------------------------------------------------- 拖拽 / 框选（把「选择 几个 哪方」这几张词牌一次填好）
+  /** 每个分句的起始词牌下标（用逐个前缀解析出来：前缀解析完恰好回到 start 的位置就是下一段开头） */
+  clauseStarts(): number[] {
+    const out: number[] = [];
+    for (let i = 0; i < this.tokens.length; i++) if (this.parse(this.tokens.slice(0, i)).expect === "start") out.push(i);
+    return out;
+  }
+  private pruneBinds() {
+    const n = this.clauseStarts().length;
+    for (const k of Object.keys(this.binds)) if (+k >= n) delete this.binds[+k];
+  }
+  /** 现在能不能开始新的一段（空句子，或者刚拼了「并」） */
+  startsClause() { return this.parse().expect === "start"; }
+  /** 拖到目标上：kind = 敌方 / 友方 / 自身；目标是敌方或队友时当场记下是谁。返回 "" = 成功，否则是不行的原因 */
+  dragTo(kind: "enemy" | "ally" | "self", target: number): string {
+    if (!this.startsClause()) return "要加一段，先拼「并」；要改目标，在人物外框选";
+    const no = this.clauseStarts().length;
+    const save = this.tokens.length;
+    if (kind === "self") {
+      if (!this.addWord("自身")) return "这里不能用【自身】";
+      return "";
+    }
+    const bad = (m: string) => { this.tokens.length = save; return m; };
+    if (!this.addWord("选择")) return bad("这里不能选【选择】");
+    if (!this.addNumber(1)) return bad("数字牌放不下");
+    if (!this.addWord(kind === "enemy" ? "敌方" : "友方")) {
+      const w = this.options().words.find((x) => x.w === (kind === "enemy" ? "敌方" : "友方"));
+      return bad(w?.why || "这一方现在没有可选的随从");
+    }
+    if (!this.cp.late) this.binds[no] = [target];
+    return "";
+  }
+  /** 框选：把「当前这一段」的目标改成 uids（只检查这一段：都在场、方向对、人数和数字牌够）。返回 "" = 成功，否则是原因 */
+  boxTargets(uids: number[]): string {
+    const pr = this.parse();
+    const no = this.clauseStarts().length - 1;
+    const cl = pr.cur ?? pr.done[pr.done.length - 1];
+    if (no < 0 || !cl) return "先拖一次选好这一段的对象（或者点「选择」）";
+    if (cl.tmode === "self" || cl.k === "delay" || cl.k === "remove") return "这一段的对象不能框选";
+    if (!cl.side) return "先选敌方还是友方，再框选";
+    if (!uids.length) return "框里没有随从";
+    const U = this.M.R.U;
+    const wantEnemy = cl.side === "enemy";
+    for (const u of uids) {
+      const x = U[u];
+      if (x.down !== -1) return `【${x.name}】已经倒下了`;
+      if ((x.side !== this.side) !== wantEnemy) return `【${x.name}】不是${wantEnemy ? "敌方" : "友方"}，这一段要选${wantEnemy ? "敌方" : "友方"}`;
+    }
+    const n = uids.length;
+    const start = this.clauseStarts()[no], ci = start + 1;   // 「选择」后面那一张是几个
+    if (this.tokens[start]?.v !== "选择" || this.tokens[ci]?.t !== "n") return "这一段不是「选择」开头，不能框选";
+    const free = this.cp.freecount || n === 1;
+    if (!free) {
+      const used = { ...this.usedValues() };
+      const old = this.tokens[ci];
+      if (old.t === "n" && Number(old.v) > 1 && !old.free) used[+old.v] = (used[+old.v] ?? 1) - 1;
+      const have = this.M.usableValues(this.side)[n] ?? 0;
+      if ((used[n] ?? 0) >= have) return `框了 ${n} 个，要一张数字牌 ${n}，你手里没有（或已经用在别处）`;
+    }
+    this.tokens[ci] = { t: "n", v: n, free: this.cp.freecount };
+    if (this.cp.late) delete this.binds[no]; else this.binds[no] = [...uids];
+    return "";
+  }
 
   /** 拼好的句子；原样用了辅助轮建议时，目标和秒数一起带过去 */
   finish(): any[] | null {
     const pr = this.parse();
     if (!pr.complete) return null;
     const cl = structuredClone(pr.clauses);
+    cl.forEach((c: any, i: number) => {
+      const b = this.binds[i];
+      if (b && c.tmode === "choose" && b.length === (c.count ?? 1)) { c.tg = [...b]; c.pre = true; }
+    });
     if (this.sugg && JSON.stringify(this.sugg.tokens) === JSON.stringify(this.tokens) && cl.length === this.sugg.act.cl.length) {
       cl.forEach((c: any, i: number) => {
         const sc = this.sugg!.act.cl[i];

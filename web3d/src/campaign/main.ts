@@ -14,6 +14,7 @@ import "../style.css";
 import { CampaignUI } from "./ui";
 import { Game, uidOfCard } from "../game";
 import { playIntroIfFirst, playIntro } from "../intro";
+import { DragCompose } from "../drag/dragCompose";
 import { CastShow } from "../fx/castShow";
 
 // 0-2 = 对手（上排，红），3-5 = 我方（下排，蓝）；关卡开始时按关卡数据换名字、换立绘
@@ -160,6 +161,12 @@ async function main() {
     setNdc(e);
     const c = pickCard();
     if (c) ui.cardClicked(uidOfCard(cards.indexOf(c))); else ui.blankClicked();
+  });
+  new DragCompose({
+    dom: renderer.domElement, camera, cards,
+    pick: (e) => { setNdc(e); return pickCard(); },
+    size: () => { const r = renderer.domElement.getBoundingClientRect(); return [r.width, r.height]; },
+    game: () => (game.active ? game : null),
   });
   // 右键随从：弹出详情面板（右键空白处 = 关面板）
   renderer.domElement.addEventListener("contextmenu", (e) => {

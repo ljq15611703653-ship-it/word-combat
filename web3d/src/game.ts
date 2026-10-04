@@ -50,10 +50,10 @@ export interface GameCtx {
 }
 
 // ---- [campaign hook] 可选钩子：教程盖在正常对局上用。不传 hooks 时行为和原来完全一样。
-export type GameClickKind = "unit" | "pass" | "word" | "num" | "undo" | "clear" | "restart" | "assist" | "done" | "target" | "act" | "time" | "late";
+export type GameClickKind = "unit" | "pass" | "word" | "num" | "undo" | "clear" | "restart" | "assist" | "done" | "target" | "act" | "time" | "late" | "drag" | "box";
 export interface GameClick { kind: GameClickKind; value?: string | number; uid?: number; stage: string; tokens: number; clause: number; picked: number[]; latePick: number[] }
 /** 当前该点什么（高亮用） */
-export interface GameHl { kind: GameClickKind; value?: string | number; uid?: number }
+export interface GameHl { kind: GameClickKind; value?: string | number; uid?: number; drag?: { from: number; to: number } }
 export interface GameHooks {
   /** 拼句台只开放这些词（没教到的词不出现） */
   allow?: string[];
@@ -356,6 +356,8 @@ export class Game {
       if (on && guide && guide.uid === uid) this.hlCards.push(uid);
       card.setSelected(on);
     });
+    // 教程：这一步可以拖（从出手的随从拖到目标），把两头都亮出来
+    if (guide?.drag) for (const uid of [guide.drag.from, guide.drag.to]) { this.ctx.cards[cardIndex(uid)].setSelected(true); this.hlCards.push(uid); }
   }
 
   // ------------------------------------------------------------ 顶栏、单位、手牌、宣告
@@ -619,6 +621,37 @@ export class Game {
     }
     this.pendI = 0;
     this.advanceTargets();
+  }
+
+  // ------------------------------------------------------------ 拖拽 / 框选（场景里的鼠标操作，见 drag/dragCompose.ts）
+  /** 能不能从这个随从开始拖：返回 "" = 能，否则是原因（空字符串之外的都是提示） */
+  dragFromProblem(uid: number): string {
+    if (!this.active || this.M.R.U[uid]?.side !== 0) return "只能从我方随从开始拖";
+    if (this.ui === "pick_unit") return this.M.remaining[0].includes(uid) ? "" : "这个随从这一轮已经定过了";
+    if (this.ui === "compose") return uid === this.selUid ? "" : "这一句是别的随从的；要换人先取消";
+    return "现在不能拖";
+  }
+  /** 从 actor 拖到 target（self = 双击自己）。必要时先替它打开拼句面板，然后把「选择 1 敌方/友方」或「自身」填进去 */
+  dragDrop(actor: number, target: number, self = false) {
+    const bad = this.dragFromProblem(actor);
+    if (bad) { this.toast(bad); return; }
+    const U = this.M.R.U;
+    if (U[target].down !== -1) { this.toast(`【${U[target].name}】已经倒下了`); return; }
+    const kind: "enemy" | "ally" | "self" = self || target === actor ? "self" : U[target].side === 0 ? "ally" : "enemy";
+    if (this.ui === "pick_unit") { if (!this.gate("unit", { uid: actor })) return; this.openComposer(actor); }
+    if (!this.cmp) return;
+    if (!this.gate("drag", { uid: target, value: kind })) return;
+    const e = this.cmp.dragTo(kind, target);
+    if (e) { this.toast(e); return; }
+    this.renderAct();
+  }
+  /** 在人物外框选：把当前这一段的目标改成框到的随从 */
+  dragBox(uids: number[]) {
+    if (this.ui !== "compose" || !this.cmp) return;
+    if (!this.gate("box", { value: uids.length })) return;
+    const e = this.cmp.boxTargets(uids);
+    if (e) { this.toast(e); return; }
+    this.renderAct();
   }
 
   // ------------------------------------------------------------ 选目标 / 起手秒数

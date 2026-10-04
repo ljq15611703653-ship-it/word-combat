@@ -85,3 +85,9 @@
 - 写文件失败要检查是否变成 0 字节。
 - 用户的本地仓库 `Documents/New project/word-combat-lab` 是另一条线（Godot 版 + 研究文件），分支 `word-combat-lab`，有大量未提交改动，不要碰。
 - 记忆文件在 `C:\Users\27654\.claude\projects\C--Users-27654-Documents-New-project\memory\`（含界面改版、技能演出、截图自检等条目）。
+
+## 拖拽拼句（横版对战 + 教程）
+- `src/drag/dragCompose.ts`：从我方随从按住拖到别的随从 = 填「选择 1 敌方/友方」（拖到自己或双击自己 = 「自身」）；面板开着时在人物外拖框 = 把**当前这一段**的目标改成框到的随从（要求全部合法、数字牌够用，否则 toast 原因）。拖的时候面板半透明不挡鼠标，选取框按随从在屏幕上的外接矩形算。
+- 规则在 `engine/composer.ts` 的 `dragTo / boxTargets / binds`，`Game.dragDrop / dragBox` 负责开面板和教程拦截（点击种类 `drag` / `box`）。
+- 教程：第 1 关第 1 轮用 `{kind:"drag"}` 教学（点随从再拼照样放行）；之后的引导里「选择 1 敌方/友方/自身」开头的句子都允许拖，框选在引导里一律拒绝。
+- 真鼠标测试：`scripts/dragshots.mjs`（静态包 + CDP）。

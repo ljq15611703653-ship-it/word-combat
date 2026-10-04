@@ -1,3 +1,4 @@
+import { DragCompose } from "./drag/dragCompose";
 import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -112,7 +113,7 @@ async function main() {
     scene.add(c.root);
     cards.push(c);
     // 句子读数面板：屏幕空间，顶边对齐卡的前沿
-    const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句",
+    const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句（可拖）",
       enemy ? undefined : () => {
         if (game?.active) { game.cardClicked(uidOfCard(i)); return; }
         if (online?.active) { online.cardClicked(uidOfCard(i)); return; }
@@ -384,6 +385,12 @@ async function main() {
     renderTimeline();
   });
 
+  // 拖拽拼句：从我方随从拖到目标 / 面板开着时拖框选目标
+  new DragCompose({
+    dom: renderer.domElement, camera, cards, pick,
+    size: () => { const r = renderer.domElement.getBoundingClientRect(); return [r.width, r.height]; },
+    game: () => (game.active ? game : online.active ? online : null),
+  });
   // ---------- 技能演出：镜头拉近出手随从 → 词牌飞到盔甲壳 → 命中 → 归位拉回（只借用取景，不碰场景） ----------
   const cast = new CastShow({ camera, app, cards, panels, goal, release: reframe, solve: (pts) => solve(pts, topPx(), 16) });
   // ---------- 完整对局：真人对电脑 ----------
