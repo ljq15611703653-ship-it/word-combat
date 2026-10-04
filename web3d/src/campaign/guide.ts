@@ -33,9 +33,6 @@ export class GuideTracker {
     switch (c.stage) {
       case "pick_unit": {
         const q = this.queue[0];
-        // 第一关第一轮：教「从随从拖到目标」（点随从再拼也照样可以）
-        const d = q && this.lv.id === 1 && this.M.rnd === 1 ? this.dragPlan(q) : null;
-        if (d) return { kind: "drag", uid: q.uid, drag: d };
         if (q) return { kind: "unit", uid: q.uid };
         return { kind: "pass", uid: this.M.remaining[0][0] };
       }
@@ -57,14 +54,6 @@ export class GuideTracker {
     return null;
   }
 
-  /** 这一句开头是「选择 1 敌方/友方/自身」且目标是单个时，可以用拖拽一步填好 */
-  private dragPlan(g: Guide): { from: number; to: number } | null {
-    const t = g.tokens;
-    if (t[0] !== "选择" || t[1] !== 1 || !["敌方", "友方", "自身"].includes(String(t[2]))) return null;
-    const to = t[2] === "自身" ? g.uid : g.targets?.[0]?.[0];
-    return to === undefined ? null : { from: g.uid, to };
-  }
-
   /** 点击拦截：返回字符串 = 拒绝；null = 放行（同时推进内部状态） */
   before(c: GameClick): string | null {
     if (!this.guided) return null;
@@ -72,17 +61,8 @@ export class GuideTracker {
     if (c.kind === "restart") { if (this.cur) this.queue.unshift(this.cur); this.cur = null; return null; }
     if (c.kind === "clear") return "引导里请用「撤回一张」，一步步来。";
     if (c.kind === "assist") return "这一关是跟着引导学，先不用辅助轮。";
-    if (c.kind === "box") return "引导里这一步先不框选，照高亮的来。";
-    if (c.kind === "drag") {
-      const g = this.cur;
-      const d = g && c.tokens === 0 ? this.dragPlan(g) : null;
-      const kindWord = c.value === "enemy" ? "敌方" : c.value === "ally" ? "友方" : "自身";
-      if (d && g!.tokens[2] === kindWord && d.to === c.uid) return null;
-      return "这一步要照引导来：拖到的目标不对，或者这一句不是这样开头的。";
-    }
     const e = this.expect(c);
     if (!e) return null;
-    if (e.kind === "drag" && c.kind === "unit" && c.uid === e.uid) { this.cur = this.queue.shift() ?? null; return null; }
     const same = e.kind === c.kind && (e.value === undefined || e.value === c.value) && (e.uid === undefined || e.uid === c.uid);
     if (!same) return `这一步要照引导来：${this.describe(e)}`;
     if (c.kind === "unit") this.cur = this.queue.shift() ?? null;
@@ -93,7 +73,6 @@ export class GuideTracker {
 
   private describe(e: GameHl): string {
     switch (e.kind) {
-      case "drag": return `从发光的随从【${this.nm(e.uid!)}】按住拖到发光的目标上（或点随从再拼）`;
       case "unit": return `点发光的随从【${this.nm(e.uid!)}】`;
       case "pass": return `点【${this.nm(e.uid!)}】的「它这轮不出手」`;
       case "word": return `点词牌【${e.value}】`;
@@ -115,7 +94,6 @@ export class GuideTracker {
     if (!e) return "";
     const tip = this.rs?.tip ? `<br><span style="opacity:.8">${this.rs.tip}</span>` : "";
     switch (e.kind) {
-      case "drag": return `<b>拖一下：${this.nm(e.uid!)} → 目标</b><br>按住发光的随从，拖到发光的目标上松手，「选择 1 敌方」就自动填好了；剩下的词牌自己拼。<br>也可以像平常一样点随从再拼。${tip}`;
       case "unit": return `<b>先点它：${this.nm(e.uid!)}</b><br>让它出手，给它拼一句。${tip}`;
       case "pass": return `<b>点它：${this.nm(e.uid!)}</b><br>这个随从这一轮不出手（引导里没有它的句子）。${tip}`;
       case "word": return `<b>【${e.value}】</b><br>${this.body(e.value, g?.notes?.[c.tokens] ?? WORDS[String(e.value)]?.desc ?? BASIC_DESC[String(e.value)] ?? "")}`;

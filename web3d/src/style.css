@@ -165,3 +165,50 @@ body.composing .top .cta, body.composing .top .pts { visibility: hidden; }
 .ro.over.dead { opacity: 0.45; }
 .ro.over .ro-pass { display: block; margin: 3px auto 0; padding: 0 10px; font: 600 11px "Noto Sans SC", sans-serif; color: #cfe; background: rgba(0, 0, 0, 0.35); border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent); border-radius: 9px; cursor: pointer; }
 .ro.over .ro-pass[hidden] { display: none; }
+
+/* ---------- 手牌条拼句：名牌 = 句子条；底部 = 手牌条 ---------- */
+.ro.over.edit { z-index: 5; pointer-events: auto; border-top-color: #7ff5df; box-shadow: 0 0 18px rgba(127, 245, 223, 0.35), inset 0 0 14px rgba(127, 245, 223, 0.12); background: linear-gradient(180deg, rgba(3, 30, 27, 0.94), rgba(3, 30, 27, 0.8)); }
+.ro.edit .ro-body { min-height: 2.1em; align-items: center; gap: 0.15em 0.35em; }
+.ro.edit .w { cursor: grab; padding: 1px 6px; border: 1px solid color-mix(in srgb, var(--c, #93a8c9) 55%, transparent); border-radius: 4px; background: rgba(0, 0, 0, 0.35); transition: opacity 0.12s, transform 0.12s; }
+.ro.edit .w:hover { transform: translateY(-1px); border-color: var(--c, #fff); }
+.ro.edit .w.lifted { opacity: 0.25; }
+.ro .slot { display: inline-block; width: 4px; height: 1.5em; border-radius: 2px; background: rgba(127, 245, 223, 0.25); transition: width 0.12s, background 0.12s, box-shadow 0.12s; }
+.ro.dragon .slot { width: 10px; background: rgba(127, 245, 223, 0.35); }
+.ro .slot.hot { width: 22px; background: rgba(127, 245, 223, 0.8); box-shadow: 0 0 12px #7ff5df; }
+.hs { position: fixed; left: 50%; bottom: 8px; transform: translateX(-50%); width: min(780px, 96vw); z-index: 7; padding: 6px 10px 8px;
+  background: linear-gradient(180deg, rgba(4, 18, 30, 0.86), rgba(4, 18, 30, 0.96)); border: 1px solid rgba(127, 245, 223, 0.4); box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5), 0 0 18px rgba(127, 245, 223, 0.18); font: 500 13px "Noto Sans SC", sans-serif; color: #dff6ff; animation: hsin 0.18s ease-out; }
+@keyframes hsin { from { transform: translate(-50%, 24px); opacity: 0; } }
+.hs[hidden] { display: none; }
+.hs-top { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.hs-title { color: #7ff5df; font-size: 14px; }
+.hs-info { color: #9db6c9; font-size: 11px; }
+.hs-text { margin: 3px 0 0; min-height: 1.4em; color: #fff; }
+.hs-text.hint { color: #ffe39a; }
+.hs-cost { color: #9db6c9; font-size: 11px; margin-bottom: 4px; }
+.hs-rows { display: flex; flex-direction: column; gap: 6px; }
+.hs-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-end; }
+.hs-grp { display: flex; gap: 6px; padding-right: 12px; border-right: 1px solid rgba(255, 255, 255, 0.12); }
+.hs-grp:last-child { border-right: 0; }
+.hs-card { position: relative; min-width: 40px; padding: 5px 9px 6px; font: 700 14px "Noto Sans SC", sans-serif; color: #eaffff; cursor: grab; touch-action: none; user-select: none;
+  background: linear-gradient(180deg, rgba(60, 120, 150, 0.55), rgba(20, 50, 70, 0.85)); border: 1px solid rgba(143, 212, 255, 0.55); border-radius: 6px; box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4); transition: transform 0.1s, box-shadow 0.1s, opacity 0.1s; }
+.hs-card:hover { transform: translateY(-5px); box-shadow: 0 8px 14px rgba(0, 0, 0, 0.45), 0 0 12px rgba(127, 245, 223, 0.4); }
+.hs-card.adv { border-color: #ffd36b; background: linear-gradient(180deg, rgba(150, 110, 30, 0.55), rgba(60, 40, 10, 0.85)); }
+.hs-card.n { min-width: 44px; padding: 3px 8px 4px; text-align: center; background: linear-gradient(180deg, rgba(120, 80, 160, 0.5), rgba(40, 24, 64, 0.85)); border-color: #c9a2ff; }
+.hs-card.n b { display: block; font: 700 17px "Chakra Petch", monospace; }
+.hs-card.n small { display: block; font-size: 10px; opacity: 0.75; }
+.hs-card.off { opacity: 0.38; filter: grayscale(0.6); }
+.hs-card.lifted { opacity: 0.25; }
+.hs-foot { display: flex; gap: 6px; margin-left: auto; align-self: center; }
+.hs-btn { padding: 5px 10px; font: 600 12px "Noto Sans SC", sans-serif; color: #dff6ff; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.25); cursor: pointer; }
+.hs-btn.primary { color: #04201c; background: #7ff5df; border-color: #7ff5df; }
+.hs-btn.primary.hl { box-shadow: 0 0 14px #7ff5df; }
+.hs-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.hs-help { display: block; margin-top: 6px; color: #7e97aa; font-size: 11px; }
+.hs-ghost { position: fixed; z-index: 30; pointer-events: none; transform: translate(-50%, -60%) rotate(-3deg); padding: 6px 12px; font: 700 15px "Noto Sans SC", sans-serif; color: #eaffff;
+  background: rgba(30, 80, 110, 0.9); border: 1px solid #7ff5df; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(127, 245, 223, 0.5); }
+.hs-ghost.n { background: rgba(70, 40, 110, 0.9); border-color: #c9a2ff; font-family: "Chakra Petch", monospace; }
+.hs-ghost.ok { box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 22px #7ff5df; transform: translate(-50%, -60%) rotate(0deg) scale(1.08); }
+.hs-ghost.out { border-color: #ff7a86; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 18px rgba(255, 122, 134, 0.7); opacity: 0.85; }
+body.hs-dragging { cursor: grabbing; }
+body.hs-dragging * { cursor: grabbing !important; }
+@media (max-width: 720px) { .hs-card { padding: 6px 8px 7px; font-size: 14px; } }

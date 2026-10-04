@@ -1,4 +1,3 @@
-import { DragCompose } from "./drag/dragCompose";
 import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -113,7 +112,7 @@ async function main() {
     scene.add(c.root);
     cards.push(c);
     // 句子读数面板：屏幕空间，顶边对齐卡的前沿
-    const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句（可拖）",
+    const panel = new SentencePanel(seat.spec.side, seat.spec.name, enemy ? "待机 · 这轮不行动" : "＋ 拼一句",
       enemy ? undefined : () => {
         if (game?.active) { game.cardClicked(uidOfCard(i)); return; }
         if (online?.active) { online.cardClicked(uidOfCard(i)); return; }
@@ -385,12 +384,6 @@ async function main() {
     renderTimeline();
   });
 
-  // 拖拽拼句：从我方随从拖到目标 / 面板开着时拖框选目标
-  new DragCompose({
-    dom: renderer.domElement, camera, cards, pick,
-    size: () => { const r = renderer.domElement.getBoundingClientRect(); return [r.width, r.height]; },
-    game: () => (game.active ? game : online.active ? online : null),
-  });
   // ---------- 技能演出：镜头拉近出手随从 → 词牌飞到盔甲壳 → 命中 → 归位拉回（只借用取景，不碰场景） ----------
   const cast = new CastShow({ camera, app, cards, panels, goal, release: reframe, solve: (pts) => solve(pts, topPx(), 16) });
   // ---------- 完整对局：真人对电脑 ----------
@@ -445,9 +438,10 @@ async function main() {
         el.style.visibility = "";
         const p = cards[i].root.position;
         const [hx, hy] = scr(figPoint(p.x, p.z, FIG.h * (1 - cards[i].koAmount * 0.9) + 0.05));
-        el.style.setProperty("--pw", `${pw}px`);
+        const pwi = panels[i].editing ? Math.min(Math.round(pw * 1.7), 320) : pw;       // 拼句时名牌放宽一些，牌好拖
+        el.style.setProperty("--pw", `${pwi}px`);
         el.style.setProperty("--lead", `${lead}px`);
-        el.style.left = `${Math.round(clampN(hx - pw / 2, 6, w - pw - 6))}px`;
+        el.style.left = `${Math.round(clampN(hx - pwi / 2, 6, w - pwi - 6))}px`;
         el.style.top = `${Math.round(hy - lead - el.offsetHeight)}px`;
       });
       return;

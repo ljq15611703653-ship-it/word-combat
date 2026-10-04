@@ -50,6 +50,13 @@ export class SentencePanel {
   private passCb: (() => void) | null = null;
   private toks: Tok[] = [];
   private sec: number | null = null;
+  /** 手牌条拼句：名牌就是句子条，牌可以拖出来 / 拖进来 */
+  private edit = false;
+  private onTok: ((i: number, e: PointerEvent) => void) | null = null;
+  private slots: Set<number> | null = null;
+  private hot = -1;
+  private hide = -1;
+  get editing() { return this.edit; }
 
   constructor(side: "r" | "b", name: string, private emptyText: string, onClick?: () => void) {
     this.el = document.createElement("div");
@@ -89,6 +96,32 @@ export class SentencePanel {
     this.render(false);
   }
 
+  /** 进入 / 退出「句子条」编辑状态；onTok = 按住某张牌时的回调（用来拖出去 / 换位置） */
+  setEdit(on: boolean, onTok: ((i: number, e: PointerEvent) => void) | null = null) {
+    this.edit = on; this.onTok = on ? onTok : null;
+    if (!on) { this.slots = null; this.hot = -1; this.hide = -1; }
+    this.el.classList.toggle("edit", on);
+    this.render(false);
+  }
+  /** 拖牌时：把能放的位置显示成一个个缝；hot = 最近的那个；hide = 正在被拖的那张（先淡掉） */
+  showSlots(legal: number[] | null, hot = -1, hide = -1) {
+    this.slots = legal ? new Set(legal) : null; this.hot = hot; this.hide = hide;
+    this.el.classList.toggle("dragon", !!legal);
+    this.render(false);
+  }
+  /** 离屏幕坐标最近的缝（没有缝返回 -1） */
+  nearestSlot(x: number, y: number): number {
+    let best = -1, bd = 1e9;
+    this.body.querySelectorAll<HTMLElement>(".slot").forEach((el) => {
+      const r = el.getBoundingClientRect(), dx = x - (r.left + r.width / 2), dy = (y - (r.top + r.height / 2)) * 1.6;
+      const d = Math.hypot(dx, dy);
+      if (d < bd) { bd = d; best = +el.dataset.i!; }
+    });
+    return best;
+  }
+  /** 新装上的那张闪一下 */
+  flash(i: number) { const el = this.body.querySelector<HTMLElement>(`.w[data-i="${i}"]`); if (el) { el.classList.remove("fresh"); void el.offsetWidth; el.classList.add("fresh"); } }
+
   /** 头顶名牌：血条 + 状态小标（横版布局用；不调用就不显示） */
   setHp(hp: number, max: number, chips: string[] = []) {
     const sig = `${hp}/${max}|${chips.join(",")}`;
@@ -115,7 +148,21 @@ export class SentencePanel {
   private render(animate: boolean) {
     this.code.textContent = this.sec === null ? "" : `T+${String(this.sec).padStart(2, "0")}s`;
     this.body.innerHTML = "";
+    const slot = (i: number) => {
+      if (!this.slots?.has(i)) return;
+      const e = document.createElement("i");
+      e.className = "slot" + (i === this.hot ? " hot" : ""); e.dataset.i = String(i);
+      this.body.appendChild(e);
+    };
     if (!this.toks.length) {
+      if (this.edit) {
+        slot(0);
+        const e = document.createElement("span");
+        e.className = "ro-empty";
+        e.textContent = "把词牌拖到这里";
+        this.body.appendChild(e);
+        return;
+      }
       const e = document.createElement("span");
       e.className = "ro-empty";
       e.textContent = this.emptyText;
@@ -123,11 +170,17 @@ export class SentencePanel {
       return;
     }
     this.toks.forEach((t, i) => {
+      slot(i);
       const el = tokEl(t, animate);
       if (animate) el.style.animationDelay = `${i * 40}ms`;
+      if (this.edit) {
+        el.dataset.i = String(i);
+        el.classList.add("grab");
+        if (i === this.hide) el.classList.add("lifted");
+        el.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); this.onTok?.(i, e); });
+      }
       this.body.appendChild(el);
     });
+    slot(this.toks.length);
   }
 }
-
-export const sideColor = SIDE;

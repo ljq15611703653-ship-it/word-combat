@@ -7,6 +7,7 @@ import { Match } from "./engine/match";
 import * as NR from "./engine/rules";
 import * as NE from "./engine/engine";
 import * as NT from "./engine/text";
+import { HandStrip, type HandModel, type HandWord } from "./handStrip";
 import { Composer, BASIC_DESC, actTokens, type Tok } from "./engine/composer";
 import { suggest, suggestLate, assignLate, PASS_GAIN } from "./engine/ai";
 import { loadoutOf } from "./engine/loadout";
@@ -51,10 +52,10 @@ export interface GameCtx {
 }
 
 // ---- [campaign hook] 可选钩子：教程盖在正常对局上用。不传 hooks 时行为和原来完全一样。
-export type GameClickKind = "unit" | "pass" | "word" | "num" | "undo" | "clear" | "restart" | "assist" | "done" | "target" | "act" | "time" | "late" | "drag" | "box";
+export type GameClickKind = "unit" | "pass" | "word" | "num" | "undo" | "clear" | "restart" | "assist" | "done" | "target" | "act" | "time" | "late";
 export interface GameClick { kind: GameClickKind; value?: string | number; uid?: number; stage: string; tokens: number; clause: number; picked: number[]; latePick: number[] }
 /** 当前该点什么（高亮用） */
-export interface GameHl { kind: GameClickKind; value?: string | number; uid?: number; drag?: { from: number; to: number } }
+export interface GameHl { kind: GameClickKind; value?: string | number; uid?: number }
 export interface GameHooks {
   /** 拼句台只开放这些词（没教到的词不出现） */
   allow?: string[];
@@ -137,7 +138,9 @@ export class Game {
       this.elPop.addEventListener("animationend", () => this.elPop.classList.remove("nudge"));
       document.body.append(this.root, this.float, this.overlay);
       window.addEventListener("keydown", (e) => {
-        if (e.key !== "Escape" || !this.active || !this.popMode || !this.overlay.hidden || this.ctx.cast?.active) return;
+        if (e.key !== "Escape" || !this.active || !this.overlay.hidden || this.ctx.cast?.active) return;
+        if (this.topLayout && this.ui === "compose") { if (!this.gate("restart")) return; this.cmp = null; this.setUi("pick_unit"); this.renderAct(); return; }
+        if (!this.popMode) return;
         this.dismissPop();
       });
       window.addEventListener("resize", () => this.placePop());
@@ -199,6 +202,7 @@ export class Game {
   /** 引导里：这一类按钮当前有发光的 */
   private hlKind(kind: GameClickKind): boolean { return this.hooks?.expect?.(this.clickInfo(kind))?.kind === kind; }
   close() {
+    this.leaveEdit();
     this.closePop();
     this.token++;
     this.active = false;
@@ -314,22 +318,71 @@ export class Game {
     void this.step();
   }
 
+  /** 横版：手牌条（拼句时屏幕底部的词牌 / 数字牌，拖到名牌上装配） */
+  protected hand = new HandStrip({
+    cmp: () => this.cmp,
+    plate: () => (this.selUid >= 0 ? this.ctx.panels[cardIndex(this.selUid)] : null),
+    refresh: () => this.renderAct(),
+    toast: (m) => this.toast(m),
+    allow: (tok) => this.gate(tok.t === "n" ? "num" : "word", { value: tok.v }),
+  });
+  private editPlate: SentencePanel | null = null;
   /** 正在「现场拼」的随从（对手演出 / 我自己拼到一半）：名牌上的句子由逐张演出管，不被刷新覆盖 */
   private staging = -1;
-  private draftN = 0;
   protected setUi(ui: string) {
     const was = this.ui;
     this.ui = ui; this.highlight();
-    if (was === "compose" && ui !== "compose") { this.draftN = 0; if (this.M) this.syncCards(); }
+    if (was === "compose" && ui !== "compose") { this.leaveEdit(); if (this.M) this.syncCards(); }
   }
-  /** 我拼的每一张牌同步落到随从头顶的名牌上（新加的那张带落下动画） */
+  /** 横版拼句：名牌变成句子条（牌可以拖进拖出），底部摆出手牌条 */
+  private enterEdit() {
+    const panel = this.ctx.panels[cardIndex(this.selUid)];
+    if (this.editPlate && this.editPlate !== panel) this.editPlate.setEdit(false);
+    this.editPlate = panel;
+    panel.setEdit(true, (i, e) => this.hand.plateDown(i, e));
+  }
+  private leaveEdit() {
+    this.editPlate?.setEdit(false); this.editPlate = null;
+    this.hand.hide();
+  }
   private mirrorDraft() {
     const cmp = this.cmp, panel = this.ctx.panels[cardIndex(this.selUid)];
     if (!cmp || !panel) return;
+    this.enterEdit();
     const toks: PTok[] = cmp.tokens.map((t) => (t.t === "n" ? { k: "num" as const, v: Number(t.v) } : { k: "word" as const, w: String(t.v) }));
-    if (toks.length === this.draftN + 1 && panel.tokens.length === this.draftN) panel.push(toks[toks.length - 1]);
-    else panel.set(toks, null);
-    this.draftN = toks.length;
+    panel.set(toks, null);
+  }
+  private renderHandStrip() {
+    const M = this.M, cmp = this.cmp!, u = M.R.U[this.selUid], cls = M.clsOf(0);
+    const op = cmp.options(), pr = op.parsed;
+    const GROUPS: [number, string[]][] = [[0, ["选择", "自身", "延后", "移除"]], [1, ["敌方", "友方"]], [2, ["造成", "恢复", "减伤", "易伤", "灼烧", "衰弱", "转移"]], [3, ["重复", "持续", "并"]]];
+    const words: HandWord[] = [];
+    for (const [g, list] of GROUPS) for (const w of list) {
+      if (cmp.allow && !cmp.allow.has(w)) continue;
+      const adv = !!NR.WORDS[w];
+      if (adv && !(M.res[0].words[w] > 0) && !(cmp.tokens.some((t) => t.v === w))) continue;      // 卡组里没有的进阶词不摆
+      if (w === "持续" && cls !== "续" && !adv) { if (!op.words.some((x) => x.w === w)) continue; }
+      let tip = NR.WORDS[w] ? NR.WORDS[w].desc : BASIC_DESC[w] ?? "";
+      if (w === "并") tip += `（每多一段 +${cmp.cp.and} 行动点，最多 ${cmp.cp.clauses} 段）`;
+      if (adv) tip += `（进阶词：卡组里还能用 ${cmp.wordLeft(w)} 张，价格 ${NR.WORDS[w].price}）`;
+      words.push({ w, tip, adv, group: g });
+    }
+    const have = M.usableValues(0), used = cmp.usedValues();
+    const nums: HandModel["nums"] = [{ v: 1, left: null, free: true }];
+    if (cmp.freeCount()) for (const fv of [2, 3]) nums.push({ v: fv, left: null, free: true });
+    for (const v of Object.keys(have).map(Number).sort((a, b) => a - b)) nums.push({ v, left: have[v] - (used[v] ?? 0), free: false });
+    const ci = cmp.costInfo();
+    const text = pr.err ? pr.err : pr.complete ? `这句话：${NT.actionText(M as any, pr.clauses)}。` : !cmp.tokens.length ? "这句话：（空的）把词牌拖到头顶的句子条上" : `拼到这里：${cmp.draftText()}（还没拼完）`;
+    this.hand.render({
+      words, nums,
+      title: `给【${u.name}】拼一句`,
+      info: `行动点 ${M.res[0].ap}${cmp.cp.blood > 0 ? ` · 不够可用血付，最多 ${M.bloodRoom(0, this.selUid)}` : ""}`,
+      text, cost: ci.text, canDone: !(ci.bad || !pr.complete), doneLabel: ci.allLate ? "拼好了 → 定起手秒数" : "拼好了 → 去选目标", doneHl: this.hl("done"),
+      onUndo: () => { if (!this.gate("undo")) return; cmp.undo(); this.renderAct(); },
+      onClear: () => { if (!this.gate("clear")) return; cmp.clear(); this.renderAct(); },
+      onCancel: () => { if (!this.gate("restart")) return; this.cmp = null; this.setUi("pick_unit"); this.renderAct(); },
+      onDone: () => { if (this.gate("done")) this.composerDone(); },
+    });
   }
   /** 对手的句子不是一下子出现，而是一张张落到名牌上（只在打电脑时用；联机由真实同步另做） */
   private async perform(uid: number, a: any) {
@@ -388,8 +441,6 @@ export class Game {
       if (on && guide && guide.uid === uid) this.hlCards.push(uid);
       card.setSelected(on);
     });
-    // 教程：这一步可以拖（从出手的随从拖到目标），把两头都亮出来
-    if (guide?.drag) for (const uid of [guide.drag.from, guide.drag.to]) { this.ctx.cards[cardIndex(uid)].setSelected(true); this.hlCards.push(uid); }
   }
 
   // ------------------------------------------------------------ 顶栏、单位、手牌、宣告
@@ -546,7 +597,7 @@ export class Game {
   protected renderComposer() {
     const el = this.elAct, M = this.M, cmp = this.cmp!;
     el.innerHTML = "";
-    if (this.topLayout) this.mirrorDraft();
+    if (this.topLayout) { this.mirrorDraft(); this.renderHandStrip(); return; }
     const op = cmp.options(), pr = op.parsed;
     const cls = M.clsOf(0), u = M.R.U[this.selUid];
     const head = h("div", "cmp-head");
@@ -658,37 +709,6 @@ export class Game {
     }
     this.pendI = 0;
     this.advanceTargets();
-  }
-
-  // ------------------------------------------------------------ 拖拽 / 框选（场景里的鼠标操作，见 drag/dragCompose.ts）
-  /** 能不能从这个随从开始拖：返回 "" = 能，否则是原因（空字符串之外的都是提示） */
-  dragFromProblem(uid: number): string {
-    if (!this.active || this.M.R.U[uid]?.side !== 0) return "只能从我方随从开始拖";
-    if (this.ui === "pick_unit") return this.M.remaining[0].includes(uid) ? "" : "这个随从这一轮已经定过了";
-    if (this.ui === "compose") return uid === this.selUid ? "" : "这一句是别的随从的；要换人先取消";
-    return "现在不能拖";
-  }
-  /** 从 actor 拖到 target（self = 双击自己）。必要时先替它打开拼句面板，然后把「选择 1 敌方/友方」或「自身」填进去 */
-  dragDrop(actor: number, target: number, self = false) {
-    const bad = this.dragFromProblem(actor);
-    if (bad) { this.toast(bad); return; }
-    const U = this.M.R.U;
-    if (U[target].down !== -1) { this.toast(`【${U[target].name}】已经倒下了`); return; }
-    const kind: "enemy" | "ally" | "self" = self || target === actor ? "self" : U[target].side === 0 ? "ally" : "enemy";
-    if (this.ui === "pick_unit") { if (!this.gate("unit", { uid: actor })) return; this.openComposer(actor); }
-    if (!this.cmp) return;
-    if (!this.gate("drag", { uid: target, value: kind })) return;
-    const e = this.cmp.dragTo(kind, target);
-    if (e) { this.toast(e); return; }
-    this.renderAct();
-  }
-  /** 在人物外框选：把当前这一段的目标改成框到的随从 */
-  dragBox(uids: number[]) {
-    if (this.ui !== "compose" || !this.cmp) return;
-    if (!this.gate("box", { value: uids.length })) return;
-    const e = this.cmp.boxTargets(uids);
-    if (e) { this.toast(e); return; }
-    this.renderAct();
   }
 
   // ------------------------------------------------------------ 选目标 / 起手秒数
@@ -987,7 +1007,7 @@ export class Game {
   }
   protected placeAct() {
     this.syncPass();
-    const inPop = (this.ui === "compose" || this.ui === "target" || this.ui === "timing") && this.selUid >= 0;
+    const inPop = ((this.ui === "compose" && !this.topLayout) || this.ui === "target" || this.ui === "timing") && this.selUid >= 0;
     if (inPop) {
       if (this.popMode !== "act" || this.popUid !== this.selUid) this.popMax = false;
       this.popUid = this.selUid; this.popMode = "act";
