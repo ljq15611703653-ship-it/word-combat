@@ -103,6 +103,19 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
 // 21 合法性与全体效果的价格
 { const s = fresh(); const bad = [whenever("foe", cat("atk"), 99, [dmg(1, { t: "src" })], 1, 2)]; check(canAfford(s, 0, bad) === null, "「以后全程」不合法（全程只能读已发生的事）");
   const ok = [act(dmg(2, { t: "allFoe" }))]; const s2 = fresh(); s2.side[0].ap = 1; check(canAfford(s2, 0, ok) === null, "打全体：比单体多 1 点行动点（1 点不够）"); s2.side[0].ap = 2; check(canAfford(s2, 0, ok) !== null, "打全体：2 点够"); }
+// 22 三个位置（LAB2.POS 开启时）：词位并更便宜、数位数字更宽、引用位引用不冷却且全程半价
+{ const { P2 } = await import("./params"); const oldPos = P2.POS, oldAnd = P.AND; P2.POS = 1; P.AND = 1;
+  const two = [act(dmg(1, unit(3))), act(dmg(1, unit(4)))];
+  const base = canAfford(fresh(), 0, two, 1)!.cost, word = canAfford(fresh(), 0, two, 0)!.cost;
+  check(word === base - 1, "词位：多一段并少付 1 点行动点");
+  const s3 = fresh(); s3.side[0].cards.forEach((c) => (c.cd = 2));
+  check(canAfford(s3, 0, [act(dmg(3, unit(3)))], 0) === null && canAfford(s3, 0, [act(dmg(2, unit(3)))], 1) !== null, "数位：没有可用牌也能写 2（牌面 +1），其他位置不行");
+  const s5 = fresh(); const w = () => [whenever("foe", cat("atk"), 2, [dmg(1, { t: "src" })], 1, 2)];
+  declare(s5, 0, 0, w()); declare(s5, 0, 1, w());
+  check(canAfford(s5, 0, w(), 0) === null && canAfford(s5, 0, w(), 2) !== null, "引用位：引用词不冷却，别的位置用完要等");
+  const all = [act(dmg({ q: query(win("before", 99), "me", cat("dealt"), "sum"), mult: 1 }, { t: "lowFoe" }))]; const s6 = fresh(); s6.rnd = 6;
+  check(canAfford(s6, 0, all, 2)!.cost < canAfford(s6, 0, all, 0)!.cost, "引用位：全程半价");
+  P2.POS = oldPos; P.AND = oldAnd; }
 // 随机试玩：不崩、能打完
 function rnd(n: number) { return Math.floor(Math.random() * n); }
 function randSentence(s: St, u: number): Sentence {

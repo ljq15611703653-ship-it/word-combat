@@ -161,9 +161,12 @@ export function advWordsOf(cl: Sentence): string[] {
   });
   return out;
 }
-export function sentenceCost(cl: Sentence, rnd = 1): number {
+/** pos：随从位置（0 词位 / 1 数位 / 2 引用位），-1 = 不分位置 */
+export function sentenceCost(cl: Sentence, rnd = 1, pos = -1): number {
   const ks = refKindsOf(cl);
-  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 ? (isChain(c) ? P2.CHAINAP : P.AND) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * Math.max(2, rnd);
+  const seg = (c: Clause) => { const x = isChain(c) ? P2.CHAINAP : P.AND; return pos === 0 ? Math.max(0, x - P2.POS_WORD) : x; };
+  const allCost = pos === 2 && P2.POS3 === "ref" ? Math.max(1, Math.ceil(Math.max(2, rnd) / 2)) : Math.max(2, rnd);
+  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * allCost;
 }
 /** 起手时间：段越多、数字越大越晚 */
 export function windup(cl: Sentence): number {

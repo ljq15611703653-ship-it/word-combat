@@ -1,8 +1,7 @@
 // 通用电脑：不分流派。候选句子来自语法（gen.ts），每个候选推演几轮（默认策略代打），选估值最高的。
 import { P } from "../lab/rules";
 import { act, dmg, heal, type Sentence, type Side } from "./ast";
-import { windup } from "./ast";
-import { type St, clone, declare, passUnit, nextSide, resolveRound, nextRound, alive, unitsOf, total, nAlive, canAfford } from "./interp";
+import { type St, windupFor, clone, declare, passUnit, nextSide, resolveRound, nextRound, alive, unitsOf, total, nAlive, canAfford } from "./interp";
 import { candidates, type Rng } from "./gen";
 
 export interface AiCfg {
@@ -34,7 +33,7 @@ export function defaultMove(s: St, side: Side, u: number): boolean {
   const maxN = Math.max(1, ...s.side[side].cards.filter((c) => c.cd === 0).map((c) => c.v));
   for (let n = Math.min(3, maxN); n >= 1; n--) {
     const cl: Sentence = [act(dmg(n, { t: "lowFoe" }))];
-    if (canAfford(s, side, cl)) return declare(s, side, u, cl, windup(cl));
+    if (canAfford(s, side, cl, u)) return declare(s, side, u, cl, windupFor(cl, u));
   }
   return false;
 }
@@ -71,7 +70,7 @@ export function think(s: St, side: Side, r: Rng, cfg: AiCfg = AI_DEFAULT): { uni
     const base = rollout(s, side, u, null, 1, cfg) + cfg.passBias;
     if (base > bestV) { bestV = base; best = { unit: u, cl: null, start: 1 }; }
     for (const cl of candidates(s, side, u, r, Math.ceil(cfg.k / us.length) + 1, cfg.mode ?? "free")) {
-      const w = windup(cl);
+      const w = windupFor(cl, u);
       const starts = cfg.mode === "playbook" ? [...new Set([w, w + 3, 8, 12].filter((x) => x >= w && x <= P.TL))] : [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
       for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg) + (fancy(cl) ? cfg.recBonus : 0); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
     }

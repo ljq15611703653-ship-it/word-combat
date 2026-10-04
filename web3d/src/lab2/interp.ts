@@ -178,7 +178,7 @@ function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
       if (n > 0) n = Math.max(0, n + stLvl(s, u, "vuln") - (r.actor >= 0 ? stLvl(s, r.actor, "weak") : 0));
       if (n <= 0) continue;
       const d = hit(s, u, n, e.ignore === "shield", r);
-      if (d > 0) { ok = true; stat(s, `s${owner}:dealt`, d); emit(s, { sord: r.sord, side: owner, kind: "dealt", words: [], cats: ["dealt"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived }); } else stat(s, `s${owner}:blocked`);
+      if (d > 0) { ok = true; stat(s, `s${owner}:dealt`, d); if (P2.POS && r.actor >= 0) stat(s, `s${owner}:dealt:pos${r.actor % 3}`, d); emit(s, { sord: r.sord, side: owner, kind: "dealt", words: [], cats: ["dealt"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived }); } else stat(s, `s${owner}:blocked`);
     } else if (e.verb === "heal") {
       const d = Math.max(0, Math.min(base - P.HEALPEN, P.HP - s.hp[u]));
       s.hp[u] += d;
@@ -214,26 +214,36 @@ export function pickCards(s: St, side: Side, nums: number[]): number[] | null {
 }
 const countOf = (xs: string[]) => { const m: Record<string, number> = {}; for (const x of xs) m[x] = (m[x] ?? 0) + 1; return m; };
 /** 这句话能不能说：行动点、数字牌、卡组里的进阶词、自指词（含冷却） */
-export function canAfford(s: St, side: Side, cl: Sentence): { cost: number; nums: number[] } | null {
+/** 这句话要占卡组里的哪些进阶词（词位：第一个并免占张数） */
+function advFor(cl: Sentence, pos: number): string[] { const a = advWordsOf(cl); if (pos === 0 && P2.POS_WORD_FREE) { const i = a.indexOf("并"); if (i >= 0) a.splice(i, 1); } return a; }
+const posOf = (unit: number) => (P2.POS && unit >= 0 ? unit % 3 : -1);
+/** 起手最早时间：速位提前几秒 */
+export const windupFor = (cl: Sentence, unit: number) => Math.max(1, windup(cl) - (posOf(unit) === 2 && P2.POS3 === "speed" ? P2.POS_SPEED : 0));
+export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: number; nums: number[] } | null {
   if (!legal(cl)) return null;
-  const cost = sentenceCost(cl, s.rnd);
+  const pos = posOf(unit);
+  const cost = sentenceCost(cl, s.rnd, pos);
   if (cost > s.side[side].ap) return null;
   const dk = s.deck[side];
-  if (dk) for (const [w, n] of Object.entries(countOf(advWordsOf(cl)))) if ((dk[w] ?? 0) < n) return null;
-  for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) if (s.refc[side][k].filter((cd) => cd === 0).length < n) return null;
-  const nums = cl.flatMap(numsOf).filter((n) => n >= 2);
+  if (dk) for (const [w, n] of Object.entries(countOf(advFor(cl, pos)))) if ((dk[w] ?? 0) < n) return null;
+  for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) if (!(pos === 2 && P2.POS3 === "ref") && s.refc[side][k].filter((cd) => cd === 0).length < n) return null;   // 引用位：引用词不冷却
+  const bonus = pos === 1 ? P2.POS_NUM : 0;   // 数位：牌面 +N
+  const raw = cl.flatMap(numsOf);
+  const mx = Math.max(...raw, 0);
+  let used = false;
+  const nums = raw.map((n) => { if (P2.POS_NUM_ONE && bonus && n === mx && !used) { used = true; return n - bonus; } return P2.POS_NUM_ONE ? n : n - bonus; }).filter((n) => n >= 2);
   return pickCards(s, side, nums) === null ? null : { cost, nums };
 }
 const isStanding = (c: Clause) => (c.k === "when" && c.q.win.dir === "after") || c.k === "delay" || c.k === "ignore";
-export function declare(s: St, side: Side, unit: number, cl: Sentence, start = windup(cl)): boolean {
-  const a = canAfford(s, side, cl);
+export function declare(s: St, side: Side, unit: number, cl: Sentence, start = windupFor(cl, unit)): boolean {
+  const a = canAfford(s, side, cl, unit);
   if (!a) return false;
-  start = Math.max(start, windup(cl));
+  start = Math.max(start, windupFor(cl, unit));
   for (const i of pickCards(s, side, a.nums)!) s.side[side].cards[i].cd = 2;
   const dk = s.deck[side];
-  const adv = advWordsOf(cl);
+  const adv = advFor(cl, posOf(unit));
   if (dk) for (const w of adv) dk[w]--;
-  for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) { let m = n; for (let i = 0; i < s.refc[side][k].length && m > 0; i++) if (s.refc[side][k][i] === 0) { s.refc[side][k][i] = 2; m--; } }
+  if (!(posOf(unit) === 2 && P2.POS3 === "ref")) for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) { let m = n; for (let i = 0; i < s.refc[side][k].length && m > 0; i++) if (s.refc[side][k][i] === 0) { s.refc[side][k][i] = 2; m--; } }
   s.side[side].ap -= a.cost; s.done[unit] = true;
   const sord = s.sord++, ord = s.ord++;
   s.decl.push({ side, unit, cl, ord, sord, cost: a.cost, nums: a.nums, start });
@@ -247,6 +257,15 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
     stat(s, `s${side}:${c.k}`);
   }
   for (const w of adv) stat(s, `s${side}:w:${w}`);
+  const pos = posOf(unit);
+  if (pos >= 0) {
+    stat(s, `s${side}:pos${pos}`);
+    // 位置加成真的发挥了多少：词位少付的行动点 / 数位省下的数字牌 / 引用位免冷却的引用词与全程半价
+    if (pos === 0) stat(s, `s${side}:bon0`, Math.max(0, cl.length - 1) * Math.min(P2.POS_WORD, Math.max(P.AND, 0)));
+    if (pos === 1) stat(s, `s${side}:bon1`, cl.flatMap(numsOf).filter((n) => n >= 2).length - a.nums.length);
+    if (pos === 0 && P2.POS_WORD_FREE && advWordsOf(cl).includes("并")) stat(s, `s${side}:bon0`, 1);
+    if (pos === 2 && P2.POS3 === "ref") stat(s, `s${side}:bon2`, refKindsOf(cl).length);
+  }
   stat(s, `s${side}:len`, cl.length); stat(s, `s${side}:sent`); stat(s, `s${side}:ap`, a.cost); stat(s, `s${side}:start`, start);
   return true;
 }

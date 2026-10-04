@@ -7,6 +7,7 @@ import {
 import { type St, alive, unitsOf, canAfford } from "./interp";
 import type { Side } from "./ast";
 import { playbook } from "./playbook";
+import { P2 } from "./params";
 
 export type Rng = () => number;
 export function mulberry32(a: number): Rng {
@@ -88,7 +89,7 @@ export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode
   const foes = unitsOf((1 - side) as Side).filter((x) => alive(s, x));
   const mine = unitsOf(side).filter((x) => alive(s, x));
 
-  const maxN = Math.max(1, ...s.side[side].cards.filter((c) => c.cd === 0).map((c) => c.v));
+  const maxN = Math.max(1, ...s.side[side].cards.filter((c) => c.cd === 0).map((c) => c.v)) + (P2.POS && u % 3 === 1 ? P2.POS_NUM : 0);
   const e: Env = { s, side, unit: u, r, maxN, foes, mine };
   const out: Sentence[] = [];
   const seen = new Set<string>();
@@ -96,7 +97,7 @@ export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode
   const mineStand = s.stand.filter((x) => x.owner === side).map((x) => JSON.stringify(x.c));
   const pending = s.decl.filter((d) => d.side === side).flatMap((d) => d.cl).map((c) => JSON.stringify(c));
   const dup = (cl: Sentence) => cl.some((c) => (c.k === "ignore" || c.k === "when" || c.k === "delay") && (c.k === "ignore" ? s.stand.some((x) => x.owner === side && x.c.k === "ignore") || s.decl.some((d) => d.side === side && d.cl.some((z) => z.k === "ignore")) : mineStand.includes(JSON.stringify(c)) || pending.includes(JSON.stringify(c))));
-  const add = (cl: Sentence) => { const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl)) { seen.add(key); out.push(cl); } };
+  const add = (cl: Sentence) => { const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl, u)) { seen.add(key); out.push(cl); } };
   basics(e).forEach(add);
   if (mode === "playbook") playbook(e).forEach(add);
   else if (mode === "plain") playbook(e, "atkdef").forEach(add);

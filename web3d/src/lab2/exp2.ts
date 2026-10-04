@@ -68,6 +68,9 @@ const effRows = Object.entries(eff).filter(([, v]) => v.g >= 25).sort((a, b) => 
 md += "\n手册句效率（用过它的对局里该方胜率；样本≥25局）：\n" + effRows.map((r) => "- " + r).join("\n") + "\n";
 md += `先手方胜率（越接近 50% 越不受先后手影响）：${pct(firstWon / Math.max(1, decided))}
 `;
+const posLines = players.map((p, i) => { const a = agg[i], sent = Math.max(1, a.sent ?? 0); const d = [0, 1, 2].map((k) => a[`dealt:pos${k}`] ?? 0), dt = Math.max(1, d[0] + d[1] + d[2]);
+  return `- ${p.name}：三个位置各说了 ${[0, 1, 2].map((k) => pct((a[`pos${k}`] ?? 0) / sent)).join("/")}，各自打出伤害 ${d.map((x) => pct(x / dt)).join("/")}；加成发挥 词位少付${((a.bon0 ?? 0) / games[i]).toFixed(1)}点AP、数位省${((a.bon1 ?? 0) / games[i]).toFixed(1)}张牌、引用位免冷却${((a.bon2 ?? 0) / games[i]).toFixed(1)}词（每局）`; });
+md += "\n位置使用（词位/数位/第三位）：\n" + posLines.join("\n") + "\n";
 const spread = Math.max(...tot) - Math.min(...tot);
 md += `\n总胜率极差 ${pct(spread)}（最高 ${players[tot.indexOf(Math.max(...tot))].name} ${pct(Math.max(...tot))}，最低 ${players[tot.indexOf(Math.min(...tot))].name} ${pct(Math.min(...tot))}）\n`;
 appendFileSync(`${OUT}/迭代日志.md`, md);
