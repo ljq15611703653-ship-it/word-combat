@@ -121,6 +121,19 @@ export class Match {
     this.flip(); return true;
   }
   pass(unit: number) { passUnit(this.s, unit); this.flip(); }
+  /** 教学/脚本用：指定电脑方（1）的某个随从宣告 cl。成功返回 true，并记入历史 */
+  foeDeclare(unit: number, cl: Sentence, start: number): boolean {
+    if (this.s.done[unit] || !alive(this.s, unit)) return false;
+    if (!declare(this.s, 1, unit, cl, start)) return false;
+    const d = this.s.decl[this.s.decl.length - 1];
+    this.history.push({ rnd: this.s.rnd, side: 1, unit, text: sText(cl), start: d.start });
+    this.flip(); return true;
+  }
+  /** 撤回用快照：宣告阶段（结算前）可整体回退 */
+  snap(): unknown { return structuredClone({ s: this.s, history: this.history, usedAdv: this.usedAdv }); }
+  restore(snap: unknown) { const o = structuredClone(snap) as { s: St; history: HistoryRec[]; usedAdv: Record<string, number> }; this.s = o.s; this.history = o.history; this.usedAdv = o.usedAdv; }
+  /** 教学场景用：某个随从直接缺席（血量 0、记为已倒下，不参与胜负） */
+  removeUnit(u: number) { this.s.hp[u] = 0; this.s.dead[u] = true; this.s.done[u] = true; }
   /** 我方剩下的随从全部不出手（「结束本轮」） */
   passRest() { for (const u of unitsOf(0)) if (this.canAct(u)) passUnit(this.s, u); this.s.turn = 1; }
   minStart(cl: Sentence, unit: number) { return windupFor(cl, unit, this.s); }
