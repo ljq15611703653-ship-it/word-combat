@@ -38,7 +38,6 @@ export class VfxCastPlayer implements CastPlayer {
   private temps: HTMLElement[] = [];
   private lifted: HTMLElement[] = [];
   private hinted = new Set<string>();
-  private playing = false;
   /** 给测试用：最近一次播放的统计 */
   stats = { groups: 0, sentences: 0, ms: 0 };
 
@@ -49,7 +48,7 @@ export class VfxCastPlayer implements CastPlayer {
   async play(events: ReplayEvent[], view: BattleView): Promise<void> {
     this.view = view; this.stage = view.stageEl;
     const t0 = performance.now();
-    this.skipS = false; this.skipA = false; this.hinted.clear(); this.playing = true;
+    this.skipS = false; this.skipA = false; this.hinted.clear();
     const mode = modeOf(view.speed());
     this.camEl = this.stage.querySelector<HTMLElement>(".cam");
     this.cam = { s: 1, tx: 0, ty: 0 }; this.applyCam();
@@ -57,7 +56,7 @@ export class VfxCastPlayer implements CastPlayer {
       for (const e of events) this.apply(e);
       view.clock(null);
       await new Promise((r) => setTimeout(r, mode === "off" ? 120 : 0));
-      this.playing = false; return;
+      return;
     }
     this.layer = document.createElement("div"); this.layer.className = "vx-layer"; this.camEl.appendChild(this.layer);
     const onKey = (e: KeyboardEvent) => { if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); this.skip(); } else if (e.key === "Escape") this.skipAll(); };
@@ -86,7 +85,7 @@ export class VfxCastPlayer implements CastPlayer {
       removeEventListener("keydown", onKey); this.stage.removeEventListener("pointerdown", onDown);
       this.cleanup(); this.layer.remove();
       this.cam = { s: 1, tx: 0, ty: 0 }; this.applyCam();
-      view.clock(null); this.playing = false;
+      view.clock(null);
       this.stats.ms = performance.now() - t0;
     }
   }
@@ -207,7 +206,7 @@ export class VfxCastPlayer implements CastPlayer {
     shell.style.opacity = "0";
     const shellIn = this.A(shell, [{ opacity: 0, transform: px({ x: g.cx - g.w / 2, y: g.cy - g.h / 2 + g.h * 0.12 }, " scale(.85)") }, { opacity: 1, transform: px({ x: g.cx - g.w / 2, y: g.cy - g.h / 2 }, " scale(1)") }], 300);
     // 3 飞到盔甲壳旁
-    const slots = this.slots(toks, g);
+    const slots = this.slots(toks, g, src);
     await Promise.all(toks.map((t, i) => this.flyTo(t, slots[i], 340, i * 45, sty, c, grpEl)));
     await shellIn;
     // 4 按职业拼装
@@ -220,6 +219,17 @@ export class VfxCastPlayer implements CastPlayer {
     await this.deliver(seg, f, toks, sty, c, c2, grpEl);
     // 8 归位
     await this.returnHome(toks, shell, g, grpEl);
+  }
+
+  /** 词牌飞回句子条，壳收起 */
+  private async returnHome(toks: Tok[], shell: HTMLElement, g: ReturnType<VfxCastPlayer["geo"]>, grpEl: HTMLElement) {
+    void g;
+    for (const t of toks) t.el.classList.remove("fired");
+    const sty = toks.length ? toks[0].el.className.match(/s-(\w+)/)?.[1] ?? "bing" : "bing";
+    void this.A(shell, [{ opacity: 1 }, { opacity: 0 }], 260);
+    await Promise.all(toks.map((t, i) => { const from = t.pos; t.pos = { ...t.home }; return this.A(t.el, [{ transform: px(from) + " scale(1.05)" }, { transform: px({ x: (from.x + t.home.x) / 2, y: Math.min(from.y, t.home.y) - 12 }) + " scale(1.1)", offset: 0.5 }, { transform: px(t.home) + " scale(1)" }], 300, { delay: i * 25, easing: "cubic-bezier(.4,0,.2,1)" }); }));
+    void sty; void grpEl;
+    await Promise.all(toks.map((t) => this.A(t.el, [{ opacity: 1 }, { opacity: 0 }], 90)));
   }
 
   // ---- 词牌：从随从面板的句子条里拿起
@@ -265,14 +275,14 @@ export class VfxCastPlayer implements CastPlayer {
       return { el, home: homes[i], pos: { ...homes[i] }, w: el.offsetWidth, h: el.offsetHeight, text: w };
     });
   }
-  private slots(toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>): Pt[] {
+  private slots(toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, u: number): Pt[] {
     const maxRow = Math.max(g.w * 1.25, 150), gap = 12;
     const rows: Tok[][] = [[]]; let rw = 0;
     for (const t of toks) { if (rw + t.w > maxRow && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(t); rw += t.w + gap; }
-    const rh = 30, top = g.cy - (rows.length * rh) / 2 + 2;
+    const rh = 30, top = g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, W = this.stage.clientWidth, off = (u < 3 ? 1 : -1) * g.w * 0.28;
     const out = new Map<Tok, Pt>();
     rows.forEach((row, ri) => {
-      const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = g.cx - tw / 2;
+      const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = Math.max(10, Math.min(W - 10 - tw, g.cx + off - tw / 2));
       for (const t of row) { out.set(t, { x, y: top + ri * rh }); x += t.w + gap; }
     });
     return toks.map((t) => out.get(t)!);
@@ -300,7 +310,7 @@ export class VfxCastPlayer implements CastPlayer {
       const byRow = new Map<number, Tok[]>(); toks.forEach((t, i) => { const k = rowY[i]; byRow.set(k, [...(byRow.get(k) ?? []), t]); });
       const ps: Promise<void>[] = [];
       for (const row of byRow.values()) {
-        const tw = row.reduce((a, t) => a + t.w, 0) + 2 * (row.length - 1); let x = g.cx - tw / 2; let k = 0;
+        const tw = row.reduce((a, t) => a + t.w, 0) + 2 * (row.length - 1); const rc = (row[0].pos.x + row[row.length - 1].pos.x + row[row.length - 1].w) / 2; let x = rc - tw / 2; let k = 0;
         for (const t of row) {
           const to = { x, y: t.pos.y }; x += t.w + 2;
           const from = t.pos; t.pos = to;

@@ -51,6 +51,7 @@ export interface CastPlayer {
   play(events: ReplayEvent[], view: BattleView): Promise<void>;
   /** 立刻跳到结尾 */
   skip(): void;
+  skipAll?(): void;
 }
 export type { Match, Candidate, Sentence, ReplayEvent };
 
