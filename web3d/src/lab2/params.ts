@@ -1,3 +1,4 @@
+import { P } from "../lab/rules";
 // lab2 的额外参数（lab/rules.ts 的 P 继续用于血量、行动点、过热、数字牌）。环境变量 LAB2='{"BUDGET":18}' 可覆盖
 export const P2 = {
   BUDGET: 18,                 // 卡组预算
@@ -27,7 +28,20 @@ export const ADV: Record<string, { price: number; max: number }> = {
   // 引用量词：把引用到的量放进数字位置（追击、吸血、攒爆…）。正常写数字不收费
   累计: { price: 3, max: 2 }, 次数: { price: 3, max: 2 }, 词数: { price: 2, max: 2 }, 段数: { price: 2, max: 1 },
 };
+// 环境变量 LAB2 里的 ADVO 可以改某个词的价格/张数，例如 {"ADVO":{"累计":{"price":8,"max":1}}}
+const ADVO = (P2 as unknown as { ADVO?: Record<string, { price?: number; max?: number }> }).ADVO;
+if (ADVO) for (const [w, o] of Object.entries(ADVO)) ADV[w] = { ...ADV[w], ...o };
 export const ADV_WORDS = Object.keys(ADV);
+// ---- 运行中切换参数（自动调参用）：先恢复默认（含环境变量里的覆盖），再套上 rules ----
+const D_P = JSON.parse(JSON.stringify(P)), D_P2 = { ...P2 }, D_ADV = JSON.parse(JSON.stringify(ADV));
+export interface Rules { P?: Record<string, unknown>; P2?: Record<string, unknown>; ADV?: Record<string, { price?: number; max?: number }> }
+export function applyRules(r: Rules = {}) {
+  Object.assign(P, JSON.parse(JSON.stringify(D_P))); Object.assign(P2, D_P2);
+  for (const w of Object.keys(D_ADV)) ADV[w] = { ...D_ADV[w] };
+  if (r.P) Object.assign(P, JSON.parse(JSON.stringify(r.P)));
+  if (r.P2) Object.assign(P2, r.P2);
+  if (r.ADV) for (const [w, o] of Object.entries(r.ADV)) ADV[w] = { ...ADV[w], ...o };
+}
 export type Deck = Record<string, number>;
 export const deckCost = (d: Deck) => Object.entries(d).reduce((a, [w, n]) => a + (ADV[w]?.price ?? 0) * n, 0);
 export const deckOk = (d: Deck) => deckCost(d) <= P2.BUDGET && Object.entries(d).every(([w, n]) => n >= 0 && n <= (ADV[w]?.max ?? 0));

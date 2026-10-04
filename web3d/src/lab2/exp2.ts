@@ -22,7 +22,7 @@ const players: { name: string; deck: Deck; cfg: AiCfg }[] = [
   { name: "禁令", deck: { 不得: 2, 收紧: 2, 至多: 2, 移除: 1 }, cfg: cfg("playbook") },
   { name: "引用", deck: { 定时: 1, 次数: 1, 累计: 1, 收紧: 2, 移除: 1 }, cfg: cfg("playbook") },
   { name: "状态", deck: { 易伤: 2, 衰弱: 2, 灼烧: 2, 并: 2 }, cfg: cfg("playbook") },
-  { name: "累计", deck: { 累计: 2, 易伤: 2, 段数: 1, 定时: 1, 并: 1 }, cfg: cfg("playbook") },
+  { name: "累计", deck: process.env.ACC0 ? { 定时: 1, 移除: 1, 易伤: 2, 并: 2 } : process.env.ACC1 ? { 累计: 1, 易伤: 2, 并: 2 } : { 累计: 2, 易伤: 2, 段数: 1, 定时: 1, 并: 1 }, cfg: cfg("playbook") },
   { name: "混合", deck: { 不得: 1, 并: 2, 易伤: 1, 定时: 1, 次数: 1, 移除: 1 }, cfg: cfg("playbook") },
 ];
 const pool = new Pool(16);
@@ -67,6 +67,8 @@ players.forEach((p, i) => {
 });
 const effRows = Object.entries(eff).filter(([, v]) => v.g >= 25).sort((a, b) => b[1].g - a[1].g).slice(0, 14).map(([k, v]) => `${k}：${v.g}局用过，用过时胜率${pct(v.w / v.g)}`);
 md += "\n手册句效率（用过它的对局里该方胜率；样本≥25局）：\n" + effRows.map((r) => "- " + r).join("\n") + "\n";
+md += `每局最大单次伤害（平均，按流派）：${players.map((p, i) => `${p.name} ${((agg[i].maxhit ?? 0) / games[i]).toFixed(1)}`).join("；")}
+`;
 md += `先手方胜率（越接近 50% 越不受先后手影响）：${pct(firstWon / Math.max(1, decided))}
 `;
 const posLines = players.map((p, i) => { const a = agg[i], sent = Math.max(1, a.sent ?? 0); const d = [0, 1, 2].map((k) => a[`dealt:pos${k}`] ?? 0), dt = Math.max(1, d[0] + d[1] + d[2]);

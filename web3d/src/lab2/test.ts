@@ -102,7 +102,7 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
   check(cnt(cat("dealt")) === 3 && cnt(cat("taken")) === 2, "我方：造成 3、受到 2，分开统计"); }
 // 21 合法性与全体效果的价格
 { const s = fresh(); const bad = [whenever("foe", cat("atk"), 99, [dmg(1, { t: "src" })], 1, 2)]; check(canAfford(s, 0, bad) === null, "「以后全程」不合法（全程只能读已发生的事）");
-  const ok = [act(dmg(2, { t: "allFoe" }))]; const s2 = fresh(); s2.side[0].ap = 1; check(canAfford(s2, 0, ok) === null, "打全体：比单体多 1 点行动点（1 点不够）"); s2.side[0].ap = 2; check(canAfford(s2, 0, ok) !== null, "打全体：2 点够"); }
+  const ok = [act(dmg(2, { t: "some", n: 3, side: "foe" }))]; const s2 = fresh(); s2.side[0].cards.forEach((c) => (c.cd = 2)); check(canAfford(s2, 0, ok) === null, "选择 3 个目标：没有数字牌就写不出（目标个数占数字牌）"); const s3 = fresh(); check(canAfford(s3, 0, ok) !== null, "选择 3 个目标：有牌就能写"); const one = [act(dmg(1, { t: "some", n: 1, side: "foe" }))]; check(canAfford(s2, 0, one) !== null, "选择 1 个目标：免费"); }
 // 22 三个位置（LAB2.POS 开启时）：词位并更便宜、数位数字更宽、引用位引用不冷却且全程半价
 { const { P2 } = await import("./params"); const oldPos = P2.POS, oldAnd = P.AND; P2.POS = 1; P.AND = 1;
   const two = [act(dmg(1, unit(3))), act(dmg(1, unit(4)))];

@@ -29,7 +29,8 @@ export type Amt = number | { q: Query; mult: number };
 export type Tg =
   | { t: "unit"; u: number }
   | { t: "src" }                                         // 触发这条长期句子的那个随从
-  | { t: "lowFoe" } | { t: "lowMe" } | { t: "allMe" } | { t: "allFoe" };
+  | { t: "lowFoe" } | { t: "lowMe" } | { t: "some"; n: number; side: "me" | "foe" }   // 选择 n 个（血最低的 n 个）；n 是数字，要写出来、占数字牌
+  | { t: "allMe" } | { t: "allFoe" };                                                   // 旧写法，等同于选择 3 个（三个随从）
 
 export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield" }
 export type StatusKind = "burn" | "vuln" | "weak";
@@ -96,20 +97,23 @@ export function catsOf(c: Clause): string[] {
   else out.add("struct");
   return [...out];
 }
+/** 目标个数：选择 n 个就是 n；旧「全体」= 3；其余 = 1（免费） */
+export const tgN = (t: Tg): number => (t.t === "some" ? t.n : t.t === "allMe" || t.t === "allFoe" ? 3 : 1);
+const effNums = (e: Eff): number[] => [...amNums(e.n), tgN(e.tg)];
 const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n >= 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
 /** 数字牌需求：所有 ≥2 的数字（Amt 引用量里的窗口 N、倍率也算） */
 export function numsOf(c: Clause): number[] {
   switch (c.k) {
-    case "act": return amNums(c.eff.n);
-    case "when": return [c.q.win.n === 99 ? 1 : c.q.win.n, c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap((e) => amNums(e.n))];
-    case "delay": return [c.wait, ...c.effs.flatMap((e) => amNums(e.n))];
+    case "act": return effNums(c.eff);
+    case "when": return [c.q.win.n === 99 ? 1 : c.q.win.n, c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap(effNums)];
+    case "delay": return [c.wait, ...c.effs.flatMap(effNums)];
     case "status": return [c.lvl, c.dur];
     case "ignore": return [c.win];
     default: return [];
   }
 }
 export function clauseCost(c: Clause): number {
-  const ec = (x: Eff) => (x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (x.tg.t === "allMe" || x.tg.t === "allFoe" ? P2.AOE : 0);
+  const ec = (x: Eff) => (x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (tgN(x.tg) > 1 ? P2.AOE * (tgN(x.tg) - 1) : 0);
   switch (c.k) {
     case "act": return ec(c.eff);
     case "when": return P.STAND + (c.q.obj.t === "cat" && c.q.obj.c === "any" ? P.ANYCLS : 0);
@@ -180,7 +184,7 @@ const objText = (o: Obj) => o.t === "word" ? `「${o.w}」` : o.t === "cat" ? (O
 const whoText = (w: Who) => (w === "me" ? "我方" : "对方");
 const winText = (w: Win) => `${w.dir === "before" ? "之前" : "以后"}${w.n === 99 ? "全程" : w.n}${w.unit === "round" ? "轮" : "句"}`;
 const aggText = (a: Query["agg"]) => ({ count: "次数", sum: "累计", len: "词数", segs: "段数" }[a]);
-const tgText = (t: Tg) => t.t === "unit" ? `随从${t.u}` : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
+const tgText = (t: Tg) => t.t === "some" ? `选择${t.n}个${t.side === "foe" ? "敌方" : "我方"}随从` : t.t === "unit" ? `随从${t.u}` : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
 const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.who)}${objText(a.q.obj)}${aggText(a.q.agg)}×${a.mult}`);
 const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}`;
 export function clauseText(c: Clause): string {

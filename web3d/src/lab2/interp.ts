@@ -147,6 +147,7 @@ function targets(s: St, owner: Side, verb: Eff["verb"] | "status", t: Tg, r: Run
     case "lowFoe": case "lowMe": return [lowest(s, want)].filter((u) => u >= 0);
     case "allMe": return unitsOf(owner).filter((u) => alive(s, u));
     case "allFoe": return unitsOf(foe).filter((u) => alive(s, u));
+    case "some": { const side = t.side === "foe" ? foe : owner; return unitsOf(side).filter((u) => alive(s, u)).sort((a, b) => s.hp[a] - s.hp[b]).slice(0, t.n); }
   }
 }
 function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
@@ -178,7 +179,8 @@ function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
       if (n > 0) n = Math.max(0, n + stLvl(s, u, "vuln") - (r.actor >= 0 ? stLvl(s, r.actor, "weak") : 0));
       if (n <= 0) continue;
       const d = hit(s, u, n, e.ignore === "shield", r);
-      if (d > 0) { ok = true; stat(s, `s${owner}:dealt`, d); if (P2.POS && r.actor >= 0) stat(s, `s${owner}:dealt:pos${r.actor % 3}`, d); emit(s, { sord: r.sord, side: owner, kind: "dealt", words: [], cats: ["dealt"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived }); } else stat(s, `s${owner}:blocked`);
+      if (d > 0) { ok = true; stat(s, `s${owner}:dealt`, d); if (P2.POS && r.actor >= 0) stat(s, `s${owner}:dealt:pos${r.actor % 3}`, d);
+        { const mk = `s${owner}:maxhit`; s.stats[mk] = Math.max(s.stats[mk] ?? 0, d); } emit(s, { sord: r.sord, side: owner, kind: "dealt", words: [], cats: ["dealt"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived }); } else stat(s, `s${owner}:blocked`);
     } else if (e.verb === "heal") {
       const d = Math.max(0, Math.min(base - P.HEALPEN, P.HP - s.hp[u]));
       s.hp[u] += d;
