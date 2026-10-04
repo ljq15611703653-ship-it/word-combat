@@ -14,6 +14,7 @@ const { mulberry32 } = await import("./gen");
 type Rules = import("./params").Rules;
 type Task = import("./worker").Task;
 
+const CONFIRM = +(process.env.CONFIRM ?? 0);
 const ITERS = +(process.env.ITERS ?? 20), LAMBDA = +(process.env.LAMBDA ?? 4), ND = +(process.env.ND ?? 64), K = +(process.env.K ?? 24), SEED = +(process.env.SEED ?? 1);
 const CFG = { k: 8, depth: 2, w: [1, 0.7, 0.5], passBias: 0, mode: "playbook" as const, wAp: 0.3, wCard: 0.4, recBonus: 0.5 };
 
@@ -134,8 +135,16 @@ async function main() {
       const mu = mutate(best, r); const m = await evaluate(pool, mu.cfg, seed);
       if (!cand || m.score < cand.m.score) cand = { ...mu, m };
     }
-    const ok = cand && cand.m.score < parent.score - 0.004;
-    log(`第${it}轮 ${((Date.now() - t0) / 60000).toFixed(1)}分｜父代 ${fmt(parent)}｜最好子代 ${cand ? fmt(cand.m) : "-"}｜${ok ? "采纳：" + cand!.changes.join("；") : "不采纳"}`);
+    // 复测确认：第一阶段赢了才用 CONFIRM 批新种子，父代与子代各量一遍，三批平均后仍更好才采纳（防止追噪声）
+    let ok = !!cand && cand.m.score < parent.score - 0.004, confirmNote = "";
+    if (ok && CONFIRM > 0) {
+      let ps = parent.score, cs = cand!.m.score;
+      for (let c = 0; c < CONFIRM; c++) { const sd = 5000 + it * 10 + c; ps += (await evaluate(pool, best, sd)).score; cs += (await evaluate(pool, cand!.cfg, sd)).score; }
+      ps /= CONFIRM + 1; cs /= CONFIRM + 1; ok = cs < ps - 0.01;
+      confirmNote = `｜复测均分 父${ps.toFixed(3)} 子${cs.toFixed(3)}`;
+      if (ok) cand!.m = { ...cand!.m, score: cs };
+    }
+    log(`第${it}轮 ${((Date.now() - t0) / 60000).toFixed(1)}分｜父代 ${fmt(parent)}｜最好子代 ${cand ? fmt(cand.m) : "-"}${confirmNote}｜${ok ? "采纳：" + cand!.changes.join("；") : "不采纳"}`);
     if (ok) { best = cand!.cfg; bm = cand!.m; history.push({ it, changes: cand!.changes, before: fmt(parent), after: fmt(cand!.m) }); writeFileSync(`${OUT}/best.json`, JSON.stringify({ cfg: best, rules: toRules(best), metrics: bm, history }, null, 1)); }
   }
   writeFileSync(`${OUT}/best.json`, JSON.stringify({ cfg: best, rules: toRules(best), metrics: bm, history }, null, 1));
