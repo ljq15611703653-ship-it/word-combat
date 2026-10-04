@@ -291,6 +291,8 @@ export interface Legal {
   complete: boolean;
   /** 语法上接下来需要什么（给人看的一句） */
   expect: string;
+  /** 语法上此刻能接的词（含付不起的；手牌条只显示这些） */
+  struct: Set<Token>;
   ast?: Sentence;
 }
 /** 全词表（palette 用）：按此刻的局面列出所有可能出现的词 */
@@ -336,7 +338,7 @@ function numVals(spec: { c: "NUM"; min?: number; cap?: "foe" | "me" }, ctx: Ctx)
 /** 缺省补全：把一个未完成的前缀补成「说得出口」的完整句（找不到就返回第一个补出来的句子和它的拒绝原因）。
  *  数字位置按从小到大试（有预算上限），其余位置取最便宜的默认。nextLegal 用它判断「这个词放进去还说得出口吗」 */
 function completeBest(prefix: Token[], ctx: Ctx): { ast: Sentence | null; reason: string | null } {
-  let budget = 40, first: { ast: Sentence; reason: string | null } | null = null;
+  let budget = 40; let first = null as { ast: Sentence; reason: string | null } | null;
   const rec = (t0: Token[]): Sentence | null => {
     const t = t0.slice();
     for (let n = 0; n < 80; n++) {
@@ -448,7 +450,7 @@ export function diagnose(ast: Sentence, ctx: Ctx, forTok?: Token): string | null
 export function nextLegal(prefix: Token[], ctx: Ctx): Legal {
   const r = parseTokens(prefix);
   const ok = new Set<Token>(), why = new Map<Token, string>();
-  if (r.err) { for (const t of U) why.set(t, r.err); return { ok, why, canEnd: false, endWhy: r.err, complete: false, expect: r.err }; }
+  if (r.err) { for (const t of U) why.set(t, r.err); return { ok, why, canEnd: false, endWhy: r.err, complete: false, expect: r.err, struct: new Set() }; }
   const specs = r.opts;
   const struct = expand(specs, ctx, U);
   const expect = expectText(specs, r.complete);
@@ -456,7 +458,7 @@ export function nextLegal(prefix: Token[], ctx: Ctx): Legal {
     if (!struct.has(t)) {
       // 目标：对方/我方不对、已倒下
       if (isUnitTok(t) && specs.some((sp) => typeof sp !== "string" && sp.c === "TGT")) {
-        const u = +t[1];
+        
         const sp = specs.find((x) => typeof x !== "string" && x.c === "TGT") as { c: "TGT"; side: "foe" | "me" };
         why.set(t, `这里要选${sp.side === "foe" ? "敌方" : "我方"}随从`); continue;
       }
@@ -471,7 +473,7 @@ export function nextLegal(prefix: Token[], ctx: Ctx): Legal {
   let canEnd = false, endWhy: string | undefined;
   if (r.complete && r.ast) { endWhy = diagnose(r.ast, ctx) ?? undefined; canEnd = !endWhy; }
   else endWhy = prefix.length ? `句子还没写完。${expect}` : "先点一个词开始";
-  return { ok, why, canEnd, endWhy, complete: r.complete, expect, ast: r.ast ?? undefined };
+  return { ok, why, canEnd, endWhy, complete: r.complete, expect, struct, ast: r.ast ?? undefined };
 }
 /** 句子能不能付得起（= 引擎 canAfford）。canEnd 与它一致，测试里对拍 */
 export const affordable = (ast: Sentence, ctx: Ctx) => !!canAfford(ctx.s, ctx.side, ast, ctx.unit);

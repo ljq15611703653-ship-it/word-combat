@@ -3,7 +3,7 @@ import { Match, P2, configureRules, setUnitNames, type ReplayEvent } from "./eng
 import { KW_TIP } from "./setup";
 import { STYLES, styleOf, type StyleDef } from "./styles";
 import { loadArt } from "./art";
-import { MenuInput } from "./inputMenu";
+import { SwitchInput } from "./composer/composerInput";
 import { SimpleCastPlayer } from "./cast";
 import type { BattleView, CastPlayer, InputMode, Settings } from "./types";
 
@@ -23,7 +23,7 @@ export class Battle {
   m: Match;
   root: HTMLElement;
   stage!: HTMLElement;
-  input: InputMode = new MenuInput();
+  input: InputMode = new SwitchInput();
   cast: CastPlayer = new SimpleCastPlayer();
   private disp = { hp: Array(6).fill(0) as number[], sh: Array(6).fill(0) as number[] };
   private typing = new Map<number, string>();
@@ -68,7 +68,7 @@ export class Battle {
       <div class="center"><div class="clock" hidden></div><div class="banner" hidden><b></b><span></span></div></div>
       <div class="hud"></div>
       <div class="acts"><button class="bt skip" data-a="skip" hidden>跳过动画 ⏭</button><button class="bt main" data-a="main"></button><div class="menuwrap"><button class="bt" data-a="menu">菜单 ☰</button><div class="pop" hidden>
-        <button data-a="speed">动画速度：<b class="spd"></b></button><button data-a="auto">电脑代打：<b class="autov"></b></button><button data-a="rules">规则说明</button><button data-a="exit">退出对局</button></div></div></div>
+        <button data-a="inmode">输入方式：<b class="inm"></b></button><button data-a="speed">动画速度：<b class="spd"></b></button><button data-a="auto">电脑代打：<b class="autov"></b></button><button data-a="rules">规则说明</button><button data-a="exit">退出对局</button></div></div></div>
       <div class="status" aria-live="polite"></div>`;
     r.appendChild(st);
     const mk = (u: number) => {
@@ -131,6 +131,7 @@ export class Battle {
     const labels = { none: "…", end: "结束宣告", resolve: "结算 ▶", next: "下一轮 ▶", wait: "电脑出手中…" } as const;
     b.textContent = labels[this.mainState]; b.disabled = this.mainState === "none" || this.mainState === "wait"; b.classList.toggle("go", this.mainState === "resolve" || this.mainState === "next");
     this.stage.querySelector<HTMLElement>(".spd")!.textContent = ["慢", "正常", "快", "极速"][this.speedIdx];
+    { const si = this.input as SwitchInput; this.stage.querySelector<HTMLElement>(".inm")!.textContent = si.mode === "composer" ? "逐词拼句" : "句子菜单"; }
     this.stage.querySelector<HTMLElement>(".autov")!.textContent = this.auto ? "开" : "关";
   }
   private setStatus(t: string) { this.stage.querySelector<HTMLElement>(".status")!.textContent = t; }
@@ -177,6 +178,7 @@ export class Battle {
       else if (this.mainState === "resolve" || this.mainState === "next") this.waitBtn?.();
     }
     else if (a === "skip") this.cast.skip();
+    else if (a === "inmode") { const si = this.input as SwitchInput; si.mode = si.mode === "composer" ? "menu" : "composer"; this.renderMain(); }
     else if (a === "speed") { this.speedIdx = (this.speedIdx + 1) % 4; this.renderMain(); }
     else if (a === "auto") { this.auto = !this.auto; this.renderMain(); if (this.auto) { this.closeInput(); this.waitHuman?.("act"); } }
     else if (a === "rules") this.showRules();
