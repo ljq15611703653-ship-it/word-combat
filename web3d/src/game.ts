@@ -34,8 +34,8 @@ function btn(text: string, cls = "", on?: (e: MouseEvent) => void) {
   return b;
 }
 
-interface Settings { cls: NR.Cls; words: Record<string, number>; kws: string[]; hp: number[]; foe: NR.Cls | "随机" }
-const DEFAULT: Settings = { cls: "并", words: { ...NR.PRESETS["并"].words }, kws: [...NR.PRESETS["并"].kws], hp: [NR.W.HP, NR.W.HP, NR.W.HP], foe: "随机" };
+interface Settings { cls: NR.Cls; words: Record<string, number>; kws: string[]; hp: number[]; foe: NR.Cls | "随机"; limit: number }
+const DEFAULT: Settings = { cls: "并", words: { ...NR.PRESETS["并"].words }, kws: [...NR.PRESETS["并"].kws], hp: [NR.W.HP, NR.W.HP, NR.W.HP], foe: "随机", limit: 0 };
 
 export interface GameCtx {
   cards: UnitCard[];
@@ -134,7 +134,7 @@ export class Game {
       this.elPop.hidden = true;
       this.elDrawer.append(this.elDecl, this.elLog);
       this.elDrawer.hidden = true;
-      if (this.topLayout) this.float.append(this.elRound, this.elMenu, this.elDock, this.elPop, this.elDrawer); else this.float.append(this.elPop, this.elDrawer);
+      if (this.topLayout) this.float.append(this.elRound, this.elLimit, this.elMenu, this.elDock, this.elPop, this.elDrawer); else this.float.append(this.elPop, this.elDrawer);
       this.elPop.addEventListener("animationend", () => this.elPop.classList.remove("nudge"));
       document.body.append(this.root, this.float, this.overlay);
       window.addEventListener("keydown", (e) => {
@@ -276,6 +276,10 @@ export class Game {
       const r4 = h("div", "foe-row");
       for (const f of ["随机", ...NR.CLASSES] as (NR.Cls | "随机")[]) r4.append(btn(f === "随机" ? "随机" : NR.CLASS_NAME[f], S.foe === f ? "on" : "", () => { S.foe = f; render(); }));
       s4.append(r4);
+      s4.append(h("h3", "", "每轮宣告的时间限制"));
+      const r5 = h("div", "foe-row");
+      for (const sec of [0, 30, 60, 90]) r5.append(btn(sec ? `${sec} 秒` : "不限", (S.limit ?? 0) === sec ? "on" : "", () => { S.limit = sec; render(); }));
+      s4.append(r5);
       const bad = NR.deckProblem(S.words, S.kws) || NR.hpProblem(S.hp, NR.W.POOL);
       const foot = h("div", "foot");
       foot.append(h("span", "err", bad), btn("怎么玩", "ghost", () => this.showRules()), btn("退出对局模式", "ghost", () => { this.overlay.hidden = true; this.close(); }));
@@ -310,6 +314,7 @@ export class Game {
     const theirs = NR.presetDeck(foe, true);
     this.M = new Match();
     this.M.start(mine, theirs, Math.floor(Math.random() * 1e9), true, false, { wipe: true });
+    this.setTimeLimit(S.limit ?? 0);
     this.token++;
     this.ui = "idle";
     this.elLog.innerHTML = "";
@@ -327,6 +332,38 @@ export class Game {
     allow: (tok) => this.gate(tok.t === "n" ? "num" : "word", { value: tok.v }),
   });
   private editPlate: SentencePanel | null = null;
+  // ---- 每轮宣告时间限制（接口）：limit 秒 / 轮，0 = 不限。时间到了触发 onTimeout()，子类（联机）可以覆盖。
+  protected limit = 0;
+  protected deadline = 0;
+  protected deadlineRnd = -1;
+  protected expiredRnd = -1;
+  protected elLimit = h("div", "gm-limit");
+  private limitTimer = 0;
+  setTimeLimit(sec: number) { this.limit = Math.max(0, sec | 0); this.deadlineRnd = -1; this.expiredRnd = -1; this.tickLimit(); }
+  /** 这一轮的倒计时从第一次轮到我宣告时开始 */
+  protected armLimit() {
+    if (!this.limit || this.deadlineRnd === this.M.rnd || this.expiredRnd === this.M.rnd) return;
+    this.deadlineRnd = this.M.rnd; this.deadline = Date.now() + this.limit * 1000;
+    if (!this.limitTimer) this.limitTimer = window.setInterval(() => this.tickLimit(), 250);
+    this.tickLimit();
+  }
+  protected tickLimit() {
+    const on = this.active && this.limit > 0 && this.M?.phase === "declare" && this.deadlineRnd === this.M.rnd && this.expiredRnd !== this.M.rnd;
+    this.elLimit.hidden = !on;
+    if (!on) return;
+    const left = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
+    this.elLimit.textContent = `本轮还剩 ${left} 秒`;
+    this.elLimit.classList.toggle("low", left <= 10);
+    if (left <= 0 && ["pick_unit", "compose", "target", "timing"].includes(this.ui)) this.onTimeout();
+  }
+  /** 时间到：正在拼的这一句作废，还没定的随从全部不出手。联机版覆盖这里就能改成「服务端判超时」 */
+  protected onTimeout() {
+    this.toast("时间到：没定的随从这一轮不出手");
+    this.expiredRnd = this.M.rnd; this.elLimit.hidden = true;
+    this.cmp = null; this.pending = [];
+    for (const uid of [...this.M.remaining[0]]) if (this.M.R.U[uid].down === -1) this.M.submit(0, uid, null);
+    this.refreshAll(); void this.step();
+  }
   /** 正在「现场拼」的随从（对手演出 / 我自己拼到一半）：名牌上的句子由逐张演出管，不被刷新覆盖 */
   private staging = -1;
   protected setUi(ui: string) {
@@ -350,6 +387,20 @@ export class Game {
     if (!cmp || !panel) return;
     this.enterEdit();
     const toks: PTok[] = cmp.tokens.map((t) => (t.t === "n" ? { k: "num" as const, v: Number(t.v) } : { k: "word" as const, w: String(t.v) }));
+    panel.set(toks, null);
+  }
+  /** 选目标 / 定秒数时：名牌上仍是这句话，后面跟着已经选好的目标（还没选的是「？」） */
+  private plateDraft(panel: SentencePanel) {
+    const cmp = this.cmp!, U = this.M.R.U;
+    const toks: PTok[] = cmp.tokens.map((t) => (t.t === "n" ? { k: "num" as const, v: Number(t.v) } : { k: "word" as const, w: String(t.v) }));
+    const picked: PTok[] = [];
+    this.pending.forEach((c: any, i: number) => {
+      if (c.tmode !== "choose") return;
+      const need = c.count ?? 1, tg: number[] = c.tg ?? [];
+      for (const x of tg) picked.push({ k: "unit", name: U[x].name, side: U[x].side === 0 ? "b" : "r" });
+      if (this.ui === "target" && i === this.pendI) for (let j = tg.length; j < need; j++) picked.push({ k: "word", w: "？", auto: true });
+    });
+    if (picked.length) toks.push({ k: "word", w: "→" }, ...picked);
     panel.set(toks, null);
   }
   private renderHandStrip() {
@@ -420,6 +471,7 @@ export class Game {
       const list = M.phase === "declare" || M.phase === "assign" ? M.declared : M.lastDeclared;
       const a = list.find((x: any) => x.uid === u.uid);
       if (u.uid === this.staging || (this.ui === "compose" && u.uid === this.selUid)) continue;
+      if ((this.ui === "target" || this.ui === "timing") && u.uid === this.selUid && this.cmp) { this.plateDraft(panel); continue; }
       if (a) panel.set(actionToks(M as any, a, 0), a.start);
       else panel.set([], null);
     }
@@ -558,7 +610,7 @@ export class Game {
     if (M.phase !== "declare") return;
     const s = M.declareSide();
     if (s === -1) { void this.resolve(); return; }
-    if (s === 0) { this.selUid = -1; this.setUi("pick_unit"); this.renderAct(); return; }
+    if (s === 0) { this.armLimit(); this.selUid = -1; this.setUi("pick_unit"); this.renderAct(); return; }
     this.setUi("foe"); this.renderAct();
     await sleep(this.fast ? 50 : 600);
     if (tk !== this.token) return;
@@ -701,8 +753,7 @@ export class Game {
   protected composerDone() {
     const cl = this.cmp?.finish();
     if (!cl) return;
-    this.cmp = null;
-    this.pending = cl;
+    this.pending = cl;          // cmp 先留着：选目标时可以「返回修改」，句子原样还在
     for (const c of cl) {
       if (c.tmode === "self") c.tg = [this.selUid];
       else if (c.k !== "delay" && !c.pre) c.tg = [];
@@ -720,6 +771,7 @@ export class Game {
       break;
     }
     this.setUi(this.pendI >= this.pending.length ? "timing" : "target");
+    this.syncCards();
     this.renderAct();
   }
 
@@ -745,8 +797,26 @@ export class Game {
     if (r.err) { this.toast(r.err); return; }
     const e = M.submit(0, this.selUid, r.act!);
     if (e) { this.toast(e); return; }
-    this.pending = [];
+    this.pending = []; this.cmp = null;
     this.refreshAll(); void this.step();
+  }
+  /** 选目标 / 定秒数时：回到拼句（句子原样保留） */
+  protected backToCompose() {
+    if (!this.cmp) { this.openComposer(this.selUid); return; }
+    this.pending = [];
+    this.setUi("compose"); this.renderAct();
+  }
+  /** 撤回上一个选好的目标（这一段没选就退回上一段）；一个都没有就回到拼句 */
+  protected undoTarget() {
+    let i = Math.min(this.pendI, this.pending.length - 1);
+    for (; i >= 0; i--) {
+      const c = this.pending[i];
+      if (c.k === "delay" && (c.act ?? -1) >= 0) { c.act = -1; break; }
+      if (c.tmode === "choose" && (c.tg ?? []).length) { c.tg.pop(); break; }
+    }
+    if (i < 0) { this.backToCompose(); return; }
+    this.pendI = i;
+    this.setUi("target"); this.syncCards(); this.renderAct();
   }
 
   // ------------------------------------------------------------ 择流定目标
@@ -953,7 +1023,7 @@ export class Game {
           el.append(h("p", "", "要延后对方的哪一句？"));
           for (const a of M.declared) if (a.side === 1) el.append(btn(`${mk(a.ord)} ${this.foeName}·${M.R.U[a.uid].name} 第 ${a.start} 秒：${NT.actionText(M as any, a.cl)}`, "sug" + (this.hl("act", a.ord) ? " hl" : ""), () => { if (!this.gate("act", { value: a.ord })) return; c.act = a.ord; this.advanceTargets(); }));
         } else el.append(h("p", "", `点 ${c.count ?? 1} 个${(c.side ?? "enemy") === "enemy" ? "敌方" : "你的"}随从（已选 ${c.tg.length} 个）——直接点场上的卡`));
-        el.append(btn("重新拼", "ghost", () => { if (this.gate("restart")) this.openComposer(this.selUid); }));
+        el.append(btn("撤回上一个目标", "ghost", () => { if (this.gate("undo")) this.undoTarget(); }), btn("返回修改句子", "ghost", () => { if (this.gate("restart")) this.backToCompose(); }));
         break;
       }
       case "timing": {
@@ -970,7 +1040,7 @@ export class Game {
         const foe = new Set(M.declared.filter((a: any) => a.side === 1).map((a: any) => a.start));
         const flow = h("div", "opts");
         for (let t = ms; t <= NR.TIMELINE; t++) flow.append(btn(`${t} 秒${foe.has(t) ? "·对方" : ""}`, this.hl("time", t) ? "w hl" : this.hlKind("time") ? "w dimmed" : t === best ? "w primary" : "w", () => { if (this.gate("time", { value: t })) this.declare(t); }));
-        el.append(flow, btn("重新拼", "ghost", () => { if (this.gate("restart")) this.openComposer(this.selUid); }));
+        el.append(flow, btn("撤回上一个目标", "ghost", () => { if (this.gate("undo")) this.undoTarget(); }), btn("返回修改句子", "ghost", () => { if (this.gate("restart")) this.backToCompose(); }));
         break;
       }
       case "assign": {

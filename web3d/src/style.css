@@ -212,3 +212,9 @@ body.composing .top .cta, body.composing .top .pts { visibility: hidden; }
 body.hs-dragging { cursor: grabbing; }
 body.hs-dragging * { cursor: grabbing !important; }
 @media (max-width: 720px) { .hs-card { padding: 6px 8px 7px; font-size: 14px; } }
+
+/* 每轮宣告倒计时（接口：Game.setTimeLimit） */
+.gm-limit { position: fixed; top: 34px; left: 50%; transform: translateX(-50%); z-index: 6; padding: 2px 12px; font: 600 12px "Noto Sans SC", sans-serif; color: #dff6ff; background: rgba(6, 22, 36, 0.8); border: 1px solid rgba(143, 212, 255, 0.5); pointer-events: none; }
+.gm-limit[hidden] { display: none; }
+.gm-limit.low { color: #ffd0d4; border-color: #ff7a86; animation: limpulse 0.8s infinite alternate; }
+@keyframes limpulse { to { box-shadow: 0 0 14px rgba(255, 122, 134, 0.7); } }

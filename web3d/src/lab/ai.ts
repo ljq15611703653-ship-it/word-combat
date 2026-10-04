@@ -39,7 +39,7 @@ export function genCands(s: St, side: 0 | 1, style: Style, rng: Rng, cap = 40): 
     if (useAtk) {
       for (const n of nums) for (const f of F) {
         add([D(n, f), D(n, f, "ok")], true, true);
-        add([D(n, f, undefined, true)], true);                                     // 无视（穿透）
+        add([D(n, f, undefined, true)], true);                                     // 无视（对攻击：无视减伤）
         for (const g of F) add([D(n, f), D(n, g, "fail")], true, true);            // 若失败转火
         add([D(n, f), D(n, f, "fail", true)], true, true);                         // 被挡住就再来一刀无视
       }
