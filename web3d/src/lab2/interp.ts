@@ -3,13 +3,13 @@ import { P, type SideState } from "../lab/rules";
 import { P2, type Deck } from "./params";
 import {
   type Clause, type Eff, type Obj, type Query, type Amt, type Sentence, type Side, type Tg, type StatusKind,
-  wordsOf, catsOf, numsOf, sentenceCost, windup, advWordsOf, refKindsOf,
+  wordsOf, catsOf, numsOf, sentenceCost, windup, advWordsOf, refKindsOf, legal,
 } from "./ast";
 
 export interface Ev {
   seq: number; rnd: number; sord: number; rord: number;
   side: Side;                       // 这件事「属于」哪一方：使用/宣告 = 出手方；受伤/倒下/被恢复 = 承受方
-  kind: "use" | "decl" | "hurt" | "down" | "healed";
+  kind: "use" | "decl" | "hurt" | "down" | "healed" | "dealt";   // dealt = 实际打掉的伤害（攻击方）；hurt = 实际受到的伤害（承受方）
   words: string[]; cats: string[]; amt: number; len: number; segs: number;
   src: number;                      // 造成它的随从（没有 = -1）
   derived?: boolean;                // 数量来自「引用量」的效果产生的事件：不再被引用量查询统计（防止滚雪球）
@@ -25,7 +25,7 @@ export interface Standing {
 }
 export interface Status { unit: number; kind: StatusKind; lvl: number; left: number }
 export interface Decl { side: Side; unit: number; cl: Sentence; ord: number; sord: number; cost: number; nums: number[]; start: number }
-export const REF_KINDS = ["cond", "win", "judge", "ref"] as const;
+export const REF_KINDS = ["cond", "win", "judge", "ref", "all"] as const;
 export interface St {
   rnd: number; sec: number; seq: number; sord: number;
   hp: number[]; sh: number[];
@@ -45,7 +45,7 @@ export const total = (s: St, side: Side) => unitsOf(side).reduce((a, u) => a + M
 export const nAlive = (s: St, side: Side) => unitsOf(side).filter((u) => s.hp[u] > 0).length;
 const stat = (s: St, k: string, n = 1) => { s.stats[k] = (s.stats[k] ?? 0) + n; };
 
-const mkRef = () => Object.fromEntries(REF_KINDS.map((k) => [k, Array(P2.REFCOPIES).fill(0)])) as Record<string, number[]>;
+const mkRef = () => Object.fromEntries(REF_KINDS.map((k) => [k, Array(k === "all" ? 1 : P2.REFCOPIES).fill(0)])) as Record<string, number[]>;
 export function newGame(first: Side, decks: [Deck | null, Deck | null] = [null, null], record = false): St {
   const mk = (): SideState => ({ ap: P.AP0, cards: P.CARDS0.map((v) => ({ v, cd: 0 })) });
   return {
@@ -85,7 +85,8 @@ export function evalQ(s: St, q: Query, c: Ctx): number {
   for (const e of s.log) {
     if (e.side !== side || e.derived) continue;
     if (w.dir === "before") {
-      if (w.unit === "round" ? e.rnd <= s.rnd - w.n : e.sord >= c.sord || e.sord < c.sord - w.n) continue;
+      // 「之前 N 轮」= 已经结束的前 N 轮（不含当前这一轮）；要读本轮用「之前 N 句」
+      if (w.unit === "round" ? e.rnd >= s.rnd || e.rnd < s.rnd - w.n : e.sord >= c.sord || e.sord < c.sord - w.n) continue;
     } else {
       if (e.seq < (c.fromSeq ?? s.seq)) continue;
       if (w.unit === "round" ? e.rnd >= (c.fromRnd ?? s.rnd) + w.n : e.sord <= c.sord || e.sord > c.sord + w.n) continue;
@@ -153,7 +154,7 @@ function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
   const d = Math.min(s.hp[u], n - ab);
   if (d > 0) {
     s.hp[u] -= d;
-    emit(s, { sord: r.sord, side: sideOf(u), kind: "hurt", words: [], cats: ["dmg", "hpchg"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
+    emit(s, { sord: r.sord, side: sideOf(u), kind: "hurt", words: [], cats: ["taken", "hpchg"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
     if (s.hp[u] <= 0) {
       emit(s, { sord: r.sord, side: sideOf(u), kind: "down", words: [], cats: [], amt: 1, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
       s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u));
@@ -177,7 +178,7 @@ function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
       if (n > 0) n = Math.max(0, n + stLvl(s, u, "vuln") - (r.actor >= 0 ? stLvl(s, r.actor, "weak") : 0));
       if (n <= 0) continue;
       const d = hit(s, u, n, e.ignore === "shield", r);
-      if (d > 0) { ok = true; stat(s, `s${owner}:dealt`, d); } else stat(s, `s${owner}:blocked`);
+      if (d > 0) { ok = true; stat(s, `s${owner}:dealt`, d); emit(s, { sord: r.sord, side: owner, kind: "dealt", words: [], cats: ["dealt"], amt: d, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived }); } else stat(s, `s${owner}:blocked`);
     } else if (e.verb === "heal") {
       const d = Math.max(0, Math.min(base - P.HEALPEN, P.HP - s.hp[u]));
       s.hp[u] += d;
@@ -214,7 +215,8 @@ export function pickCards(s: St, side: Side, nums: number[]): number[] | null {
 const countOf = (xs: string[]) => { const m: Record<string, number> = {}; for (const x of xs) m[x] = (m[x] ?? 0) + 1; return m; };
 /** 这句话能不能说：行动点、数字牌、卡组里的进阶词、自指词（含冷却） */
 export function canAfford(s: St, side: Side, cl: Sentence): { cost: number; nums: number[] } | null {
-  const cost = sentenceCost(cl);
+  if (!legal(cl)) return null;
+  const cost = sentenceCost(cl, s.rnd);
   if (cost > s.side[side].ap) return null;
   const dk = s.deck[side];
   if (dk) for (const [w, n] of Object.entries(countOf(advWordsOf(cl)))) if ((dk[w] ?? 0) < n) return null;

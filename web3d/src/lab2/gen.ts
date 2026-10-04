@@ -15,7 +15,7 @@ export function mulberry32(a: number): Rng {
 const pick = <T>(r: Rng, xs: T[]): T => xs[Math.floor(r() * xs.length)];
 const chance = (r: Rng, p: number) => r() < p;
 
-const CATS = ["atk", "atk", "heal", "def", "dmg", "hpchg", "status", "any"];
+const CATS = ["atk", "atk", "heal", "def", "dealt", "taken", "hpchg", "status", "any"];
 const EVS = ["down", "hurt", "hurt", "healed"] as const;
 const WORDS = ["造成", "恢复", "减伤", "灼烧", "易伤", "衰弱", "移除", "不得", "定时", "兑现"];
 
@@ -32,7 +32,7 @@ function genObj(e: Env): Obj {
   return { t: "order", a: pick(e.r, ["造成", "恢复", "减伤"]), b: pick(e.r, ["造成", "恢复", "减伤"]) };
 }
 function genAmt(e: Env, hi: number): Amt {
-  if (chance(e.r, 0.12)) return { q: query(win("before", 1 + Math.floor(e.r() * 2), chance(e.r, 0.3) ? "sent" : "round"), pick(e.r, ["me", "foe"] as const), cat(pick(e.r, ["dmg", "heal", "atk"])), pick(e.r, ["count", "sum"] as const)), mult: 1 };
+  if (chance(e.r, 0.12)) return { q: query(win("before", 1 + Math.floor(e.r() * 2), chance(e.r, 0.3) ? "sent" : "round"), pick(e.r, ["me", "foe"] as const), cat(pick(e.r, ["dealt", "taken", "heal"])), pick(e.r, ["count", "sum"] as const)), mult: 1 };
   return num(e, hi);
 }
 /** 与「谁触发」相称的效果：对方的事 → 反击来源或我方防护；我方的事 → 追加进攻或自保 */
@@ -87,13 +87,19 @@ export type Mode = "free" | "plain" | "playbook";
 export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode: Mode = "free"): Sentence[] {
   const foes = unitsOf((1 - side) as Side).filter((x) => alive(s, x));
   const mine = unitsOf(side).filter((x) => alive(s, x));
+
   const maxN = Math.max(1, ...s.side[side].cards.filter((c) => c.cd === 0).map((c) => c.v));
   const e: Env = { s, side, unit: u, r, maxN, foes, mine };
   const out: Sentence[] = [];
   const seen = new Set<string>();
-  const add = (cl: Sentence) => { const key = JSON.stringify(cl); if (!seen.has(key) && canAfford(s, side, cl)) { seen.add(key); out.push(cl); } };
+  // 教电脑：不要重复铺同一个长期效果（我方已经挂着，或本轮别的随从刚说过一样的）
+  const mineStand = s.stand.filter((x) => x.owner === side).map((x) => JSON.stringify(x.c));
+  const pending = s.decl.filter((d) => d.side === side).flatMap((d) => d.cl).map((c) => JSON.stringify(c));
+  const dup = (cl: Sentence) => cl.some((c) => (c.k === "ignore" || c.k === "when" || c.k === "delay") && (c.k === "ignore" ? s.stand.some((x) => x.owner === side && x.c.k === "ignore") || s.decl.some((d) => d.side === side && d.cl.some((z) => z.k === "ignore")) : mineStand.includes(JSON.stringify(c)) || pending.includes(JSON.stringify(c))));
+  const add = (cl: Sentence) => { const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl)) { seen.add(key); out.push(cl); } };
   basics(e).forEach(add);
   if (mode === "playbook") playbook(e).forEach(add);
+  else if (mode === "plain") playbook(e, "atkdef").forEach(add);
   for (let i = 0; i < k * 3 && out.length < k + 6; i++) add(genSentence(e, mode === "free"));
   return out;
 }

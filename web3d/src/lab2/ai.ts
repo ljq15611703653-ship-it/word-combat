@@ -5,14 +5,23 @@ import { windup } from "./ast";
 import { type St, clone, declare, passUnit, nextSide, resolveRound, nextRound, alive, unitsOf, total, nAlive, canAfford } from "./interp";
 import { candidates, type Rng } from "./gen";
 
-export interface AiCfg { k: number; depth: number; w: number[]; passBias: number; mode?: "free" | "plain" | "playbook" }
-export const AI_DEFAULT: AiCfg = { k: 8, depth: 2, w: [1, 0.7, 0.5], passBias: 0, mode: "free" };
+export interface AiCfg {
+  k: number; depth: number; w: number[]; passBias: number; mode?: "free" | "plain" | "playbook";
+  wAp: number;        // 留行动点的价值（每点）
+  wCard: number;      // 留数字牌的价值（每点牌面；冷却中的算一半）
+  recBonus: number;   // 「推荐」：复杂句子的估值加成（不强迫，只是轻推）
+}
+export const AI_DEFAULT: AiCfg = { k: 8, depth: 2, w: [1, 0.7, 0.5], passBias: 0, mode: ((process.env.AIMODE ?? "free") as "free" | "plain" | "playbook"), wAp: +(process.env.WAP ?? 0.3), wCard: +(process.env.WCARD ?? 0.4), recBonus: +(process.env.RECB ?? 2) };
+/** 复杂句：多段、带长期/引用/状态/定时/移除等 */
+export const fancy = (cl: Sentence) => cl.length > 1 || cl.some((c) => c.k !== "act" || typeof c.eff.n !== "number");
+const cardValue = (s: St, side: Side) => s.side[side].cards.reduce((a, c) => a + (c.cd === 0 ? c.v : c.cd === 1 ? c.v * 0.5 : 0), 0);
 
 /** 估值：站在 side 看，活着的随从差 + 总血量差；终局给大数 */
-export function evaluate(s: St, side: Side): number {
+export function evaluate(s: St, side: Side, cfg: AiCfg = AI_DEFAULT): number {
   const o = (1 - side) as Side;
   if (s.win >= 0) return s.win === 2 ? 0 : s.win === side ? 1000 : -1000;
-  return 10 * (nAlive(s, side) - nAlive(s, o)) + 1.2 * (total(s, side) - total(s, o));
+  return 10 * (nAlive(s, side) - nAlive(s, o)) + 1.2 * (total(s, side) - total(s, o))
+    + cfg.wAp * (s.side[side].ap - s.side[o].ap) + cfg.wCard * (cardValue(s, side) - cardValue(s, o));
 }
 
 /** 默认策略（推演里给所有人代打）：打最低血量的敌人；残血回血；其余不出手 */
@@ -47,7 +56,7 @@ function rollout(s0: St, side: Side, unit: number, cl: Sentence | null, start: n
     if (d > 0) { if (s.win >= 0) break; nextRound(s); }
     playOutRound(s);
     resolveRound(s);
-    val += (cfg.w[d] ?? 0.4) * evaluate(s, side);
+    val += (cfg.w[d] ?? 0.4) * evaluate(s, side, cfg);
     if (s.win >= 0) break;
   }
   return val;
@@ -64,7 +73,7 @@ export function think(s: St, side: Side, r: Rng, cfg: AiCfg = AI_DEFAULT): { uni
     for (const cl of candidates(s, side, u, r, Math.ceil(cfg.k / us.length) + 1, cfg.mode ?? "free")) {
       const w = windup(cl);
       const starts = cfg.mode === "playbook" ? [...new Set([w, w + 3, 8, 12].filter((x) => x >= w && x <= P.TL))] : [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
-      for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
+      for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg) + (fancy(cl) ? cfg.recBonus : 0); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
     }
   }
   return best;

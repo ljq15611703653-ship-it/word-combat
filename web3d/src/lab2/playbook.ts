@@ -3,13 +3,15 @@
 import { act, dmg, shield, heal, status, forbid, whenever, unless, timer, query, win, cat, word, ev, type Sentence, type Tg, type Clause, type Obj } from "./ast";
 import type { Env } from "./gen";
 
-export interface Named { name: string; cl: Sentence }
+export interface Named { name: string; cl: Sentence; group: "atkdef" | "other" }
+/** 普通进攻/防御也能用的复杂句（只用连环、并、减伤、无视这类攻防词，不需要限制/引用/状态类进阶词） */
+const ATKDEF = ["爽·连环成功", "爽·集火", "爽·连环攻守", "爽·全员强化防", "爽·穿透连击", "爽·饱和攻击", "爽·铁壁", "无视长期句"];
 const rm = (obj: Obj): Clause => ({ k: "remove", obj });
 const before1s = (who: "me" | "foe", obj: Obj, tight = 1) => query(win("before", 1, "sent"), who, obj, "count", tight);
 
 export function playbookNamed(_e?: Env): Named[] {
   const o: Named[] = [];
-  const add = (name: string, ...cl: Sentence) => o.push({ name, cl });
+  const add = (name: string, ...cl: Sentence) => o.push({ name, cl, group: ATKDEF.some((k) => name.startsWith(k)) ? "atkdef" : "other" });
   const src: Tg = { t: "src" }, lowFoe: Tg = { t: "lowFoe" }, allMe: Tg = { t: "allMe" }, lowMe: Tg = { t: "lowMe" };
 
   // ---- 限制：让对方「做不了」或「做了就疼」
@@ -45,9 +47,9 @@ export function playbookNamed(_e?: Env): Named[] {
   add("对方不防就打", unless("foe", cat("def"), 2, [dmg(3, lowFoe)]));
 
   // ---- 引用量：把对方/我方做过的事变成数字
-  add("追击（我方累计伤害）", act(dmg({ q: query(win("before", 1, "round"), "me", cat("dmg"), "sum"), mult: 1 }, lowFoe)));
+  add("追击（我方累计伤害）", act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 1 }, lowFoe)));
   add("反制句长（对方上一句词数）", act(dmg({ q: query(win("before", 1, "sent"), "foe", ev("decl"), "len"), mult: 1 }, lowFoe)));
-  add("吸血", act(dmg(2, lowFoe)), act(heal({ q: query(win("before", 1, "round"), "me", cat("dmg"), "sum"), mult: 1 }, lowMe), "ok"));
+  add("吸血", act(dmg(2, lowFoe)), act(heal({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 1 }, lowMe), "ok"));
   add("受伤转盾", act(shield({ q: query(win("before", 1, "round"), "me", ev("hurt"), "sum"), mult: 1 }, allMe)));
   add("受伤转治疗", act(heal({ q: query(win("before", 1, "round"), "me", ev("hurt"), "sum"), mult: 1 }, lowMe)));
 
@@ -74,8 +76,41 @@ export function playbookNamed(_e?: Env): Named[] {
   add("无视长期句", { k: "ignore", cat: "stand", win: 2 });
   add("移除结构词", rm(cat("struct")));
   add("移除任意词", rm(cat("any")));
+
+  // ================= 爽句：复杂、强大、要规划的组合（电脑可以不用；只是推荐） =================
+  // 多米诺：每一段「若成功」才打下一段，一路推下去
+  add("爽·连环成功(4段)", act(dmg(2, lowFoe)), act(dmg(2, lowFoe), "ok"), act(dmg(3, lowFoe), "ok"), act(dmg(3, lowFoe), "ok"));
+  add("爽·连环成功(3段)", act(dmg(2, lowFoe)), act(dmg(3, lowFoe), "ok"), act(dmg(3, lowFoe), "ok"));
+  add("爽·集火(3段)", act(dmg(3, lowFoe)), act(dmg(3, lowFoe), "ok"), act(dmg(3, lowFoe), "ok"));
+  add("爽·连环攻守", act(dmg(3, lowFoe)), act(shield(3, allMe), "fail"), act(heal(3, lowMe), "ok"));          // 打中就治疗，被挡就自保
+  add("爽·全员强化防", act(shield(3, allMe)), act(heal(3, allMe), "ok"));
+  // 多段乘积：易伤让后面每一击都变大
+  add("爽·易伤三连击", status("vuln", 3, 2, lowFoe), act(dmg(1, lowFoe)), act(dmg(1, lowFoe)), act(dmg(1, lowFoe)));
+  add("爽·易伤二连重击", status("vuln", 3, 2, lowFoe), act(dmg(2, lowFoe)), act(dmg(2, lowFoe)));
+  add("爽·三状态齐发", status("weak", 2, 2, lowFoe), status("burn", 3, 3, lowFoe), status("vuln", 2, 2, lowFoe));
+  add("爽·饱和攻击(敌方全体各2)", act(dmg(2, { t: "allFoe" })));
+  add("爽·饱和攻击(全体各3)", act(dmg(3, { t: "allFoe" })));
+  add("爽·穿透连击", act(dmg(3, lowFoe, "shield")), act(dmg(3, lowFoe, "shield")));
+  // 引用巨量
+  add("爽·乘积放大(上轮累计×2)", act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 2 }, lowFoe)));
+  add("爽·全程收割(全部累计伤害)", act(dmg({ q: query(win("before", 99), "me", cat("dealt"), "sum"), mult: 1 }, lowFoe)));
+  add("爽·全程转治疗(全部受到伤害)", act(heal({ q: query(win("before", 99), "me", ev("hurt"), "sum"), mult: 1 }, allMe)));
+  add("爽·对方句长×2", act(dmg({ q: query(win("before", 1, "sent"), "foe", ev("decl"), "len"), mult: 2 }, lowFoe)));
+  add("爽·倍率攒爆(3轮×3)", timer(3, cat("atk"), "foe", 3));
+  add("爽·复仇放大(受伤×3)", timer(2, ev("hurt"), "me", 3));
+  // 封锁与设伏
+  add("爽·全封锁(任何动作受罚)", forbid(cat("any"), 3, 3, 2));
+  add("爽·全封锁+衰弱", forbid(cat("any"), 2, 3, 1), status("weak", 2, 2, lowFoe));
+  add("爽·设伏连锁(反击+自保)", whenever("foe", cat("atk"), 3, [dmg(2, src), shield(1, allMe)], 3, 3));
+  add("爽·全面设伏(攻/疗/防)", whenever("foe", cat("atk"), 3, [dmg(2, src)], 2, 3), whenever("foe", cat("heal"), 3, [dmg(2, src)], 2, 3), whenever("foe", cat("def"), 3, [dmg(2, src)], 2, 3));
+  add("爽·反伤护盾", act(shield(3, allMe)), whenever("me", ev("hurt"), 2, [dmg(2, src, "shield")], 2, 3));
+  add("爽·铁壁(全员减伤+无视长期句)", act(shield(3, allMe)), { k: "ignore", cat: "stand", win: 2 });
+  add("爽·以静制动(不动则回血盾)", forbid(cat("any"), 2, 2, 1), unless("foe", cat("any"), 2, [heal(2, allMe), shield(2, allMe)]));
+  // 接力：读我方上一句（之前 2 句里我方说过什么）
+  add("爽·接力追击", { k: "when", q: query(win("before", 2, "sent"), "me", word("造成"), "count", 1), judge: "exist", effs: [dmg(3, lowFoe, "shield")], cap: 1 });
+  add("爽·接力防御", { k: "when", q: query(win("before", 2, "sent"), "me", word("造成"), "count", 1), judge: "exist", effs: [shield(3, allMe), heal(2, lowMe)], cap: 1 });
   return o;
 }
 /** 环境变量 PB_EXCLUDE='追击,吸血' 可以把名字里含这些字的手册句去掉（做对照实验用） */
 const EXC = (typeof process !== "undefined" && process.env.PB_EXCLUDE ? process.env.PB_EXCLUDE.split(",") : []).filter(Boolean);
-export const playbook = (e: Env): Sentence[] => playbookNamed(e).filter((x) => !EXC.some((k) => x.name.includes(k))).map((x) => x.cl);
+export const playbook = (e: Env, group?: "atkdef"): Sentence[] => playbookNamed(e).filter((x) => !EXC.some((k) => x.name.includes(k)) && (!group || x.group === group)).map((x) => x.cl);

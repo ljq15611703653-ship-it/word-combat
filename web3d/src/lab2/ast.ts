@@ -96,7 +96,7 @@ export function catsOf(c: Clause): string[] {
   else out.add("struct");
   return [...out];
 }
-const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n === 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
+const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n >= 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
 /** 数字牌需求：所有 ≥2 的数字（Amt 引用量里的窗口 N、倍率也算） */
 export function numsOf(c: Clause): number[] {
   switch (c.k) {
@@ -109,7 +109,7 @@ export function numsOf(c: Clause): number[] {
   }
 }
 export function clauseCost(c: Clause): number {
-  const ec = (x: Eff) => (x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC);
+  const ec = (x: Eff) => (x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (x.tg.t === "allMe" || x.tg.t === "allFoe" ? P2.AOE : 0);
   switch (c.k) {
     case "act": return ec(c.eff);
     case "when": return P.STAND + (c.q.obj.t === "cat" && c.q.obj.c === "any" ? P.ANYCLS : 0);
@@ -120,11 +120,15 @@ export function clauseCost(c: Clause): number {
   }
 }
 const isChain = (c: Clause) => c.k === "act" && !!c.ifPrev;
+const AGG_WORD = { count: "次数", sum: "累计", len: "词数", segs: "段数" } as const;
+/** 全程 = 之前窗口里的 99（只许「之前」）；价格 = 当前轮数，不低于 2 */
+export const isAll = (q: Query) => q.win.dir === "before" && q.win.n >= 99;
 /** 自指词用量：每种每用一次占一张（用完冷却一轮） */
 export function refKindsOf(cl: Sentence): string[] {
   const out: string[] = [];
   const q = (x: Query) => {
     out.push("win");
+    if (isAll(x)) out.push("all");
     if (x.agg !== "count" || x.obj.t === "order" || x.obj.t === "nth" || x.obj.t === "word" || x.obj.t === "ev" || (x.obj.t === "cat" && x.obj.c !== "any")) out.push("ref");
   };
   const am = (a: Amt) => { if (typeof a !== "number") q(a.q); };
@@ -139,7 +143,9 @@ export function refKindsOf(cl: Sentence): string[] {
 /** 一句话用掉的进阶词（卡组里要有） */
 export function advWordsOf(cl: Sentence): string[] {
   const out: string[] = [];
+  const am = (a: Amt) => { if (typeof a !== "number") out.push(AGG_WORD[a.q.agg]); };
   cl.forEach((c, i) => {
+    if (c.k === "act") am(c.eff.n); else if (c.k === "when" || c.k === "delay") c.effs.forEach((e) => am(e.n));
     if (i > 0 && !isChain(c)) out.push("并");
     if (c.k === "act") { if (c.eff.verb === "shield") out.push("减伤"); if (c.eff.ignore) out.push("无视"); }
     else if (c.k === "when") {
@@ -155,8 +161,9 @@ export function advWordsOf(cl: Sentence): string[] {
   });
   return out;
 }
-export function sentenceCost(cl: Sentence): number {
-  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 && !isChain(c) ? P.AND : 0), 0) + refKindsOf(cl).length * P2.REFAP;
+export function sentenceCost(cl: Sentence, rnd = 1): number {
+  const ks = refKindsOf(cl);
+  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 ? (isChain(c) ? P2.CHAINAP : P.AND) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * Math.max(2, rnd);
 }
 /** 起手时间：段越多、数字越大越晚 */
 export function windup(cl: Sentence): number {
@@ -183,5 +190,9 @@ export function clauseText(c: Clause): string {
     case "cash": return "兑现";
     case "remove": return `移除 ${objText(c.obj)}`;
   }
+}
+/** 玩家拼不出来的句子：「全程」只能读已发生的事，不能写成「以后全程」（长期句子的窗口 ≥99、无视 ≥99 都不合法）；定时内部用的 99 不算 */
+export function legal(cl: Sentence): boolean {
+  return cl.every((c) => !(c.k === "when" && c.q.win.dir === "after" && c.q.win.n >= 99) && !(c.k === "ignore" && c.win >= 99) && !(c.k === "status" && c.dur >= 99));
 }
 export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");

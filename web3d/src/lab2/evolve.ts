@@ -1,6 +1,8 @@
 // 卡组自动进化：预算内随机抽进阶词卡组 → 循环赛 → 竞争性适应度共享 + 新颖度（行为描述符）→ 选择、变异、交叉。
 // 运行：node --import tsx src/lab2/evolve.ts   （环境变量 POP GENS OUT SEED WORKERS）
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+if (existsSync((process.env.OUT ?? "D:/wc/out") + "/rules.json")) process.env.LAB = readFileSync((process.env.OUT ?? "D:/wc/out") + "/rules.json", "utf8");
+if (existsSync((process.env.OUT ?? "D:/wc/out") + "/rules2.json")) process.env.LAB2 = readFileSync((process.env.OUT ?? "D:/wc/out") + "/rules2.json", "utf8");
 import { Pool } from "./pool";
 import { mulberry32 } from "./gen";
 import { randDeck, mutate, cross, deckKey, addStats, descriptor, dist, type Agg } from "./deck";

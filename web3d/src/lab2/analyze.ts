@@ -1,6 +1,12 @@
 // 进化结果分析：大循环赛 → 聚成 4 大类 × 2 小类 → 流派报告（Markdown）
 // 运行：node --import tsx src/lab2/analyze.ts   （环境变量 OUT GPP MAXDECKS）
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+if (existsSync((process.env.OUT ?? "D:/wc/out") + "/rules.json")) process.env.LAB = readFileSync((process.env.OUT ?? "D:/wc/out") + "/rules.json", "utf8");
+if (existsSync((process.env.OUT ?? "D:/wc/out") + "/rules2.json")) process.env.LAB2 = readFileSync((process.env.OUT ?? "D:/wc/out") + "/rules2.json", "utf8");
+import { playbookNamed } from "./playbook";
+import { sentenceText as stext, type Sentence } from "./ast";
+const shapeOf = (cl: Sentence) => stext(cl).replace(/\d+(?=级|轮|句|次|条)/g, "N").replace(/随从\d/g, "随从").replace(/\d+/g, "N");
+const NAMES = new Map<string, string>(playbookNamed().map((x) => [shapeOf(x.cl), x.name]));
 import { Pool } from "./pool";
 import { roundRobin } from "./evolve";
 import { deckKey, DESC_NAMES, dist } from "./deck";

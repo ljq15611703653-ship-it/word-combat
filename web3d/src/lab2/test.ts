@@ -55,7 +55,7 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
 { const s = fresh(); say(s, 0, [forbid(cat("heal"), 2, 3)]); say(s, 3, [act(heal(2, unit(3)))], 4); s.hp[3] = 6; resolveRound(s);
   check(s.hp[3] === 6 + 2 - 3, "不得 恢复：违者受 3 点"); }
 // 13 一层封顶：触发效果不再触发别的触发
-{ const s = fresh(); say(s, 0, [whenever("foe", cat("dmg"), 2, [dmg(1, { t: "src" })], 3, 2)]); say(s, 1, [whenever("me", cat("dmg"), 2, [dmg(1, unit(3))], 3, 2)]);
+{ const s = fresh(); say(s, 0, [whenever("foe", cat("dealt"), 2, [dmg(1, { t: "src" })], 3, 2)]); say(s, 1, [whenever("me", cat("dealt"), 2, [dmg(1, unit(3))], 3, 2)]);
   say(s, 3, [act(dmg(1, unit(2)))], 5); resolveRound(s);
   check(s.hp[3] <= P.HP && s.log.filter((e) => e.trig).length > 0, "触发产生的效果只触发一层"); }
 
@@ -81,10 +81,28 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
 { const run = (cap: number) => { const s = fresh(); say(s, 0, [whenever("foe", cat("atk"), 2, [dmg(1, { t: "src" })], cap, 2)]); say(s, 3, [act(dmg(1, unit(1)))], 5); say(s, 4, [act(dmg(1, unit(2)))], 6); resolveRound(s); return s.stats["s0:fire"] ?? 0; };
   check(run(1) === 1 && run(3) === 2, "至多 N 次：cap 1 触发 1 次、cap 3 触发 2 次"); }
 
-// 18 引用量不滚雪球：两句「造成 我方累计伤害」只数真正的伤害
-{ const s = fresh(); const snow = () => [act(dmg({ q: query(win("before", 1, "round"), "me", cat("dmg"), "sum"), mult: 1 }, { t: "lowFoe" }))];
-  say(s, 0, [act(dmg(2, unit(3)))], 1); say(s, 1, snow(), 3); say(s, 2, snow(), 5); resolveRound(s);
-  check(total(s, 1) === 3 * P.HP - 2 - 2 - 2, "引用量只统计非引用产生的伤害：2 → 2 → 2，不翻倍"); }
+// 18 引用量：读已结束的轮、只数实际打掉的血、不滚雪球；全程要付轮数、冷却
+{ const s = fresh(); const snow = () => [act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 1 }, { t: "lowFoe" }))];
+  say(s, 0, [act(dmg(2, unit(3)))], 1); resolveRound(s); nextRound(s);
+  say(s, 0, snow(), 3); say(s, 1, snow(), 5); resolveRound(s);
+  check(total(s, 1) === 3 * P.HP - 2 - 2 - 2, "累计伤害：读上一轮实际打掉的 2，两句追击各 2，不翻倍"); }
+{ const s = fresh(); const snow = () => [act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 1 }, { t: "lowFoe" }))];
+  say(s, 0, [act(dmg(2, unit(3)))], 1); say(s, 1, snow(), 5); resolveRound(s);
+  check(total(s, 1) === 3 * P.HP - 2, "本轮的伤害不能读（只读已结束的轮）"); }
+{ const all = [act(dmg({ q: query(win("before", 99), "me", cat("dealt"), "sum"), mult: 1 }, { t: "lowFoe" }))];
+  const s = fresh(); const c1 = declare(s, 0, 0, all); check(c1, "全程：能说"); check(!declare(s, 0, 1, all), "全程：只有 1 张，同一轮第二次说不了");
+  s.rnd = 5; check(s.side[0].ap >= 0 && (() => { const t = fresh(); t.rnd = 5; t.side[0].ap = 4; return canAfford(t, 0, all) === null; })(), "全程：第 5 轮价格 5，行动点 4 说不了"); }
+// 19 引用量词是进阶词：没带「累计」就不能把引用量当数字
+{ const s = newGame(0, [{ 并: 1 }, null]); s.side[0].ap = 20; const snow = [act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 1 }, { t: "lowFoe" }))];
+  check(canAfford(s, 0, snow) === null, "没带 累计：不能引用累计量当数字");
+  const s2 = newGame(0, [{ 累计: 1 }, null]); s2.side[0].ap = 20; check(canAfford(s2, 0, snow) !== null, "带了 累计：可以"); }
+// 20 造成与受到分开
+{ const s = fresh(); say(s, 0, [act(dmg(3, unit(3)))], 1); say(s, 3, [act(dmg(2, unit(0)))], 2); resolveRound(s); nextRound(s);
+  const cnt = (o: ReturnType<typeof cat>) => s.log.filter((e) => e.side === 0 && e.kind !== "decl" && (o.t === "cat" && e.cats.includes(o.c))).reduce((a, e) => a + e.amt, 0);
+  check(cnt(cat("dealt")) === 3 && cnt(cat("taken")) === 2, "我方：造成 3、受到 2，分开统计"); }
+// 21 合法性与全体效果的价格
+{ const s = fresh(); const bad = [whenever("foe", cat("atk"), 99, [dmg(1, { t: "src" })], 1, 2)]; check(canAfford(s, 0, bad) === null, "「以后全程」不合法（全程只能读已发生的事）");
+  const ok = [act(dmg(2, { t: "allFoe" }))]; const s2 = fresh(); s2.side[0].ap = 1; check(canAfford(s2, 0, ok) === null, "打全体：比单体多 1 点行动点（1 点不够）"); s2.side[0].ap = 2; check(canAfford(s2, 0, ok) !== null, "打全体：2 点够"); }
 // 随机试玩：不崩、能打完
 function rnd(n: number) { return Math.floor(Math.random() * n); }
 function randSentence(s: St, u: number): Sentence {
