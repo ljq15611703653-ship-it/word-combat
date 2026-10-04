@@ -1,0 +1,21 @@
+// 职业风格：先只是配色 + 徽章 + 立绘目录 + 随从名字，规则暂不分职业（职业规则开关之后再接）
+export interface StyleDef {
+  id: string; name: string; tag: string; accent: string; accent2: string; glyph: string;
+  /** public/duanju/art/<artDir>/battle_idle.png */
+  artDir: string;
+  names: [string, string, string];
+  deckPreset: string;
+}
+export const STYLES: StyleDef[] = [
+  { id: "bing", name: "并流", tag: "一句话接几段，连环出手", accent: "#ff2d95", accent2: "#ffd23f", glyph: "并", artDir: "bing", names: ["连枝", "叠码", "疾并"], deckPreset: "newbie" },
+  { id: "yin", name: "引用流", tag: "把前几轮的量当数字用", accent: "#00e5ff", accent2: "#b388ff", glyph: "引", artDir: "yin", names: ["回声", "账本", "快读"], deckPreset: "quote" },
+  { id: "xian", name: "限制流", tag: "不得/收紧：做了就疼", accent: "#b388ff", accent2: "#ff2d95", glyph: "限", artDir: "xian", names: ["禁言", "封条", "断路"], deckPreset: "forbid" },
+  { id: "zhuang", name: "状态流", tag: "灼烧易伤衰弱，慢慢磨", accent: "#ffd23f", accent2: "#5eead4", glyph: "状", artDir: "zhuang", names: ["烛火", "裂纹", "迟滞"], deckPreset: "state" },
+];
+export const styleOf = (id: string) => STYLES.find((s) => s.id === id) ?? STYLES[0];
+export const TIER_DESC: Record<string, string> = {
+  入门: "只会朴素的攻击/治疗/减伤，偶尔失手",
+  普通: "会用连环、并、减伤、无视这类攻防词",
+  进阶: "会用限制、状态、定时、引用等整套手册",
+  大师: "看得更远，几乎不失误",
+};

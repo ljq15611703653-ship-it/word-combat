@@ -1,0 +1,50 @@
+{
+ "P": {
+  "HP": 6,
+  "AP0": 5,
+  "APINC": 4,
+  "APCAP": 10,
+  "HEAT_FROM": 3,
+  "ROUNDS": 12,
+  "TL": 10,
+  "BASE": 1,
+  "AND": 2,
+  "WIND_CL": 1,
+  "WIND_N": 0,
+  "CARDS0": [],
+  "SCHEDULE": {
+   "3": [
+    2
+   ],
+   "5": [
+    3
+   ],
+   "7": [
+    4
+   ]
+  },
+  "EXACT": true,
+  "REMOVE": 1
+ },
+ "P2": {
+  "TGT_AT_DECL": 1,
+  "REDIR": 1,
+  "POSTPONE": 1,
+  "KW": 1,
+  "STAUTO": 1,
+  "RMREAL": 1,
+  "REP": 1,
+  "ORDER": 1,
+  "KOCHECK": 1,
+  "COSTREAL": 1,
+  "MITHIT": 1,
+  "STRICT_TG": 1,
+  "FIZZLE": 1,
+  "AP_REDIR": 2,
+  "AP_POST": 1,
+  "STATUS_AP": 1,
+  "WIND_WORD": 1,
+  "AOE": 0
+ },
+ "ADV": {}
+}

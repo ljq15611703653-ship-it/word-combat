@@ -10,7 +10,7 @@ export default defineConfig({
   server: { host: true, proxy: { "/ws": { target: "ws://localhost:8787", ws: true } } },
   build: {
     rollupOptions: {
-      input: { main: resolve(__dirname, "index.html"), online: resolve(__dirname, "online.html"), campaign: resolve(__dirname, "campaign.html"), intro: resolve(__dirname, "intro.html"), side: resolve(__dirname, "side.html") },
+      input: { main: resolve(__dirname, "index.html"), online: resolve(__dirname, "online.html"), campaign: resolve(__dirname, "campaign.html"), intro: resolve(__dirname, "intro.html"), side: resolve(__dirname, "side.html"), duanju: resolve(__dirname, "duanju.html") },
     },
   },
 });
