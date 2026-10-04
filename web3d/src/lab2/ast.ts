@@ -30,6 +30,7 @@ export type Tg =
   | { t: "unit"; u: number }
   | { t: "src" }                                         // 触发这条长期句子的那个随从
   | { t: "lowFoe" } | { t: "lowMe" } | { t: "some"; n: number; side: "me" | "foe" }   // 选择 n 个（血最低的 n 个）；n 是数字，要写出来、占数字牌
+  | { t: "units"; us: number[] }                                                       // 显式的一组随从（TGT_AT_DECL：宣告时把别名解析成具体随从）
   | { t: "allMe" } | { t: "allFoe" };                                                   // 旧写法，等同于选择 3 个（三个随从）
 
 export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield"; rep?: number }   // rep = 重复 M（真实引擎：打 M 次每次 N，数字占牌）
@@ -57,6 +58,7 @@ export const shield = (n: Amt, tg: Tg = { t: "lowMe" }): Eff => ({ verb: "shield
 export const act = (eff: Eff, ifPrev?: "ok" | "fail"): Clause => ({ k: "act", eff, ifPrev });
 export const status = (kind: StatusKind, lvl: number, dur: number, tg: Tg = { t: "lowFoe" }): Clause => ({ k: "status", kind, lvl, dur, tg });
 export const unit = (u: number): Tg => ({ t: "unit", u });
+export const units = (us: number[]): Tg => ({ t: "units", us });
 export const redirect = (tg: Tg): Clause => ({ k: "redirect", tg });
 export const postpone = (ord: number, n: number): Clause => ({ k: "postpone", ord, n });
 export const strip = (tg: Tg): Clause => ({ k: "strip", tg });
@@ -107,7 +109,7 @@ export function catsOf(c: Clause): string[] {
   return [...out];
 }
 /** 目标个数：选择 n 个就是 n；旧「全体」= 3；其余 = 1（免费） */
-export const tgN = (t: Tg): number => (t.t === "some" ? t.n : t.t === "allMe" || t.t === "allFoe" ? 3 : 1);
+export const tgN = (t: Tg): number => (t.t === "units" ? Math.max(1, t.us.length) : t.t === "some" ? t.n : t.t === "allMe" || t.t === "allFoe" ? 3 : 1);
 const effNums = (e: Eff): number[] => [...amNums(e.n), tgN(e.tg), e.rep ?? 1];
 const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n >= 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
 /** 数字牌需求：所有 ≥2 的数字（Amt 引用量里的窗口 N、倍率也算） */
@@ -203,7 +205,9 @@ const objText = (o: Obj) => o.t === "word" ? `「${o.w}」` : o.t === "cat" ? (O
 const whoText = (w: Who) => (w === "me" ? "我方" : "对方");
 const winText = (w: Win) => `${w.dir === "before" ? "之前" : "以后"}${w.n === 99 ? "全程" : w.n}${w.unit === "round" ? "轮" : "句"}`;
 const aggText = (a: Query["agg"]) => ({ count: "次数", sum: "累计", len: "词数", segs: "段数" }[a]);
-const tgText = (t: Tg) => t.t === "some" ? `选择${t.n}个${t.side === "foe" ? "敌方" : "我方"}随从` : t.t === "unit" ? `随从${t.u}` : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
+/** 显式目标的可读名：甲/乙方（0~2 号随从是甲方，3~5 号是乙方）+ 位置名（词位/数位/速位）+ 序号 */
+export const unitName = (u: number) => `${u < 3 ? "甲" : "乙"}方${u % 3 + 1}号${["词位", "数位", "速位"][u % 3]}随从`;
+const tgText = (t: Tg) => t.t === "some" ? `选择${t.n}个${t.side === "foe" ? "敌方" : "我方"}随从` : t.t === "unit" ? unitName(t.u) : t.t === "units" ? t.us.map(unitName).join("、") : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
 const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.who)}${objText(a.q.obj)}${aggText(a.q.agg)}×${a.mult}`);
 const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `重复${e.rep}次` : ""}`;
 export function clauseText(c: Clause): string {

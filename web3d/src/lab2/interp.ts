@@ -154,6 +154,7 @@ function targets(s: St, owner: Side, verb: Eff["verb"] | "status" | "redir" | "s
     case "lowFoe": case "lowMe": return [lowest(s, want)].filter((u) => u >= 0);
     case "allMe": return unitsOf(owner).filter((u) => alive(s, u));
     case "allFoe": return unitsOf(foe).filter((u) => alive(s, u));
+    case "units": return t.us.filter((u) => sideOf(u) === want && ok(u));
     case "some": { const side = t.side === "foe" ? foe : owner; return unitsOf(side).filter((u) => alive(s, u)).sort((a, b) => s.hp[a] - s.hp[b]).slice(0, t.n); }
   }
 }
@@ -279,7 +280,33 @@ function quantMax(s: St, side: Side, cl: Sentence): number {
 }
 export const windupFor = (cl: Sentence, unit: number, s?: St) =>
   Math.max(1, windup(cl, P2.QWIND && s ? quantMax(s, sideOf(unit), cl) : 0) - (posOf(unit) === 2 && P2.POS3 === "speed" ? P2.POS_SPEED : 0));
+/** TGT_AT_DECL：把别名目标（最低血 / 全体 / 选择 N 个）解析成宣告那一刻的具体随从；不改传进来的句子 */
+export function resolveTgs(s: St, side: Side, cl: Sentence): Sentence {
+  const foe = (1 - side) as Side;
+  const rt = (t: Tg, verb: Eff["verb"] | "status" | "redir" | "strip"): Tg => {
+    const want = verb === "dmg" || verb === "status" || verb === "strip" ? foe : side;
+    switch (t.t) {
+      case "lowFoe": case "lowMe": { const u = lowest(s, want); return u >= 0 ? { t: "unit", u } : t; }
+      case "allMe": return { t: "units", us: unitsOf(side).filter((u) => alive(s, u)) };
+      case "allFoe": return { t: "units", us: unitsOf(foe).filter((u) => alive(s, u)) };
+      case "some": return { t: "units", us: unitsOf(t.side === "foe" ? foe : side).filter((u) => alive(s, u)).sort((a, b) => s.hp[a] - s.hp[b]).slice(0, t.n) };
+      default: return t;
+    }
+  };
+  const re = (e: Eff): Eff => ({ ...e, tg: rt(e.tg, e.verb) });
+  return cl.map((c): Clause => {
+    switch (c.k) {
+      case "act": return { ...c, eff: re(c.eff) };
+      case "when": case "delay": return { ...c, effs: c.effs.map(re) } as Clause;
+      case "status": return { ...c, tg: rt(c.tg, "status") };
+      case "redirect": return { ...c, tg: rt(c.tg, "redir") };
+      case "strip": return { ...c, tg: rt(c.tg, "strip") };
+      default: return c;
+    }
+  });
+}
 export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: number; nums: number[] } | null {
+  if (P2.TGT_AT_DECL) cl = resolveTgs(s, side, cl);
   if (!legal(cl)) return null;
   for (const c of cl) if (c.k === "postpone" && !s.decl.some((d) => d.ord === c.ord && d.side !== side)) return null;   // 延后要选对方本轮已经宣告的一句
   const pos = posOf(unit);
@@ -297,6 +324,7 @@ export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: n
 }
 const isStanding = (c: Clause) => (c.k === "when" && c.q.win.dir === "after") || c.k === "delay" || c.k === "ignore";
 export function declare(s: St, side: Side, unit: number, cl: Sentence, start = windupFor(cl, unit, s)): boolean {
+  if (P2.TGT_AT_DECL) cl = resolveTgs(s, side, cl);
   const a = canAfford(s, side, cl, unit);
   if (!a) return false;
   start = Math.max(start, windupFor(cl, unit, s));

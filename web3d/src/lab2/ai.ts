@@ -74,7 +74,7 @@ export function think(s: St, side: Side, r: Rng, cfg: AiCfg = AI_DEFAULT): { uni
     if (base > bestV) { bestV = base; best = { unit: u, cl: null, start: 1 }; }
     for (const cl of candidates(s, side, u, r, Math.ceil(cfg.k / us.length) + 1, cfg.mode ?? "free")) {
       const w = windupFor(cl, u, s);
-      const starts = cfg.mode === "playbook" ? [...new Set([w, w + 3, 8, 12].filter((x) => x >= w && x <= P.TL))] : [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
+      const starts = cl.some((c) => c.k === "postpone") ? [w] : cfg.mode === "playbook" ? [...new Set([w, w + 3, 8, 12].filter((x) => x >= w && x <= P.TL))] : [w, ...(w < P.TL - 1 && r() < 0.7 ? [w + 1 + Math.floor(r() * Math.min(8, P.TL - 1 - w))] : [])];
       for (const st of starts) { const v = rollout(s, side, u, cl, st, cfg) + (fancy(cl) ? cfg.recBonus : 0); all.push({ v, m: { unit: u, cl, start: st } }); if (v > bestV) { bestV = v; best = { unit: u, cl, start: st }; } }
     }
   }

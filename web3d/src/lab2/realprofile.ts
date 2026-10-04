@@ -23,7 +23,7 @@ export const REAL_LAB: Record<string, unknown> = {
 };
 /** LAB2（params.ts 的 P2） */
 export const REAL_LAB2: Record<string, unknown> = {
-  REDIR: 1, POSTPONE: 1, KW: 1, STAUTO: 1, RMREAL: 1, REP: 1, ORDER: 1, KOCHECK: 1, COSTREAL: 1, MITHIT: 1, STRICT_TG: 1,
+  REDIR: 1, POSTPONE: 1, KW: 1, STAUTO: 1, RMREAL: 1, REP: 1, ORDER: 1, KOCHECK: 1, COSTREAL: 1, MITHIT: 1, STRICT_TG: 1, TGT_AT_DECL: 1,
   FIZZLE: 1,                               // 出手的随从先倒下，这句落空
   AP_REDIR: 2, AP_POST: 1, STATUS_AP: 1,   // 转移 2、延后 1、状态词 1
   WIND_WORD: 1,                            // 每个词类段（状态/转移/延后/移除）起手晚 1 秒

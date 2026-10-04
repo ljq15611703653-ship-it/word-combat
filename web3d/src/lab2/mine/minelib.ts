@@ -63,7 +63,7 @@ const OBJ_ZH: Record<string, string> = { atk: "攻击词", dmg: "伤害词", hea
 const oText = (o: Obj) => o.t === "word" ? `「${o.w}」` : o.t === "cat" ? (OBJ_ZH[o.c] ?? o.c) : o.t === "ev" ? ({ down: "倒下", hurt: "受到伤害", healed: "被恢复", decl: "宣告" }[o.e]) : o.t === "nth" ? `第${o.n}句` : `「${o.a}」先于「${o.b}」`;
 const wText = (w: { dir: string; n: number; unit: string }) => `${w.dir === "before" ? "之前" : "以后"}${w.n >= 99 ? "全程" : w.n}${w.unit === "round" ? "轮" : "句"}`;
 const whoZ = (w: string) => (w === "me" ? "我方" : "对方");
-const tgZ = (t: Eff["tg"]) => ({ unit: "指定随从", src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t]);
+const tgZ = (t: Eff["tg"]) => ({ units: "指定随从组", unit: "指定随从", src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t]);
 const aggZ = { count: "次数", sum: "累计", len: "词数", segs: "段数" } as const;
 const amZ = (a: Amt) => (typeof a === "number" ? String(a) : `[${wText(a.q.win)}${whoZ(a.q.who)}${oText(a.q.obj)}${aggZ[a.q.agg]}]×${a.mult}`);
 const eZ = (e: Eff) => `${tgZ(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amZ(e.n)}${e.ignore ? "(无视减伤)" : ""}`;

@@ -6,7 +6,7 @@ import {
 } from "./ast";
 import { type St, alive, unitsOf, canAfford } from "./interp";
 import type { Side } from "./ast";
-import { playbook } from "./playbook";
+import { playbook, expandTg, postponeOk } from "./playbook";
 import { P2 } from "./params";
 
 export type Rng = () => number;
@@ -94,7 +94,7 @@ function basics(e: Env): Sentence[] {
 /** 真实引擎的词：转移（保护）、延后（把对方已宣告的一句推后）、移除（拆敌人的保护） */
 function realBasics(e: Env): Sentence[] {
   const out: Sentence[] = [];
-  if (P2.POSTPONE) for (const d of e.s.decl.filter((x) => x.side !== e.side)) for (const n of new Set([P.TL - d.start + 1, 1, 2, 3])) if (n >= 1) out.push([postpone(d.ord, n)]);
+  if (P2.POSTPONE) for (const d of e.s.decl.filter((x) => x.side !== e.side)) if (postponeOk(e, d)) out.push([postpone(d.ord, P.TL - d.start + 1)]);   // N = 刚好推出时间轴的最小值
   if (P2.REDIR) for (const m of e.mine) out.push([redirect(unit(m))]);
   if (P2.RMREAL) for (const f of e.foes) out.push([strip(unit(f))]);
   return out;
@@ -115,12 +115,13 @@ export function candidates(s: St, side: Side, u: number, r: Rng, k: number, mode
   const mineStand = s.stand.filter((x) => x.owner === side).map((x) => JSON.stringify(x.c));
   const pending = s.decl.filter((d) => d.side === side).flatMap((d) => d.cl).map((c) => JSON.stringify(c));
   const dup = (cl: Sentence) => cl.some((c) => (c.k === "ignore" || c.k === "when" || c.k === "delay") && (c.k === "ignore" ? s.stand.some((x) => x.owner === side && x.c.k === "ignore") || s.decl.some((d) => d.side === side && d.cl.some((z) => z.k === "ignore")) : mineStand.includes(JSON.stringify(c)) || pending.includes(JSON.stringify(c))));
-  const add = (cl0: Sentence) => { const cl = normStatus(cl0); const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl, u)) { seen.add(key); out.push(cl); } };
+  const add0 = (cl0: Sentence) => { const cl = normStatus(cl0); const key = JSON.stringify(cl); if (!seen.has(key) && !dup(cl) && canAfford(s, side, cl, u)) { seen.add(key); out.push(cl); } };
+  const add = (cl: Sentence) => (P2.TGT_AT_DECL ? expandTg(e, cl) : [cl]).forEach(add0);   // 目标在宣告时定：别名展开成显式随从（敌方 3 人、我方各一条）
   basics(e).forEach(add);
   if (mode === "basic") return out;   // 入门：只会朴素的攻击/治疗/减伤
   realBasics(e).forEach(add);
   if (mode === "playbook") playbook(e).forEach(add);
   else if (mode === "plain") playbook(e, "atkdef").forEach(add);
-  for (let i = 0; i < k * 3 && out.length < k + 6; i++) add(genSentence(e, mode === "free"));
+  for (let i = 0; i < k * 3 && out.length < k + 6; i++) { const g = genSentence(e, mode === "free"); if (P2.TGT_AT_DECL) expandTg(e, g, true).forEach(add0); else add(g); }
   return out;
 }

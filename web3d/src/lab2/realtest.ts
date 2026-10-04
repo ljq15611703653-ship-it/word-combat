@@ -10,6 +10,9 @@ import { newGame, declare, resolveRound, nextRound, canAfford, type St } from ".
 import { applyRules, ADV_WORDS } from "./params";
 import { whenever, cat } from "./ast";
 import { randDeck } from "./deck";
+import { candidates } from "./gen";
+import { P2 } from "./params";
+import { sentenceText } from "./ast";
 import { mulberry32 } from "./gen";
 import { useReal } from "./realprofile";
 import { sentenceCost, windup, numsOf } from "./ast";
@@ -230,6 +233,46 @@ if (process.argv[1]?.replace(/\\/g, "/").endsWith("lab2/realtest.ts")) {
     const sx = newGame(0, [null, null], false, [null, null]); refill(sx); sx.hp[3] = 1;
     declare(sx, 0, 0, [act(dmg(6, unit(3)))], 4); declare(sx, 0, 1, [act(dmg(2, unit(3)))], 6); resolveRound(sx);
     check(sx.hp[4] === 6 && sx.hp[5] === 6, "REAL：指定的目标已倒下，后一句落空，不换人");
+  }
+  // ===== 11c 目标在宣告时定（TGT_AT_DECL）：别名在 declare 时解析成具体随从；生效时它已倒下 → 落空（真实：tg 是宣告时点选的，hit 对已倒下的目标返回 0）=====
+  {
+    const alias = (cl: Sentence) => cl;
+    const mk = () => { const s = newGame(0, [null, null], false, [null, null]); refill(s); s.hp[3] = 1; return s; };
+    const run = (flag: number) => {
+      P2.TGT_AT_DECL = flag; const s = mk();
+      declare(s, 0, 1, alias([act(dmg(2, { t: "lowFoe" }))]), 6);           // 宣告时最低血是 u3（1 血）
+      declare(s, 0, 0, alias([act(dmg(3, unit(3)))]), 4);                      // 第 4 秒先把 u3 打倒
+      resolveRound(s); return s;
+    };
+    const s1 = run(1), s0 = run(0);
+    check(s1.decl[0].cl[0].k === "act" && (s1.decl[0].cl[0] as { eff: { tg: { t: string; u?: number } } }).eff.tg.t === "unit" && (s1.decl[0].cl[0] as { eff: { tg: { u?: number } } }).eff.tg.u === 3, "宣告时 lowFoe 被解析成具体随从（u3）");
+    check(s1.hp[4] === 6 && s1.hp[5] === 6 && s1.hp[3] === 0, "目标已倒下 → 这一段落空，不换人（与真实引擎 tg 固定一致）");
+    check(s0.hp[3] === 0 && s0.hp[4] === 4, "开关关：生效时才取最低血（旧行为不变）");
+    // 与真实引擎对照：宣告时的最低血是 u3，换成真实的固定 tg
+    P2.TGT_AT_DECL = 1;
+    const sc: Sc = { hp: { 3: 1 }, rounds: [[A(1, 6, { k: "atk", n: 2, tg: 3 }), A(0, 4, { k: "atk", n: 3, tg: 3 })]] };
+    const rr = runReal(sc);
+    check(rr[0].hp[4] === s1.hp[4] && rr[0].hp[3] === s1.hp[3], "与真实引擎一致（u4 不受伤）");
+    // 全体 / 选择 N 个：宣告时定下一组
+    const sa = mk(); sa.hp[3] = 6; declare(sa, 0, 0, [act(dmg(2, { t: "allFoe" }))], 4); declare(sa, 0, 1, [act(dmg(1, { t: "some", n: 2, side: "foe" }))], 5);
+    const tgs = sa.decl.map((d) => JSON.stringify((d.cl[0] as { eff: { tg: unknown } }).eff.tg));
+    check(tgs[0] === '{"t":"units","us":[3,4,5]}' && JSON.parse(tgs[1]).t === "units" && JSON.parse(tgs[1]).us.length === 2, "全体 / 选择 2 个 被解析成显式随从组");
+    check(sentenceText(sa.decl[0].cl).includes("乙方1号词位随从") && !sentenceText([act(dmg(2, unit(4)))]).includes("敌方最低"), "显式目标读成「乙方N号位置名随从」");
+    // 生成器：开关开时不再出现任何别名目标；延后只出「刚好推出时间轴」的最小 N 且只在来得及时出现
+    const aliasT = new Set(["lowFoe", "lowMe", "allMe", "allFoe", "some"]);
+    let nAlias = 0, nCand = 0, postBad = 0, postN = 0;
+    const rg = mulberry32(99);
+    for (let g = 0; g < 60; g++) {
+      const s = newGame((g % 2) as 0 | 1, [null, null], false, [["首挡", "不屈", "首挡"], ["不屈", "首挡", "不屈"]]); refill(s); s.rnd = 1 + (g % 5);
+      declare(s, 1, 3, [act(dmg(3 + (g % 3), unit(0)))], 3 + (g % 7)); if (g % 2) declare(s, 1, 4, [act(heal(2, unit(4)))], 5);
+      for (const mode of ["free", "playbook"] as const) for (const cl of candidates(s, 0, 0, rg, 12, mode)) {
+        nCand++;
+        const tgOf = (c: Sentence[number]) => (c.k === "act" ? [c.eff.tg] : c.k === "when" || c.k === "delay" ? c.effs.map((x) => x.tg) : "tg" in c ? [c.tg] : []);
+        for (const c of cl) { for (const tg of tgOf(c)) if (aliasT.has(tg.t)) nAlias++; if (c.k === "postpone") { postN++; const d = s.decl.find((x) => x.ord === c.ord)!; if (c.n !== P.TL - d.start + 1 || !d.cl.some((z) => z.k === "act")) postBad++; } }
+      }
+    }
+    check(nCand > 100 && nAlias === 0, `开关开：${nCand} 个候选句里没有任何别名目标（lowFoe 等）`, `（别名 ${nAlias}）`);
+    check(postN > 0 && postBad === 0, `延后候选 ${postN} 条：N 都是刚好推出时间轴的最小值`);
   }
   // ===== 12 模糊对照：随机场景、三轮，逐轮比较血量/状态/胜负 =====
   const N = +(process.argv[2] ?? 400);

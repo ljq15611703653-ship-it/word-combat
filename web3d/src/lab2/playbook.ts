@@ -1,10 +1,10 @@
 // 「手册」：人写的、可能造成漂亮结果的句子与组合（限制 / 引用类）。
 // 它们大多依赖复杂决策（时机、读对手的上一句、几句话互相配合）——电脑只拿到「可以说的句子」，什么时候说由推演决定。
-import { act, dmg, shield, heal, status, forbid, whenever, unless, timer, query, win, cat, word, ev, redirect, postpone, strip, unit, type Sentence, type Tg, type Clause, type Obj } from "./ast";
+import { type Eff, units, act, dmg, shield, heal, status, forbid, whenever, unless, timer, query, win, cat, word, ev, redirect, postpone, strip, unit, type Sentence, type Tg, type Clause, type Obj } from "./ast";
 import type { Env } from "./gen";
 import { P } from "../lab/rules";
 import { P2 } from "./params";
-import { sideOf, type Decl } from "./interp";
+import { sideOf, windupFor, type Decl } from "./interp";
 
 export interface Named { name: string; cl: Sentence; group: "atkdef" | "other" }
 /** 普通进攻/防御也能用的复杂句（只用连环、并、减伤、无视这类攻防词，不需要限制/引用/状态类进阶词） */
@@ -115,6 +115,8 @@ export function playbookNamed(_e?: Env): Named[] {
   if (_e) realExtras(_e, add);
   return o;
 }
+/** 延后值得用：对方那句带伤害，我方能在它起手之前出手（不然它已经生效，延后落空） */
+export function postponeOk(e: Env, d: Decl): boolean { return d.cl.some((c) => c.k === "act" && c.eff.verb === "dmg") && windupFor([postpone(d.ord, 1)], e.unit, e.s) < d.start; }
 /** 对方这一句里最大的单次伤害（只看写死数字的伤害，重复算在一起） */
 function bigHit(d: Decl): number { let m = 0; for (const c of d.cl) if (c.k === "act" && c.eff.verb === "dmg" && typeof c.eff.n === "number") m = Math.max(m, c.eff.n * (c.eff.rep ?? 1)); return m; }
 /** 真实引擎的词（开关打开才有）：转移反弹大单击、延后推出时间轴、关键词保护大招、拆保护、重复 */
@@ -130,11 +132,10 @@ function realExtras(e: Env, add: (name: string, ...cl: Sentence) => void) {
       const ts = new Set<number>(); for (const g of tg) { if (g.t === "unit" && sideOf(g.u) === e.side) ts.add(g.u); else if (g.t === "lowFoe" || g.t === "lowMe") ts.add(lowMine); }
       for (const u of ts) add("转移·反弹大单击", redirect(unit(u)));
     }
-    if (P2.POSTPONE) {
+    if (P2.POSTPONE && postponeOk(e, d)) {   // 只在「推得出时间轴」且我方来得及在它之前出手时才用延后，N 取最小的
       const nOut = P.TL - d.start + 1;
       add("延后·大招推出时间轴", postpone(d.ord, nOut));
       add("延后·大招推出时间轴并打", postpone(d.ord, nOut), act(dmg(2, lowFoe)));
-      add("延后·大招推后一点", postpone(d.ord, Math.min(3, nOut)));
     }
   }
   const kw = s.kw[e.unit];
@@ -160,4 +161,35 @@ function realExtras(e: Env, add: (name: string, ...cl: Sentence) => void) {
 }
 /** 环境变量 PB_EXCLUDE='追击,吸血' 可以把名字里含这些字的手册句去掉（做对照实验用） */
 const EXC = (typeof process !== "undefined" && process.env.PB_EXCLUDE ? process.env.PB_EXCLUDE.split(",") : []).filter(Boolean);
-export const playbook = (e: Env, group?: "atkdef"): Sentence[] => playbookNamed(e).filter((x) => !EXC.some((k) => x.name.includes(k)) && (!group || x.group === group)).map((x) => x.cl);
+/** TGT_AT_DECL：把句子里的别名目标（最低血 / 全体 / 选择 N 个）展开成显式随从。敌方（或我方）「最低血」的每个可选随从各出一条；one = 随机只留一条 */
+export function expandTg(e: Env, cl: Sentence, one = false): Sentence[] {
+  const s = e.s;
+  const isAlias = (t: Tg) => t.t === "lowFoe" || t.t === "lowMe" || t.t === "allMe" || t.t === "allFoe" || t.t === "some";
+  const effsOf = (c: Clause): Eff[] => (c.k === "act" ? [c.eff] : c.k === "when" || c.k === "delay" ? c.effs : []);
+  const need = cl.some((c) => effsOf(c).some((x) => isAlias(x.tg)) || ((c.k === "status" || c.k === "redirect" || c.k === "strip") && isAlias(c.tg)));
+  if (!need) return [cl];
+  const foeSide = (v: string) => v === "dmg" || v === "status" || v === "strip";
+  const fch = e.foes.length ? e.foes : [-1], mch = e.mine.length ? e.mine : [-1];
+  const pickF = one ? [fch[Math.floor(e.r() * fch.length)]] : fch, pickM = one ? [mch[Math.floor(e.r() * mch.length)]] : mch;
+  const out: Sentence[] = [], seen = new Set<string>();
+  for (const f of pickF) for (const m of pickM) {
+    const rt = (t: Tg, v: string): Tg => {
+      const fs = foeSide(v);
+      switch (t.t) {
+        case "lowFoe": case "lowMe": { const u = fs ? f : m; return u >= 0 ? unit(u) : t; }
+        case "allMe": return units(e.mine);
+        case "allFoe": return units(e.foes);
+        case "some": return units((t.side === "foe" ? e.foes : e.mine).slice().sort((a, b) => s.hp[a] - s.hp[b]).slice(0, t.n));
+        default: return t;
+      }
+    };
+    const re = (x: Eff): Eff => ({ ...x, tg: rt(x.tg, x.verb) });
+    const n = cl.map((c): Clause => c.k === "act" ? { ...c, eff: re(c.eff) } : c.k === "when" || c.k === "delay" ? ({ ...c, effs: c.effs.map(re) } as Clause) : c.k === "status" ? { ...c, tg: rt(c.tg, "status") } : c.k === "redirect" ? { ...c, tg: rt(c.tg, "redir") } : c.k === "strip" ? { ...c, tg: rt(c.tg, "strip") } : c);
+    const key = JSON.stringify(n); if (!seen.has(key)) { seen.add(key); out.push(n); }
+  }
+  return out;
+}
+export const playbook = (e: Env, group?: "atkdef"): Sentence[] => {
+  const base = playbookNamed(e).filter((x) => !EXC.some((k) => x.name.includes(k)) && (!group || x.group === group)).map((x) => x.cl);
+  return P2.TGT_AT_DECL ? base.flatMap((cl) => expandTg(e, cl)) : base;
+};
