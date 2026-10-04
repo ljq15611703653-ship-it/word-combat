@@ -1,6 +1,7 @@
 // 句子即规则：共享语法树（AST）。原型解释器 interp.ts 直接解释它；之后真实引擎和界面也用同一份结构。
 // 设计依据：设计与审计/数字牌模式/交接-句子语言设计总览.md §1、§5
 import { P } from "../lab/rules";
+import { P2 } from "./params";
 
 export type Side = 0 | 1;
 export type Who = "me" | "foe";
@@ -8,7 +9,7 @@ export type Who = "me" | "foe";
 /** 被引用的东西：词 / 类别 / 事件 / 第 N 句 / 词序 */
 export type Obj =
   | { t: "word"; w: string }
-  | { t: "cat"; c: string }                              // atk dmg heal hpchg def guard struct any
+  | { t: "cat"; c: string }                              // atk dmg heal hpchg def guard status struct any
   | { t: "ev"; e: "down" | "hurt" | "healed" | "decl" }
   | { t: "nth"; n: number }                              // 本轮第 N 句（按宣告顺序）
   | { t: "order"; a: string; b: string };                // 句子里 a 词在 b 词之前
@@ -31,15 +32,17 @@ export type Tg =
   | { t: "lowFoe" } | { t: "lowMe" } | { t: "allMe" } | { t: "allFoe" };
 
 export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield" }
+export type StatusKind = "burn" | "vuln" | "weak";
 
 export type Clause =
   | { k: "act"; eff: Eff; ifPrev?: "ok" | "fail" }       // 造成 / 恢复 / 减伤，可接「成功/失败」
-  | { k: "when"; q: Query; judge: "exist" | "absent"; effs: Eff[]; cap: number }
+  | { k: "when"; q: Query; judge: "exist" | "absent"; effs: Eff[]; cap: number; forbid?: boolean }
   //    before 窗口：宣告生效那一刻判断一次；after 窗口：留在场上，窗口里发生了才触发（至多 cap 次/轮）
   | { k: "delay"; wait: number; effs: Eff[] }            // N 轮后结算；Eff 的 Amt 里可引用「等待期间」的量
+  | { k: "status"; kind: StatusKind; lvl: number; dur: number; tg: Tg }   // 灼烧：轮末掉 lvl；易伤：受伤 +lvl；衰弱：出手伤害 −lvl
   | { k: "ignore"; cat: "stand"; win: number }           // 无视：这几轮里对面长期句子的效果落不到我方
   | { k: "cash" }                                        // 兑现：提前结算我方定时句
-  | { k: "remove"; obj: Obj };                           // 移除一句带有某词/类别的话（any 更贵）
+  | { k: "remove"; obj: Obj };                           // 移除一句带有某词/类别的话（any 更贵）；cat status = 清除我方身上的状态
 
 export type Sentence = Clause[];
 
@@ -48,6 +51,7 @@ export const dmg = (n: Amt, tg: Tg = { t: "lowFoe" }, ignore?: "shield"): Eff =>
 export const heal = (n: Amt, tg: Tg = { t: "lowMe" }): Eff => ({ verb: "heal", n, tg });
 export const shield = (n: Amt, tg: Tg = { t: "lowMe" }): Eff => ({ verb: "shield", n, tg });
 export const act = (eff: Eff, ifPrev?: "ok" | "fail"): Clause => ({ k: "act", eff, ifPrev });
+export const status = (kind: StatusKind, lvl: number, dur: number, tg: Tg = { t: "lowFoe" }): Clause => ({ k: "status", kind, lvl, dur, tg });
 export const unit = (u: number): Tg => ({ t: "unit", u });
 export const win = (dir: Win["dir"], n: number, u: Win["unit"] = "round"): Win => ({ dir, n, unit: u });
 export const cat = (c: string): Obj => ({ t: "cat", c });
@@ -60,20 +64,25 @@ export const whenever = (who: Who, obj: Obj, n: number, effs: Eff[], cap = 1, ti
 /** 若 不存在（长期）：以后 N 轮里每轮结束时，who 本轮没有 obj，则 effs */
 export const unless = (who: Who, obj: Obj, n: number, effs: Eff[]): Clause =>
   ({ k: "when", q: query(win("after", n), who, obj), judge: "absent", effs, cap: 1 });
-/** 不得：违者受罚。以后 N 轮里对方每次 obj，对其本人造成 pen 点（语法糖：每当 + 对来源造成） */
-export const forbid = (obj: Obj, n: number, pen: number, cap = 1): Clause => whenever("foe", obj, n, [dmg(pen, { t: "src" })], cap, 99);
+/** 不得：违者受罚。以后 N 轮里对方每次 obj，对其本人造成 pen 点 */
+export const forbid = (obj: Obj, n: number, pen: number, cap = 1): Clause =>
+  ({ k: "when", q: query(win("after", n), "foe", obj, "count", 99), judge: "exist", effs: [dmg(pen, { t: "src" })], cap, forbid: true });
 /** 定时：N 轮后，对面最低血量随从受到「等待期间 obj 次数 × mult」 */
 export const timer = (wait: number, obj: Obj, who: Who, mult: number): Clause =>
   ({ k: "delay", wait, effs: [dmg({ q: query(win("after", 99), who, obj), mult })] });
 
-// ---------- 词表与费用 ----------
+// ---------- 词、类别、数字、费用 ----------
+const STATUS_WORD: Record<StatusKind, string> = { burn: "灼烧", vuln: "易伤", weak: "衰弱" };
+const verbWord = (e: Eff) => (e.verb === "dmg" ? "造成" : e.verb === "heal" ? "恢复" : "减伤");
+const verbCats = (e: Eff) => (e.verb === "dmg" ? ["atk", "dmg", "hpchg"] : e.verb === "heal" ? ["heal", "hpchg"] : ["def", "guard"]);
+
 /** 一个子句里出现的词（按出现顺序，用于「带有 xx 词的句子」「先于/后于」） */
 export function wordsOf(c: Clause): string[] {
-  const v = (e: Eff) => (e.verb === "dmg" ? "造成" : e.verb === "heal" ? "恢复" : "减伤");
   switch (c.k) {
-    case "act": return [v(c.eff), ...(c.eff.ignore ? ["无视"] : [])];
-    case "when": return [c.judge === "absent" ? "不存在" : "存在", c.q.win.dir === "after" ? "每当" : "若", ...c.effs.map(v)];
-    case "delay": return ["定时", ...c.effs.map(v)];
+    case "act": return [verbWord(c.eff), ...(c.eff.ignore ? ["无视"] : [])];
+    case "when": return [c.judge === "absent" ? "不存在" : "存在", c.forbid ? "不得" : c.q.win.dir === "after" ? "每当" : "若", ...c.effs.map(verbWord)];
+    case "delay": return ["定时", ...c.effs.map(verbWord)];
+    case "status": return [STATUS_WORD[c.kind]];
     case "ignore": return ["无视"];
     case "cash": return ["兑现"];
     case "remove": return ["移除"];
@@ -81,18 +90,20 @@ export function wordsOf(c: Clause): string[] {
 }
 export function catsOf(c: Clause): string[] {
   const out = new Set<string>(["any"]);
-  const e = (x: Eff) => (x.verb === "dmg" ? ["atk", "dmg", "hpchg"] : x.verb === "heal" ? ["heal", "hpchg"] : ["def", "guard"]).forEach((k) => out.add(k));
-  if (c.k === "act") e(c.eff); else if (c.k === "when" || c.k === "delay") { out.add("struct"); c.effs.forEach(e); } else out.add("struct");
+  if (c.k === "act") verbCats(c.eff).forEach((k) => out.add(k));
+  else if (c.k === "when" || c.k === "delay") { out.add("struct"); c.effs.forEach((e) => verbCats(e).forEach((k) => out.add(k))); }
+  else if (c.k === "status") out.add("status");
+  else out.add("struct");
   return [...out];
 }
+const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n === 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
 /** 数字牌需求：所有 ≥2 的数字（Amt 引用量里的窗口 N、倍率也算） */
 export function numsOf(c: Clause): number[] {
-  const am = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n === 99 ? 1 : a.q.win.n, a.mult, a.q.tight ?? 1]);
-  const ef = (x: Eff) => am(x.n);
   switch (c.k) {
-    case "act": return ef(c.eff);
-    case "when": return [c.q.win.n === 99 ? 1 : c.q.win.n, c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap(ef)];
-    case "delay": return [c.wait, ...c.effs.flatMap(ef)];
+    case "act": return amNums(c.eff.n);
+    case "when": return [c.q.win.n === 99 ? 1 : c.q.win.n, c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap((e) => amNums(e.n))];
+    case "delay": return [c.wait, ...c.effs.flatMap((e) => amNums(e.n))];
+    case "status": return [c.lvl, c.dur];
     case "ignore": return [c.win];
     default: return [];
   }
@@ -103,15 +114,74 @@ export function clauseCost(c: Clause): number {
     case "act": return ec(c.eff);
     case "when": return P.STAND + (c.q.obj.t === "cat" && c.q.obj.c === "any" ? P.ANYCLS : 0);
     case "delay": case "ignore": return P.STAND;
+    case "status": return P2.STATUS_AP;
     case "cash": return P.CASH;
     case "remove": return c.obj.t === "cat" && c.obj.c === "any" ? P.REMOVE_ANY : P.REMOVE;
   }
 }
+const isChain = (c: Clause) => c.k === "act" && !!c.ifPrev;
+/** 自指词用量：每种每用一次占一张（用完冷却一轮） */
+export function refKindsOf(cl: Sentence): string[] {
+  const out: string[] = [];
+  const q = (x: Query) => {
+    out.push("win");
+    if (x.agg !== "count" || x.obj.t === "order" || x.obj.t === "nth" || x.obj.t === "word" || x.obj.t === "ev" || (x.obj.t === "cat" && x.obj.c !== "any")) out.push("ref");
+  };
+  const am = (a: Amt) => { if (typeof a !== "number") q(a.q); };
+  for (const c of cl) {
+    if (c.k === "when") { out.push("cond", "judge"); q(c.q); c.effs.forEach((e) => am(e.n)); }
+    else if (c.k === "delay") c.effs.forEach((e) => am(e.n));
+    else if (c.k === "act") am(c.eff.n);
+    else if (c.k === "remove" && !(c.obj.t === "cat" && c.obj.c === "any")) out.push("ref");
+  }
+  return out;
+}
+/** 一句话用掉的进阶词（卡组里要有） */
+export function advWordsOf(cl: Sentence): string[] {
+  const out: string[] = [];
+  cl.forEach((c, i) => {
+    if (i > 0 && !isChain(c)) out.push("并");
+    if (c.k === "act") { if (c.eff.verb === "shield") out.push("减伤"); if (c.eff.ignore) out.push("无视"); }
+    else if (c.k === "when") {
+      if (c.forbid) out.push("不得"); else if ((c.q.tight ?? 1) > 1) out.push("收紧");
+      if (c.cap > 1) out.push("至多");
+      if (c.q.obj.t === "order") out.push("先后");
+      c.effs.forEach((e) => { if (e.verb === "shield") out.push("减伤"); });
+    } else if (c.k === "delay") { out.push("定时"); c.effs.forEach((e) => { if (e.verb === "shield") out.push("减伤"); }); }
+    else if (c.k === "status") out.push(STATUS_WORD[c.kind]);
+    else if (c.k === "ignore") out.push("无视");
+    else if (c.k === "cash") out.push("兑现");
+    else if (c.k === "remove") out.push("移除");
+  });
+  return out;
+}
 export function sentenceCost(cl: Sentence): number {
-  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 && !(c.k === "act" && c.ifPrev) ? P.AND : 0), 0);
+  return cl.reduce((t, c, i) => t + clauseCost(c) + (i > 0 && !isChain(c) ? P.AND : 0), 0) + refKindsOf(cl).length * P2.REFAP;
 }
 /** 起手时间：段越多、数字越大越晚 */
 export function windup(cl: Sentence): number {
   const maxN = Math.max(1, ...cl.flatMap(numsOf));
   return Math.min(P.TL, 1 + (cl.length - 1) * P.WIND_CL + Math.floor((maxN - 1) * P.WIND_N));
 }
+
+// ---------- 读成中文 ----------
+const OBJ_ZH: Record<string, string> = { atk: "攻击词", dmg: "伤害", heal: "治疗词", hpchg: "生命变动", def: "防护词", guard: "防护", status: "状态词", struct: "结构词", any: "任意词" };
+const objText = (o: Obj) => o.t === "word" ? `「${o.w}」` : o.t === "cat" ? (OBJ_ZH[o.c] ?? o.c) : o.t === "ev" ? ({ down: "倒下", hurt: "受到伤害", healed: "被恢复", decl: "宣告" }[o.e]) : o.t === "nth" ? `第${o.n}句` : `「${o.a}」先于「${o.b}」`;
+const whoText = (w: Who) => (w === "me" ? "我方" : "对方");
+const winText = (w: Win) => `${w.dir === "before" ? "之前" : "以后"}${w.n === 99 ? "全程" : w.n}${w.unit === "round" ? "轮" : "句"}`;
+const aggText = (a: Query["agg"]) => ({ count: "次数", sum: "累计", len: "词数", segs: "段数" }[a]);
+const tgText = (t: Tg) => t.t === "unit" ? `随从${t.u}` : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
+const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.who)}${objText(a.q.obj)}${aggText(a.q.agg)}×${a.mult}`);
+const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}`;
+export function clauseText(c: Clause): string {
+  switch (c.k) {
+    case "act": return `${c.ifPrev ? (c.ifPrev === "ok" ? "若成功，" : "若失败，") : ""}${effText(c.eff)}`;
+    case "when": return `${c.forbid ? "不得：" : c.q.win.dir === "after" ? "每当" : "若"} ${winText(c.q.win)} ${whoText(c.q.who)}${c.judge === "absent" ? "不存在" : "存在"}${objText(c.q.obj)}${(c.q.tight ?? 1) > 1 && !c.forbid ? `(收紧${c.q.tight})` : ""}，则 ${c.effs.map(effText).join("并")}${c.cap > 1 ? `（至多${c.cap}次）` : ""}`;
+    case "delay": return `${c.wait}轮后：${c.effs.map(effText).join("并")}`;
+    case "status": return `${tgText(c.tg)}${STATUS_WORD[c.kind]}${c.lvl}级持续${c.dur}轮`;
+    case "ignore": return `无视 长期句子 ${c.win}轮`;
+    case "cash": return "兑现";
+    case "remove": return `移除 ${objText(c.obj)}`;
+  }
+}
+export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");

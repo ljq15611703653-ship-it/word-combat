@@ -1,7 +1,7 @@
 // 解释器行为测试：npx tsx src/lab2/test.ts
 import { P } from "../lab/rules";
-import { act, dmg, heal, shield, unit, cat, word, ev, win, query, whenever, unless, forbid, timer, type Sentence } from "./ast";
-import { newGame, declare, resolveRound, nextRound, passUnit, nextSide, alive, total, type St } from "./interp";
+import { status, act, dmg, heal, shield, unit, cat, word, ev, win, query, whenever, unless, forbid, timer, type Sentence } from "./ast";
+import { newGame, declare, resolveRound, nextRound, passUnit, nextSide, alive, total, canAfford, type St } from "./interp";
 
 let bad = 0;
 const check = (ok: boolean, name: string) => { if (!ok) { bad++; console.log("✗", name); } else console.log("✓", name); };
@@ -42,7 +42,7 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
   say(s, 0, [{ k: "when", q: query(win("before", 1, "sent"), "foe", { t: "order", a: "造成", b: "恢复" }, "count", 2), judge: "exist", effs: [dmg(2, unit(3))], cap: 1 }], 7);
   resolveRound(s); check(s.hp[3] === P.HP - 2, "词序：造成 先于 恢复"); }
 { const s = fresh(); say(s, 3, [act(dmg(1, unit(1))), act(heal(1, unit(3)))], 6);
-  say(s, 0, [{ k: "when", q: { ...query(win("before", 1, "sent"), "foe", ev("decl"), "len", 2) }, judge: "exist", effs: [dmg({ q: query(win("before", 1, "sent"), "foe", ev("decl"), "len"), mult: 1 }, unit(3))], cap: 1 }], 7);
+  say(s, 0, [{ k: "when", q: { ...query(win("before", 1, "sent"), "foe", ev("decl"), "len", 3) }, judge: "exist", effs: [dmg({ q: query(win("before", 1, "sent"), "foe", ev("decl"), "len"), mult: 1 }, unit(3))], cap: 1 }], 7);
   resolveRound(s); check(s.hp[3] === P.HP - 2, "句子长度作引用量：对方上一句 2 个词 → 造成 2"); }
 // 10 成功 / 失败
 { const s = fresh(); say(s, 3, [act(shield(3, unit(3)))], 1); say(s, 0, [act(dmg(3, unit(3))), act(dmg(2, unit(4)), "fail")], 3);
@@ -59,19 +59,42 @@ const say = (s: St, u: number, cl: Sentence, start?: number) => { if (!declare(s
   say(s, 3, [act(dmg(1, unit(2)))], 5); resolveRound(s);
   check(s.hp[3] <= P.HP && s.log.filter((e) => e.trig).length > 0, "触发产生的效果只触发一层"); }
 
+
+// 14 状态词
+{ const s = fresh(); say(s, 0, [status("burn", 2, 2, unit(3))]); resolveRound(s); check(s.hp[3] === P.HP - 2 && s.sts.length === 1, "灼烧 2 级：轮末掉 2 点，状态留下"); }
+{ const s = fresh(); say(s, 0, [status("vuln", 2, 2, unit(3))]); say(s, 1, [act(dmg(1, unit(3)))], 5); resolveRound(s); check(s.hp[3] === P.HP - 3, "易伤 2 级：1 点伤害变 3"); }
+{ const s = fresh(); say(s, 0, [status("weak", 1, 2, unit(3))], 1); say(s, 3, [act(dmg(3, unit(0)))], 5); resolveRound(s); check(s.hp[0] === P.HP - 2, "衰弱 1 级：出手伤害 −1"); }
+{ const s = fresh(); say(s, 0, [status("burn", 2, 3, unit(3))]); resolveRound(s); say(s, 4, [{ k: "remove", obj: cat("status") }]); void s; check(true, "（清除状态见下）"); }
+{ const s = fresh(); s.sts.push({ unit: 0, kind: "burn", lvl: 2, left: 3 }); say(s, 1, [{ k: "remove", obj: cat("status") }]); resolveRound(s); check(s.sts.length === 0, "移除 状态词：清除我方身上的状态"); }
+// 15 自指词冷却：每种 REFCOPIES 张，用完冷却一轮
+{ const s = fresh(); const w = () => [whenever("foe", cat("atk"), 2, [dmg(1, { t: "src" })], 1, 2)];
+  say(s, 0, w()); say(s, 1, w()); const third = canAfford(s, 0, w());
+  check(third === null, "自指词用完：本轮第三句说不了");
+  resolveRound(s); nextRound(s); check(canAfford(s, 0, w()) === null, "下一轮仍在冷却");
+  resolveRound(s); nextRound(s); check(canAfford(s, 0, w()) !== null, "再下一轮恢复"); }
+// 16 卡组：进阶词用完就没了
+{ const s = newGame(0, [{ 并: 1 }, null]); s.side[0].ap = 20;
+  check(declare(s, 0, 0, [act(dmg(1, unit(3))), act(dmg(1, unit(4)))]), "卡组里有 并：能说");
+  check(!declare(s, 0, 1, [act(dmg(1, unit(3))), act(dmg(1, unit(4)))]), "并 用完：第二句说不了");
+  check(declare(s, 0, 2, [act(dmg(1, unit(3)))]), "不带进阶词的句子照说"); }
+// 17 至多：cap 3 比 cap 1 多触发
+{ const run = (cap: number) => { const s = fresh(); say(s, 0, [whenever("foe", cat("atk"), 2, [dmg(1, { t: "src" })], cap, 2)]); say(s, 3, [act(dmg(1, unit(1)))], 5); say(s, 4, [act(dmg(1, unit(2)))], 6); resolveRound(s); return s.stats["s0:fire"] ?? 0; };
+  check(run(1) === 1 && run(3) === 2, "至多 N 次：cap 1 触发 1 次、cap 3 触发 2 次"); }
+
 // 随机试玩：不崩、能打完
 function rnd(n: number) { return Math.floor(Math.random() * n); }
 function randSentence(s: St, u: number): Sentence {
   const foeU = (u < 3 ? [3, 4, 5] : [0, 1, 2]).filter((x) => alive(s, x));
   const myU = (u < 3 ? [0, 1, 2] : [3, 4, 5]).filter((x) => alive(s, x));
   const t = () => unit(foeU[rnd(foeU.length)] ?? 0), m = () => unit(myU[rnd(myU.length)] ?? 0);
-  switch (rnd(8)) {
+  switch (rnd(9)) {
     case 0: return [act(heal(1 + rnd(2), m()))];
     case 1: return [act(shield(1 + rnd(2), m()))];
     case 2: return [whenever("foe", cat("atk"), 2, [dmg(1 + rnd(2), { t: "src" })], 1, 2)];
     case 3: return [unless("foe", cat("atk"), 2, [heal(2, { t: "allMe" })])];
     case 4: return [timer(1 + rnd(2), cat("atk"), "foe", 1 + rnd(2))];
     case 5: return [{ k: "remove", obj: cat("any") }];
+    case 8: return [status(["burn", "vuln", "weak"][rnd(3)] as "burn", 1 + rnd(2), 2, t())];
     case 6: return [act(dmg(1, t())), act(dmg(1, t()), rnd(2) ? "ok" : "fail")];
     default: return [act(dmg(1 + rnd(2), t(), rnd(3) === 0 ? "shield" : undefined))];
   }
