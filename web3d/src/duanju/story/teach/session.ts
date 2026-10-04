@@ -43,7 +43,7 @@ export class TeachSession {
     return JSON.stringify(j);
   }
   settings(): Settings {
-    return { styleId: "yin", deck: {}, tier: this.beat.tier ?? "入门", first: this.beat.first, rules: "custom", customRules: this.rulesJson(), kws: [] };
+    return { styleId: "yin", deck: {}, tier: this.beat.tier ?? "入门", first: this.beat.first, rules: "custom", customRules: this.rulesJson(), kws: [], foe: { mode: "random", preset: "", deck: {} } };
   }
   absent(): number[] {
     const b = this.beat; if (!b.me || !b.foe) return [];
