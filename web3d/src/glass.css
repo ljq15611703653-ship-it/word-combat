@@ -409,3 +409,20 @@ html:not(.classic) {
   .ro.over .ro-body { max-height: 150px; overflow-y: auto; scrollbar-width: thin; }
   body.gm-top .tl::before { content: ""; position: absolute; inset: 0 -22px; background: linear-gradient(180deg, rgba(5, 10, 24, 0.55), rgba(5, 10, 24, 0)); pointer-events: none; }
 }
+
+/* 第五档：右上角只有行动点 + 数字牌；上方中间一行轮数/过热；左上角菜单；右下角只有「下一轮」这类 */
+html:not(.classic) {
+  body.gm-top .tl { top: 62px; }
+  .gm.pl.tp { left: auto; right: 10px; top: 8px; width: auto; max-width: 440px; transform: none; padding: 6px 12px 7px; }
+  .gm.tp .sv-me { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; }
+  .gm.tp .sv-me .ap { color: #ffe08a; font-family: var(--mono); font-size: 14px; font-weight: 700; }
+  .gm.tp .sv-foe { font-size: 11px; margin-top: 2px; }
+  .gm-float > .gm-roundbar { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; gap: 12px; align-items: center; font: 600 13px var(--mono); letter-spacing: 0.1em; text-shadow: 0 1px 6px #000; white-space: nowrap; }
+  .gm-roundbar .heat { font-size: 12px; letter-spacing: 0.04em; color: #ffb27a; border: 1px solid rgba(255, 178, 122, 0.45); padding: 0 8px; border-radius: 9px; }
+  .gm-roundbar .heat.on { color: #ff8a6a; border-color: rgba(255, 110, 80, 0.8); background: rgba(255, 80, 50, 0.14); }
+  .gm-float > .gm-menubar { position: absolute; left: 10px; top: 8px; display: flex; gap: 4px; }
+  .gm-menubar button { padding: 2px 8px; font-size: 11px; }
+  .gm-menubar button.on { border-color: var(--g-line-hi); background: rgba(74, 163, 255, 0.2); }
+  .gm-float > .gm-dock { left: auto; right: 12px; transform: none; bottom: 12px; width: min(300px, 30vw); }
+  .gm-drawer { top: 70px; }
+}

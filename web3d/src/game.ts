@@ -114,6 +114,8 @@ export class Game {
   protected popMax = false;
   /** 横版布局：顶部一小块代替右栏 */
   protected topLayout = false;
+  protected elRound = h("div", "gm-roundbar");
+  protected elMenu = h("div", "gm-menubar");
 
   constructor(protected ctx: GameCtx) {
     this.root.hidden = true;
@@ -130,7 +132,7 @@ export class Game {
       this.elPop.hidden = true;
       this.elDrawer.append(this.elDecl, this.elLog);
       this.elDrawer.hidden = true;
-      if (this.topLayout) this.float.append(this.elDock, this.elPop, this.elDrawer); else this.float.append(this.elPop, this.elDrawer);
+      if (this.topLayout) this.float.append(this.elRound, this.elMenu, this.elDock, this.elPop, this.elDrawer); else this.float.append(this.elPop, this.elDrawer);
       this.elPop.addEventListener("animationend", () => this.elPop.classList.remove("nudge"));
       document.body.append(this.root, this.float, this.overlay);
       window.addEventListener("keydown", (e) => {
@@ -362,37 +364,25 @@ export class Game {
     const M = this.M, el = this.elTop, wipe = !!M.opts.wipe;
     if (!M.sides.length || !M.R) return;       // 联机：对手刚进房间、第一份快照还没到
     el.innerHTML = "";
-    const first = M.firstSide();
-    const mid = h("div", "gm-round", `第 ${M.rnd} / ${NR.MAX_ROUNDS} 轮 · 本轮先宣告：${first === 0 ? "你" : this.foeName}`);
+    // 右上角：只有行动点和数字牌（我方 + 对手一行）；整局的信息（轮数、过热）在屏幕上方中间；菜单在左上角
+    const ap = (s: number) => (M.phase === "declare" ? M.res[s].ap : M.sides[s].ap);
+    const apMax = wipe ? NR.W.AP_CAP : NR.AP_CAP;
+    const me = h("div", "sv-me");
+    me.append(h("span", "ap", `行动点 ${ap(0)}/${apMax}`), this.elHand);
+    const foe = h("div", "sv-foe dim", `${this.foeName}：行动点 ${ap(1)}/${apMax} · 数字牌 ${M.sides[1].cards.length} 张`);
+    el.append(me, foe);
+    const rb = this.elRound;
+    rb.innerHTML = "";
+    rb.append(h("span", "", `第 ${M.rnd} / ${NR.MAX_ROUNDS} 轮 · 本轮先宣告：${M.firstSide() === 0 ? "你" : this.foeName}`));
     if (wipe) {
       const hf = NR.W.HEAT_FROM;
-      mid.append(h("span", M.rnd >= hf ? "heat on" : "heat", M.rnd >= hf ? `过热：本轮末每个随从 −${M.rnd - hf + 1}` : `第 ${hf} 轮起过热`));
+      rb.append(h("span", M.rnd >= hf ? "heat on" : "heat", M.rnd >= hf ? `本轮末过热：每个随从 −${M.rnd - hf + 1}` : `第 ${hf} 轮起过热`));
     }
-    const cols = h("div", "sv-cols");
-    for (let s = 0; s < 2; s++) {
-      const c = M.clsOf(s), p = M.progress(s);
-      const us = M.R.U.filter((u: any) => u.side === s && !u.perma);
-      let hp = 0, mx = 0, alive = 0;
-      for (const u of us) { const sh = this.shown[u.uid] ?? [u.hp, u.down !== -1]; mx += u.mx; if (!sh[1]) { hp += sh[0]; alive++; } }
-      const ap = M.phase === "declare" ? M.res[s].ap : M.sides[s].ap;
-      const col = h("div", `sv-col ${s === 0 ? "me" : "foe"}`);
-      col.title = `成长：${NR.CLASS_GOAL[c]}\n特长：${NR.talentOf(c, wipe)}`;
-      const l1 = h("div", "l1");
-      const chip = h("span", "chip", `${s === 0 ? "你" : this.foeName} · ${NR.CLASS_NAME[c]}`); chip.style.background = NR.CLASS_COLOR[c];
-      l1.append(chip, h("b", "", `生命 ${hp}/${mx}`), h("span", "dim", `存活 ${alive}/${us.length}`));
-      const l2 = h("div", "l2");
-      const bar = h("span", "bar"), fill = h("i"); fill.style.width = `${Math.min(100, p * 100)}%`; fill.style.background = NR.CLASS_COLOR[c];
-      bar.append(fill);
-      l2.append(h("span", "dim", wipe ? "成长" : "完成度"), bar, h("span", "dim", `${Math.round(p * 100)}%`), h("span", "ap", `行动点 ${ap}/${wipe ? NR.W.AP_CAP : NR.AP_CAP}`));
-      col.append(l1, l2);
-      if (s === 0) col.append(this.elHand); else col.append(h("div", "gm-hand dim", `数字牌 ${M.sides[1].cards.length} 张`));
-      cols.append(col);
-    }
-    const bar = h("div", "gm-tools");
-    bar.append(btn("怎么玩", "ghost", () => this.showRules()), btn(this.fast ? "动画：快" : "动画：正常", "ghost", (e) => { this.fast = !this.fast; (e.target as HTMLElement).textContent = this.fast ? "动画：快" : "动画：正常"; }),
+    const mn = this.elMenu;
+    mn.innerHTML = "";
+    mn.append(btn("怎么玩", "ghost", () => this.showRules()), btn(this.fast ? "动画：快" : "动画：正常", "ghost", (e) => { this.fast = !this.fast; (e.target as HTMLElement).textContent = this.fast ? "动画：快" : "动画：正常"; }),
       btn("日志", "ghost" + (this.elDrawer.hidden ? "" : " on"), (e) => { this.elDrawer.hidden = !this.elDrawer.hidden; (e.target as HTMLElement).classList.toggle("on", !this.elDrawer.hidden); }),
       btn("退出", "ghost", () => (this.hooks?.exit ? this.hooks.exit() : this.close())));
-    el.append(mid, cols, bar);
   }
 
   protected renderTop() {
@@ -853,16 +843,9 @@ export class Game {
     if (this.ui === "compose") { this.renderComposer(); return; }
     el.innerHTML = "";
     switch (this.ui) {
-      case "foe": el.append(h("h3", "dim", `${this.foeName}在想……`)); break;
+      case "foe": if (!this.topLayout) el.append(h("h3", "dim", `${this.foeName}在想……`)); break;
       case "pick_unit": {
-        if (this.topLayout) {
-          // 横版：直接点随从（或点它头顶的「＋ 拼一句」）；这里只留「不出手」和提示
-          el.append(h("h3", "gold", "轮到你：点一个随从，给它拼一句"));
-          const row = h("div", "row2 wrap");
-          for (const uid of M.remaining[0]) row.append(btn(`${M.R.U[uid].name}不出手`, "ghost" + (this.hl("pass", undefined, uid) ? " hl" : ""), () => this.pass(uid)));
-          el.append(row, h("small", "dim", `行动点还剩 ${M.res[0].ap} · 右键随从看详情`));
-          break;
-        }
+        if (this.topLayout) break;     // 横版：直接点随从（或头顶小框的「＋ 拼一句」/「不出手」），右下角不放东西
         el.append(h("h3", "gold", this.pl ? "轮到你：点随从拼一句" : "轮到你：选一个随从，给它拼一句"));
         el.append(h("small", "dim", this.pl ? "左键点随从＝在它旁边拼一句；右键＝看它的详情。每个随从一轮一句。" : "点下面的按钮（或点你的随从卡）。每个随从一轮一句；可以先让一个随从出手，看看对方怎么接，再定下一个。"));
         for (const uid of M.remaining[0]) {
@@ -922,7 +905,18 @@ export class Game {
 
   // ------------------------------------------------------------ 新界面：悬浮面板 / 操作卡
   /** 正在为某个随从拼句 / 选目标 / 定秒数：操作放进它旁边的悬浮面板；其余时候放在窄条底部的操作卡里 */
+  /** 横版：「不出手」按钮挂在我方随从头顶的小框上（轮到我选随从时才出现） */
+  protected syncPass() {
+    if (!this.topLayout) return;
+    const M = this.M;
+    for (const u of M.R.U) {
+      if (u.perma || u.side !== 0) continue;
+      const on = this.ui === "pick_unit" && M.remaining[0].includes(u.uid);
+      this.ctx.panels[cardIndex(u.uid)]?.setPass(on ? () => this.pass(u.uid) : null);
+    }
+  }
   protected placeAct() {
+    this.syncPass();
     const inPop = (this.ui === "compose" || this.ui === "target" || this.ui === "timing") && this.selUid >= 0;
     if (inPop) {
       if (this.popMode !== "act" || this.popUid !== this.selUid) this.popMax = false;
@@ -1005,6 +999,10 @@ export class Game {
           btn("它这轮不出手", "ghost" + (this.hl("pass", undefined, u.uid) ? " hl" : ""), () => { this.closePop(); this.pass(u.uid); }));
         body.append(row);
       } else if (u.side !== 0) body.append(h("small", "dim", "只显示公开信息：它这轮宣告的句子看得到；对手的数字牌、卡组和择流的待定目标看不到。"));
+      if (this.topLayout) {
+        const c0 = M.clsOf(u.side), p0 = M.progress(u.side);
+        body.append(h("small", "dim", `${u.side === 0 ? "你" : this.foeName} · ${NR.CLASS_NAME[c0]} · 成长 ${Math.round(p0 * 100)}%（${NR.METRIC_NAME[c0]} ${M.R.M[u.side][NR.METRIC[c0]]}/${NR.TARGET[c0]}，用来解锁数字牌）`));
+      }
       if (this.popMax) {
         const c = M.clsOf(u.side);
         body.append(h("p", "", `${u.side === 0 ? "你" : this.foeName}的职业：${NR.CLASS_NAME[c]}`), h("small", "talent", `特长：${NR.CLASS_TALENT[c]}`), h("small", "dim", `得分：${NR.CLASS_GOAL[c]}`));

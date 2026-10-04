@@ -24,6 +24,7 @@ for (let g = 0; g < n; g++) {
   const c0 = CLASSES[g % nc] as Cls, c1 = CLASSES[(g + 1 + (Math.floor(g / nc) % (nc - 1))) % nc] as Cls;
   const m = new Match() as any;
   if (noDef0) m.aiNoDef = [true, false];
+  if (process.env.NOATK === "1") m.aiNoAtk = [true, false];
   m.start(presetDeck(c0, mode === "wipe"), presetDeck(c1, mode === "wipe"), 1 + g, false, false, mode === "wipe" ? { wipe: true } : {});
   let steps = 0;
   while (m.phase !== "over" && steps++ < 4000) {

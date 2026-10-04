@@ -46,13 +46,16 @@ export class SentencePanel {
   private code: HTMLElement;
   private hpBar: HTMLElement; private hpFill: HTMLElement; private hpNum: HTMLElement; private chips: HTMLElement;
   private hpSig = "";
+  private passBtn!: HTMLButtonElement;
+  private passCb: (() => void) | null = null;
   private toks: Tok[] = [];
   private sec: number | null = null;
 
   constructor(side: "r" | "b", name: string, private emptyText: string, onClick?: () => void) {
     this.el = document.createElement("div");
     this.el.className = `ro ro-${side}`;
-    this.el.innerHTML = `<i class="ro-lead"></i><div class="ro-head"><span class="ro-name">${name}</span><span class="ro-code"></span></div><div class="ro-hp" hidden><i></i><b></b></div><div class="ro-chips" hidden></div><div class="ro-body"></div>`;
+    this.el.innerHTML = `<i class="ro-lead"></i><div class="ro-head"><span class="ro-name">${name}</span><span class="ro-code"></span></div><div class="ro-hp" hidden><i></i><b></b></div><div class="ro-chips" hidden></div><div class="ro-body"></div><button class="ro-pass" hidden>不出手</button>`;
+    this.passBtn = this.el.querySelector(".ro-pass")!;
     this.hpBar = this.el.querySelector(".ro-hp")!;
     this.hpFill = this.hpBar.querySelector("i")!;
     this.hpNum = this.hpBar.querySelector("b")!;
@@ -97,6 +100,12 @@ export class SentencePanel {
     this.hpNum.textContent = hp > 0 ? `${hp}/${max}` : "倒下";
     this.chips.hidden = !chips.length;
     this.chips.innerHTML = chips.map((c) => `<span>${c}</span>`).join("");
+  }
+  /** 「不出手」小按钮（横版：轮到我选随从时才有） */
+  setPass(cb: (() => void) | null) {
+    this.passCb = cb;
+    this.passBtn.hidden = !cb;
+    this.passBtn.onclick = (e) => { e.stopPropagation(); this.passCb?.(); };
   }
   setName(name: string) { const e = this.el.querySelector(".ro-name"); if (e && e.textContent !== name) e.textContent = name; }
   setActive(v: boolean) { this.el.classList.toggle("active", v); }

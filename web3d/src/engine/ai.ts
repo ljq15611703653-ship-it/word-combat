@@ -121,7 +121,7 @@ function singles(M: any, s: number, cp: any): [Clause[], number][] {
   if (cp.slots > 0) for (let i = 0; i < Math.min(2, vals.length); i++) if (vals[i] > 1) conts.push(vals[i]);
   const words = M.res[s].words;
   const out: [Clause[], number][] = [];
-  if (E.length) {
+  if (E.length && !M.aiNoAtk?.[s]) {   // aiNoAtk：平衡测试用，纯龟缩对照组
     for (const n of copts) {
       if (n > E.length) continue;
       for (const d of opts) {

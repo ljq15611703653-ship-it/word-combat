@@ -163,3 +163,5 @@ body.composing .top .cta, body.composing .top .pts { visibility: hidden; }
 .ro.over .ro-chips span { font: 600 10px "Noto Sans SC", sans-serif; padding: 0 5px; border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent); border-radius: 8px; color: #dff; background: rgba(0, 0, 0, 0.35); }
 .ro.over .ro-body { font-size: 12px; line-height: 1.45; }
 .ro.over.dead { opacity: 0.45; }
+.ro.over .ro-pass { display: block; margin: 3px auto 0; padding: 0 10px; font: 600 11px "Noto Sans SC", sans-serif; color: #cfe; background: rgba(0, 0, 0, 0.35); border: 1px solid color-mix(in srgb, var(--sc) 55%, transparent); border-radius: 9px; cursor: pointer; }
+.ro.over .ro-pass[hidden] { display: none; }
