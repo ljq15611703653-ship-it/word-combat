@@ -1,0 +1,68 @@
+第1代 47s｜平均5.6轮｜最高胜率62%｜胜率离散6.2｜多样度0.060｜头名 并3 定时1 收紧2 易伤2
+第2代 87s｜平均5.6轮｜最高胜率66%｜胜率离散8.5｜多样度0.064｜头名 并3 定时1 收紧2 易伤2
+第3代 126s｜平均5.5轮｜最高胜率63%｜胜率离散7.1｜多样度0.059｜头名 并2 减伤1 定时1 移除1 收紧1 灼烧1 易伤1
+第4代 166s｜平均5.5轮｜最高胜率65%｜胜率离散6.1｜多样度0.067｜头名 并2 减伤1 定时1 移除1 收紧1 灼烧1 易伤1
+第5代 204s｜平均5.5轮｜最高胜率64%｜胜率离散8.1｜多样度0.069｜头名 并3 定时2 收紧1 易伤2
+第6代 244s｜平均5.4轮｜最高胜率64%｜胜率离散8.8｜多样度0.074｜头名 并3 定时1 无视1 收紧2 灼烧1
+第7代 282s｜平均5.4轮｜最高胜率61%｜胜率离散6.4｜多样度0.063｜头名 并3 定时2 先后1 灼烧1
+第8代 317s｜平均5.4轮｜最高胜率64%｜胜率离散7.8｜多样度0.074｜头名 并2 定时1 无视1 收紧2 灼烧2
+第9代 350s｜平均5.4轮｜最高胜率63%｜胜率离散6.4｜多样度0.062｜头名 并1 兑现1 无视2 收紧2 灼烧1 衰弱1
+第10代 384s｜平均5.4轮｜最高胜率67%｜胜率离散6.9｜多样度0.060｜头名 并3 定时1 无视1 收紧1 灼烧2
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+(node:19608) MaxListenersExceededWarning: Possible EventEmitter memory leak detected. 11 error listeners added to [ChildProcess]. MaxListeners is 10. Use emitter.setMaxListeners() to increase limit
+第11代 418s｜平均5.4轮｜最高胜率65%｜胜率离散8.1｜多样度0.069｜头名 并2 移除1 至多2 先后1 灼烧1 易伤1
+第12代 452s｜平均5.4轮｜最高胜率61%｜胜率离散6.1｜多样度0.060｜头名 并1 定时2 兑现1 不得1 先后1 衰弱1
+第13代 487s｜平均5.5轮｜最高胜率67%｜胜率离散6.4｜多样度0.073｜头名 并3 减伤1 定时1 无视1 至多1 衰弱1
+第14代 522s｜平均5.5轮｜最高胜率64%｜胜率离散7.1｜多样度0.078｜头名 并3 定时1 收紧1 至多1 先后1 衰弱1
+第15代 561s｜平均5.4轮｜最高胜率63%｜胜率离散6.6｜多样度0.066｜头名 并3 兑现1 无视1 收紧1 易伤1 衰弱1
+第16代 595s｜平均5.4轮｜最高胜率63%｜胜率离散8.4｜多样度0.073｜头名 并3 定时1 兑现1 无视1 至多1 衰弱1
+第17代 629s｜平均5.4轮｜最高胜率62%｜胜率离散6.8｜多样度0.062｜头名 并3 定时2 至多1 先后1
+第18代 663s｜平均5.3轮｜最高胜率63%｜胜率离散6.8｜多样度0.070｜头名 并3 定时1 至多2 先后1 易伤1
+第19代 696s｜平均5.4轮｜最高胜率61%｜胜率离散6.5｜多样度0.063｜头名 并3 定时2 无视1 易伤1
+第20代 730s｜平均5.4轮｜最高胜率62%｜胜率离散6.5｜多样度0.064｜头名 并3 定时2 不得1 易伤1
+第21代 763s｜平均5.3轮｜最高胜率62%｜胜率离散7.6｜多样度0.064｜头名 并3 定时1 无视1 不得1 衰弱1
+第22代 799s｜平均5.4轮｜最高胜率62%｜胜率离散6.2｜多样度0.059｜头名 并3 定时1 无视2 先后1
+第23代 835s｜平均5.3轮｜最高胜率64%｜胜率离散4.9｜多样度0.060｜头名 并3 定时1 无视2 衰弱1
+第24代 878s｜平均5.4轮｜最高胜率64%｜胜率离散7.4｜多样度0.070｜头名 并1 定时1 无视1 至多2 易伤2 衰弱1
+第25代 921s｜平均5.4轮｜最高胜率62%｜胜率离散5.4｜多样度0.066｜头名 并3 定时1 收紧1 至多2 灼烧1
+第26代 966s｜平均5.4轮｜最高胜率65%｜胜率离散6.2｜多样度0.069｜头名 并3 定时1 兑现1 无视1 先后1
+第27代 1009s｜平均5.4轮｜最高胜率61%｜胜率离散6.7｜多样度0.072｜头名 并2 无视2 灼烧1 易伤2 衰弱1
+第28代 1052s｜平均5.3轮｜最高胜率65%｜胜率离散6.6｜多样度0.066｜头名 并3 减伤1 定时1 兑现1 无视1 衰弱1
+第29代 1095s｜平均5.4轮｜最高胜率63%｜胜率离散7.8｜多样度0.072｜头名 并3 减伤1 移除1 兑现1 先后1 易伤1
+第30代 1139s｜平均5.3轮｜最高胜率63%｜胜率离散7.6｜多样度0.068｜头名 并1 定时1 移除1 不得1 收紧1 灼烧1 易伤1
+第31代 1183s｜平均5.4轮｜最高胜率65%｜胜率离散7.4｜多样度0.066｜头名 并3 定时1 兑现1 灼烧1 衰弱2
+第32代 1226s｜平均5.5轮｜最高胜率65%｜胜率离散7.1｜多样度0.059｜头名 并2 定时2 收紧1 易伤2 衰弱1
+第33代 1269s｜平均5.4轮｜最高胜率64%｜胜率离散7.7｜多样度0.068｜头名 并3 无视2 不得1 易伤1
+第34代 1311s｜平均5.5轮｜最高胜率65%｜胜率离散6.7｜多样度0.069｜头名 并2 定时1 无视2 不得1 衰弱1
+第35代 1355s｜平均5.5轮｜最高胜率63%｜胜率离散7.0｜多样度0.074｜头名 并2 定时1 移除1 兑现1 收紧1 至多1 衰弱1
+第36代 1398s｜平均5.4轮｜最高胜率65%｜胜率离散6.1｜多样度0.070｜头名 并3 无视2 不得1 易伤1
+第37代 1442s｜平均5.5轮｜最高胜率62%｜胜率离散5.8｜多样度0.069｜头名 并3 定时1 兑现1 至多1 灼烧1 衰弱1
+第38代 1484s｜平均5.4轮｜最高胜率66%｜胜率离散8.7｜多样度0.068｜头名 并2 定时2 移除1 收紧1 衰弱1
+第39代 1527s｜平均5.4轮｜最高胜率60%｜胜率离散7.0｜多样度0.071｜头名 并3 定时2 收紧1 易伤1 衰弱1
+第40代 1569s｜平均5.4轮｜最高胜率69%｜胜率离散8.5｜多样度0.068｜头名 并1 定时1 无视1 先后1 易伤2 衰弱1
+第41代 1611s｜平均5.4轮｜最高胜率62%｜胜率离散6.6｜多样度0.071｜头名 并3 定时1 移除1 无视2
+第42代 1654s｜平均5.4轮｜最高胜率64%｜胜率离散7.3｜多样度0.071｜头名 并1 定时1 无视1 先后1 易伤2 衰弱1
+第43代 1698s｜平均5.4轮｜最高胜率69%｜胜率离散8.6｜多样度0.078｜头名 并2 定时2 无视1 灼烧1 易伤1
+第44代 1741s｜平均5.4轮｜最高胜率63%｜胜率离散7.1｜多样度0.071｜头名 并1 定时1 无视1 不得2 收紧1 至多1
+第45代 1783s｜平均5.4轮｜最高胜率64%｜胜率离散7.2｜多样度0.064｜头名 并3 移除1 兑现1 无视1 不得1
+第46代 1827s｜平均5.5轮｜最高胜率62%｜胜率离散6.8｜多样度0.072｜头名 并1 定时2 移除1 兑现1 收紧1 先后1
+第47代 1871s｜平均5.5轮｜最高胜率67%｜胜率离散7.1｜多样度0.072｜头名 并1 定时1 无视1 不得2 易伤1 衰弱1
+第48代 1914s｜平均5.4轮｜最高胜率63%｜胜率离散6.6｜多样度0.069｜头名 并3 定时1 收紧1 至多1 易伤2
+第49代 1957s｜平均5.4轮｜最高胜率67%｜胜率离散8.9｜多样度0.073｜头名 并3 定时1 无视1 先后1 易伤1
+第50代 1999s｜平均5.4轮｜最高胜率65%｜胜率离散7.7｜多样度0.063｜头名 并2 定时1 无视1 不得1 至多2
+完成，用时 1999 秒，结果在 D:/wc/out/evo_state.json
