@@ -26,6 +26,8 @@ export class ComposerInput implements InputMode {
   setGuide(g: Guide | null) { this.guide = g; this.refresh?.(); }
   /** 程序化点词（冒烟测试、教程演示用）：返回是否被接受 */
   push(t: Token): boolean { const L = this.cur; if (!L || !this.allow(t, L).ok) return false; this.tokens.push(t); this.refresh?.(); return true; }
+  /** 重新计算并刷新界面（测试改了局面后用） */
+  update() { this.refresh?.(); }
   /** 程序化确认宣告 */
   confirm(): boolean { const b = this.bar?.querySelector<HTMLButtonElement>('[data-a="go"]'); if (!b || b.disabled) return false; b.click(); return true; }
   private allow(t: Token, L: Legal): { ok: boolean; why?: string } {
@@ -46,8 +48,8 @@ export class ComposerInput implements InputMode {
     let sugList: ReturnType<typeof m.legalSentences> = [];
     const bar = document.createElement("div"); bar.className = "cp-bar"; this.bar = bar;
     const hand = document.createElement("div"); hand.className = "cp-hand"; this.hand = hand;
-    bar.innerHTML = `<div class="cp-head"><b>${esc(ctx.label ?? "")} 说什么？</b><span class="ap"></span><button class="cp-x" data-a="close" aria-label="关闭">✕</button></div>
-      <div class="cp-sent empty"></div><div class="cp-read"></div><div class="cp-meta"></div>
+    bar.innerHTML = `<div class="cp-head"><b>${esc(ctx.label ?? "")} 说什么？</b><span class="ap"></span><button class="cp-tool" data-a="fold" aria-label="收起手牌条">手牌 ▾</button><button class="cp-x" data-a="close" aria-label="关闭">✕</button></div>
+      <div class="cp-sent empty"></div><div class="cp-read"></div><div class="cp-meta"></div><div class="cp-why"></div>
       <div class="cp-start"><label>起手 <b class="sv">1</b> 秒</label><input type="range" min="1" max="${m.tl()}" step="1" value="1" /><div class="cp-tl"></div></div>
       <div class="cp-sug" hidden></div>
       <div class="cp-btns"><button data-a="back">退格</button><button data-a="clear">清空</button><button data-a="sug">推荐句</button><button data-a="pass">不出手</button><button class="go" data-a="go" disabled>确认宣告</button></div>`;
@@ -94,11 +96,12 @@ export class ComposerInput implements InputMode {
       groups[2][1] = groups[2][1].filter((t) => +t <= maxCard).sort((a, b) => +a - +b);
       groups[3][1].sort((a, b) => (isUnit(a) ? +a[1] : 9) - (isUnit(b) ? +b[1] : 9));
       const tip = whyTxt || (L.canEnd ? "句子完整，可以确认宣告；也可以继续往后接。" : L.expect);
-      hand.innerHTML = `<div class="cp-why">${esc(tip)}</div>` + groups.filter(([, l]) => l.length).map(([n, l]) => `<div class="cp-grp"><span>${n}</span>${l.map((t) => {
+      q(".cp-why").textContent = tip;
+      hand.innerHTML = `` + groups.filter(([, l]) => l.length).map(([n, l]) => `<div class="cp-grp"><span>${n}</span>${l.map((t) => {
         const a = this.allow(t, L);
         const cnt = isAdvWord(t) ? `<small>×${left[t] ?? 0}</small>` : isNum(t) && +t >= 2 ? `<small>${cards.filter((c) => c.v >= +t && c.cd === 0).length}</small>` : "";
         return `<button class="cp-w ${kindOf(t)}${a.ok ? "" : " off"}${t === nextHint ? " hint" : ""}" data-t="${esc(t)}" title="${esc(a.ok ? "" : a.why ?? "")}">${esc(tokenLabel(t, names))}${cnt}</button>`;
-      }).join("")}</div>`).join("");
+      }).join("")}</div>`).join("") + `<div class="cp-tip" hidden></div>`;
     };
     const tryPush = (t: Token) => {
       const L = this.cur!, a = this.allow(t, L);
@@ -109,7 +112,8 @@ export class ComposerInput implements InputMode {
     const declare = () => { const L = this.cur!; if (!L.ast || go.disabled) return; const cl = L.ast; this.close(); ctx.onDeclare(cl, start); };
     const onClick = (e: Event) => {
       const t = e.target as HTMLElement;
-      const w = t.closest<HTMLElement>(".cp-w"); if (w) { tryPush(w.dataset.t!); return; }
+      if (t.closest("[data-a=fold]")) { hand.classList.toggle("fold"); place(); return; }
+      const w = t.closest<HTMLElement>(".cp-w"); if (w) { tryPush(w.dataset.t!); if (w.classList.contains("off")) requestAnimationFrame(() => showTip(hand.querySelector<HTMLElement>(`.cp-w[data-t="${w.dataset.t}"]`))); return; }
       const sg = t.closest<HTMLElement>("[data-s]");
       if (sg) { const c = sugList[+sg.dataset.s!]; try { this.tokens = astToTokens(c.cl); } catch { /* 不支持的句型不填 */ } sugOpen = false; sug.hidden = true; startTouched = false; render(); return; }
       const a = t.closest<HTMLElement>("[data-a]")?.dataset.a;
@@ -120,6 +124,17 @@ export class ComposerInput implements InputMode {
         if (sugOpen) { sugList = m.legalSentences(u, 40).filter((c) => !this.guide?.allowed || this.guide.allowed(c.cl)).sort((x, y) => KIND_ORDER.indexOf(x.kind) - KIND_ORDER.indexOf(y.kind)).slice(0, 14); sug.innerHTML = sugList.map((c, i) => `<button data-s="${i}">${esc(c.text)}</button>`).join("") || "<i>没有推荐</i>"; }
       }
     };
+    // 悬停/点按灰词：浮出原因（原生 title 在触屏和截图里不可见）
+    const showTip = (w: HTMLElement | null) => {
+      const tip = hand.querySelector<HTMLElement>(".cp-tip"); if (!tip) return;
+      if (!w || !w.classList.contains("off")) { tip.hidden = true; return; }
+      const a = this.allow(w.dataset.t!, this.cur!);
+      tip.textContent = `「${tokenLabel(w.dataset.t!, names)}」现在不能用：${a.why ?? ""}`; tip.hidden = false;
+      const r = w.getBoundingClientRect(), hr = hand.getBoundingClientRect();
+      void hr; tip.style.left = Math.max(6, Math.min(r.left, innerWidth - tip.offsetWidth - 6)) + "px"; tip.style.top = Math.max(4, r.top - tip.offsetHeight - 6) + "px";
+    };
+    hand.addEventListener("mouseover", (e) => showTip((e.target as HTMLElement).closest<HTMLElement>(".cp-w")));
+    hand.addEventListener("mouseleave", () => showTip(null));
     bar.addEventListener("click", onClick); hand.addEventListener("click", onClick);
     slider.addEventListener("input", () => { start = +slider.value; startTouched = true; render(); });
     // 点场上随从 = 选目标（捕获阶段，先于战斗界面自己的点击）

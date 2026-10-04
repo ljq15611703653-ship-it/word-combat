@@ -19,7 +19,18 @@ for (const [w, h, mob, tag] of scenes) {
   await ev(`document.querySelector('.unit[data-u="1"]').dispatchEvent(new MouseEvent('click',{bubbles:true}))`); await sleep(400);
   await shot(`${tag}_1_empty`);
   await ev(js(["造成", "2"])); await sleep(300); await shot(`${tag}_2_half`);
-  await ev(`document.querySelector('.cp-w.off')?.click()`); await sleep(200); await shot(`${tag}_3_gray_reason`);
   await ev(js(["@3"])); await sleep(300); await shot(`${tag}_4_complete`);
+  // 灰态原因三场景：行动点不够 / 没有可用的数字牌 / 卡组里没有这个词（悬停；手机上用点按）
+  const hover = async (t) => {
+    const r = await ev(`(()=>{const e=document.querySelector('.cp-w[data-t="${t}"]');if(!e)return null;const b=e.getBoundingClientRect();return [b.x+b.width/2,b.y+b.height/2]})()`);
+    if (!r) { console.log("找不到词", t); return; }
+    if (mob) await ev(`document.querySelector('.cp-w[data-t="${t}"]').click()`);
+    else { await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: r[0] - 3, y: r[1] }); await cdp("Input.dispatchMouseEvent", { type: "mouseMoved", x: r[0], y: r[1] }); }
+    await sleep(300);
+  };
+  const clear = `document.querySelector('.cp-bar [data-a=clear]').click()`;
+  await ev(clear); await ev("(()=>{const b=__dj.battle;b.m.s.side[0].ap=0;b.input.composer.update()})()"); await sleep(200); await hover("造成"); await shot(`${tag}_5_why_ap`);
+  await ev("(()=>{const b=__dj.battle;b.m.s.side[0].ap=5;b.m.s.side[0].cards.forEach((c)=>c.cd=2);b.input.composer.update()})()"); await ev(js(["造成"])); await sleep(200); await hover("3"); await shot(`${tag}_6_why_cards`);
+  await ev(clear); await ev("(()=>{const b=__dj.battle;b.m.s.side[0].cards.forEach((c)=>c.cd=0);b.m.s.deck[0]={};b.input.composer.update()})()"); await sleep(200); await hover("灼烧"); await shot(`${tag}_7_why_deck`);
 }
 proc.kill();
