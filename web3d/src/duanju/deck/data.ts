@@ -1,6 +1,6 @@
 // 词说明/示例/类别（来自 D:/wc/deckbuilder/words.js；价格与张数不在这里，取自引擎 ADV）。
 export interface WordInfo { cat: string; icon: string; desc: string; example: string }
-export const CATEGORIES = [{"id":"core","name":"攻防结构","color":"#ff2d95"},{"id":"quote","name":"引用量","color":"#00e5ff"},{"id":"state","name":"状态","color":"#ffd23f"},{"id":"limit","name":"限制与条件","color":"#b388ff"},{"id":"time","name":"时机与清除","color":"#5eead4"}] as const;
+export const CATEGORIES = [{"id":"core","name":"攻防结构","color":"#ff4fa3"},{"id":"quote","name":"引用量","color":"#22e6ff"},{"id":"state","name":"状态","color":"#ffc857"},{"id":"limit","name":"限制与条件","color":"#a98bff"},{"id":"time","name":"时机与清除","color":"#3dffb0"}] as const;
 export const WORD_INFO: Record<string, WordInfo> = {
  "并": {
   "cat": "core",

@@ -82,7 +82,7 @@ export function mountSetup(root: HTMLElement, st: Settings, onStart: (s: Setting
     el.querySelector('[data-slot="deck"]')!.appendChild(deckHost);
     if (st.foe.mode === "custom") { ensureFoe(); el.querySelector('[data-slot="foe"]')!.appendChild(foeHost); }
     setCost();
-    el.querySelectorAll<HTMLImageElement>("img[data-art]").forEach((im) => { const s = styleOf(im.dataset.art!); loadArt(s.artDir, s.accent, s.accent2, 0, s.glyph).then((u) => (im.src = u)); });
+    el.querySelectorAll<HTMLImageElement>("img[data-art]").forEach((im) => { const s = styleOf(im.dataset.art!); loadArt(s.artDir, s.accent, s.accent2, 0, s.glyph).then((u) => (im.src = u.idle)); });
     const ta = el.querySelector<HTMLTextAreaElement>(".su-rules");
     if (ta) ta.addEventListener("input", () => { st.customRules = ta.value; });
     if (ta) ta.addEventListener("change", () => { st.customRules = ta.value; render(); });

@@ -8,10 +8,10 @@
 .vx-shell-svg { display: block; filter: drop-shadow(0 0 8px currentColor); }
 .vx-tok { padding: 2px 8px; font-size: 14px; font-weight: 800; line-height: 20px; color: #fff; background: rgba(11, 6, 20, .92); border: 1.5px solid var(--c, #fff); white-space: nowrap; box-shadow: 0 0 10px -2px var(--c, #fff); clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px)); }
 .vx-layer .vx-tok { border-color: #ffffffcc; }
-.vx-tok.s-bing { border-color: #ff2d95; background: #2a0a1f; } .vx-tok.s-bing.snap { background: #ff2d95; color: #14031c; }
-.vx-tok.s-yin { border-color: #00e5ff; border-style: dashed; border-radius: 12px; clip-path: none; background: #04222a; } .vx-tok.s-yin.lit { background: #00e5ff; color: #04222a; }
-.vx-tok.s-xian { border-color: #b388ff; border-width: 2px; background: #1c1034; clip-path: none; } .vx-tok.s-xian.locked { border-color: #ff2d95; box-shadow: 0 0 0 2px #1c1034, 0 0 0 4px #ff2d95; }
-.vx-tok.s-zhuang { border-color: #ffd23f; border-radius: 10px 10px 14px 6px; clip-path: none; background: #2a2208; }
+.vx-tok.s-bing { border-color: #ff4fa3; background: #2a0a1f; } .vx-tok.s-bing.snap { background: #ff4fa3; color: #14031c; }
+.vx-tok.s-yin { border-color: #22e6ff; border-style: dashed; border-radius: 12px; clip-path: none; background: #04222a; } .vx-tok.s-yin.lit { background: #22e6ff; color: #04222a; }
+.vx-tok.s-xian { border-color: #9a7bff; border-width: 2px; background: #1c1034; clip-path: none; } .vx-tok.s-xian.locked { border-color: #ff4fa3; box-shadow: 0 0 0 2px #1c1034, 0 0 0 4px #ff4fa3; }
+.vx-tok.s-zhuang { border-color: #3dffb0; border-radius: 10px 10px 14px 6px; clip-path: none; background: #08281c; }
 .vx-tok.ghost { opacity: 0; } .vx-tok.fired { opacity: .35; } .vx-tok.pulse { background: #fff; color: #111; }
 .vx-tok.trig { border-color: #ffd23f; color: #ffd23f; } .vx-tok.victim { border-color: #ff5c7a; color: #ff9fb0; }
 .vx-pushtag { font-weight: 900; font-size: 14px; text-shadow: 0 0 6px #000; white-space: nowrap; }

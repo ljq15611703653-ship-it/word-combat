@@ -478,3 +478,13 @@ export function nextLegal(prefix: Token[], ctx: Ctx): Legal {
 }
 /** 句子能不能付得起（= 引擎 canAfford）。canEnd 与它一致，测试里对拍 */
 export const affordable = (ast: Sentence, ctx: Ctx) => !!canAfford(ctx.s, ctx.side, ast, ctx.unit);
+
+// ---------------------------------------------------------------- 拖拽拼句用：任意位置插入/删除后的整句可行性
+/** 词序列在语法上是不是合法前缀（不看行动点/卡组） */
+export const structOk = (tokens: Token[]): boolean => !parseTokens(tokens).err;
+/** 词序列作为「前缀」是否可行：语法合法 + 补全后说得出口。null = 可行，否则是原因 */
+export function prefixWhy(tokens: Token[], ctx: Ctx): string | null {
+  const r = parseTokens(tokens);
+  if (r.err) return r.err;
+  return completeBest(tokens, ctx).reason;
+}
