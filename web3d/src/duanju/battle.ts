@@ -5,10 +5,11 @@ import { randDeck } from "./engine/deck";
 import { deckOk } from "./engine/api";
 import { presetDeck } from "./deck/words";
 import { STYLES, styleOf, type StyleDef } from "./styles";
-import { loadArt } from "./art";
-import { SwitchInput } from "./composer/composerInput";
+import { loadArt, type ArtSet } from "./art";
+import { Dock } from "./dock";
 import { VfxCastPlayer } from "./vfx/player";
-import type { BattleView, CastPlayer, InputMode, Settings } from "./types";
+import "./layout.css";
+import type { BattleView, CastPlayer, Guide, Settings } from "./types";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -29,8 +30,8 @@ export interface BattleHooks {
   setup?(m: Match): void;
   /** 不上场的随从（隐藏） */
   absent?: number[];
-  /** 输入方式（替换菜单） */
-  input?: InputMode;
+  /** 教程引导：某个随从开始拼句时返回当前的 Guide（限制可用词 / 高亮下一张词牌）；null = 自由 */
+  guide?: (m: Match, u: number) => Guide | null;
   /** 脚本化电脑：返回 null 则走默认 AI */
   foeMove?(m: Match): { unit: number; passed: boolean; text: string; start: number } | null;
   onMount?(b: Battle): void;
@@ -53,7 +54,7 @@ export class Battle {
   m: Match;
   root: HTMLElement;
   stage!: HTMLElement;
-  input: InputMode = new SwitchInput();
+  dock!: Dock;
   cast: CastPlayer = new VfxCastPlayer();
   private disp = { hp: Array(6).fill(0) as number[], sh: Array(6).fill(0) as number[] };
   private typing = new Map<number, string>();
@@ -61,7 +62,7 @@ export class Battle {
   private foeStyle: StyleDef;
   private myStyle: StyleDef;
   private speedIdx = 0;
-  private openUnit = -1;
+  private arts: ArtSet[] = [];
   private waitHuman: ((a: "act" | "end") => void) | null = null;
   private waitBtn: ((v: void) => void) | null = null;
   hooks?: BattleHooks;
@@ -74,7 +75,6 @@ export class Battle {
   onExit: () => void;
   constructor(root: HTMLElement, st: Settings, opts: { auto?: boolean; fast?: boolean; speed?: number; onEnd: (r: BattleResult) => void; onExit: () => void; seed?: number; hooks?: BattleHooks }) {
     this.hooks = opts.hooks;
-    if (opts.hooks?.input) this.input = opts.hooks.input;
     this.root = root; this.onEnd = opts.onEnd; this.onExit = opts.onExit; this.auto = !!opts.auto;
     if (opts.fast) this.speedIdx = 2;
     if (opts.speed !== undefined) this.speedIdx = opts.speed;
@@ -96,7 +96,7 @@ export class Battle {
     this.hp0 = Math.max(...this.m.s.hp);
     for (let u = 0; u < 6; u++) { this.disp.hp[u] = this.m.s.hp[u]; this.disp.sh[u] = this.m.s.sh[u]; }
   }
-  destroy() { this.aborted = true; this.input.close(); this.root.innerHTML = ""; this.waitHuman?.("end"); this.waitBtn?.(); }
+  destroy() { this.aborted = true; this.dock?.destroy(); this.root.innerHTML = ""; this.waitHuman?.("end"); this.waitBtn?.(); }
 
   // ---------- 视图 ----------
   private styleFor(u: number) { return u < 3 ? this.myStyle : this.foeStyle; }
@@ -105,11 +105,11 @@ export class Battle {
     const st = document.createElement("div"); st.className = "dj-stage"; this.stage = st; if (this.hooks) st.classList.add("teach");
     st.style.setProperty("--me", this.myStyle.accent); st.style.setProperty("--foe", this.foeStyle.accent);
     st.innerHTML = `<div class="cam"><div class="bg"></div><div class="vig"></div>
-      <div class="col me"></div><div class="col foe"></div></div>
+      <div class="field"><div class="col me"></div><div class="col foe"></div></div></div>
       <div class="center"><div class="clock" hidden></div><div class="banner" hidden><b></b><span></span></div></div>
       <div class="hud"></div>
       <div class="acts"><button class="bt undo" data-a="undo" hidden>撤回 ↶</button><button class="bt skip" data-a="skip" hidden>跳过本句 ⏭</button><button class="bt skip" data-a="skipall" hidden>跳过全部</button><button class="bt main" data-a="main"></button><div class="menuwrap"><button class="bt" data-a="menu">菜单 ☰</button><div class="pop" hidden>
-        <button data-a="inmode">输入方式：<b class="inm"></b></button><button data-a="speed">动画速度：<b class="spd"></b></button><button data-a="auto">电脑代打：<b class="autov"></b></button><button data-a="rules">规则说明</button><button data-a="exit">退出对局</button></div></div></div>
+        <button data-a="speed">动画速度：<b class="spd"></b></button><button data-a="auto">电脑代打：<b class="autov"></b></button><button data-a="rules">规则说明</button><button data-a="exit">退出对局</button></div></div></div>
       <div class="status" aria-live="polite"></div>`;
     r.appendChild(st);
     const mk = (u: number) => {
@@ -117,16 +117,23 @@ export class Battle {
       const d = document.createElement("div");
       d.className = `unit ${side} pos${u % 3}`; d.dataset.u = String(u); d.dataset.style = s.id;
       d.style.setProperty("--c", s.accent); d.style.setProperty("--c2", s.accent2);
-      d.innerHTML = `<div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>
-        <div class="panel"><div class="p-head"><span class="pos" title="${esc(posTip(u % 3))}">${P2.POS ? POS_NAME[u % 3] : ""}</span><b class="nm">${s.names[u % 3]}</b><button class="fold" aria-label="折叠">▾</button></div>
+      d.innerHTML = `<div class="panel"><div class="p-head"><span class="pos" title="${esc(posTip(u % 3))}">${P2.POS ? POS_NAME[u % 3] : ""}</span><b class="nm">${s.names[u % 3]}</b>${side === "me" ? `<button class="pass" title="这个随从本轮不出手">不出手</button>` : ""}<button class="fold" aria-label="折叠">▾</button></div>
         <div class="hpbar"><i class="hpfill"></i><i class="shfill"></i><b class="hptxt"></b></div>
-        <div class="chips"></div><div class="stand"></div><div class="decl"></div></div>`;
+        <div class="chips"></div><div class="stand"></div><div class="decl"></div></div>
+        <div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>`;
       (side === "me" ? st.querySelector(".col.me") : st.querySelector(".col.foe"))!.appendChild(d);
       this.unitEls[u] = d;
-      loadArt(s.artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((url) => { d.querySelector("img")!.src = url; });
+      loadArt(s.artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
       d.addEventListener("click", (e) => this.onUnitClick(u, e));
     };
     [0, 1, 2, 3, 4, 5].forEach(mk);
+    this.dock = new Dock({
+      match: this.m, stage: st, unitEl: (u) => this.unitEls[u], label: (u) => `${this.styleFor(u).names[u % 3]}${P2.POS ? "·" + POS_NAME[u % 3] : ""}`,
+      canPick: (u) => this.canPick(u),
+      onDeclare: (u, cl, start) => this.handleDeclare(u, cl, start),
+      onPass: (u) => { this.m.pass(u); this.render(); this.waitHuman?.("act"); },
+      guideFor: (u) => this.hooks?.guide?.(this.m, u) ?? null,
+    });
     st.addEventListener("click", (e) => { const a = (e.target as HTMLElement).closest<HTMLElement>("[data-a]")?.dataset.a; if (a) this.onAct(a); else st.querySelector<HTMLElement>(".pop")!.hidden = true; });
     this.render();
     this.hooks?.onMount?.(this);
@@ -150,13 +157,13 @@ export class Battle {
       el.querySelector<HTMLElement>(".stand")!.innerHTML = v.standing.map((s) => `<div class="sl" title="长期句子"><i>长期</i>${esc(s.text)}<small>${s.left >= 99 ? "" : `${s.left}轮`}</small></div>`).join("");
       const dec = el.querySelector<HTMLElement>(".decl")!;
       const typed = this.typing.get(u);
-      if (typed !== undefined) dec.innerHTML = `<i>本轮</i><span class="tx">${esc(typed)}</span><span class="caret"></span>`;
+      if (this.dock?.unit === u) { /* 拼句中：句子条由 Dock 管 */ }
+      else if (typed !== undefined) dec.innerHTML = `<i>拼句中</i><span class="tx">${esc(typed)}</span><span class="caret"></span>`;
       else if (v.decl) dec.innerHTML = `<i>本轮</i><span class="tx">${esc(v.decl.text)}</span><small>起手 ${v.decl.start} 秒 · ⚡${v.decl.cost}</small>`;
       else if (v.done && v.alive) dec.innerHTML = `<i class="np">本轮不出手</i>`;
       else dec.innerHTML = "";
-      el.classList.toggle("ready", side === 0 && this.canPick(u));
+      el.classList.toggle("ready", side === 0 && this.canPick(u) && (this.dock?.unit ?? -1) < 0);
       el.classList.toggle("folded", this.collapsed.has(u));
-      el.classList.toggle("open", this.openUnit === u);
     }
     // 右上角：轮数 / 行动点 / 数字牌
     const h = m.hud();
@@ -175,8 +182,8 @@ export class Battle {
     b.textContent = labels[this.mainState]; b.disabled = this.mainState === "none" || this.mainState === "wait"; b.classList.toggle("go", this.mainState === "resolve" || this.mainState === "next");
     this.stage.querySelector<HTMLElement>('[data-a="undo"]')!.hidden = !(this.hooks?.undo && this.snaps.length && this.mainState === "end");
     this.stage.querySelector<HTMLElement>(".spd")!.textContent = ["正常", "快", "关闭"][this.speedIdx];
-    { const si = this.input as SwitchInput; this.stage.querySelector<HTMLElement>(".inm")!.textContent = si.mode === "composer" ? "逐词拼句" : "句子菜单"; }
     this.stage.querySelector<HTMLElement>(".autov")!.textContent = this.auto ? "开" : "关";
+    this.dock?.light();
   }
   private setStatus(t: string) { this.stage.querySelector<HTMLElement>(".status")!.textContent = t; }
   private canPick(u: number) { return this.mainState === "end" && u < 3 && this.m.canAct(u) && !this.busy; }
@@ -187,7 +194,7 @@ export class Battle {
     setDisplay: (u, hp, sh) => { this.disp.hp[u] = hp; this.disp.sh[u] = sh; this.render(); },
     getDisplay: (u) => ({ hp: this.disp.hp[u], sh: this.disp.sh[u] }),
     float: (u, text, cls) => { const f = document.createElement("span"); f.className = `fl ${cls}`; f.textContent = text; f.style.setProperty("--dx", `${(Math.random() - 0.5) * 36}px`); this.unitEls[u].querySelector(".floats")!.appendChild(f); setTimeout(() => f.remove(), 1400 / this.view.speed() + 300); },
-    flash: (u, cls) => { const el = this.unitEls[u]; el.classList.remove("fx-hit", "fx-heal", "fx-shield", "fx-cast"); void el.offsetWidth; el.classList.add("fx-" + cls); setTimeout(() => el.classList.remove("fx-" + cls), 600); },
+    flash: (u, cls) => { const el = this.unitEls[u]; el.classList.remove("fx-hit", "fx-heal", "fx-shield", "fx-cast"); void el.offsetWidth; el.classList.add("fx-" + cls); if (cls === "hit") this.pose(u, "hurt", 600); else if (cls === "cast") this.pose(u, "cast", 600); setTimeout(() => el.classList.remove("fx-" + cls), 600); },
     markDown: (u) => { this.unitEls[u].classList.add("dead", "fall"); },
     banner: (text, sub) => { const b = this.stage.querySelector<HTMLElement>(".banner")!; b.hidden = false; b.querySelector("b")!.textContent = text; b.querySelector("span")!.textContent = sub ?? ""; b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); },
     clock: (sec) => { const c = this.stage.querySelector<HTMLElement>(".clock")!; if (sec === null) { c.hidden = true; this.stage.querySelector<HTMLElement>(".banner")!.hidden = true; } else { c.hidden = false; c.textContent = `第 ${sec} 秒`; } },
@@ -195,49 +202,45 @@ export class Battle {
   };
 
   // ---------- 交互 ----------
+  /** 2D Q 版立绘有 cast / hurt 单张时临时换图，没有就保持 idle */
+  private pose(u: number, p: "cast" | "hurt", ms: number) {
+    const a = this.arts[u], img = this.unitEls[u]?.querySelector("img"); const url = a?.[p];
+    if (!a || !img || !url) return;
+    img.src = url; setTimeout(() => { img.src = a.idle; }, ms);
+  }
   private onUnitClick(u: number, e: Event) {
     const t = e.target as HTMLElement;
     if (t.closest(".fold")) { this.collapsed.has(u) ? this.collapsed.delete(u) : this.collapsed.add(u); this.render(); e.stopPropagation(); return; }
+    if (t.closest(".pass")) { e.stopPropagation(); if (this.canPick(u)) { this.dock.cancel(); this.m.pass(u); this.render(); this.waitHuman?.("act"); } return; }
+    if (t.closest(".comp, .strip")) return;
     if (!this.canPick(u)) return;
-    if (this.openUnit === u) { this.closeInput(); return; }
-    this.openInput(u);
+    if (this.dock.unit === u) { this.dock.cancel(); this.render(); return; }
+    this.dock.begin(u); this.render();
   }
-  private openInput(u: number) {
-    this.closeInput();
-    this.openUnit = u; this.render();
-    this.input.open({
-      match: this.m, unit: u, label: `${this.styleFor(u).names[u % 3]}${P2.POS ? "·" + POS_NAME[u % 3] : ""}`, anchor: this.unitEls[u].querySelector(".panel")!, host: this.stage,
-      onDeclare: (cl, start) => {
-        const err = this.hooks?.beforeDeclare?.(u, cl, start, this.m);
-        if (err) { this.closeInput(); this.setStatus(err); this.hooks?.onTick?.(this); return; }
-        const snap = this.hooks?.undo ? this.m.snap() : null;
-        this.closeInput();
-        if (this.m.declare(u, cl, start)) { if (snap) this.snaps.push(snap); this.hooks?.afterDeclare?.(u, this.m); this.render(); this.waitHuman?.("act"); } else this.setStatus("这句现在说不了");
-      },
-      onPass: () => { this.closeInput(); this.m.pass(u); this.render(); this.waitHuman?.("act"); },
-      onCancel: () => this.closeInput(),
-    });
+  private handleDeclare(u: number, cl: import("./engine/api").Sentence, start: number) {
+    const err = this.hooks?.beforeDeclare?.(u, cl, start, this.m);
+    if (err) { this.setStatus(err); this.render(); this.hooks?.onTick?.(this); return; }
+    const snap = this.hooks?.undo ? this.m.snap() : null;
+    if (this.m.declare(u, cl, start)) { if (snap) this.snaps.push(snap); this.hooks?.afterDeclare?.(u, this.m); this.render(); this.waitHuman?.("act"); } else { this.setStatus("这句现在说不了"); this.render(); }
   }
-  private closeInput() { this.input.close(); this.openUnit = -1; this.render(); }
   /** 撤回最近一句（只在宣告阶段、电脑没动之前） */
   undo() {
     const sn = this.snaps.pop(); if (!sn || this.mainState !== "end") return;
-    this.closeInput(); this.m.restore(sn); this.render(); this.waitHuman?.("act");
+    this.dock.cancel(); this.m.restore(sn); this.render(); this.waitHuman?.("act");
   }
   private onAct(a: string) {
     const pop = this.stage.querySelector<HTMLElement>(".pop")!;
     if (a !== "menu") pop.hidden = true;
     if (a === "menu") pop.hidden = !pop.hidden;
     else if (a === "main") {
-      if (this.mainState === "end") { const err = this.hooks?.beforeEnd?.(this.m); if (err) { this.setStatus(err); this.hooks?.onTick?.(this); return; } this.closeInput(); this.m.passRest(); this.render(); this.waitHuman?.("end"); }
+      if (this.mainState === "end") { const err = this.hooks?.beforeEnd?.(this.m); if (err) { this.setStatus(err); this.hooks?.onTick?.(this); return; } this.dock.cancel(); this.m.passRest(); this.render(); this.waitHuman?.("end"); }
       else if (this.mainState === "resolve" || this.mainState === "next") this.waitBtn?.();
     }
     else if (a === "skip") this.cast.skip();
     else if (a === "skipall") this.cast.skipAll?.();
-    else if (a === "inmode") { const si = this.input as SwitchInput; si.mode = si.mode === "composer" ? "menu" : "composer"; this.renderMain(); }
     else if (a === "undo") this.undo();
     else if (a === "speed") { this.speedIdx = (this.speedIdx + 1) % 3; this.renderMain(); }
-    else if (a === "auto") { this.auto = !this.auto; this.renderMain(); if (this.auto) { this.closeInput(); this.waitHuman?.("act"); } }
+    else if (a === "auto") { this.auto = !this.auto; this.renderMain(); if (this.auto) { this.dock.cancel(); this.waitHuman?.("act"); } }
     else if (a === "rules") this.showRules();
     else if (a === "exit") { if (confirm("退出这局？")) { this.destroy(); this.onExit(); } }
   }
@@ -267,11 +270,11 @@ export class Battle {
     el.classList.remove("fx-cast"); this.render();
   }
   private humanTurn(): Promise<"act" | "end"> {
-    this.mainState = "end"; this.setStatus("轮到你：点一个随从，选一句话"); this.render();
+    this.mainState = "end"; this.setStatus("轮到你：把词牌拖到随从头顶的句子条上"); this.render(); this.dock.refresh();
     return new Promise((res) => { this.waitHuman = (a) => { this.waitHuman = null; res(a); }; });
   }
   private button(state: "resolve" | "next", label: string): Promise<void> {
-    this.mainState = state; this.setStatus(label); this.render();
+    this.mainState = state; this.setStatus(label); this.dock.cancel(); this.render();
     return new Promise((res) => { this.waitBtn = () => { this.waitBtn = null; res(); }; });
   }
   private autoHuman() {
@@ -295,7 +298,7 @@ export class Battle {
       for (let g = 0; g < 40 && !this.aborted; g++) {
         const w = m.who(); if (w === -1) break;
         if (w === 1) {
-          this.mainState = "wait"; this.setStatus("电脑在想…"); this.render();
+          this.mainState = "wait"; this.setStatus("电脑在想…"); this.dock.cancel(); this.render();
           this.busy = true;
           await sleep(this.speedIdx === 2 ? 0 : 380 / this.view.speed());
           this.snaps.length = 0;

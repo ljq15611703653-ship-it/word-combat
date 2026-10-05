@@ -3,7 +3,7 @@ import { Battle, type BattleHooks } from "../../battle";
 import { STYLES } from "../../styles";
 import { backgroundFor } from "../../art";
 import { playDialog, type Line } from "../dialog/dialog";
-import { GuidedInput } from "./guided";
+import { guideFor } from "./guided";
 import type { TeachSession } from "./session";
 
 export interface LevelDialog { level: number; beat: number; intro: Line[]; outro: Line[]; rounds: { round: number; say?: Line[]; after?: Line[] }[] }
@@ -19,14 +19,11 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
     const foe = { ...STYLES.find((s) => s.id === "zhuang")!, names: beat.foeNames as [string, string, string] };
     let warn: { text: string; t: number } | null = null;
     let timer = 0, finished = false;
-    const input = new GuidedInput((ctx) => ({
-      allowed: ses.allowed(ctx.match, ctx.unit), want: ses.wantsFn(ctx.match, ctx.unit), hint: ses.hintWords(ctx.match, ctx.unit),
-    }));
     const done = (r: BattleOutcome) => { if (finished) return; finished = true; clearInterval(timer); b.destroy(); holder.remove(); resolve(r); };
     const dlgOpts = { history: hist, onSkipAll: o.onSkipAll, speed: o.fast ? 0 : 1 };
     const bubble = document.createElement("div"); bubble.className = "tb-bubble"; bubble.hidden = true;
     const hooks: BattleHooks = {
-      styles: { me, foe }, foeDeck: ses.foeDeck(), absent: ses.absent(), input,
+      styles: { me, foe }, foeDeck: ses.foeDeck(), absent: ses.absent(), guide: (m, u) => guideFor(ses, m, u),
       setup: (m) => ses.setup(m),
       foeMove: (m) => ses.foeMove(m),
       beforeDeclare: (u, cl, start, m) => { const e = ses.check(u, cl, start, m); if (e) warn = { text: e, t: Date.now() }; else warn = null; return e; },
@@ -59,14 +56,14 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
       const m = bb.m;
       const main = st.querySelector<HTMLElement>('[data-a="main"]')!;
       const mt = main?.textContent ?? "";
-      const menu = st.querySelector<HTMLElement>(".dj-menu");
+      const edit = st.querySelector<HTMLElement>(".unit.me.editing");
+      const menu = edit; // 拼句中：气泡指向词牌库里该拖的那张（没有提示词时指向句子条）
       let text = "", target: HTMLElement | null = null;
-      if (menu) {
-        const u = +(st.querySelector<HTMLElement>(".unit.me.open")?.dataset.u ?? -1);
+      if (edit) {
+        const u = +(edit.dataset.u ?? -1);
         const stp = ses.stepFor(m, u);
         text = stp?.say?.menu ?? (ses.beat.intro ?? "");
-        target = menu.querySelector<HTMLElement>(".mn-row.guide") ?? menu;
-        if (target === menu) target = menu.querySelector<HTMLElement>(".mn-head");
+        target = st.querySelector<HTMLElement>(".lib .cw.hint") ?? edit.querySelector<HTMLElement>(".comp .go:not(:disabled)") ?? edit.querySelector<HTMLElement>(".panel");
       } else if (mt.includes("结束宣告")) {
         const pend = ses.pending(m);
         if (pend.length) { const s0 = pend[0]; text = s0.say?.unit ?? "点高亮的随从。"; target = st.querySelector<HTMLElement>(`.unit[data-u="${s0.unit}"] .panel`); target?.closest(".unit")?.classList.add("guide-hl"); }

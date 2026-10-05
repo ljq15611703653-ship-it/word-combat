@@ -1,41 +1,27 @@
-// 菜单版教学输入：包一层 MenuInput，把菜单过滤成「本关允许的句子」，并高亮应选的那一条。
-// 之后换成 composer（逐词拼句）时，只需把 resolve 的结果通过 InputMode.setGuide 交给它，本文件整体替换为适配层。
-import { MenuInput } from "../../inputMenu";
-import type { Sentence } from "../../engine/api";
-import type { Guide, InputCtx, InputMode } from "../../types";
+// 教学引导：把课程表里「本关允许的句子 / 这一步想让玩家说的句子」变成拖拽拼句的 Guide（types.ts）。
+//   allowed  —— 整句过滤（不满足不能确认宣告）；
+//   lockWords —— 只许拿本关用得上的词（候选句里出现过的词的并集），其余词牌灰掉并说明；
+//   hint     —— 这一步想要的句子的词序列：下一张该拖的词牌在词牌库里脉冲，句子条末尾亮「放这里」。
+import type { Match } from "../../engine/api";
+import type { Guide } from "../../types";
+import { astToTokens } from "../../composer/grammar";
+import type { TeachSession } from "./session";
 
-export interface Resolved { allowed: (cl: Sentence) => boolean; want?: ((cl: Sentence) => boolean) | null; hint?: string[]; denyText?: string }
-
-export class GuidedInput implements InputMode {
-  id = "guided-menu"; label = "教学菜单";
-  private inner = new MenuInput();
-  private obs: MutationObserver | null = null;
-  private override: Guide | null = null;
-  constructor(private resolve: (ctx: InputCtx) => Resolved) {}
-  isOpen() { return this.inner.isOpen(); }
-  close() { this.obs?.disconnect(); this.obs = null; this.inner.close(); }
-  setGuide(g: Guide | null) { this.override = g; }
-  open(ctx: InputCtx) {
-    const r = this.resolve(ctx);
-    const allowed = this.override?.allowed ?? r.allowed;
-    let list: { cl: Sentence }[] = [];
-    const proxy = Object.create(ctx.match);
-    proxy.legalSentences = (u: number) => { list = ctx.match.legalSentences(u, 400).filter((c) => allowed(c.cl)); return list as any; };
-    this.inner.open({ ...ctx, match: proxy });
-    const el = ctx.host.querySelector<HTMLElement>(".dj-menu");
-    if (!el) return;
-    el.classList.add("guided");
-    const mark = () => {
-      el.querySelectorAll<HTMLElement>(".mn-row").forEach((row) => {
-        const c = list[+row.dataset.i!];
-        row.classList.toggle("guide", !!(c && r.want && r.want(c.cl)));
-      });
-    };
-    mark();
-    this.obs = new MutationObserver(mark);
-    this.obs.observe(el.querySelector(".mn-list")!, { childList: true });
-    el.querySelector<HTMLElement>(".mn-row.guide")?.scrollIntoView({ block: "nearest" });
-    // 教学里没有搜索
-    el.querySelector<HTMLElement>(".mn-q")?.setAttribute("hidden", "");
+export function guideFor(ses: TeachSession, m: Match, u: number): Guide {
+  const allowed = ses.allowed(m, u), want = ses.wantsFn(m, u);
+  const all = m.legalSentences(u, 400).filter((c) => allowed(c.cl));
+  const pool = want ? all.filter((c) => want(c.cl)) : all;
+  const use = pool.length ? pool : all;
+  const toks = (cl: (typeof all)[number]["cl"]): string[] | null => { try { return astToTokens(cl); } catch { return null; } };
+  const g: Guide = { allowed };
+  if (use.length && (want || all.length < 400)) {
+    const set = new Set<string>();
+    for (const c of use) toks(c.cl)?.forEach((t) => set.add(t));
+    if (set.size) g.lockWords = [...set];
   }
+  if (want && pool.length) {
+    const best = pool.map((c) => toks(c.cl)).filter((x): x is string[] => !!x).sort((a, b) => a.length - b.length)[0];
+    if (best) g.hint = best;
+  }
+  return g;
 }
