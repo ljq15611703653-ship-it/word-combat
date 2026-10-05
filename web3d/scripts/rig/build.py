@@ -95,7 +95,7 @@ def build(name):
         pd = dict(comps=e["c"], bone=b, pivot=e.get("pivot", "top"), ps=e.get("ps", 0.8), erase=e.get("erase", []),
                   off=([e["at"][0] - bones[b]["at"][0], e["at"][1] - bones[b]["at"][1]] if "at" in e else list(e.get("off", [0, 0]))))
         if e.get("peg"): pd["erase"] = list(pd["erase"]) + [{"peg": "both"}]
-        for k in ("rot", "glow", "clip", "alpha"):
+        for k in ("rot", "glow", "clip", "alpha", "sw"):
             if k in e: pd[k] = e[k]
         if "pivot_src" in e: pd["pivot"] = e["pivot_src"]
         add(e["n"], pd); z[e.get("z", "front")].append(e["n"])
