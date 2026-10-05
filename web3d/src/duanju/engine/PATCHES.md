@@ -30,3 +30,11 @@ engine/api.ts 的 Match.resolve() 用 setTrace 收集，再按 sec 稳定排序�
 
 ## T2（教程分支，手改 ast.ts，同步脚本会覆盖，同步后要补回）
 - `OBJ_ZH` 增加 `dealt: "造成的伤害"`、`taken: "受到的伤害"`：引用量词的句子读法里不再出现英文 dealt/taken。
+
+## 2026-10-05 职业同步（duanju-cls 分支）：全部由 sync-engine.mjs 自动施加
+- 同步源：lab2 当前版（含职业 Cls/CLASSES、SUM_AP、classProblem、segCap）；默认规则 = D:/wc/out_final2/duanju_final.json + TGT_AT_DECL=1、CLASSES=1、DICE=1（游戏专有）。另生成 rules.tutorial.json（职业关）、rules.final-nodice.json（与模拟器逐局对拍用）。
+- T2：ast.ts OBJ_ZH 增 dealt/taken（脚本施加）。
+- T3：SUM_AP 已在 lab2，不再补丁。
+- T4：击倒投骰（interp.ts St.rs / rollDown / koNow / 过热倒下 / declare 清一次性牌；params.ts DICE；lab-rules.ts Card.once），脚本施加。
+- S1：gen.ts / playbook.ts 的 allMe / allFoe 改成 `some`（选择N个），含 classExtras；deck-words.json 示例去掉「最低血」。
+- api.ts（手写）：MatchOpts.cls 传给 newGame；composer/grammar.ts diagnose 对齐 canAfford 的职业逻辑。
