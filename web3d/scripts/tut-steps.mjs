@@ -35,20 +35,25 @@ const STEP = `(async()=>{
   const ctr=el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}};
   const ptr=(ty,x,y,tgt)=>tgt.dispatchEvent(new PointerEvent(ty,{bubbles:true,clientX:x,clientY:y,button:0,buttons:ty==='pointerup'?0:1,pointerId:1,isPrimary:true}));
   const edit=$('.unit.me.editing');
+  if(edit&&window.__cheat){ edit.querySelector('.pass').click(); return 'pass'; }
   if(edit){
     const u=+edit.dataset.u; const st=ses.stepFor(b.m,u);
     const go=edit.querySelector('.comp [data-a=go]');
     if(!go.disabled){
       const sl=edit.querySelector('.comp input[type=range]'); let v=+sl.value; const lo=+sl.min;
+      if(window.__plan&&window.__plan.unit===u){ v=Math.max(+sl.min,window.__plan.start); } else
       if(st){ if(st.startMin!==undefined) v=Math.max(v,st.startMin); if(st.startMax!==undefined) v=Math.min(v,st.startMax); }
       v=Math.max(v,lo); if(+sl.value!==v){ sl.value=v; sl.dispatchEvent(new Event('input',{bubbles:true})); }
-      go.click(); return 'declare';
+      go.click(); window.__plan=null; return 'declare';
     }
     // 目标词序列：提示里的整句，没有就取第一条允许的句子
-    let toks=st&&st.words;
+    if(window.__plan&&window.__plan.unit===u&&!window.__plan.cl){ window.__plan=null; edit.querySelector('.pass').click(); return 'pass'; }
+    let toks=st&&st.words; if(window.__plan&&window.__plan.unit===u) toks=__cp.astToTokens(window.__plan.cl);
     if(!toks){
       const al=ses.allowed(b.m,u), wf=ses.wantsFn(b.m,u);
-      const c=b.m.legalSentences(u,400).find(x=>al(x.cl)&&(!wf||wf(x.cl)));
+      const ls=b.m.legalSentences(u,400).filter(x=>al(x.cl)&&(!wf||wf(x.cl)));
+      const good=window.__smart?ls.filter(x=>/敌方·[^，；]*受伤/.test(x.text)&&!/我方·[^，；]*受伤/.test(x.text)):[];
+      const c=(good.length?good[Math.floor(Math.random()*Math.min(good.length,6))]:ls[0]);
       if(!c) return 'NOROW';
       toks=__cp.astToTokens(c.cl);
     }
@@ -58,11 +63,21 @@ const STEP = `(async()=>{
     const a=ctr(card); ptr('pointerdown',a.x,a.y,card); ptr('pointermove',a.x+12,a.y+12,window);
     const p=ctr(edit.querySelector('.panel')); ptr('pointermove',p.x,p.y,window);
     const sls=[...edit.querySelectorAll('.slot')]; const sp=sls.length?ctr(sls[sls.length-1]):p; ptr('pointermove',sp.x,sp.y,window);
+    if(window.__holdOnce){ window.__holdOnce=false; window.__rel=()=>ptr('pointerup',sp.x,sp.y,window); return 'holding'; }
     ptr('pointerup',sp.x,sp.y,window); await sleep(30); return 'pick';
   }
   if(t.includes('结束宣告')){
     const p=ses.pending(b.m);
     if(p.length){ const e=$('.unit[data-u="'+p[0].unit+'"]'); e.click(); return 'unit'+p[0].unit; }
+    if(!ses.scripted&&window.__smart){
+      if(!window.__plan){
+        const sn=b.m.snap(), ns=b.m.s.decl.length, dn=b.m.s.done.slice(); b.m.autoMyMove();
+        const d=b.m.s.decl.length>ns?b.m.s.decl[b.m.s.decl.length-1]:null;
+        const u=d?d.unit:b.m.s.done.findIndex((x,i)=>x&&!dn[i]);
+        window.__plan={unit:u,cl:d?d.cl:null,start:d?d.start:0}; b.m.restore(sn);
+      }
+      const e=$('.unit[data-u="'+window.__plan.unit+'"]'); if(e){ e.click(); return 'unit'+window.__plan.unit; }
+    }
     if(!ses.scripted){ const us=b.m.myUnits().filter(u=>b.m.canAct(u)); if(us.length){ const e=$('.unit[data-u="'+us[0]+'"]'); e.click(); return 'unit'; } }
     main.click(); return 'end';
   }
@@ -72,12 +87,12 @@ const STEP = `(async()=>{
 
 
 const W = +(process.env.W ?? 1440), H = +(process.env.H ?? 810), tag = process.env.TAG ?? `${W}x${H}`;
-await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: !!process.env.MOBILE });
 const seen = new Set(); let allOk = true;
 for (const n of BEATS) {
   await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/duanju-story.html?beat=${n}&skip=1&unlock=all${process.env.FAST ? "&fast=1" : ""}` }); await sleep(1200);
   let steps = 0, last = "", prevRnd = 0; const t0 = Date.now(); let bg = "", art = "";
-  while (Date.now() - t0 < 120000) {
+  while (Date.now() - t0 < +(process.env.BEAT_MS ?? 120000)) {
     { const mt0 = await ev("document.querySelector('[data-a=main]')?.textContent ?? ''"), rn0 = await ev("window.__tb?.m?.rnd ?? 0"); const k0 = `b${n}_r${rn0}_presettle`;
       if (mt0.includes("结算") && !seen.has(k0)) { seen.add(k0); await sleep(500); await shot(`${tag}_${k0}`); } }
     if (process.env.FAILTEST && !seen.has("ft" + n) && await ev("!!document.querySelector('.unit.me.ready')")) {
@@ -90,7 +105,13 @@ for (const n of BEATS) {
       console.log("FAILTEST beat", n, JSON.stringify(locked), JSON.stringify(wrong));
       await ev("__tb.dock.cancel(); __tb.render()"); await sleep(300);
     }
-    const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
+    if (process.env.SMART) await ev("window.__smart=1");
+    if (process.env.CHEAT && !seen.has("cheat") && await ev("!!window.__tb && !!document.querySelector('.unit.me.ready')")) { seen.add("cheat"); await ev("[3,4,5].forEach(u=>__tb.m.removeUnit(u)); __tb.render()"); await ev("window.__cheat=1"); console.log("CHEAT: foes removed"); }
+    if (process.env.VFXLOG && !(await ev("!!window.__vfxLog"))) await ev("window.__vfxLog=[]; window.__vfxMark=" + (process.env.MARK ? 1 : 0));
+    const r = await ev(STEP); if (r === "mainS" && process.env.VFXLOG && !process.env.DENSE) { await sleep(9000); console.log("VFXLOG", await ev("JSON.stringify(window.__vfxLog.splice(0))")); }
+    if (r === "holding") { await sleep(350); await shot(`${tag}_b${n}_dragging`); await ev("window.__rel()"); }
+    if (process.env.DRAGSHOT && !(await ev("!!window.__holdSet"))) await ev("window.__holdSet=1; window.__holdOnce=true");
+    if (process.env.TRACE) console.log("  step", r);
     if (r === "SELECT") break;
     if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${tag}_b${n}_FAIL`); allOk = false; break; }
     if (r === "NOROW" || r === "NOGO" || r.startsWith("NOCARD")) { console.log("!! 拖拽拼句卡住", r); await shot(`${tag}_b${n}_STUCK`); allOk = false; break; }
@@ -100,6 +121,7 @@ for (const n of BEATS) {
     const key = `b${n}_r${rn}_${t}`;
     if (r === "pick") { const k = await ev("(window.__tb?.dock?.tokens?.length ?? 0)"); const kk = `${key}${k}`; if ((k === 1 || k === 3) && !seen.has(kk)) { seen.add(kk); await sleep(250); await shot(`${tag}_${kk}`); } }
     else if (["guide", "declare"].includes(t) && !seen.has(key)) { seen.add(key); await sleep(350); await shot(`${tag}_${key}`); }
+    else if (t === "settle" && !seen.has(key) && process.env.DENSE) { seen.add(key); for (let q = 0; q < 16; q++) { await sleep(q === 0 ? 400 : 260); await shot(`${tag}_${key}_p${String(q).padStart(2, "0")}`); } }
     else if (t === "settle" && !seen.has(key)) { seen.add(key); await sleep(1300); await shot(`${tag}_${key}_playing`); await sleep(2500); await shot(`${tag}_${key}_after`); }
     if (rn !== prevRnd) prevRnd = rn;
     last = r; steps++;

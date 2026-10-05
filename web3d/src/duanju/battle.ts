@@ -211,6 +211,16 @@ export class Battle {
     banner: (text, sub) => { const b = this.stage.querySelector<HTMLElement>(".banner")!; b.hidden = false; b.querySelector("b")!.textContent = text; b.querySelector("span")!.textContent = sub ?? ""; b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); },
     clock: (sec) => { const c = this.stage.querySelector<HTMLElement>(".clock")!; if (sec === null) { c.hidden = true; this.stage.querySelector<HTMLElement>(".banner")!.hidden = true; } else { c.hidden = false; c.textContent = `第 ${sec} 秒`; } },
     speed: () => [1, 2, 12][this.speedIdx],
+    anchor: (u, which, atRelease) => {
+      const rg = this.rigs[u]; if (!rg || !rg.canvas.width) return null;
+      const cv = rg.canvas, mm = rg.castMoments(); if (!mm) return null;
+      const p = rg.anchor(which, atRelease ? { anim: "cast", t: mm.release } : undefined); if (!p) return null;
+      const r = cv.getBoundingClientRect(); if (!r.width || !r.height) return null;
+      const k = Math.min(r.width / cv.width, r.height / cv.height), ox = (r.width - cv.width * k) / 2, oy = r.height - cv.height * k;
+      const x = this.unitEls[u].classList.contains("foe") ? r.width - (p.x * k + ox) : p.x * k + ox;
+      return { x: r.left + x, y: r.top + oy + p.y * k };
+    },
+    castMoments: (u) => this.rigs[u]?.canvas.width ? this.rigs[u]!.castMoments() : null,
   };
 
   // ---------- 交互 ----------

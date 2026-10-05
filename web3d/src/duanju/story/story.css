@@ -90,3 +90,13 @@ button.guide-hl { box-shadow: 0 0 0 2px var(--ye), 0 0 18px var(--ye); }
 .tb-goal.done { border-left-color: #3dffb0; }
 .tb-goal.done small::after { content: "  ✓ 完成"; color: #3dffb0; }
 .tb-goal.done.end small::after { content: "  ✓ 完成，点「结束宣告」"; }
+
+/* 手机竖屏：小目标条改成操作条下面一整行（不压 HUD / 操作条），战场整体下移；气泡字小一号 */
+@media (max-width: 720px) {
+  .tb-goal { left: 6px; right: 6px; top: 92px; max-width: none; display: block; padding: 3px 8px 4px 10px; font-size: 12px; line-height: 1.3; }
+  .tb-goal small { font-size: 10px; margin-right: 6px; }
+  .tb-goal.done small::after { content: " ✓"; } .tb-goal.done.end small::after { content: " ✓ 点「结束宣告」"; }
+  .dj-stage.teach:has(.tb-goal:not([hidden])) .field { top: 134px; }
+  .tb-bubble { font-size: 12.5px; line-height: 1.4; padding: 6px 10px; }
+}
+.tb-goal[hidden] { display: none; }

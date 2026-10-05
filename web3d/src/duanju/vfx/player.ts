@@ -58,6 +58,7 @@ export class VfxCastPlayer implements CastPlayer {
       await new Promise((r) => setTimeout(r, mode === "off" ? 120 : 0));
       return;
     }
+    this.stage.classList.add("vx-playing");
     this.layer = document.createElement("div"); this.layer.className = "vx-layer"; this.camEl.appendChild(this.layer);
     const onKey = (e: KeyboardEvent) => { if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); this.skip(); } else if (e.key === "Escape") this.skipAll(); };
     const onDown = (e: Event) => { if (!(e.target as HTMLElement).closest("[data-a],.pop")) this.skip(); };
@@ -82,6 +83,7 @@ export class VfxCastPlayer implements CastPlayer {
       this.skipS = this.skipA;
       await this.camTo({ s: 1, tx: 0, ty: 0 }, 320);
     } finally {
+      this.stage.classList.remove("vx-playing");
       removeEventListener("keydown", onKey); this.stage.removeEventListener("pointerdown", onDown);
       this.cleanup(); this.layer.remove();
       this.cam = { s: 1, tx: 0, ty: 0 }; this.applyCam();
@@ -159,13 +161,25 @@ export class VfxCastPlayer implements CastPlayer {
     return { x: (r.left - sr.left - c.tx) / c.s, y: (r.top - sr.top - c.ty) / c.s, w: r.width / c.s, h: r.height / c.s };
   }
   private frame(units: number[], maxZoom = 1.45): Cam {
-    const W = this.stage.clientWidth, H = this.stage.clientHeight;
+    const W = this.stage.clientWidth, H = this.stage.clientHeight, [VT, VB] = this.visibleY(), HV = VB - VT;
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const u of units) { const r = this.R(this.view.unitEl(u)); x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
     const uw = Math.max(40, x1 - x0), uh = Math.max(40, y1 - y0);
-    const s = Math.max(1, Math.min(maxZoom, (W * 0.88) / uw, (H * 0.84) / uh));
+    const s = Math.max(1, Math.min(maxZoom, (W * 0.88) / uw, (HV * 0.84) / uh));
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    return { s, tx: Math.min(0, Math.max(W - W * s, W / 2 - cx * s)), ty: Math.min(0, Math.max(H - H * s, H * 0.48 - cy * s)) };
+    return { s, tx: Math.min(0, Math.max(W - W * s, W / 2 - cx * s)), ty: Math.min(0, Math.max(H - H * s, VT + HV * 0.48 - cy * s)) };
+  }
+  /** 舞台里没被遮住的纵向范围 [上, 下]：手机竖屏下 HUD/操作条/小目标条盖在顶部、词牌库抽屉盖在底部，镜头要把随从框在中间（桌面是右侧栏，整高都可用） */
+  private visibleY(): [number, number] {
+    const H = this.stage.clientHeight, lib = this.stage.querySelector<HTMLElement>(".lib");
+    const sr = this.stage.getBoundingClientRect();
+    if (!lib) return [0, H];
+    const r = lib.getBoundingClientRect();
+    if (!(r.width > sr.width * 0.8 && r.top > sr.top)) return [0, H];
+    let top = 0;
+    for (const el of this.stage.querySelectorAll<HTMLElement>(".acts, .tb-goal")) { if (el.hidden) continue; const b = el.getBoundingClientRect(); if (b.width) top = Math.max(top, b.bottom - sr.top + 6); }
+    const bot = this.stage.classList.contains("vx-playing") ? H : Math.max(H * 0.5, r.top - sr.top);   // 演出时抽屉收起（vfx.css）
+    return [Math.min(top, bot - 120), bot];
   }
 
   // ------------------------------------------------------------ 取单位信息
@@ -180,7 +194,7 @@ export class VfxCastPlayer implements CastPlayer {
     return { cx: f.x + f.w / 2, cy: f.y + f.h * 0.5, w, h, rx: w / 2, ry: h / 2, fig: f };
   }
   private dir(a: number, b: number): Pt { const A = this.geo(a), B = this.geo(b); const dx = B.cx - A.cx, dy = B.cy - A.cy, d = Math.hypot(dx, dy) || 1; return { x: dx / d, y: dy / d }; }
-  private tgtPt(u: number): Pt { const g = this.geo(u); return { x: g.cx, y: g.cy - g.ry * 0.1 }; }
+  private tgtPt(u: number): Pt { const tp = this.rigPt(u, "torso"); if (tp) return tp; const g = this.geo(u); return { x: g.cx, y: g.cy - g.ry * 0.1 }; }
 
   // ------------------------------------------------------------ 一句话
   private effTargets(seg: Seg): number[] {
@@ -195,7 +209,7 @@ export class VfxCastPlayer implements CastPlayer {
     const src = f.src, sty = this.styleId(src), [c, c2] = this.col(src), kinds = f.kinds ?? [];
     // 1 镜头拉近（同秒合并：只在第一句动镜头，框住本秒所有出手者）
     if (idx === 0) await this.camTo(this.frame(grp.segs.map((s) => s.fire!.src)), 330);
-    this.view.flash(src, "cast");
+    if (!this.view.castMoments?.(src)) this.view.flash(src, "cast");   // 有骨骼小人：cast 动作推迟到出手前（deliver），与弹道同步
     // 2 词牌被拿起，盔甲壳亮起
     const toks = this.pickup(src, f.text, sty);
     const g = this.geo(src);
@@ -276,13 +290,14 @@ export class VfxCastPlayer implements CastPlayer {
     });
   }
   private slots(toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, u: number): Pt[] {
-    const maxRow = Math.max(g.w * 1.25, 150), gap = 12;
+    const W = this.stage.clientWidth, c = this.cam, vx0 = -c.tx / c.s + 8, vx1 = (W - c.tx) / c.s - 8;   // 镜头里看得见的横向范围
+    const maxRow = Math.min(Math.max(g.w * 1.25, 150), vx1 - vx0), gap = 12;
     const rows: Tok[][] = [[]]; let rw = 0;
     for (const t of toks) { if (rw + t.w > maxRow && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(t); rw += t.w + gap; }
-    const rh = 30, top = g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, W = this.stage.clientWidth, off = (u < 3 ? 1 : -1) * g.w * 0.28;
+    const rh = 30, top = g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, off = (u < 3 ? 1 : -1) * g.w * 0.28;
     const out = new Map<Tok, Pt>();
     rows.forEach((row, ri) => {
-      const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = Math.max(10, Math.min(W - 10 - tw, g.cx + off - tw / 2));
+      const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = Math.max(vx0, Math.min(vx1 - tw, g.cx + off - tw / 2));
       for (const t of row) { out.set(t, { x, y: top + ri * rh }); x += t.w + gap; }
     });
     return toks.map((t) => out.get(t)!);
@@ -429,6 +444,7 @@ export class VfxCastPlayer implements CastPlayer {
     for (const u of trig) this.trigCue(u);
     if (trig.size) await this.wait(280);
     toks.forEach((t) => t.el.classList.add("fired"));
+    await this.handCast(src, sty, c, c2);
     const n = evs.length, step = Math.min(85, 520 / Math.max(1, n));
     const applied: Promise<void>[] = [];
     evs.forEach((e, i) => {
@@ -443,6 +459,31 @@ export class VfxCastPlayer implements CastPlayer {
     });
     await Promise.all(applied);
     await this.wait(110);
+  }
+  /** 骨骼小人 cast：动作与光效一起开始，蓄力 → 在「出手帧」才继续（弹道从手腕发出）。没有骨骼小人时立即返回 */
+  private async handCast(src: number, sty: string, c: string, c2: string) {
+    const mm = this.view.castMoments?.(src);
+    if (!mm || this.skipS) return;
+    this.view.flash(src, "cast");
+    (globalThis as any).__vfxLog?.push({ ev: "cast", t: performance.now(), src, release: mm.release });
+    const h0 = this.rigPt(src, "hand", true);
+    if (h0) {
+      const r = 18, at = { x: h0.x - r, y: h0.y - r }, o = this.mk("vx-orb"); o.style.setProperty("--oc", c); o.style.setProperty("--oc2", c2);
+      void this.A(o, [{ opacity: 0, transform: px(at) + " scale(.2)" }, { opacity: 1, transform: px(at) + " scale(.9)", offset: 0.7 }, { opacity: 0, transform: px(at) + " scale(1.5)" }], mm.release * 1000 / this.tf * 1.05).then(() => o.remove());
+    }
+    await this.waitReal(mm.release * 1000);
+    const h = this.rigPt(src, "hand", true);
+    if (h) this.sparks(h, c, 6, sty === "bing" ? "sq" : sty === "yin" ? "bit" : sty === "xian" ? "x" : "blob");
+  }
+  private waitReal(ms: number): Promise<void> {
+    if (this.skipS || ms <= 0) return Promise.resolve();
+    return new Promise((res) => { const done = () => { clearTimeout(h); this.waiters.delete(done); res(); }; const h = setTimeout(done, ms); this.waiters.add(done); });
+  }
+  /** 骨骼小人锚点 → 覆盖层（镜头内）坐标；没有骨骼小人返回 null */
+  private rigPt(u: number, which: "hand" | "torso" | "head", atRelease = false): Pt | null {
+    const p = this.view.anchor?.(u, which, atRelease); if (!p) return null;
+    const sr = this.stage.getBoundingClientRect(), c = this.cam;
+    return { x: (p.x - sr.left - c.tx) / c.s, y: (p.y - sr.top - c.ty) / c.s };
   }
   private lunge(u: number, to: number, grpEl: HTMLElement) {
     const d = this.dir(u, to), mv = { x: d.x * 16, y: d.y * 6 };
@@ -489,6 +530,7 @@ export class VfxCastPlayer implements CastPlayer {
         this.hint(e.tgt, "首挡"); break;
       }
       case "hit": {
+        (globalThis as any).__vfxLog?.push({ ev: "hit", t: performance.now(), tgt: e.tgt });
         const d = v.getDisplay(e.tgt); const hp = Math.max(0, d.hp - e.amount); v.setDisplay(e.tgt, hp, d.sh); v.float(e.tgt, e.text, "hit"); v.flash(e.tgt, "hit");
         if (hp === 1) this.hint(e.tgt, "不屈"); break;
       }
@@ -516,11 +558,14 @@ export class VfxCastPlayer implements CastPlayer {
 
   // ---- 弹道
   private anchorPt(u: number, toward: number): Pt {
+    const hp = this.rigPt(u, "hand", true); if (hp) return hp;
     const g = this.geo(u), d = this.dir(u, toward);
     return { x: g.cx + d.x * g.rx * 0.9, y: g.cy + d.y * g.ry * 0.5 - g.ry * 0.1 };
   }
   private async projectile(src: number, tgt: number, sty: string, c: string, c2: string, pierce: boolean) {
     const a = this.anchorPt(src, tgt), b = this.tgtPt(tgt);
+    (globalThis as any).__vfxLog?.push({ ev: "launch", t: performance.now(), src, tgt, a, live: this.rigPt(src, "hand"), b });
+    if ((globalThis as any).__vfxMark) for (const [p, col] of [[a, "#f00"], [b, "#0f0"]] as [Pt, string][]) { const m = this.mk("vx-mark", "", { x: p.x - 4, y: p.y - 4 }); m.style.cssText += `;width:8px;height:8px;border-radius:50%;background:${col};z-index:99;position:absolute;left:0;top:0`; }
     const ang = Math.atan2(b.y - a.y, b.x - a.x), dist = Math.hypot(b.x - a.x, b.y - a.y);
     const ms = Math.max(230, Math.min(420, dist * 0.45));
     if (sty === "bing") {

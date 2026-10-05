@@ -38,6 +38,10 @@ export interface RigFigure {
   /** 测试用：停掉动画循环，直接渲染 name 在 t 秒的姿态 */
   seek(name: AnimName, t: number): void;
   destroy(): void;
+  /** 只读：锚点在 canvas 自身像素坐标（未经 CSS 缩放/镜像）。which=hand 出手那只手腕 / torso 躯干中心 / head；at 缺省 = 当前动作当前时刻，传 {anim,t} 则取该动作 t 秒的姿态（如 cast 出手瞬间）。未加载返回 null */
+  anchor(which: "hand" | "torso" | "head", at?: { anim: AnimName; t: number }): { x: number; y: number } | null;
+  /** 只读：cast 动作的关键时刻（秒，已含风格速度）：charge 蓄力到位 / release 出手瞬间 / dur 总长；未加载返回 null */
+  castMoments(): { charge: number; release: number; dur: number } | null;
   readonly canvas: HTMLCanvasElement;
 }
 type M = [number, number, number, number, number, number]; // a b c d e f  (x' = a x + c y + e)
@@ -95,6 +99,24 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
     if ((pose.flash ?? 0) > 0.01) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = `rgba(255,255,255,${pose.flash})`; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }
     if ((pose.tint ?? 0) > 0.01) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = `rgba(255,70,100,${pose.tint})`; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }
   }
+  function anchorOf(which: string, anim: AnimName, t: number): { x: number; y: number } | null {
+    if (!asset) return null;
+    const { data } = asset, v = data.view, sc = cv.width / v[2];
+    const bone = which === "hand" ? "wr_near" : which === "head" ? "head" : "torso";
+    if (!data.bones[bone]) return null;
+    const pose: Pose = samplePose(anim, t, data.gain, data.style);
+    const base: M = facing === 1 ? [sc, 0, 0, sc, -v[0] * sc, -v[1] * sc] : [-sc, 0, 0, sc, (v[0] + v[2]) * sc, -v[1] * sc];
+    const rootOff = pose.root ?? { x: 0, y: 0 };
+    const memo: Record<string, M> = {};
+    const W = (b: string): M => {
+      if (memo[b]) return memo[b];
+      const bd = data.bones[b], par = bd.parent ? data.bones[bd.parent] : null, a = pose.bones[b];
+      const lx = bd.at[0] - (par ? par.at[0] : 0) + (a?.x ?? 0) + (b === "root" ? rootOff.x : 0), ly = bd.at[1] - (par ? par.at[1] : 0) + (a?.y ?? 0) + (b === "root" ? rootOff.y : 0);
+      return (memo[b] = mul(bd.parent ? W(bd.parent) : base, trs(lx, ly, a?.rot ?? 0, a?.sx ?? 1, a?.sy ?? 1)));
+    };
+    const m = W(bone);
+    return { x: m[4], y: m[5] };
+  }
   function loop() {
     if (dead) return;
     const now = performance.now(); let t = (now - t0) / 1000; const a = ANIMS[cur]; const sp = speedOf(asset?.data.style);
@@ -107,6 +129,13 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
     play(name) { if (name === "idle") { cur = "idle"; t0 = performance.now(); } else { cur = name; t0 = performance.now(); } },
     setFacing(f) { facing = f; if (!raf) draw(cur, tManual); },
     seek(name, t) { manual = true; cancelAnimationFrame(raf); raf = 0; cur = name; tManual = t; draw(name, t); },
+    anchor(which, at) {
+      if (at) return anchorOf(which, at.anim, at.t);
+      const a = ANIMS[cur], sp = speedOf(asset?.data.style);
+      const t = manual ? tManual : Math.max(0, (performance.now() - t0) / 1000);
+      return anchorOf(which, cur, a.loop ? t % (a.dur / sp) : t);
+    },
+    castMoments() { if (!asset) return null; const sp = speedOf(asset.data.style); return { charge: 0.28 / sp, release: 0.5 / sp, dur: ANIMS.cast.dur / sp }; },
     destroy() { dead = true; cancelAnimationFrame(raf); cv.remove(); },
   };
 }
