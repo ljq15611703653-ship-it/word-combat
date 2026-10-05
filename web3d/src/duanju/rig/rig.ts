@@ -22,8 +22,8 @@ export function loadRig(artDir: string): Promise<RigAsset | null> {
   let p = cache.get(artDir);
   if (!p) {
     const dir = `${BASE}duanju/art/${artDir}/rig/`;
-    p = fetch(dir + "rig.json?v=" + ((import.meta as any).env?.VITE_BUILD ?? "")).then((r) => (r.ok ? r.json() : Promise.reject())).then((data: RigData) => new Promise<RigAsset | null>((res) => {
-      const img = new Image(); img.onload = () => res({ data, img }); img.onerror = () => res(null); img.src = dir + "atlas.png?v=" + ((import.meta as any).env?.VITE_BUILD ?? "");
+    p = fetch(dir + "rig.json?v=" + encodeURIComponent((import.meta as any).env?.VITE_BUILD ?? "")).then((r) => (r.ok ? r.json() : Promise.reject())).then((data: RigData) => new Promise<RigAsset | null>((res) => {
+      const img = new Image(); img.onload = () => res({ data, img }); img.onerror = () => res(null); img.src = dir + "atlas.png?v=" + encodeURIComponent((import.meta as any).env?.VITE_BUILD ?? "");
     })).catch(() => null);
     cache.set(artDir, p);
   }

@@ -4,7 +4,7 @@
 const BASE = (import.meta as any).env?.BASE_URL ?? "/";
 const TUTORIAL_BG = ["calibrate", "echo", "wake", "probe", "streetlamp", "rainnight", "rooftop", "oldfactory", "darkcorner", "mirrorhall", "candlehall", "dicehall", "crimsonarena", "graduate"];
 /** 背景数据驱动：mode = "battle"（打电脑）或教程节拍序号 1..14 */
-const VER = ((import.meta as any).env?.VITE_BUILD ?? "") as string;
+const VER = encodeURIComponent(((import.meta as any).env?.VITE_BUILD ?? "") as string);
 export function backgroundFor(mode: "battle" | number = "battle"): string {
   if (mode === "battle") return `${BASE}duanju/bg/bg_battle.webp?v=${VER}`;
   const n = Math.max(1, Math.min(TUTORIAL_BG.length, mode));
