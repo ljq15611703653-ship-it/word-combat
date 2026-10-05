@@ -67,6 +67,7 @@ async function playLevel(n: number) {
   await titleCard(n, beat.name, beat.teach);
   await comicSeg(n, "pre");
   await dialogSeg(dlg?.intro, hist, n);
+  let lost = 0;
   for (;;) {
     sj.state = "battle";
     const ses = new TeachSession(beat, cur);
@@ -77,6 +78,8 @@ async function playLevel(n: number) {
     if (r === "win") break;
     const a = await retryPrompt();
     if (a === "quit") return selectPage();
+    // 毕业考不能卡死玩家：连输两次后对手换成最朴素的卡组
+    if (n === 14 && ++lost >= 2) (beat as any).foeDeck = "newbie";
   }
   sj.state = "after";
   await dialogSeg(dlg?.outro, hist, n);

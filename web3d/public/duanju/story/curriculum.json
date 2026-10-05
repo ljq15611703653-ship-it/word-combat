@@ -163,7 +163,7 @@
         {"goal": "「全程」：把整场的账一起算", "foe": [{"unit": 4, "s": [{"verb": "dmg", "n": 1, "tg": 0}], "start": 7}], "steps": [{"unit": 0, "words": ["造成", "累计", "之前", "全程", "轮", "对方", "类:dealt", "@4"], "say": {"unit": "对方整场打出去的伤害，都记着账。点叶栖。", "menu": "「造成」「累计」「之前」「全程」「轮」「对方」，再在「对象」栏拖「造成伤害」，最后「赤心乙」。伤害 = 对方整场已经打出的总伤害。", "wrong": "这一句：造成 累计 之前 全程 轮 对方 造成伤害 赤心乙。"}}]}
       ]
     },
-    { "beat": 14, "name": "毕业", "teach": ["完整规则对打"], "foeNames": ["叶晴", "宋伯", "阿豆"], "first": "me", "seed": 25, "tier": "普通", "rules": "default", "meDeck": "newbie", "foeDeck": "quote", "hintKind": null,
+    { "beat": 14, "name": "毕业", "teach": ["完整规则对打"], "foeNames": ["叶晴", "宋伯", "阿豆"], "first": "me", "seed": 25, "tier": "入门", "rules": "default", "meDeck": "newbie", "foeDeck": "quote", "hintKind": null,
       "intro": "没有引导了。把学到的全用上。" }
   ]
 }
