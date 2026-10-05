@@ -11,7 +11,8 @@ for p in d["panels"]:
     im = Image.open(src).convert("RGB"); W, H = im.size
     if W / H > r: nw = int(H * r); im = im.crop(((W - nw) // 2, 0, (W - nw) // 2 + nw, H))
     else: nh = int(W / r); im = im.crop((0, (H - nh) // 2, W, (H - nh) // 2 + nh))
-    if im.width > 1600: im = im.resize((1600, int(1600 / r)), Image.LANCZOS)
-    im.save(f"{DST}/{p['id']}.webp", quality=84); p["image"] = f"{p['id']}.webp"; n += 1
+    L = 1152
+    if max(im.size) > L: s = L / max(im.size); im = im.resize((round(im.width * s), round(im.height * s)), Image.LANCZOS)
+    im.save(f"{DST}/{p['id']}.webp", quality=72, method=6); p["image"] = f"{p['id']}.webp"; n += 1
 json.dump(d, open(PJ, "w", encoding="utf8"), ensure_ascii=False, indent=1)
 print("installed", n, "of", len(d["panels"]))
