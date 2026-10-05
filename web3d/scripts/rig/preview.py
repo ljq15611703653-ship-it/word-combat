@@ -1,9 +1,9 @@
-"""静止组装预览(与运行时同一套 FK): python preview.py <角色> [--pose name:t] -> D:/wc/art/rig/_debug/<角色>_assembled.png (左: 组装, 右: idle_raw, 另有 50% 叠加)"""
+"""静止组装预览(与运行时同一套 FK): python preview.py <角色> [--pose name:t] -> D:/wc/art/rig2/_debug/<角色>_assembled.png (左: 组装, 右: idle_raw, 另有 50% 叠加)"""
 import sys, json, math
 import numpy as np
 from PIL import Image
 
-OUT = "D:/wc/wt_rig/web3d/public/duanju/art"
+OUT = "D:/wc/wt_rig2/web3d/public/duanju/art"
 
 def mat(tx=0, ty=0, rot=0, sx=1, sy=1):
     c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
@@ -24,7 +24,7 @@ def render(rig, atlas, size=1254, pose=None):
         p = rig["parts"][pn]; f = p["atlas"]
         im = atlas.crop((f["x"], f["y"], f["x"] + f["w"], f["y"] + f["h"]))
         ps = p.get("ps", rig["ps"]); off = p.get("off", [0, 0])
-        M = W(p["bone"]) @ mat(off[0], off[1], p.get("rot", 0), ps, ps) @ mat(-p["pivot"][0], -p["pivot"][1])
+        M = W(p["bone"]) @ mat(off[0], off[1], p.get("rot", 0), ps * p.get("sw", 1), ps) @ mat(-p["pivot"][0], -p["pivot"][1])
         inv = np.linalg.inv(M)
         layer = im.transform((size, size), Image.AFFINE, tuple(inv[:2].flatten()), Image.BICUBIC)
         canvas.alpha_composite(layer)
@@ -44,4 +44,4 @@ if __name__ == "__main__":
     g = Image.new("RGBA", a.size, (70, 70, 80, 255)); g.alpha_composite(a)
     ov = ref.copy(); ov.alpha_composite(a.copy().point(lambda v: v)); ov = Image.blend(ref, g, 0.5)
     sheet = Image.new("RGB", (a.width * 3, a.height)); sheet.paste(g.convert("RGB"), (0, 0)); sheet.paste(ref.convert("RGB"), (a.width, 0)); sheet.paste(ov.convert("RGB"), (a.width * 2, 0))
-    sheet.save(f"D:/wc/art/rig/_debug/{name}_assembled.png"); g.convert("RGB").save(f"D:/wc/art/rig/_debug/{name}_asm_only.png")
+    sheet.resize((1800,int(1254*1800/3762))).save(f"D:/wc/art/rig2/_debug/{name}_assembled.png"); sheet.crop((0,0,1254*3,1254)).save(f"D:/wc/art/rig2/_debug/{name}_assembled_full.png"); g.convert("RGB").save(f"D:/wc/art/rig2/_debug/{name}_asm_only.png")

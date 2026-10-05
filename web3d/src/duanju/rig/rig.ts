@@ -8,7 +8,7 @@ const BASE = (import.meta as any).env?.BASE_URL ?? "/";
 export interface RigData {
   name: string; ps: number; view: [number, number, number, number];
   bones: Record<string, { parent?: string; at: [number, number] }>;
-  parts: Record<string, { atlas: { x: number; y: number; w: number; h: number }; pivot: [number, number]; bone: string; rot?: number; off?: [number, number]; ps?: number; glow?: number }>;
+  parts: Record<string, { atlas: { x: number; y: number; w: number; h: number }; pivot: [number, number]; bone: string; rot?: number; off?: [number, number]; ps?: number; sw?: number; glow?: number }>;
   order: string[];
   /** 各骨骼旋转幅度倍率（没有肩骨的角色，把肘骨动作放大） */
   gain?: Record<string, number>;
@@ -80,7 +80,7 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
     for (const pn of data.order) {
       const p = data.parts[pn]; if (!p || !data.bones[p.bone]) continue;
       const ps = p.ps ?? data.ps, off = p.off ?? [0, 0];
-      const m = mul(mul(W(p.bone), trs(off[0], off[1], p.rot ?? 0, ps, ps)), [1, 0, 0, 1, -p.pivot[0], -p.pivot[1]]);
+      const m = mul(mul(W(p.bone), trs(off[0], off[1], p.rot ?? 0, ps * (p.sw ?? 1), ps)), [1, 0, 0, 1, -p.pivot[0], -p.pivot[1]]);
       ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
       const f = p.atlas;
       ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);

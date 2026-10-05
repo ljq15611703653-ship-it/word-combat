@@ -12,7 +12,7 @@ from scipy import ndimage as ndi
 sys.path.insert(0, os.path.dirname(__file__))
 from cut import load
 
-OUT = "D:/wc/wt_rig/web3d/public/duanju/art"
+OUT = "D:/wc/wt_rig2/web3d/public/duanju/art"
 HERE = os.path.dirname(__file__)
 
 def label(alpha, grow, mina):
@@ -33,8 +33,8 @@ def end_pt(mask, which, band=12):
     cx = xs[sel].mean(); cy = (y0 + band * 0.8) if which == "top" else (y1 - band * 0.8)
     return [float(cx), float(cy)]
 
-def main(name):
-    spec = json.load(open(f"{HERE}/maps/{name}.json", encoding="utf-8-sig"))
+def main(name, spec=None):
+    spec = spec or json.load(open(f"{HERE}/maps/{name}.json", encoding="utf-8-sig"))
     rgb, alpha = load(name)
     lab, keep = label(alpha, spec.get("grow", 1), spec.get("mina", 300))
     parts = {}; imgs = {}
@@ -57,7 +57,21 @@ def main(name):
         other = (lab > 0) & ~mask
         a = np.where(other, 0.0, a)
         for e in pd.get("erase", []):
-            if isinstance(e, dict):  # {"g":[rect]}: 矩形内灰色(低饱和、中亮度)像素的凸包整块抹掉 (接口圆柱/环)
+            if isinstance(e, dict) and "peg" in e:  # {"peg":"top|bot|both","h":40}: 端部圆形灰色关节球(小而圆的低饱和连通块)整块抹掉
+                yy, xx = np.nonzero(mask); h_ = e.get("h", 44); lo, hi = e.get("v", [35, 215])
+                for side in (["top", "bot"] if e["peg"] == "both" else [e["peg"]]):
+                    y0 = int(yy.min()) if side == "top" else int(yy.max()) + 1 - h_; y1 = y0 + h_
+                    x0, x1 = int(xx.min()), int(xx.max()) + 1
+                    sub = rgb[y0:y1, x0:x1].astype(int); mx = sub.max(2); mn = sub.min(2)
+                    gm = (a[y0:y1, x0:x1] > 0.3) & ((mx - mn) < 0.3 * np.maximum(mx, 1)) & (mx >= lo) & (mx <= hi)
+                    gm = ndi.binary_opening(gm, iterations=2)
+                    lb, nb = ndi.label(gm)
+                    for k, sl in enumerate(ndi.find_objects(lb), 1):
+                        ww = sl[1].stop - sl[1].start; hh = sl[0].stop - sl[0].start; ar = int((lb[sl] == k).sum())
+                        if 100 <= ar and ww <= e.get("maxw", 60) and hh <= e.get("maxw", 60) and ar / (ww * hh) >= 0.55:
+                            hullm = ndi.binary_dilation(lb == k, iterations=3)
+                            a[y0:y1, x0:x1][hullm] = 0; mask[y0:y1, x0:x1][hullm] = False
+            elif isinstance(e, dict):  # {"g":[rect]}: 矩形内灰色(低饱和、中亮度)像素的凸包整块抹掉 (接口圆柱/环)
                 if isinstance(e["g"], str):
                     yy, xx = np.nonzero(mask); h_ = e.get("h", 45)
                     x0, x1 = int(xx.min()), int(xx.max()) + 1
@@ -86,6 +100,7 @@ def main(name):
         elif pv == "mid": pv = [(x0 + x1) / 2, (y0 + y1) / 2]
         yy, xx = np.nonzero(mask); yb = yy.max(); sel = yy > yb - 6
         hem = [float(xx[sel].mean()), float(yb)]
+        if "hem" in pd: hem = [float(pd["hem"][0]), float(pd["hem"][1])]
         parts[pn] = dict(hem=hem, src=[int(x0), int(y0), int(x1 - x0), int(y1 - y0)], pivot=[round(pv[0] - x0, 1), round(pv[1] - y0, 1)])
     # 打图集(货架式)
     names = sorted(imgs, key=lambda n: -imgs[n].height)
@@ -97,8 +112,8 @@ def main(name):
     H = y + rowh + 2
     atlas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     for n in names: atlas.alpha_composite(imgs[n], pos[n])
-    rd = f"{OUT}/{name}/rig"; os.makedirs(rd + "/parts", exist_ok=True)
-    for n in names: imgs[n].save(f"{rd}/parts/{n}.png")
+    rd = f"{OUT}/{name}/rig"; os.makedirs(rd, exist_ok=True)
+    if os.environ.get("PARTS"): os.makedirs(rd + "/parts", exist_ok=True); [imgs[n].save(f"{rd}/parts/{n}.png") for n in names]
     atlas.save(f"{rd}/atlas.png", optimize=True)
     aj = {n: dict(x=int(pos[n][0]), y=int(pos[n][1]), w=int(imgs[n].width), h=int(imgs[n].height)) for n in names}
     json.dump(dict(size=[W, H], frames=aj), open(f"{rd}/atlas.json", "w"), indent=1)
@@ -124,11 +139,11 @@ def main(name):
     rig = dict(name=name, ps=spec.get("ps", 1.9), ref=spec.get("ref"), view=spec.get("view"), gain=spec.get("gain"), bones=spec["bones"], parts={}, order=spec["order"], anims=spec.get("anims"))
     for pn, pd in spec["parts"].items():
         p = dict(atlas=aj[pn], pivot=parts[pn]["pivot"], bone=pd["bone"])
-        for k in ("rot", "off", "ps", "glow", "alpha", "blend", "sway"):
+        for k in ("rot", "off", "ps", "glow", "alpha", "blend", "sway", "sw"):
             if k in pd: p[k] = pd[k]
         rig["parts"][pn] = p
     json.dump(rig, open(f"{rd}/rig.json", "w"), indent=1, ensure_ascii=False, default=float)
-    json.dump({n: parts[n] for n in parts}, open(f"D:/wc/art/rig/_debug/{name}_parts_info.json", "w"), indent=1, default=float)
+    json.dump({n: parts[n] for n in parts}, open(f"D:/wc/art/rig2/_debug/{name}_parts_info.json", "w"), indent=1, default=float)
     print(name, "atlas", W, H, "parts", len(parts))
     for n in parts: print(" ", n, parts[n])
 

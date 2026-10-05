@@ -1,0 +1,20 @@
+{
+ "peg":1,
+ "sw":{"arm":1.3,"leg":1.35},
+ "head":{"c":[1],"ps":1.2,"pivot":[245,425],"off":[0,0]},
+ "hair_back":{"c":[2],"at":[540,310],"ps":1.1},
+ "torso":{"c":[20],"ps":1.25},
+ "arm_far":[{"c":[21]},{"c":[23]},{"c":[25],"ps":0.9}],
+ "arm_near":[{"c":[22]},{"c":[24]},{"c":[26],"ps":0.9}],
+ "leg_far":[{"c":[27]},{"c":[29]},{"c":[34],"ps":1.0}],
+ "leg_near":[{"c":[28]},{"c":[30],"clip":[1060,885,1235,1105]},{"c":[30],"clip":[1060,1095,1235,1212],"ps":1.0}],
+ "extras":[
+  {"n":"skirt_f","c":[33],"bone":"skirt","pivot":"top","at":[500,740],"ps":1.1,"z":"mid","peg":1},
+  {"n":"skirt_n","c":[32],"bone":"skirt","pivot":"top","at":[760,740],"ps":1.1,"z":"front","peg":1},
+  {"n":"ring","c":[19],"bone":"holo","pivot":"mid","at":[1040,520],"ps":0.7,"z":"top","glow":1},
+  {"n":"page1","c":[5],"bone":"holo","pivot":"mid","at":[320,420],"ps":1.0,"z":"top","glow":1},
+  {"n":"page2","c":[4],"bone":"holo","pivot":"mid","at":[900,420],"ps":1.0,"z":"top","glow":1},
+  {"n":"page3","c":[13],"bone":"holo","pivot":"mid","at":[940,540],"ps":1.0,"z":"top","glow":1},
+  {"n":"page4","c":[18],"bone":"holo","pivot":"mid","at":[330,560],"ps":1.0,"z":"top","glow":1}
+ ]
+}
