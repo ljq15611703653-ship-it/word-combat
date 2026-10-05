@@ -48,13 +48,17 @@ function draw(who: string, expr: string): string {
   g.stroke();
   return c.toDataURL("image/png");
 }
-/** 返回半身像的 URL（真实图或占位） */
-export function portraitUrl(who: string, expr: string): Promise<string> {
-  const key = `${who}|${expr}`;
+/** 对白里的称呼 -> 立绘文件名（文件名 = 全名）；括号备注（全角/半角）先去掉 */
+const ALIAS: Record<string, string> = { 小满: "陆小满", 叶栖: "叶栖", 柯谦: "柯谦" };
+export const portraitName = (who: string) => { const w = who.replace(/[（(].*[）)]?/, "").trim(); return ALIAS[w] ?? w; };
+/** 返回半身像的 URL：<名>_<表情>.webp -> .png -> <名>_neutral.webp -> .png -> 程序占位 */
+export function portraitUrl(who0: string, expr: string): Promise<string> {
+  const who = portraitName(who0), key = `${who}|${expr}`;
   let p = cache.get(key);
   if (!p) {
-    const real = `${STORY_BASE}portraits/${encodeURIComponent(who)}_${expr}.png`;
-    p = imgOk(real).then((ok) => (ok ? real : draw(who, expr)));
+    const base = (e: string, ext: string) => `${STORY_BASE}portraits/${encodeURIComponent(who)}_${e}.${ext}`;
+    const tries = [base(expr, "webp"), base(expr, "png"), ...(expr === "neutral" ? [] : [base("neutral", "webp"), base("neutral", "png")])];
+    p = (async () => { for (const u of tries) if (await imgOk(u)) return u; return draw(who, expr); })();
     cache.set(key, p);
   }
   return p;

@@ -45,7 +45,7 @@ export function playDialog(host: HTMLElement, lines: Line[], opts: DialogOpts = 
       for (const k of ["left", "right"] as const) pts[k].classList.toggle("on", !narr && k === side);
       if (!narr) {
         const el = pts[side]; const img = el.querySelector("img")!;
-        portraitUrl(l.who.replace(/（.*）/, ""), l.expr ?? "neutral").then((u) => { if (lines[i] === l) img.src = u; });
+        portraitUrl(l.who, l.expr ?? "neutral").then((u) => { if (lines[i] === l) img.src = u; });
         el.style.setProperty("--c", colorOf(l.who)); el.classList.remove("enter"); void el.offsetWidth; el.classList.add("enter");
       }
       showText(l.text);
