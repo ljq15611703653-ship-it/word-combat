@@ -21,6 +21,8 @@ export interface Allow {
   tgs?: number[];
   /** true = 不限制（自由对打） */
   free?: boolean;
+  /** 特训：允许「选择 N 个」多目标 */
+  multi?: boolean;
 }
 
 export function buildSentence(specs: ClauseSpec[]): Sentence {
@@ -79,7 +81,7 @@ export function allowedFn(a: Allow): (cl: Sentence) => boolean {
         if (c.eff.ignore) return false;
         const t = tgList(c.eff.tg);
         if (!t.length) return false;
-        if (t.length > 1) return false;
+        if (t.length > 1 && !a.multi) return false;
         return !a.tgs || t.every((u) => a.tgs!.includes(u));
       }
       if (c.k === "status") return !!a.kinds?.includes("status") && (!a.statuses || a.statuses.includes(c.kind)) && tgList(c.tg).length === 1 && (!a.tgs || a.tgs.includes(tgList(c.tg)[0])) && c.dur <= (a.maxN ?? 3);
