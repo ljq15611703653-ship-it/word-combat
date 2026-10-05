@@ -58,6 +58,7 @@ const STEP = `(async()=>{
     const a=ctr(card); ptr('pointerdown',a.x,a.y,card); ptr('pointermove',a.x+12,a.y+12,window);
     const p=ctr(edit.querySelector('.panel')); ptr('pointermove',p.x,p.y,window);
     const sls=[...edit.querySelectorAll('.slot')]; const sp=sls.length?ctr(sls[sls.length-1]):p; ptr('pointermove',sp.x,sp.y,window);
+    if(window.__holdOnce){ window.__holdOnce=false; window.__rel=()=>ptr('pointerup',sp.x,sp.y,window); return 'holding'; }
     ptr('pointerup',sp.x,sp.y,window); await sleep(30); return 'pick';
   }
   if(t.includes('结束宣告')){
@@ -92,6 +93,8 @@ for (const n of BEATS) {
     }
     if (process.env.VFXLOG && !(await ev("!!window.__vfxLog"))) await ev("window.__vfxLog=[]; window.__vfxMark=" + (process.env.MARK ? 1 : 0));
     const r = await ev(STEP); if (r === "mainS" && process.env.VFXLOG && !process.env.DENSE) { await sleep(9000); console.log("VFXLOG", await ev("JSON.stringify(window.__vfxLog.splice(0))")); }
+    if (r === "holding") { await sleep(350); await shot(`${tag}_b${n}_dragging`); await ev("window.__rel()"); }
+    if (process.env.DRAGSHOT && !(await ev("!!window.__holdSet"))) await ev("window.__holdSet=1; window.__holdOnce=true");
     if (process.env.TRACE) console.log("  step", r);
     if (r === "SELECT") break;
     if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${tag}_b${n}_FAIL`); allOk = false; break; }

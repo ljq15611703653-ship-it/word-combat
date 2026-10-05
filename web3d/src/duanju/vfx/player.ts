@@ -58,6 +58,7 @@ export class VfxCastPlayer implements CastPlayer {
       await new Promise((r) => setTimeout(r, mode === "off" ? 120 : 0));
       return;
     }
+    this.stage.classList.add("vx-playing");
     this.layer = document.createElement("div"); this.layer.className = "vx-layer"; this.camEl.appendChild(this.layer);
     const onKey = (e: KeyboardEvent) => { if (e.code === "Space" || e.key === "Enter") { e.preventDefault(); this.skip(); } else if (e.key === "Escape") this.skipAll(); };
     const onDown = (e: Event) => { if (!(e.target as HTMLElement).closest("[data-a],.pop")) this.skip(); };
@@ -82,6 +83,7 @@ export class VfxCastPlayer implements CastPlayer {
       this.skipS = this.skipA;
       await this.camTo({ s: 1, tx: 0, ty: 0 }, 320);
     } finally {
+      this.stage.classList.remove("vx-playing");
       removeEventListener("keydown", onKey); this.stage.removeEventListener("pointerdown", onDown);
       this.cleanup(); this.layer.remove();
       this.cam = { s: 1, tx: 0, ty: 0 }; this.applyCam();
@@ -159,13 +161,25 @@ export class VfxCastPlayer implements CastPlayer {
     return { x: (r.left - sr.left - c.tx) / c.s, y: (r.top - sr.top - c.ty) / c.s, w: r.width / c.s, h: r.height / c.s };
   }
   private frame(units: number[], maxZoom = 1.45): Cam {
-    const W = this.stage.clientWidth, H = this.stage.clientHeight;
+    const W = this.stage.clientWidth, H = this.stage.clientHeight, [VT, VB] = this.visibleY(), HV = VB - VT;
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     for (const u of units) { const r = this.R(this.view.unitEl(u)); x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
     const uw = Math.max(40, x1 - x0), uh = Math.max(40, y1 - y0);
-    const s = Math.max(1, Math.min(maxZoom, (W * 0.88) / uw, (H * 0.84) / uh));
+    const s = Math.max(1, Math.min(maxZoom, (W * 0.88) / uw, (HV * 0.84) / uh));
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-    return { s, tx: Math.min(0, Math.max(W - W * s, W / 2 - cx * s)), ty: Math.min(0, Math.max(H - H * s, H * 0.48 - cy * s)) };
+    return { s, tx: Math.min(0, Math.max(W - W * s, W / 2 - cx * s)), ty: Math.min(0, Math.max(H - H * s, VT + HV * 0.48 - cy * s)) };
+  }
+  /** 舞台里没被遮住的纵向范围 [上, 下]：手机竖屏下 HUD/操作条/小目标条盖在顶部、词牌库抽屉盖在底部，镜头要把随从框在中间（桌面是右侧栏，整高都可用） */
+  private visibleY(): [number, number] {
+    const H = this.stage.clientHeight, lib = this.stage.querySelector<HTMLElement>(".lib");
+    const sr = this.stage.getBoundingClientRect();
+    if (!lib) return [0, H];
+    const r = lib.getBoundingClientRect();
+    if (!(r.width > sr.width * 0.8 && r.top > sr.top)) return [0, H];
+    let top = 0;
+    for (const el of this.stage.querySelectorAll<HTMLElement>(".acts, .tb-goal")) { if (el.hidden) continue; const b = el.getBoundingClientRect(); if (b.width) top = Math.max(top, b.bottom - sr.top + 6); }
+    const bot = this.stage.classList.contains("vx-playing") ? H : Math.max(H * 0.5, r.top - sr.top);   // 演出时抽屉收起（vfx.css）
+    return [Math.min(top, bot - 120), bot];
   }
 
   // ------------------------------------------------------------ 取单位信息
@@ -276,13 +290,14 @@ export class VfxCastPlayer implements CastPlayer {
     });
   }
   private slots(toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, u: number): Pt[] {
-    const maxRow = Math.max(g.w * 1.25, 150), gap = 12;
+    const W = this.stage.clientWidth, c = this.cam, vx0 = -c.tx / c.s + 8, vx1 = (W - c.tx) / c.s - 8;   // 镜头里看得见的横向范围
+    const maxRow = Math.min(Math.max(g.w * 1.25, 150), vx1 - vx0), gap = 12;
     const rows: Tok[][] = [[]]; let rw = 0;
     for (const t of toks) { if (rw + t.w > maxRow && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(t); rw += t.w + gap; }
-    const rh = 30, top = g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, W = this.stage.clientWidth, off = (u < 3 ? 1 : -1) * g.w * 0.28;
+    const rh = 30, top = g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, off = (u < 3 ? 1 : -1) * g.w * 0.28;
     const out = new Map<Tok, Pt>();
     rows.forEach((row, ri) => {
-      const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = Math.max(10, Math.min(W - 10 - tw, g.cx + off - tw / 2));
+      const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = Math.max(vx0, Math.min(vx1 - tw, g.cx + off - tw / 2));
       for (const t of row) { out.set(t, { x, y: top + ri * rh }); x += t.w + gap; }
     });
     return toks.map((t) => out.get(t)!);

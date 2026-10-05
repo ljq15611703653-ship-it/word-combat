@@ -104,6 +104,17 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
         if (menu && target !== main) { x = left - bw - 14; if (x < 8) x = Math.min(sr.width - bw - 8, r.right - sr.left + 14); y = Math.max(8, r.top - sr.top); arrow = x < left ? "right" : "left"; }
         else { x = Math.max(8, Math.min(sr.width - bw - 8, left + r.width / 2 - bw / 2)); const below = r.top - sr.top < bh + 24; y = below ? r.bottom - sr.top + 12 : r.top - sr.top - bh - 12; arrow = below ? "up" : "down"; }
       }
+      if (sr.width <= 720) {
+        // 手机竖屏：气泡不压小目标条，也不盖词牌库里的牌——拼句时放在词牌库最后一排牌的下面（放不下就放小目标条下面）
+        const gb = goal.hidden ? 0 : goal.getBoundingClientRect().bottom - sr.top, bh = bubble.offsetHeight || 70;
+        if (menu && target !== main) {
+          const cards = [...st.querySelectorAll<HTMLElement>(".lib .cw")], lastB = cards.reduce((a, e) => Math.max(a, e.getBoundingClientRect().bottom - sr.top), 0);
+          const libTop = (st.querySelector<HTMLElement>(".lib")?.getBoundingClientRect().top ?? sr.bottom) - sr.top;
+          if (lastB > 0 && lastB + 8 + bh <= sr.height - 4) { x = 8; y = lastB + 8; arrow = "none"; }
+          else { x = 8; y = Math.max(gb + 4, libTop - bh - 4); arrow = "none"; }
+        } else y = Math.max(y, gb + 6);
+        bubble.style.width = Math.min(sr.width - 16, 340) + "px";
+      }
       bubble.style.left = x + "px"; bubble.style.top = y + "px"; bubble.dataset.arrow = arrow;
     }
   });
