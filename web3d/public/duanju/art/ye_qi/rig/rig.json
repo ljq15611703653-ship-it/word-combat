@@ -1,0 +1,464 @@
+{
+ "name": "ye_qi",
+ "ps": 1.0,
+ "ref": "D:/wc/art/q/ye_qi/idle_raw.png",
+ "view": [
+  195,
+  0,
+  780,
+  1254
+ ],
+ "gain": null,
+ "bones": {
+  "root": {
+   "at": [
+    590,
+    790
+   ]
+  },
+  "hip": {
+   "parent": "root",
+   "at": [
+    590,
+    780
+   ]
+  },
+  "torso": {
+   "parent": "hip",
+   "at": [
+    590,
+    720
+   ]
+  },
+  "neck": {
+   "parent": "torso",
+   "at": [
+    595,
+    500
+   ]
+  },
+  "head": {
+   "parent": "neck",
+   "at": [
+    610,
+    480
+   ]
+  },
+  "sh_far": {
+   "parent": "torso",
+   "at": [
+    470,
+    560
+   ]
+  },
+  "el_far": {
+   "parent": "sh_far",
+   "at": [
+    410.0,
+    715.0
+   ]
+  },
+  "wr_far": {
+   "parent": "el_far",
+   "at": [
+    410.0,
+    820.0
+   ]
+  },
+  "sh_near": {
+   "parent": "torso",
+   "at": [
+    688,
+    590
+   ]
+  },
+  "el_near": {
+   "parent": "sh_near",
+   "at": [
+    733.0,
+    705.0
+   ]
+  },
+  "wr_near": {
+   "parent": "el_near",
+   "at": [
+    793.0,
+    810.0
+   ]
+  },
+  "hp_far": {
+   "parent": "hip",
+   "at": [
+    535,
+    672
+   ]
+  },
+  "kn_far": {
+   "parent": "hp_far",
+   "at": [
+    485.0,
+    964.0
+   ]
+  },
+  "an_far": {
+   "parent": "kn_far",
+   "at": [
+    470.0,
+    1099.0
+   ]
+  },
+  "hp_near": {
+   "parent": "hip",
+   "at": [
+    650,
+    676
+   ]
+  },
+  "kn_near": {
+   "parent": "hp_near",
+   "at": [
+    710.0,
+    964.0
+   ]
+  },
+  "an_near": {
+   "parent": "kn_near",
+   "at": [
+    755.0,
+    1099.0
+   ]
+  },
+  "strap": {
+   "parent": "hip",
+   "at": [
+    500,
+    760
+   ]
+  },
+  "holo": {
+   "parent": "root",
+   "at": [
+    900,
+    700
+   ]
+  },
+  "drone": {
+   "parent": "root",
+   "at": [
+    300,
+    400
+   ]
+  },
+  "hair": {
+   "parent": "head",
+   "at": [
+    600,
+    330
+   ]
+  }
+ },
+ "parts": {
+  "head": {
+   "atlas": {
+    "x": 81,
+    "y": 0,
+    "w": 266,
+    "h": 265
+   },
+   "pivot": [
+    132.0,
+    261.0
+   ],
+   "bone": "head",
+   "ps": 2.0
+  },
+  "hair_back": {
+   "atlas": {
+    "x": 349,
+    "y": 0,
+    "w": 231,
+    "h": 244
+   },
+   "pivot": [
+    115.5,
+    122.0
+   ],
+   "bone": "head",
+   "off": [
+    -25,
+    -60
+   ],
+   "ps": 1.75
+  },
+  "neck": {
+   "atlas": {
+    "x": 518,
+    "y": 529,
+    "w": 64,
+    "h": 83
+   },
+   "pivot": [
+    32.0,
+    73.0
+   ],
+   "bone": "neck",
+   "ps": 1.4
+  },
+  "torso": {
+   "atlas": {
+    "x": 706,
+    "y": 0,
+    "w": 201,
+    "h": 238
+   },
+   "pivot": [
+    118.0,
+    219.0
+   ],
+   "bone": "torso",
+   "ps": 1.3
+  },
+  "arm_far_up": {
+   "atlas": {
+    "x": 404,
+    "y": 289,
+    "w": 109,
+    "h": 216
+   },
+   "pivot": [
+    83.4,
+    10.6
+   ],
+   "bone": "sh_far",
+   "rot": 5.61,
+   "ps": 0.8833
+  },
+  "arm_far_fore": {
+   "atlas": {
+    "x": 602,
+    "y": 289,
+    "w": 85,
+    "h": 208
+   },
+   "pivot": [
+    26.2,
+    10.6
+   ],
+   "bone": "el_far",
+   "rot": 6.96,
+   "ps": 0.6039
+  },
+  "arm_far_hand": {
+   "atlas": {
+    "x": 266,
+    "y": 529,
+    "w": 95,
+    "h": 125
+   },
+   "pivot": [
+    66.3,
+    9.6
+   ],
+   "bone": "wr_far",
+   "ps": 0.75
+  },
+  "arm_near_up": {
+   "atlas": {
+    "x": 276,
+    "y": 289,
+    "w": 126,
+    "h": 220
+   },
+   "pivot": [
+    86.5,
+    9.6
+   ],
+   "bone": "sh_near",
+   "rot": -37.81,
+   "ps": 0.6389
+  },
+  "arm_near_fore": {
+   "atlas": {
+    "x": 515,
+    "y": 289,
+    "w": 85,
+    "h": 209
+   },
+   "pivot": [
+    40.2,
+    9.6
+   ],
+   "bone": "el_near",
+   "rot": -25.18,
+   "ps": 0.6909
+  },
+  "arm_near_hand": {
+   "atlas": {
+    "x": 0,
+    "y": 529,
+    "w": 102,
+    "h": 131
+   },
+   "pivot": [
+    40.1,
+    9.6
+   ],
+   "bone": "wr_near",
+   "ps": 0.75
+  },
+  "leg_far_up": {
+   "atlas": {
+    "x": 582,
+    "y": 0,
+    "w": 122,
+    "h": 240
+   },
+   "pivot": [
+    69.5,
+    9.6
+   ],
+   "bone": "hp_far",
+   "rot": 7.05,
+   "ps": 1.706
+  },
+  "leg_far_lo": {
+   "atlas": {
+    "x": 765,
+    "y": 289,
+    "w": 82,
+    "h": 175
+   },
+   "pivot": [
+    31.1,
+    9.6
+   ],
+   "bone": "kn_far",
+   "rot": 9.23,
+   "ps": 1.0901
+  },
+  "leg_far_foot": {
+   "atlas": {
+    "x": 104,
+    "y": 529,
+    "w": 160,
+    "h": 131
+   },
+   "pivot": [
+    49.1,
+    9.6
+   ],
+   "bone": "an_far",
+   "ps": 0.8
+  },
+  "leg_near_up": {
+   "atlas": {
+    "x": 162,
+    "y": 289,
+    "w": 112,
+    "h": 233
+   },
+   "pivot": [
+    54.5,
+    9.6
+   ],
+   "bone": "hp_near",
+   "rot": -8.82,
+   "ps": 1.7648
+  },
+  "leg_near_lo": {
+   "atlas": {
+    "x": 689,
+    "y": 289,
+    "w": 74,
+    "h": 181
+   },
+   "pivot": [
+    43.8,
+    9.6
+   ],
+   "bone": "kn_near",
+   "rot": -20.31,
+   "ps": 1.0905
+  },
+  "leg_near_foot": {
+   "atlas": {
+    "x": 363,
+    "y": 529,
+    "w": 153,
+    "h": 124
+   },
+   "pivot": [
+    45.1,
+    9.6
+   ],
+   "bone": "an_near",
+   "ps": 0.8
+  },
+  "strap": {
+   "atlas": {
+    "x": 0,
+    "y": 0,
+    "w": 79,
+    "h": 287
+   },
+   "pivot": [
+    40.0,
+    14.0
+   ],
+   "bone": "strap",
+   "ps": 0.9
+  },
+  "holo": {
+   "atlas": {
+    "x": 0,
+    "y": 289,
+    "w": 160,
+    "h": 238
+   },
+   "pivot": [
+    80.0,
+    119.0
+   ],
+   "bone": "holo",
+   "ps": 1.0,
+   "glow": 1
+  },
+  "drone": {
+   "atlas": {
+    "x": 849,
+    "y": 289,
+    "w": 133,
+    "h": 148
+   },
+   "pivot": [
+    66.5,
+    74.0
+   ],
+   "bone": "drone",
+   "ps": 0.9,
+   "glow": 1
+  }
+ },
+ "order": [
+  "hair_back",
+  "arm_far_hand",
+  "arm_far_fore",
+  "arm_far_up",
+  "leg_far_foot",
+  "leg_far_lo",
+  "leg_far_up",
+  "leg_near_foot",
+  "leg_near_lo",
+  "leg_near_up",
+  "strap",
+  "arm_near_up",
+  "torso",
+  "neck",
+  "head",
+  "arm_near_hand",
+  "arm_near_fore",
+  "holo",
+  "drone"
+ ],
+ "anims": null
+}
