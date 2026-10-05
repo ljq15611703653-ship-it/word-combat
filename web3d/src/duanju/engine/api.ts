@@ -1,5 +1,5 @@
 // 引擎薄封装：对战流程、合法句子、结算回放事件。UI 只通过这里碰引擎。
-import { applyRules, ADV, ADV_WORDS, P2, deckOk, deckCost, type Deck, type Rules } from "./params";
+import { applyRules, ADV, ADV_WORDS, P2, deckOk, deckCost, CLASSES_ALL, type Deck, type Rules, type Cls } from "./params";
 import { P } from "./lab-rules";
 import {
   newGame, declare, passUnit, nextSide, resolveRound, nextRound, canAfford, windupFor, alive, unitsOf, setTrace, type St,
@@ -15,7 +15,8 @@ import rulesLegacy from "./rules.legacy.json";
 import words from "./deck-words.json";
 
 export { P, P2, ADV, ADV_WORDS, deckOk, deckCost, TIER_NAMES, sentenceText, clauseText };
-export type { Deck, Sentence, St };
+export { CLASSES_ALL };
+export type { Deck, Sentence, St, Cls };
 export const DECK_WORDS = words as unknown as { presets: { id: string; name: string; deck: Deck }[]; words: { name: string; area: number; max: number; cat: string; desc: string; example: string }[]; cats: { id: string; name: string; color: string }[] };
 
 export type RulesKind = "default" | "legacy" | "real" | "custom";
@@ -46,7 +47,7 @@ export interface ReplayEvent {
 }
 
 export interface Candidate { cl: Sentence; text: string; kind: string; cost: number; nums: number[]; minStart: number; adv: string[] }
-export interface MatchOpts { kws?: string[] | null; first: 0 | 1; myDeck: Deck; foeDeck?: Deck; seed?: number; tier: string }
+export interface MatchOpts { /** 职业（[我方, 电脑]）；规则里 CLASSES 关或传 null = 无职业（教程） */ cls?: [Cls | null, Cls | null]; kws?: string[] | null; first: 0 | 1; myDeck: Deck; foeDeck?: Deck; seed?: number; tier: string }
 export interface DeclView { side: 0 | 1; unit: number; text: string; start: number; cost: number }
 
 /** 句子里的「甲方1号词位随从」读成「我方·名字」（名字由 UI 设置） */
@@ -90,7 +91,7 @@ export class Match {
     this.tier = o.tier; this.cfg = TIERS[o.tier] ?? TIERS["普通"];
     this.myDeck0 = { ...o.myDeck };
     this.foeDeck0 = o.foeDeck ? { ...o.foeDeck } : pickFoeDeck(this.rng);
-    this.s = newGame(o.first, [{ ...this.myDeck0 }, { ...this.foeDeck0 }], false, [o.kws && o.kws.length === 3 ? o.kws : randKws(this.rng), randKws(this.rng)]);
+    this.s = newGame(o.first, [{ ...this.myDeck0 }, { ...this.foeDeck0 }], false, [o.kws && o.kws.length === 3 ? o.kws : randKws(this.rng), randKws(this.rng)], o.cls);
     this.s.rs = (this.seed ^ 0x5bd1e995) >>> 0;   // 骰子的种子随机数（同 seed 同结果）
   }
   get rnd() { return this.s.rnd; }

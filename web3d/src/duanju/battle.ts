@@ -1,5 +1,5 @@
 // 战斗界面：简化版。所有信息放在随从旁边的面板里；右上角回合/行动点/数字牌；右下角操作按钮。只显示双方公开信息。
-import { Match, P2, configureRules, setUnitNames, type ReplayEvent } from "./engine/api";
+import { Match, P2, configureRules, setUnitNames, type ReplayEvent, type Cls } from "./engine/api";
 import { KW_TIP } from "./setup";
 import { randDeck } from "./engine/deck";
 import { deckOk } from "./engine/api";
@@ -31,6 +31,8 @@ export interface BattleHooks {
   /** 自定义风格（随从名字/配色）：替代随机的 foe 风格 */
   styles?: { me: StyleDef; foe: StyleDef };
   foeDeck?: Record<string, number>;
+  /** 教程/剧情：默认不传职业（教程完全不提职业）。特训等想用职业的 hooks 设 true，职业取两方风格的 cls */
+  useClass?: boolean;
   /** Match 建好后调用（改血量/行动点/数字牌/让随从缺席） */
   setup?(m: Match): void;
   /** 不上场的随从（隐藏） */
@@ -99,7 +101,12 @@ export class Battle {
     const pd = foe.mode === "preset" ? presetDeck(foe.preset) : null;
     const foeDeck = foe.mode === "custom" ? foe.deck : pd && deckOk(pd) && Object.keys(pd).length ? pd : randDeck(Math.random);
     const foeDeckF = opts.hooks?.foeDeck ?? foeDeck;
-    this.m = new Match({ first, myDeck: st.deck, foeDeck: foeDeckF, tier: st.tier, seed: opts.seed, kws: kws.length === 3 ? kws : null });
+    // 职业：配色组 = 职业（引擎 cls、推荐卡组、演出风格三者一致）；教程/剧情（有 hooks 且没开 useClass）不传
+    const clsOn = !!P2.CLASSES && (!opts.hooks || !!opts.hooks.useClass);
+    const cls: [Cls | null, Cls | null] = clsOn ? [this.myStyle.cls, this.foeStyle.cls] : [null, null];
+    // 电脑随机卡组时，用它职业的推荐卡组（与模拟器循环赛一致）；自己选的/自定义的照旧
+    const foeDeckC = clsOn && !opts.hooks?.foeDeck && foe.mode === "random" ? (presetDeck(this.foeStyle.deckPreset) as Record<string, number>) : foeDeckF;
+    this.m = new Match({ first, myDeck: st.deck, foeDeck: foeDeckC, tier: st.tier, seed: opts.seed, kws: kws.length === 3 ? kws : null, cls });
     opts.hooks?.setup?.(this.m);
     this.m.rulesKind = st.rules;
     this.hp0 = Math.max(...this.m.s.hp);

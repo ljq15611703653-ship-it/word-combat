@@ -41,10 +41,10 @@ export class TeachSession {
   /** 引擎规则（custom JSON） */
   rulesJson(): string {
     const b = this.beat;
-    if (b.rules === "default") return JSON.stringify(rulesDefault);
+    if (b.rules === "default") return JSON.stringify({ ...rulesDefault, P2: { ...rulesDefault.P2, CLASSES: 0 } });   // 教程不开职业
     const r = typeof b.rules === "object" ? b.rules : {};
     const j = JSON.parse(JSON.stringify(rulesDefault));
-    Object.assign(j.P, this.cur.base.rules.P, r.P ?? {}); Object.assign(j.P2, this.cur.base.rules.P2, r.P2 ?? {});
+    Object.assign(j.P, this.cur.base.rules.P, r.P ?? {}); Object.assign(j.P2, this.cur.base.rules.P2, r.P2 ?? {}); j.P2.CLASSES = 0;   // 教程完全不提职业
     return JSON.stringify(j);
   }
   settings(): Settings {

@@ -104,3 +104,6 @@ button:disabled { cursor: default; opacity: .45; }
 .st-door h2{margin:0 0 6px;text-align:center;letter-spacing:.3em;color:#dfe8ff}
 .st-door .door{padding:12px 18px;font-size:16px;letter-spacing:.1em}
 .st-door .door:disabled{opacity:.4}
+.su-talent { margin: 10px 0 0; padding: 8px 12px; border-left: 3px solid var(--accent, #ff4fa3); background: rgba(255,255,255,.04); border-radius: 6px; font-size: 13px; line-height: 1.6; display: grid; gap: 2px; }
+.su-talent b { color: var(--accent, #ff4fa3); font-size: 14px; }
+.su-talent .lm { color: var(--dim); }

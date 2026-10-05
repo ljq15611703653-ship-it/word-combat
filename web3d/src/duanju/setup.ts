@@ -3,6 +3,7 @@ import { TIER_NAMES, configureRules, P2, type Deck } from "./engine/api";
 import { DeckBoard } from "./deck/board";
 import { presetDeck, presetsNow } from "./deck/words";
 import { STYLES, TIER_DESC, styleOf } from "./styles";
+import { talentOf } from "./talents";
 import { loadArt } from "./art";
 import type { Settings } from "./types";
 
@@ -63,7 +64,7 @@ export function mountSetup(root: HTMLElement, st: Settings, onStart: (s: Setting
     <header class="su-title"><h1><span>断</span><i>·</i><span>句</span></h1><p>用句子当规则，打一局电脑</p></header>
     <section class="su-sec"><h2><b>01</b>队伍配色</h2>
       <div class="su-styles">${STYLES.map((s) => `<button class="su-style${s.id === st.styleId ? " on" : ""}" data-style="${s.id}" style="--c:${s.accent};--c2:${s.accent2}"><img alt="" data-art="${s.id}" /><span class="n">${s.name}</span><span class="t">${esc(s.tag)}</span></button>`).join("")}</div>
-      <p class="su-note">选一组配色与立绘，会载入对应的推荐卡组；规则不分组。</p></section>
+      ${P2.CLASSES ? `<p class="su-talent" data-cls="${sty.cls}"><b>${esc(sty.cls)}流</b><span class="tl">天赋　${esc(talentOf(sty.cls).talent)}</span><span class="lm">限制　${esc(talentOf(sty.cls).limit)}</span></p><p class="su-note">选一组配色与立绘：载入对应的推荐卡组，并让你的随从获得该职业的天赋与限制；电脑按它自己的那一组。</p>` : `<p class="su-note">选一组配色与立绘，会载入对应的推荐卡组；当前规则没有开启职业，各组规则相同。</p>`}</section>
     <section class="su-sec su-decksec"><h2><b>02</b>卡组与关键词 <small class="su-cost ok"></small></h2><div class="su-slot" data-slot="deck"></div></section>
     <section class="su-sec"><h2><b>03</b>对手卡组 <small>开局后战斗中看不到</small></h2>
       <div class="su-pills">${([["random", "随机"], ["preset", "选一套推荐"], ["custom", "自定义"]] as const).map(([k, l]) => `<button class="su-pill${st.foe.mode === k ? " on" : ""}" data-foe="${k}">${l}</button>`).join("")}</div>

@@ -115,11 +115,40 @@ export function playbookNamed(_e?: Env): Named[] {
   // 接力：读我方上一句（之前 2 句里我方说过什么）
   add("爽·接力追击", { k: "when", q: query(win("before", 2, "sent"), "me", word("造成"), "count", 1), judge: "exist", effs: [dmg(3, lowFoe, "shield")], cap: 1 });
   add("爽·接力防御", { k: "when", q: query(win("before", 2, "sent"), "me", word("造成"), "count", 1), judge: "exist", effs: [shield(3, allMe), heal(2, lowMe)], cap: 1 });
-  if (_e) realExtras(_e, add);
+  if (_e) { realExtras(_e, add); classExtras(_e, add); }
   return o;
 }
 /** 延后值得用：对方那句带伤害，我方能在它起手之前出手（不然它已经生效，延后落空） */
 export function postponeOk(e: Env, d: Decl): boolean { return d.cl.some((c) => c.k === "act" && c.eff.verb === "dmg") && windupFor([postpone(d.ord, 1)], e.unit, e.s) < d.start; }
+/** 职业天赋的针对性补充（只是多给电脑几条可说的句子，不强迫）：并流多段句、引用流大数字、限制流封锁、状态流连击 */
+function classExtras(e: Env, add: (name: string, ...cl: Sentence) => void) {
+  const cx = P2.CLASSES ? e.s.cls[e.side] : null;
+  if (!cx) return;
+  const lowFoe: Tg = { t: "lowFoe" }, lowMe: Tg = { t: "lowMe" }, allMe: Tg = { t: "some", n: 2, side: "me" };
+  const q = (who: "me" | "foe", obj: Obj, agg: "count" | "sum", mult: number, n = 1) => ({ q: query(win("before", n, "round"), who, obj, agg), mult });
+  if (cx === "并") {
+    add("并流·攻守三连(链)", act(dmg(2, lowFoe)), act(heal(2, lowMe), "ok"), act(shield(2, allMe), "fail"));
+    add("并流·易伤攻守", status("vuln", 1, 2, lowFoe), act(dmg(2, lowFoe)), act(heal(2, lowMe)), act(shield(2, allMe)));
+    add("并流·双状态重击", status("vuln", 1, 2, lowFoe), status("weak", 1, 2, lowFoe), act(dmg(3, lowFoe)));
+    add("并流·五段全家桶", status("vuln", 1, 2, lowFoe), status("burn", 1, 2, lowFoe), act(dmg(2, lowFoe)), act(heal(2, lowMe)), act(shield(2, allMe)));
+    add("并流·七段", status("vuln", 1, 2, lowFoe), status("weak", 1, 2, lowFoe), status("burn", 1, 2, lowFoe), act(dmg(2, lowFoe)), act(heal(2, lowMe)), act(shield(2, allMe)), { k: "when", q: query(win("before", 1, "sent"), "foe", word("造成")), judge: "exist", effs: [dmg(2, lowFoe)], cap: 1 });
+  } else if (cx === "引用") {
+    add("引用流·全程收割", act(dmg(q("me", cat("dealt"), "sum", 1, 99), lowFoe)));
+    add("引用流·对方攻击次数×2", act(dmg(q("foe", cat("atk"), "count", 2), lowFoe)));
+    add("引用流·受伤次数转盾", act(shield(q("me", ev("hurt"), "count", 2), allMe)));
+    add("引用流·大数字+全体治疗", act(dmg(q("me", cat("dealt"), "sum", 2), lowFoe)), act(heal(2, allMe)));
+  } else if (cx === "限制") {
+    add("限制流·三轮封锁", forbid(cat("atk"), 3, 2, 2));
+    add("限制流·三轮全封锁+自保", forbid(cat("any"), 3, 2, 3), act(shield(2, lowMe)));
+    add("限制流·三轮设伏", whenever("foe", cat("atk"), 3, [dmg(2, { t: "src" })], 3, 2));
+    add("限制流·封疗封防", forbid(cat("heal"), 3, 2, 2), forbid(cat("def"), 3, 2, 2));
+  } else if (cx === "状态") {
+    for (const a of e.foes) for (const b of e.foes) if (a < b) add("状态流·双目标蚀骨", status("vuln", 1, 2, unit(a)), status("burn", 1, 3, unit(b)));
+    add("状态流·易伤三连", status("vuln", 1, 3, lowFoe), act(dmg(1, lowFoe)), act(dmg(1, lowFoe)));
+    add("状态流·衰弱灼烧同一目标不可", status("burn", 1, 3, lowFoe), act(shield(2, lowMe)));
+    if (P2.REP) add("状态流·易伤重复", status("vuln", 1, 3, lowFoe), act(dmg(1, lowFoe, undefined, 3)));
+  }
+}
 /** 对方这一句里最大的单次伤害（只看写死数字的伤害，重复算在一起） */
 function bigHit(d: Decl): number { let m = 0; for (const c of d.cl) if (c.k === "act" && c.eff.verb === "dmg" && typeof c.eff.n === "number") m = Math.max(m, c.eff.n * (c.eff.rep ?? 1)); return m; }
 /** 真实引擎的词（开关打开才有）：转移反弹大单击、延后推出时间轴、关键词保护大招、拆保护、重复 */
