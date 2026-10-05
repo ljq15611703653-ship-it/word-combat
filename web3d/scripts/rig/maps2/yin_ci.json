@@ -1,0 +1,21 @@
+{
+ "sw":{"arm":1.1,"leg":1.15},
+ "head":{"c":[1],"clip":[0,0,372,395],"ps":1.2,"pivot":[210,378],"off":[0,10]},
+ "hair_back":{"c":[2],"at":[540,310],"ps":1.1},
+ "torso":{"c":[21],"ps":1.05},
+ "arm_far":[{"c":[19],"hem":[150,610]},{"c":[28],"end":1}],
+ "arm_near":[{"c":[20],"hem":[810,620]},{"c":[29],"end":1}],
+ "leg_far":[{"c":[34]},{"c":[36]},{"c":[39],"ps":1.0}],
+ "leg_near":[{"c":[35]},{"c":[37]},{"c":[41],"ps":1.0}],
+ "extras":[
+  {"n":"skirt_f","c":[31],"bone":"skirt","pivot":"top","at":[510,740],"ps":1.0,"z":"mid"},
+  {"n":"skirt_n","c":[32],"bone":"skirt","pivot":"top","at":[740,740],"ps":1.0,"z":"front"},
+  {"n":"lanyard","c":[25],"bone":"strap","pivot":"top","at":[690,560],"ps":0.8,"z":"front"},
+  {"n":"ring","c":[17],"bone":"holo","pivot":"mid","at":[620,470],"ps":1.4,"z":"hair","glow":1},
+  {"n":"page1","c":[9],"bone":"holo","pivot":"mid","at":[330,370],"ps":1.2,"z":"top","glow":1},
+  {"n":"page2","c":[11],"bone":"holo","pivot":"mid","at":[880,430],"ps":1.1,"z":"top","glow":1},
+  {"n":"page3","c":[12],"bone":"holo","pivot":"mid","at":[930,560],"ps":1.0,"z":"top","glow":1},
+  {"n":"page4","c":[5],"bone":"holo","pivot":"mid","at":[340,520],"ps":1.0,"z":"top","glow":1},
+  {"n":"book","c":[23],"bone":"wr_near","pivot":"mid","off":[10,70],"ps":0.9,"z":"armn"}
+ ]
+}

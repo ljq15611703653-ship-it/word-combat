@@ -25,7 +25,8 @@ def matte(rgb):
     return a.astype(np.uint8), alpha
 
 def load(name):
-    im = Image.open(f"{SRC}/{name}_parts.png").convert("RGB")
+    p = f"D:/wc/art/q/cls/{name}/parts.png"
+    im = Image.open(p if os.path.exists(p) else f"{SRC}/{name}_parts.png").convert("RGB")
     return matte(np.array(im))
 
 def components(alpha, grow=int(os.environ.get("GROW", 6)), minarea=int(os.environ.get("MINA", 120))):

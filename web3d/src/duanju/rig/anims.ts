@@ -59,13 +59,24 @@ export const ANIMS: Record<AnimName, Anim> = {
   },
 };
 
-export function samplePose(name: AnimName, t: number, gain?: Record<string, number>): Pose {
+/** 位置风格：词位=出手克制/稍慢；数位=腕盘发光（待机呼吸式脉动）；速位=幅度更大、更快 */
+export type RigStyle = "ci" | "shu" | "su";
+export const STYLE_MOD: Record<RigStyle, { amp: number; speed: number }> = { ci: { amp: 0.72, speed: 0.92 }, shu: { amp: 1, speed: 1 }, su: { amp: 1.3, speed: 1.4 } };
+export const speedOf = (style?: RigStyle) => (style ? STYLE_MOD[style].speed : 1);
+
+export function samplePose(name: AnimName, t: number, gain?: Record<string, number>, style?: RigStyle): Pose {
   const a = ANIMS[name], pose: Pose = { bones: {} };
+  const sm = style ? STYLE_MOD[style] : { amp: 1, speed: 1 };
   for (const [bone, prop, keys] of a.tracks) {
-    let v = sample(keys, t); if (gain && bone && prop === "rot") v *= gain[bone] ?? 1;
+    let v = sample(keys, t * sm.speed); if (gain && bone && prop === "rot") v *= gain[bone] ?? 1;
+    if (bone && (prop === "rot" || prop === "x" || prop === "y") && bone !== "root") v *= sm.amp;
     if (!bone) { (pose as any)[prop] = v; continue; }
     if (prop === ("glow" as any)) continue;
     (pose.bones[bone] ??= {})[prop as Prop] = v;
+  }
+  if (style === "shu") {
+    if (name === "idle") pose.glow = 0.3 + 0.28 * Math.sin((2 * Math.PI * t) / a.dur);
+    else if (name === "cast") pose.glow = Math.max(pose.glow ?? 0, 0.85 * Math.sin(Math.PI * Math.min(1, t / a.dur)) ** 0.7);
   }
   return pose;
 }
