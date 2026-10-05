@@ -650,6 +650,44 @@
       "side": "right"
      }
     ]
+   },
+   {
+    "round": 2,
+    "say": [
+     {
+      "who": "柯谦",
+      "text": "他们靠得很近。我引用过一句：默契，是不用商量的话。",
+      "expr": "neutral",
+      "side": "right"
+     }
+    ],
+    "after": [
+     {
+      "who": "叶栖",
+      "text": "……他们在笑。",
+      "expr": "sad",
+      "side": "left"
+     }
+    ]
+   },
+   {
+    "round": 3,
+    "say": [
+     {
+      "who": "小满",
+      "text": "最后一下，你来。",
+      "expr": "smile",
+      "side": "right"
+     }
+    ],
+    "after": [
+     {
+      "who": "回声",
+      "text": "实验十，完成。",
+      "expr": "neutral",
+      "side": "right"
+     }
+    ]
    }
   ],
   "hints": [
@@ -709,6 +747,44 @@
       "who": "小满",
       "text": "对，是样本。",
       "expr": "sad",
+      "side": "right"
+     }
+    ]
+   },
+   {
+    "round": 2,
+    "say": [
+     {
+      "who": "小满",
+      "text": "烛火一点点烧，不急。",
+      "expr": "neutral",
+      "side": "right"
+     }
+    ],
+    "after": [
+     {
+      "who": "叶栖",
+      "text": "这个味道……",
+      "expr": "shock",
+      "side": "left"
+     }
+    ]
+   },
+   {
+    "round": 3,
+    "say": [
+     {
+      "who": "柯谦",
+      "text": "灯还亮着。该收尾了。",
+      "expr": "neutral",
+      "side": "right"
+     }
+    ],
+    "after": [
+     {
+      "who": "回声",
+      "text": "实验十一，完成。",
+      "expr": "neutral",
       "side": "right"
      }
     ]
@@ -785,6 +861,25 @@
       "text": "和你一样。",
       "expr": "neutral",
       "side": "right"
+     }
+    ]
+   },
+   {
+    "round": 3,
+    "say": [
+     {
+      "who": "柯谦",
+      "text": "陷阱摆好了，等他自己踩进来。",
+      "expr": "neutral",
+      "side": "right"
+     }
+    ],
+    "after": [
+     {
+      "who": "叶栖",
+      "text": "他真的踩进来了。",
+      "expr": "sad",
+      "side": "left"
      }
     ]
    }
@@ -872,6 +967,25 @@
       "text": "……我知道了。",
       "expr": "angry",
       "side": "left"
+     }
+    ]
+   },
+   {
+    "round": 3,
+    "say": [
+     {
+      "who": "柯谦",
+      "text": "把前面发生过的，都记下来。",
+      "expr": "neutral",
+      "side": "right"
+     }
+    ],
+    "after": [
+     {
+      "who": "小满",
+      "text": "差一点点……再撑一下。",
+      "expr": "sad",
+      "side": "right"
      }
     ]
    }
