@@ -516,7 +516,7 @@ export function playComic(container, data, opts = {}) {
         content = document.createElement('canvas'); content.width = 4; content.height = 5;
         loadImg(aBase + PA.src).then(img => { const o = cropToCanvas(img, PA.crop || [0, 0, 1, 1], 1000, PA.chroma); content.width = o.width; content.height = o.height; content.getContext('2d').drawImage(o, 0, 0); const hh = pw * o.height / o.width; const rr = pg.avoid.find(a => a.pop === po); if (rr) { rr.h = hh; rr.y = cy - hh / 2; } pe.style.top = (cy - hh / 2) + 'px'; }).catch(() => { });
       } else if (!po.image || opts.forcePlaceholder) { content = paintPlaceholder(panel.id + '-pop', 480, 600, [.5, .5], 'pop'); }
-      else { content = new Image(); content.src = (opts.imageBase || '') + po.image; }
+      else { content = new Image(); content.onerror = () => { pe.remove(); const k = pg.avoid.findIndex(v => v.pop === po); if (k >= 0) pg.avoid.splice(k, 1); }; content.src = (opts.imageBase || '') + po.image; } // 出框层图缺失(尚未出图)就整层不显示,不留破图图标
       pe.appendChild(content);
       pg.avoid.push({ x: cx - pw / 2, y: cy - ph / 2, w: pw, h: ph, soft: true, pop: po });
       const inner = pe; inner.style.opacity = 0;
@@ -549,7 +549,7 @@ export function playComic(container, data, opts = {}) {
       for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { if (!inPoly(x + 8 + (w - 16) * i / 2, y + 8 + (h - 16) * j / 2, o.poly)) out++; }
       const rc = { x, y, w, h };
       let c = out * (o.loose ? 150 : 5000);
-      if (sf) c += ovl(rc, sf) / 40;
+      if (sf) c += ovl(rc, sf) / 14; // 安全区(主体所在)里尽量不放气泡
       for (const a of o.avoid) c += ovl(rc, a) / (a.soft ? 80 : 4);
       if (!o.noTopBias) c += (y - bb.y) * .6 + Math.abs(x + w / 2 - (bb.x + bb.w / 2)) * .05; else c += (bb.y + bb.h - y - h) * .5;
       if (c < bc) { bc = c; best = { x, y }; }
@@ -565,7 +565,7 @@ export function playComic(container, data, opts = {}) {
     const tx = el('span', '', c); tx.textContent = line.text;
     const tl = nar ? null : el('i', 'tl', c);
     const w = c.offsetWidth, h = c.offsetHeight;
-    const pos = place(w, h, { poly: rev.poly, bb: rev.bb, safe: rev.safe, avoid: pg.avoid });
+    const pos = place(w, h, { poly: rev.poly, bb: rev.bb, safe: rev.safe, avoid: pg.avoid, noTopBias: true }); // 偏下放:仰拍/特写时脸多在上半
     c.style.left = pos.x + 'px'; c.style.top = pos.y + 'px';
     if (tl) { // 气泡尖角指向主体
       const dx = rev.safe.x + rev.safe.w / 2 - (pos.x + w / 2), dy = rev.safe.y + rev.safe.h / 2 - (pos.y + h / 2);

@@ -140,6 +140,8 @@ async function boot() {
   ]);
   const jump = +(q.get("beat") ?? 0);
   if (q.get("finale") === "1") { root.className = "dj-root story"; await finale(); return; }
+  const cs = /^L(\d+)-(pre|post)$/.exec(q.get("comic") ?? ""); // 调试：?comic=L5-post 直接播某段漫画
+  if (cs) { root.className = "dj-root story"; await comicSeg(+cs[1], cs[2] as "pre" | "post"); selectPage(); return; }
   if (q.get("unlock") === "all") { /* 调试：全部解锁 */ }
   if (!prog.prologue && !skipStory && !jump) {
     root.className = "dj-root story";
