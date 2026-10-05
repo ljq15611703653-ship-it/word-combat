@@ -52,13 +52,13 @@ const trs = (x: number, y: number, rot: number, sx: number, sy: number): M => { 
 export function createRig(artDir: string, container: HTMLElement, opts: { onFail?: () => void; onReady?: () => void; scale?: number; paused?: boolean } = {}): RigFigure {
   const cv = document.createElement("canvas"); cv.className = "rig"; cv.setAttribute("aria-hidden", "true");
   container.insertBefore(cv, container.firstChild);
-  const ctx = cv.getContext("2d")!;
+  const ctx = cv.getContext("2d")!; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
   let asset: RigAsset | null = null, facing: 1 | -1 = 1, dead = false, raf = 0;
   let cur: AnimName = "idle", t0 = performance.now(), queued: AnimName | null = null, manual = false;
   const ready = loadRig(artDir).then((a) => {
     if (dead) return;
     if (!a) { cv.remove(); opts.onFail?.(); return; }
-    asset = a; opts.onReady?.(); const v = a.data.view, sc = opts.scale ?? 0.5;
+    asset = a; opts.onReady?.(); const v = a.data.view, dpr = Math.min(2, window.devicePixelRatio || 1), sc = opts.scale ?? Math.max(0.2, Math.min(0.5, ((container.clientHeight || 190) * dpr * 2) / v[3]));
     cv.width = Math.round(v[2] * sc); cv.height = Math.round(v[3] * sc);
     if (!manual && !opts.paused) loop();
     else draw(cur, manual ? tManual : 0);
