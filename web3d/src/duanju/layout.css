@@ -10,8 +10,8 @@
 
 /* ---- 随从：头顶名牌/句子条 + 立绘 + 底座。每边一条斜线（前排靠中间、靠下；后排靠边、靠上） ---- */
 .unit { --uw: clamp(138px, 13.4vw, 172px); --dx: calc(var(--uw) * .88); position: absolute; width: var(--uw); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; transform: translateX(-50%); pointer-events: auto; --s: 1; }
-.unit.me.pos2 { left: calc(var(--uw) / 2 + 8px); bottom: 45%; --s: .86; } .unit.me.pos1 { left: calc(var(--uw) / 2 + 8px + var(--dx)); bottom: 24%; --s: .93; } .unit.me.pos0 { left: calc(var(--uw) / 2 + 8px + var(--dx) * 2); bottom: 3%; }
-.unit.foe.pos2 { left: calc(100% - var(--uw) / 2 - 8px); bottom: 45%; --s: .86; } .unit.foe.pos1 { left: calc(100% - var(--uw) / 2 - 8px - var(--dx)); bottom: 24%; --s: .93; } .unit.foe.pos0 { left: calc(100% - var(--uw) / 2 - 8px - var(--dx) * 2); bottom: 3%; }
+.unit.me.pos2 { left: calc(var(--uw) / 2 + 8px); bottom: 24%; --s: .86; } .unit.me.pos1 { left: calc(var(--uw) / 2 + 8px + var(--dx)); bottom: 13.5%; --s: .93; } .unit.me.pos0 { left: calc(var(--uw) / 2 + 8px + var(--dx) * 2); bottom: 3%; }
+.unit.foe.pos2 { left: calc(100% - var(--uw) / 2 - 8px); bottom: 24%; --s: .86; } .unit.foe.pos1 { left: calc(100% - var(--uw) / 2 - 8px - var(--dx)); bottom: 13.5%; --s: .93; } .unit.foe.pos0 { left: calc(100% - var(--uw) / 2 - 8px - var(--dx) * 2); bottom: 3%; }
 .fig { position: relative; flex: 0 0 auto; width: calc(var(--fh, clamp(120px, 25vh, 200px)) * .62 * var(--s)); height: calc(var(--fh, clamp(120px, 25vh, 200px)) * var(--s)); margin-top: 4px; }
 .fig img, .fig canvas.rig { position: absolute; left: 0; bottom: 8%; width: 100%; height: 92%; object-fit: contain; object-position: 50% 100%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .55)); transition: filter .2s, transform .35s; }
 .unit.foe .fig img, .unit.foe .fig canvas.rig { transform: scaleX(-1); }
@@ -186,3 +186,10 @@ body.hs-dragging, body.hs-dragging * { cursor: grabbing !important; }
   .lib-why { min-height: 1.4em; padding-bottom: 2px; } .cw { padding: 6px 9px 7px; }
   .status { bottom: calc(var(--lib-h) + 4px); left: 6px; right: 6px; transform: none; max-width: none; font-size: 11px; display: none; }
 }
+
+/* 骨骼小人：脚落在底座中心（画布底部有留白） */
+.fig canvas.rig { bottom: -3%; }
+/* 层级：底座在最下，人物在上，飘字最上 */
+.fig .base { z-index: 0; }
+.fig img, .fig canvas.rig { z-index: 1; }
+.fig .floats { z-index: 3; }

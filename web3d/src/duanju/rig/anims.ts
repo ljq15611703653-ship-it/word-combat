@@ -20,7 +20,7 @@ export const ANIMS: Record<AnimName, Anim> = {
   idle: {
     dur: 3.2, loop: true, tracks: [
       ["hip", "y", wave(-4, 0)], ["torso", "rot", wave(-0.9, 0.05)], ["torso", "sy", wave(0.008, 0).map(([t, v]) => [t, 1 + v] as Key)],
-      ["head", "rot", wave(1.6, -0.12)], ["hair", "rot", wave(3.6, -0.28)], ["neck", "rot", wave(0.8, -0.1)],
+      ["head", "rot", wave(1.6, -0.035)], ["hair", "rot", wave(3.6, -0.28)], ["neck", "rot", wave(0.8, -0.03)],
       ["sh_far", "rot", wave(2.2, -0.1)], ["el_far", "rot", wave(2, -0.2)], ["wr_far", "rot", wave(3, -0.3)],
       ["sh_near", "rot", wave(-2.4, -0.1)], ["el_near", "rot", wave(-2.4, -0.2)], ["wr_near", "rot", wave(-3, -0.3)],
       ["cape", "rot", wave(3, -0.25)], ["skirt", "rot", wave(2.4, -0.3)], ["strap", "rot", wave(4, -0.3)], ["tail", "rot", wave(5, -0.35)],
