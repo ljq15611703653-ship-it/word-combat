@@ -80,6 +80,16 @@ for (const n of BEATS) {
   while (Date.now() - t0 < 120000) {
     { const mt0 = await ev("document.querySelector('[data-a=main]')?.textContent ?? ''"), rn0 = await ev("window.__tb?.m?.rnd ?? 0"); const k0 = `b${n}_r${rn0}_presettle`;
       if (mt0.includes("结算") && !seen.has(k0)) { seen.add(k0); await sleep(500); await shot(`${tag}_${k0}`); } }
+    if (process.env.FAILTEST && !seen.has("ft" + n) && await ev("!!document.querySelector('.unit.me.ready')")) {
+      seen.add("ft" + n);
+      // 失败路径：点随从 → 拖一个被锁的词 → 拼一句不对的话再确认 → 看提示，再取消，不应卡死
+      await ev("document.querySelector('.unit.me.ready').click()"); await sleep(300);
+      const locked = await ev("(()=>{const d=__tb.dock; const ok=d.push('恢复'); return {ok, why:document.querySelector('.lib-why').textContent, toks:d.tokens.join(' ')}})()");
+      const wrong = await ev("(()=>{const d=__tb.dock; d.tokens=[]; d.refresh(); const a=['造成','1','@4'].map(t=>d.push(t)); const ok=d.confirm(); return {pushed:a.join(','), confirmed:ok, why:document.querySelector('.lib-why').textContent, status:document.querySelector('.status')?.textContent, bubble:document.querySelector('.tb-bubble')?.textContent, bubbleWarn:document.querySelector('.tb-bubble')?.classList.contains('warn')}})()");
+      await sleep(400); await shot(`${tag}_b${n}_failtest`);
+      console.log("FAILTEST beat", n, JSON.stringify(locked), JSON.stringify(wrong));
+      await ev("__tb.dock.cancel(); __tb.render()"); await sleep(300);
+    }
     const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
     if (r === "SELECT") break;
     if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${tag}_b${n}_FAIL`); allOk = false; break; }
@@ -88,7 +98,7 @@ for (const n of BEATS) {
     const rn = await ev("window.__tb?.m?.rnd ?? 0");
     const t = r === "mainS" ? "settle" : r === "mainN" ? "next" : r.startsWith("unit") ? "guide" : r;
     const key = `b${n}_r${rn}_${t}`;
-    if (r === "pick") { const k = await ev("window.__tb.dock.tokens.length"); const kk = `${key}${k}`; if ((k === 1 || k === 3) && !seen.has(kk)) { seen.add(kk); await sleep(250); await shot(`${tag}_${kk}`); } }
+    if (r === "pick") { const k = await ev("(window.__tb?.dock?.tokens?.length ?? 0)"); const kk = `${key}${k}`; if ((k === 1 || k === 3) && !seen.has(kk)) { seen.add(kk); await sleep(250); await shot(`${tag}_${kk}`); } }
     else if (["guide", "declare"].includes(t) && !seen.has(key)) { seen.add(key); await sleep(350); await shot(`${tag}_${key}`); }
     else if (t === "settle" && !seen.has(key)) { seen.add(key); await sleep(1300); await shot(`${tag}_${key}_playing`); await sleep(2500); await shot(`${tag}_${key}_after`); }
     if (rn !== prevRnd) prevRnd = rn;

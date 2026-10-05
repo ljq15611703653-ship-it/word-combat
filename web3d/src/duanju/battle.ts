@@ -41,6 +41,8 @@ export interface BattleHooks {
   /** 玩家点「宣告」：返回字符串 = 拒绝并显示提示 */
   beforeDeclare?(u: number, cl: import("./engine/api").Sentence, start: number, m: Match): string | null;
   afterDeclare?(u: number, m: Match): void;
+  /** 点「不出手」：返回字符串 = 拒绝（教程里有引导步骤的随从不许跳过） */
+  beforePass?(u: number, m: Match): string | null;
   /** 点「结束宣告」：返回字符串 = 拒绝 */
   beforeEnd?(m: Match): string | null;
   /** 允许「撤回」按钮 */
@@ -133,6 +135,7 @@ export class Battle {
       onDeclare: (u, cl, start) => this.handleDeclare(u, cl, start),
       onPass: (u) => { this.m.pass(u); this.render(); this.waitHuman?.("act"); },
       guideFor: (u) => this.hooks?.guide?.(this.m, u) ?? null,
+      passDenied: (u) => this.hooks?.beforePass?.(u, this.m) ?? null,
     });
     st.addEventListener("click", (e) => { const a = (e.target as HTMLElement).closest<HTMLElement>("[data-a]")?.dataset.a; if (a) this.onAct(a); else st.querySelector<HTMLElement>(".pop")!.hidden = true; });
     this.render();
@@ -211,7 +214,7 @@ export class Battle {
   private onUnitClick(u: number, e: Event) {
     const t = e.target as HTMLElement;
     if (t.closest(".fold")) { this.collapsed.has(u) ? this.collapsed.delete(u) : this.collapsed.add(u); this.render(); e.stopPropagation(); return; }
-    if (t.closest(".pass")) { e.stopPropagation(); if (this.canPick(u)) { this.dock.cancel(); this.m.pass(u); this.render(); this.waitHuman?.("act"); } return; }
+    if (t.closest(".pass")) { e.stopPropagation(); const why = this.canPick(u) ? this.hooks?.beforePass?.(u, this.m) : null; if (why) { this.setStatus(why); this.hooks?.onTick?.(this); return; } if (this.canPick(u)) { this.dock.cancel(); this.m.pass(u); this.render(); this.waitHuman?.("act"); } return; }
     if (t.closest(".comp, .strip")) return;
     if (!this.canPick(u)) return;
     if (this.dock.unit === u) { this.dock.cancel(); this.render(); return; }

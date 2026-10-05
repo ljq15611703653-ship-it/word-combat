@@ -28,6 +28,7 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
       setup: (m) => ses.setup(m),
       foeMove: (m) => ses.foeMove(m),
       beforeDeclare: (u, cl, start, m) => { const e = ses.check(u, cl, start, m); if (e) warn = { text: e, t: Date.now() }; else warn = null; return e; },
+      beforePass: (u, m) => { const e = ses.beforePass(u, m); if (e) warn = { text: e, t: Date.now() }; return e; },
       beforeEnd: (m) => { const e = ses.beforeEnd(m); if (e) warn = { text: e, t: Date.now() }; return e; },
       undo: true,
       onMount: (bb) => { bb.stage.appendChild(bubble); bb.stage.appendChild(goal); timer = window.setInterval(() => tick(bb), 200); },

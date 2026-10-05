@@ -15,7 +15,8 @@ export function guideFor(ses: TeachSession, m: Match, u: number): Guide {
   const pool = want ? all.filter((c) => want(c.cl)) : all;
   const use = pool.length ? pool : all;
   const toks = (cl: (typeof all)[number]["cl"]): string[] | null => { try { return astToTokens(cl); } catch { return null; } };
-  const g: Guide = { allowed };
+  // 有「这一步想要的句子」时，确认键只对这一句开放（拼到一半的前缀也不能提前确认）
+  const g: Guide = { allowed: want ? (cl) => allowed(cl) && want(cl) : allowed, ...(want ? { denyText: "还差几张词牌：照着发亮的那张，一张一张接着拖。" } : {}) };
   if (use.length && (want || all.length < 400)) {
     const set = new Set<string>();
     for (const c of use) toks(c.cl)?.forEach((t) => set.add(t));

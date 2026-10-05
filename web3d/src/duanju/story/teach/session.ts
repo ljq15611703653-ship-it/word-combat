@@ -120,6 +120,10 @@ export class TeachSession {
     }
     return null;
   }
+  /** 有引导步骤的随从不许「不出手」（否则这一步的教学就被跳过了） */
+  beforePass(u: number, m: Match): string | null {
+    return this.stepFor(m, u) ? "这一步就是要这位说话，照着发亮的词牌拼，别跳过。" : null;
+  }
   beforeEnd(m: Match): string | null {
     const p = this.pending(m);
     if (p.length) return "还有随从要说话：点高亮的那位。";

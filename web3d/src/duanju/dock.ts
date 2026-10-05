@@ -24,6 +24,8 @@ export interface DockApi {
   canPick(u: number): boolean;
   onDeclare(u: number, cl: Sentence, start: number): void;
   onPass(u: number): void;
+  /** 教程：这个随从现在不许「不出手」时返回原因 */
+  passDenied?(u: number): string | null;
   /** 教程：这个随从现在的引导（null = 自由） */
   guideFor?(u: number): Guide | null;
 }
@@ -66,7 +68,7 @@ export class Dock {
       const t = e.target as HTMLElement;
       const a = t.closest<HTMLElement>(".comp [data-a]")?.dataset.a;
       if (!a || this.unit < 0) return;
-      if (a === "back") this.back(); else if (a === "clear") { this.tokens = []; this.say(""); this.refresh(); } else if (a === "pass") { const u = this.unit; this.cancel(); this.api.onPass(u); } else if (a === "go") this.confirm(); else if (a === "close") this.cancel();
+      if (a === "back") this.back(); else if (a === "clear") { this.tokens = []; this.say(""); this.refresh(); } else if (a === "pass") { const u = this.unit; const why = this.api.passDenied?.(u); if (why) { this.say(why, 4200); return; } this.cancel(); this.api.onPass(u); } else if (a === "go") this.confirm(); else if (a === "close") this.cancel();
     });
   }
   destroy() { this.off?.(); this.off = null; this.ghost?.remove(); this.el.remove(); }
