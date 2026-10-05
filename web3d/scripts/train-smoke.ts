@@ -11,6 +11,7 @@ import type { Sentence } from "../src/duanju/engine/ast";
 
 const T: Training = JSON.parse(readFileSync("public/duanju/story/training.json", "utf8"));
 const only = process.env.L;
+const CLS: Record<string, any> = { bing: "并", quote: "引用", limit: "限制", state: "状态" };   // 与 STYLES 里的 cls 一致；对手职业：状态流关用限制，其余用状态（见 train-content 的 foeStyle）
 const errs: string[] = [];
 (globalThis as any).__storyErr = (e: string) => errs.push(e);
 
@@ -33,12 +34,12 @@ function statusClash(decls: Sentence[]): string {   // 状态流：同一轮对�
 
 function play(lv: TrainLevel, idle: boolean) {
   const cur = { base: { rules: T.base.rules, me: T.classes.find((c) => c.id === lv.cls)!.names }, beats: [lv.beat] } as any;
-  const beat = lv.beat;
+  const beat = JSON.parse(JSON.stringify(lv.beat)); if (process.env.MEHP) for (const u of beat.me.units) beat.me.hp = { ...(beat.me.hp ?? {}), [u]: +process.env.MEHP };
   const ses = new TrainSession(beat as any, cur);
   const st = ses.settings();
   configureRules("custom", st.customRules);
   setUnitNames(cur.base.me, beat.foeNames as [string, string, string]);
-  const m = new Match({ first: st.first === "me" ? 0 : 1, myDeck: {}, tier: st.tier, seed: beat.seed, foeDeck: ses.foeDeck() });
+  const m = new Match({ first: st.first === "me" ? 0 : 1, myDeck: {}, tier: st.tier, cls: [CLS[lv.cls], CLS[lv.cls === "state" ? "limit" : "state"]], seed: beat.seed, foeDeck: ses.foeDeck() });
   ses.setup(m);
   const log: string[] = []; const tag = `[${lv.id}${idle ? " idle" : ""}]`;
   let guard = 0; const roundDecls: Sentence[] = []; let lastRnd = 0;
@@ -87,6 +88,7 @@ for (const lv of T.levels) {
   if (!ok) bad++;
   console.log(`${lv.id} ${lv.name}: ${r.out} 轮${r.rnd} | 不出手:${idle.out}${idle.out === "win" ? " (太简单!)" : ""} ${ok ? "OK" : "FAIL"}`);
   if (!ok || process.env.V) console.log(r.log.join("\n"));
+  if (process.env.IDLE) console.log("IDLE:\n" + idle.log.join("\n"));
 }
 for (const e of errs) console.log("ERR", e);
 console.log(bad || errs.length ? `问题：${bad} 关失败，${errs.length} 条错误` : "全部通过");

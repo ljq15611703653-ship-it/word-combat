@@ -25,7 +25,7 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
     const bubble = document.createElement("div"); bubble.className = "tb-bubble"; bubble.hidden = true;
     const goal = document.createElement("div"); goal.className = "tb-goal"; goal.hidden = true;
     const hooks: BattleHooks = {
-      styles: { me, foe }, foeDeck: ses.foeDeck(), absent: ses.absent(), guide: (m, u) => guideFor(ses, m, u),
+      styles: { me, foe }, useClass: !!ms, foeDeck: ses.foeDeck(), absent: ses.absent(), guide: (m, u) => guideFor(ses, m, u),
       setup: (m) => ses.setup(m),
       foeMove: (m) => ses.foeMove(m),
       beforeDeclare: (u, cl, start, m) => { const e = ses.check(u, cl, start, m); if (e) warn = { text: e, t: Date.now() }; else warn = null; return e; },
