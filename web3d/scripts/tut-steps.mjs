@@ -35,20 +35,25 @@ const STEP = `(async()=>{
   const ctr=el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}};
   const ptr=(ty,x,y,tgt)=>tgt.dispatchEvent(new PointerEvent(ty,{bubbles:true,clientX:x,clientY:y,button:0,buttons:ty==='pointerup'?0:1,pointerId:1,isPrimary:true}));
   const edit=$('.unit.me.editing');
+  if(edit&&window.__cheat){ edit.querySelector('.pass').click(); return 'pass'; }
   if(edit){
     const u=+edit.dataset.u; const st=ses.stepFor(b.m,u);
     const go=edit.querySelector('.comp [data-a=go]');
     if(!go.disabled){
       const sl=edit.querySelector('.comp input[type=range]'); let v=+sl.value; const lo=+sl.min;
+      if(window.__plan&&window.__plan.unit===u){ v=Math.max(+sl.min,window.__plan.start); } else
       if(st){ if(st.startMin!==undefined) v=Math.max(v,st.startMin); if(st.startMax!==undefined) v=Math.min(v,st.startMax); }
       v=Math.max(v,lo); if(+sl.value!==v){ sl.value=v; sl.dispatchEvent(new Event('input',{bubbles:true})); }
-      go.click(); return 'declare';
+      go.click(); window.__plan=null; return 'declare';
     }
     // 目标词序列：提示里的整句，没有就取第一条允许的句子
-    let toks=st&&st.words;
+    if(window.__plan&&window.__plan.unit===u&&!window.__plan.cl){ window.__plan=null; edit.querySelector('.pass').click(); return 'pass'; }
+    let toks=st&&st.words; if(window.__plan&&window.__plan.unit===u) toks=__cp.astToTokens(window.__plan.cl);
     if(!toks){
       const al=ses.allowed(b.m,u), wf=ses.wantsFn(b.m,u);
-      const c=b.m.legalSentences(u,400).find(x=>al(x.cl)&&(!wf||wf(x.cl)));
+      const ls=b.m.legalSentences(u,400).filter(x=>al(x.cl)&&(!wf||wf(x.cl)));
+      const good=window.__smart?ls.filter(x=>/敌方·[^，；]*受伤/.test(x.text)&&!/我方·[^，；]*受伤/.test(x.text)):[];
+      const c=(good.length?good[Math.floor(Math.random()*Math.min(good.length,6))]:ls[0]);
       if(!c) return 'NOROW';
       toks=__cp.astToTokens(c.cl);
     }
@@ -64,6 +69,15 @@ const STEP = `(async()=>{
   if(t.includes('结束宣告')){
     const p=ses.pending(b.m);
     if(p.length){ const e=$('.unit[data-u="'+p[0].unit+'"]'); e.click(); return 'unit'+p[0].unit; }
+    if(!ses.scripted&&window.__smart){
+      if(!window.__plan){
+        const sn=b.m.snap(), ns=b.m.s.decl.length, dn=b.m.s.done.slice(); b.m.autoMyMove();
+        const d=b.m.s.decl.length>ns?b.m.s.decl[b.m.s.decl.length-1]:null;
+        const u=d?d.unit:b.m.s.done.findIndex((x,i)=>x&&!dn[i]);
+        window.__plan={unit:u,cl:d?d.cl:null,start:d?d.start:0}; b.m.restore(sn);
+      }
+      const e=$('.unit[data-u="'+window.__plan.unit+'"]'); if(e){ e.click(); return 'unit'+window.__plan.unit; }
+    }
     if(!ses.scripted){ const us=b.m.myUnits().filter(u=>b.m.canAct(u)); if(us.length){ const e=$('.unit[data-u="'+us[0]+'"]'); e.click(); return 'unit'; } }
     main.click(); return 'end';
   }
@@ -78,7 +92,7 @@ const seen = new Set(); let allOk = true;
 for (const n of BEATS) {
   await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/duanju-story.html?beat=${n}&skip=1&unlock=all${process.env.FAST ? "&fast=1" : ""}` }); await sleep(1200);
   let steps = 0, last = "", prevRnd = 0; const t0 = Date.now(); let bg = "", art = "";
-  while (Date.now() - t0 < 120000) {
+  while (Date.now() - t0 < +(process.env.BEAT_MS ?? 120000)) {
     { const mt0 = await ev("document.querySelector('[data-a=main]')?.textContent ?? ''"), rn0 = await ev("window.__tb?.m?.rnd ?? 0"); const k0 = `b${n}_r${rn0}_presettle`;
       if (mt0.includes("结算") && !seen.has(k0)) { seen.add(k0); await sleep(500); await shot(`${tag}_${k0}`); } }
     if (process.env.FAILTEST && !seen.has("ft" + n) && await ev("!!document.querySelector('.unit.me.ready')")) {
@@ -91,6 +105,8 @@ for (const n of BEATS) {
       console.log("FAILTEST beat", n, JSON.stringify(locked), JSON.stringify(wrong));
       await ev("__tb.dock.cancel(); __tb.render()"); await sleep(300);
     }
+    if (process.env.SMART) await ev("window.__smart=1");
+    if (process.env.CHEAT && !seen.has("cheat") && await ev("!!window.__tb && !!document.querySelector('.unit.me.ready')")) { seen.add("cheat"); await ev("[3,4,5].forEach(u=>__tb.m.removeUnit(u)); __tb.render()"); await ev("window.__cheat=1"); console.log("CHEAT: foes removed"); }
     if (process.env.VFXLOG && !(await ev("!!window.__vfxLog"))) await ev("window.__vfxLog=[]; window.__vfxMark=" + (process.env.MARK ? 1 : 0));
     const r = await ev(STEP); if (r === "mainS" && process.env.VFXLOG && !process.env.DENSE) { await sleep(9000); console.log("VFXLOG", await ev("JSON.stringify(window.__vfxLog.splice(0))")); }
     if (r === "holding") { await sleep(350); await shot(`${tag}_b${n}_dragging`); await ev("window.__rel()"); }
