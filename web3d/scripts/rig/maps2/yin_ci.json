@@ -17,10 +17,7 @@
   {"n":"tail_f","c":[45],"bone":"skirt","at":[450,815],"ps":0.7,"sw":1.4,"pivot":"top","z":"mid"},
   {"n":"tail_n","c":[44],"bone":"skirt","at":[790,840],"ps":0.7,"sw":1.4,"pivot":"top","z":"front"},
   {"n":"book","c":[18],"bone":"torso","at":[800,705],"ps":0.85,"pivot":"mid","z":"front"},
-  {"n":"ring","c":[41],"bone":"holo","at":[610,490],"ps":2.0,"pivot":"mid","z":"back","glow":1},
   {"n":"pg1","c":[15],"bone":"holo","at":[340,360],"ps":1.1,"pivot":"mid","z":"top","glow":1},
-  {"n":"pg2","c":[23],"bone":"holo","at":[395,480],"ps":1.1,"pivot":"mid","z":"top","glow":1},
-  {"n":"pg3","c":[13],"bone":"holo","at":[880,420],"ps":1.1,"pivot":"mid","z":"top","glow":1},
-  {"n":"pg4","c":[15],"bone":"holo","at":[800,500],"ps":0.9,"pivot":"mid","z":"top","glow":1}
+  {"n":"pg3","c":[13],"bone":"holo","at":[880,420],"ps":1.1,"pivot":"mid","z":"top","glow":1}
  ]
 }

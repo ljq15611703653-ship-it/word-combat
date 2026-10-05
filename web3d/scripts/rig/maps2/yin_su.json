@@ -14,8 +14,6 @@
  "leg_near":[{"c":[17],"clip":[314,800,462,960],"sw":0.8},{"c":[17],"clip":[314,960,462,1105]},{"c":[17],"clip":[314,1105,462,1208],"ps":1.0}],
  "extras":[
   {"n":"bag","c":[20],"clip":[484,980,668,1168],"bone":"torso","at":[430,740],"ps":1.0,"pivot":"mid","z":"front"},
-  {"n":"holo","c":[19],"bone":"holo","at":[290,610],"ps":1.0,"pivot":"mid","z":"top","glow":1},
-  {"n":"fx1","c":[35],"bone":"holo","at":[370,1040],"ps":1.0,"pivot":"mid","z":"top","glow":1},
-  {"n":"fx2","c":[36],"bone":"holo","at":[700,1075],"ps":1.0,"pivot":"mid","z":"top","glow":1}
+  {"n":"holo","c":[19],"bone":"holo","at":[290,610],"ps":1.0,"pivot":"mid","z":"top","glow":1}
  ]
 }
