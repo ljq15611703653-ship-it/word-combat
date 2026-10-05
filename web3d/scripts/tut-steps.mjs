@@ -4,10 +4,10 @@
 // 按引导高亮走完关卡（拖拽拼句）：标题卡 → 漫画 → 对话 → 教学战斗 → 对话 → 漫画 → 选关页。
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-const PORT = process.argv[2] ?? "5184", OUT = process.argv[3] ?? "D:/wc/story_shots", BEATS = (process.argv[4] ?? "10,11,12,13").split(",").map(Number), DBG = 9391;
+const PORT = process.argv[2] ?? "5184", OUT = process.argv[3] ?? "D:/wc/story_shots", BEATS = (process.argv[4] ?? "10,11,12,13").split(",").map(Number), DBG = +(process.env.DBG ?? 9391);
 mkdirSync(OUT, { recursive: true });
 const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const proc = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${DBG}`, "--user-data-dir=D:/wc/ud_tut", "--window-size=1440,900", "--no-first-run", "about:blank"], { stdio: "ignore" });
+const proc = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${DBG}`, `--user-data-dir=${process.env.UD ?? "D:/wc/ud_tut"}`, "--window-size=1440,900", "--no-first-run", "about:blank"], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let tabs; for (let i = 0; i < 60; i++) { try { tabs = await (await fetch(`http://127.0.0.1:${DBG}/json`)).json(); if (tabs.some((t) => t.type === "page")) break; } catch { /* */ } await sleep(300); }
 const ws = new WebSocket(tabs.find((t) => t.type === "page").webSocketDebuggerUrl); await new Promise((r) => ws.addEventListener("open", r));
@@ -75,7 +75,7 @@ const W = +(process.env.W ?? 1440), H = +(process.env.H ?? 810), tag = process.e
 await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
 const seen = new Set(); let allOk = true;
 for (const n of BEATS) {
-  await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/duanju-story.html?beat=${n}&skip=1&unlock=all` }); await sleep(1200);
+  await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/duanju-story.html?beat=${n}&skip=1&unlock=all${process.env.FAST ? "&fast=1" : ""}` }); await sleep(1200);
   let steps = 0, last = "", prevRnd = 0; const t0 = Date.now(); let bg = "", art = "";
   while (Date.now() - t0 < 120000) {
     { const mt0 = await ev("document.querySelector('[data-a=main]')?.textContent ?? ''"), rn0 = await ev("window.__tb?.m?.rnd ?? 0"); const k0 = `b${n}_r${rn0}_presettle`;
