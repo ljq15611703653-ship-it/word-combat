@@ -19,7 +19,17 @@ addEventListener("unhandledrejection", (e) => dj.errors.push(String((e as Promis
 let st: Settings = loadSettings();
 let battle: Battle | null = null;
 
+// 教程通关（第 14 关毕业）之前不能打电脑；?unlock=all / 自动测试可绕过
+function tutorialDone(): boolean {
+  if (q.get("unlock") === "all" || AUTO_GAMES > 0 || q.get("start") === "1") return true;
+  try { return (JSON.parse(localStorage.getItem("duanju.story.v1") ?? "null")?.done ?? []).includes(14); } catch { return false; }
+}
+function mountLocked() {
+  dj.state = "locked"; root.className = "dj-root setup";
+  root.innerHTML = `<div class="dj-setup"><header class="su-title"><h1><span>断</span><i>·</i><span>句</span></h1><p>先完成教程，才能打电脑</p></header><div class="su-lock"><p>从第 1 关开始，一步步学会「说一句话就是出招」。通关第 14 关后，这里就会解锁。</p><a class="su-go" href="duanju-story.html">进入教程</a></div></div>`;
+}
 function setup() {
+  if (!tutorialDone()) { mountLocked(); return; }
   battle?.destroy(); battle = null; dj.battle = null; dj.state = "setup";
   root.className = "dj-root setup";
   mountSetup(root, st, (s) => { st = s; saveSettings(st); play(); });
