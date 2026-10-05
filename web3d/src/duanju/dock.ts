@@ -219,6 +219,8 @@ export class Dock {
     const slot = (i: number) => (this.slots?.has(i) ? `<i class="slot${i === this.hot ? " hot" : ""}" data-i="${i}"></i>` : "");
     if (!this.tokens.length) h += `${slot(0)}<span class="strip-empty">${this.api.match.s.done[u] ? "" : "把词牌拖到这里"}</span>`;
     else { this.tokens.forEach((t, i) => { h += `${slot(i)}<span class="w k-${kindOf(t)}${i === this.lifted ? " lifted" : ""}" data-i="${i}">${esc(tokenLabel(t, names))}</span>`; }); h += slot(this.tokens.length); }
+    const GH: Record<string, string> = { 造成: "伤害", 恢复: "生命" }, nt = this.tokens.length;
+    if (nt >= 2 && /^\d+$/.test(this.tokens[nt - 1]) && GH[this.tokens[nt - 2]]) h += `<span class="w-ghost" aria-hidden="true">${GH[this.tokens[nt - 2]]}</span>`;
     h += `<span class="cp-end${hinting ? " hint" : ""}"></span></span>`;
     decl.innerHTML = h;
     decl.querySelectorAll<HTMLElement>(".strip .w").forEach((w) => w.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); this.startDrag(e, this.tokens[+w.dataset.i!], { plate: +w.dataset.i! }, null); }));
