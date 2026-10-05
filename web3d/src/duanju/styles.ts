@@ -3,14 +3,16 @@ export interface StyleDef {
   id: string; name: string; tag: string; accent: string; accent2: string; glyph: string;
   /** public/duanju/art/<artDir>/battle_idle.png */
   artDir: string;
+  /** 按站位（0/1/2）单独指定立绘目录（剧情主角用）；缺省用 artDir */
+  unitArt?: [string, string, string];
   names: [string, string, string];
   deckPreset: string;
 }
 export const STYLES: StyleDef[] = [
-  { id: "bing", name: "并流", tag: "一句话接几段，连环出手", accent: "#ff4fa3", accent2: "#7df9ff", glyph: "并", artDir: "bing", names: ["连枝", "叠码", "疾并"], deckPreset: "cls-bing" },
-  { id: "yin", name: "引用流", tag: "把前几轮的量当数字用", accent: "#22e6ff", accent2: "#a98bff", glyph: "引", artDir: "yin", names: ["回声", "账本", "快读"], deckPreset: "cls-quote" },
-  { id: "xian", name: "限制流", tag: "不得/收紧：做了就疼", accent: "#9a7bff", accent2: "#ff4fa3", glyph: "限", artDir: "xian", names: ["禁言", "封条", "断路"], deckPreset: "cls-limit" },
-  { id: "zhuang", name: "状态流", tag: "灼烧易伤衰弱，慢慢磨", accent: "#3dffb0", accent2: "#22e6ff", glyph: "状", artDir: "zhuang", names: ["烛火", "裂纹", "迟滞"], deckPreset: "cls-state" },
+  { id: "bing", name: "「并」组", tag: "一句话接几段，连环出手", accent: "#ff4fa3", accent2: "#7df9ff", glyph: "并", artDir: "bing", names: ["连枝", "叠码", "疾并"], deckPreset: "cls-bing" },
+  { id: "yin", name: "「引用」组", tag: "把前几轮的量当数字用", accent: "#22e6ff", accent2: "#a98bff", glyph: "引", artDir: "yin", names: ["回声", "账本", "快读"], deckPreset: "cls-quote" },
+  { id: "xian", name: "「不得」组", tag: "不得/收紧：做了就疼", accent: "#9a7bff", accent2: "#ff4fa3", glyph: "限", artDir: "xian", names: ["禁言", "封条", "断路"], deckPreset: "cls-limit" },
+  { id: "zhuang", name: "「状态」组", tag: "灼烧易伤衰弱，慢慢磨", accent: "#3dffb0", accent2: "#22e6ff", glyph: "状", artDir: "zhuang", names: ["烛火", "裂纹", "迟滞"], deckPreset: "cls-state" },
 ];
 export const styleOf = (id: string) => STYLES.find((s) => s.id === id) ?? STYLES[0];
 export const TIER_DESC: Record<string, string> = {

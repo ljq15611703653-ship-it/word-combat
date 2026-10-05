@@ -82,3 +82,11 @@ button.guide-hl { box-shadow: 0 0 0 2px var(--ye), 0 0 18px var(--ye); }
 .bt.undo { margin-right: 6px; }
 .tb-bubble { clip-path: none; border-radius: 8px; }
 .dj-menu.guided .mn-deck, .dj-menu.guided .mn-q { display: none; }
+
+/* 脚本关的「小目标」条 */
+.tb-goal { position: absolute; z-index: 49; left: 12px; top: 10px; max-width: min(46%, 420px); display: flex; flex-direction: column; gap: 2px; padding: 7px 12px 8px 14px; border-left: 4px solid var(--ye); background: rgba(10, 6, 24, .78); color: #fff; font-size: 14px; line-height: 1.35; border-radius: 6px; pointer-events: none; backdrop-filter: blur(3px); }
+.tb-goal small { color: var(--ye); font-size: 11px; letter-spacing: .08em; }
+.tb-goal b { font-weight: 700; }
+.tb-goal.done { border-left-color: #3dffb0; }
+.tb-goal.done small::after { content: "  ✓ 完成"; color: #3dffb0; }
+.tb-goal.done.end small::after { content: "  ✓ 完成，点「结束宣告」"; }

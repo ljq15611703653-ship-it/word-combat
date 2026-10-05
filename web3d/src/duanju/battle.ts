@@ -45,6 +45,8 @@ export interface BattleHooks {
   /** 玩家点「宣告」：返回字符串 = 拒绝并显示提示 */
   beforeDeclare?(u: number, cl: import("./engine/api").Sentence, start: number, m: Match): string | null;
   afterDeclare?(u: number, m: Match): void;
+  /** 点「不出手」：返回字符串 = 拒绝（教程里有引导步骤的随从不许跳过） */
+  beforePass?(u: number, m: Match): string | null;
   /** 点「结束宣告」：返回字符串 = 拒绝 */
   beforeEnd?(m: Match): string | null;
   /** 允许「撤回」按钮 */
@@ -129,7 +131,7 @@ export class Battle {
         <div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>`;
       (side === "me" ? st.querySelector(".col.me") : st.querySelector(".col.foe"))!.appendChild(d);
       this.unitEls[u] = d;
-      const artDir = ((this.hooks && side === "me") || rigAll()) ? PROTAG[u % 3] : s.artDir;
+      const artDir = ((this.hooks && side === "me") || rigAll()) ? PROTAG[u % 3] : (s.unitArt?.[u % 3] ?? s.artDir);
       loadArt(artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
       this.rigs[u]?.destroy();
       this.rigs[u] = createRig(artDir, d.querySelector<HTMLElement>(".fig")!, { onReady: () => { const im = d.querySelector("img"); if (im) im.style.display = "none"; }, onFail: () => { this.rigs[u] = undefined; } });
@@ -142,6 +144,7 @@ export class Battle {
       onDeclare: (u, cl, start) => this.handleDeclare(u, cl, start),
       onPass: (u) => { this.m.pass(u); this.render(); this.waitHuman?.("act"); },
       guideFor: (u) => this.hooks?.guide?.(this.m, u) ?? null,
+      passDenied: (u) => this.hooks?.beforePass?.(u, this.m) ?? null,
     });
     st.addEventListener("click", (e) => { const a = (e.target as HTMLElement).closest<HTMLElement>("[data-a]")?.dataset.a; if (a) this.onAct(a); else st.querySelector<HTMLElement>(".pop")!.hidden = true; });
     this.render();
@@ -221,7 +224,7 @@ export class Battle {
   private onUnitClick(u: number, e: Event) {
     const t = e.target as HTMLElement;
     if (t.closest(".fold")) { this.collapsed.has(u) ? this.collapsed.delete(u) : this.collapsed.add(u); this.render(); e.stopPropagation(); return; }
-    if (t.closest(".pass")) { e.stopPropagation(); if (this.canPick(u)) { this.dock.cancel(); this.m.pass(u); this.render(); this.waitHuman?.("act"); } return; }
+    if (t.closest(".pass")) { e.stopPropagation(); const why = this.canPick(u) ? this.hooks?.beforePass?.(u, this.m) : null; if (why) { this.setStatus(why); this.hooks?.onTick?.(this); return; } if (this.canPick(u)) { this.dock.cancel(); this.m.pass(u); this.render(); this.waitHuman?.("act"); } return; }
     if (t.closest(".comp, .strip")) return;
     if (!this.canPick(u)) return;
     if (this.dock.unit === u) { this.dock.cancel(); this.render(); return; }
