@@ -88,3 +88,11 @@ button:disabled { cursor: default; opacity: .45; }
 .dj-setup { max-width: 1100px; }
 .su-sec.su-decksec { clip-path: none; }
 .su-chip.on { background: var(--accent); color: var(--ink); border-color: var(--accent); font-weight: 700; }
+
+/* ---------- 质感：按钮 / 词块在原有切角上加一点层次（渐变 + 内高光 + 微发光字） ---------- */
+.bt, .su-chip, .su-pill, .dk-btn { background-image: linear-gradient(180deg, rgba(255, 255, 255, .07), rgba(255, 255, 255, 0) 55%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 -2px 0 rgba(0, 0, 0, .35); font-weight: 600; letter-spacing: .05em; }
+.su-pill.on, .su-chip.on { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -2px 0 rgba(0, 0, 0, .25), 0 0 14px -2px var(--accent); }
+.su-go { background-image: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 55%); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.su-title h1 span { box-shadow: inset 0 -4px 0 rgba(0, 0, 0, .25); text-shadow: 0 2px 0 rgba(255, 255, 255, .25); }
+.su-sec h2 { letter-spacing: .08em; } .su-sec h2 b { text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent); }
+.su-style .n { letter-spacing: .12em; text-shadow: 0 0 12px color-mix(in srgb, var(--c) 55%, transparent); }

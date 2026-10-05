@@ -1,5 +1,5 @@
 // 故事模式端到端 + 截图（无头 Chrome + CDP）：node scripts/story-shots.mjs <端口> <输出目录> [beats=1]
-// 用真实点击按引导高亮走完关卡：标题卡 → 漫画 → 对话 → 教学战斗 → 对话 → 漫画 → 选关页。
+// 按引导高亮走完关卡（拖拽拼句）：标题卡 → 漫画 → 对话 → 教学战斗 → 对话 → 漫画 → 选关页。
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 const PORT = process.argv[2] ?? "5184", OUT = process.argv[3] ?? "D:/wc/story_shots", BEATS = (process.argv[4] ?? "1").split(",").map(Number), DBG = 9388;
@@ -20,9 +20,9 @@ const until = async (cond, ms = 30000) => { const t = Date.now(); while (Date.no
 const clickEl = (sel) => ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});if(!e)return false;e.click();return true})()`);
 const key = (k) => ev(`document.dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(k)},bubbles:true}))`);
 
-// 一步：按引导做下一件事。返回描述字符串
-const STEP = `(()=>{
-  const $=s=>document.querySelector(s);
+// 一步：按引导做下一件事。返回描述字符串。拼句用指针事件把词牌从词牌库拖到句子条（同真人拖拽走同一套手势）
+const STEP = `(async()=>{
+  const $=s=>document.querySelector(s); const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   if($('.st-retry')) return 'RETRY';
   if($('.sd-root')){ $('.sd-root').click(); return 'dialog'; }
   if($('.wc-root')){ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); return 'comic-skip'; }
@@ -30,20 +30,34 @@ const STEP = `(()=>{
   if($('.st-select')) return 'SELECT';
   const b=window.__tb, ses=window.__ses; if(!b||!ses) return 'wait';
   const main=$('[data-a=main]'); const t=main?main.textContent:'';
-  const menu=$('.dj-menu');
-  if(menu){
-    const u=+($('.unit.me.open')?.dataset.u??-1); const st=ses.stepFor(b.m,u);
-    const sel=menu.querySelector('.mn-sel .mn-chosen');
-    if(!sel){ const r=menu.querySelector('.mn-row.guide')||menu.querySelector('.mn-row'); if(!r) return 'NOROW'; r.click(); return 'pick'; }
-    const sl=menu.querySelector('.mn-slider'); let v=+sl.value; const lo=+sl.min;
-    if(st){ if(st.startMin!==undefined) v=Math.max(v,st.startMin); if(st.startMax!==undefined) v=Math.min(v,st.startMax); }
-    v=Math.max(v,lo); if(+sl.value!==v){ sl.value=v; sl.dispatchEvent(new Event('input',{bubbles:true})); }
-    menu.querySelector('.mn-go').click(); return 'declare';
+  const ctr=el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2}};
+  const ptr=(ty,x,y,tgt)=>tgt.dispatchEvent(new PointerEvent(ty,{bubbles:true,clientX:x,clientY:y,button:0,buttons:ty==='pointerup'?0:1,pointerId:1,isPrimary:true}));
+  const edit=$('.unit.me.editing');
+  if(edit){
+    const u=+edit.dataset.u; const st=ses.stepFor(b.m,u);
+    const go=edit.querySelector('.comp [data-a=go]');
+    if(!go.disabled){
+      const sl=edit.querySelector('.comp input[type=range]'); let v=+sl.value; const lo=+sl.min;
+      if(st){ if(st.startMin!==undefined) v=Math.max(v,st.startMin); if(st.startMax!==undefined) v=Math.min(v,st.startMax); }
+      v=Math.max(v,lo); if(+sl.value!==v){ sl.value=v; sl.dispatchEvent(new Event('input',{bubbles:true})); }
+      go.click(); return 'declare';
+    }
+    // 目标词序列：提示里的整句，没有就取第一条允许的句子
+    const al=ses.allowed(b.m,u), wf=ses.wantsFn(b.m,u);
+    const c=b.m.legalSentences(u,400).find(x=>al(x.cl)&&(!wf||wf(x.cl)));
+    if(!c) return 'NOROW';
+    const toks=__cp.astToTokens(c.cl); const n=b.dock.tokens.length;
+    if(n>=toks.length) return 'NOGO';
+    const card=$('.lib .cw[data-t="'+toks[n]+'"]'); if(!card||card.classList.contains('off')) return 'NOCARD '+toks[n];
+    const a=ctr(card); ptr('pointerdown',a.x,a.y,card); ptr('pointermove',a.x+12,a.y+12,window);
+    const p=ctr(edit.querySelector('.panel')); ptr('pointermove',p.x,p.y,window);
+    const sls=[...edit.querySelectorAll('.slot')]; const sp=sls.length?ctr(sls[sls.length-1]):p; ptr('pointermove',sp.x,sp.y,window);
+    ptr('pointerup',sp.x,sp.y,window); await sleep(30); return 'pick';
   }
   if(t.includes('结束宣告')){
     const p=ses.pending(b.m);
     if(p.length){ const e=$('.unit[data-u="'+p[0].unit+'"]'); e.click(); return 'unit'+p[0].unit; }
-    if(!ses.scripted){ const us=b.m.myUnits().filter(u=>b.m.canAct(u)); if(us.length){ const e=$('.unit[data-u="'+us[0]+'"]'); e.click(); if(!$('.dj-menu')) return 'unit?'; return 'unit'; } }
+    if(!ses.scripted){ const us=b.m.myUnits().filter(u=>b.m.canAct(u)); if(us.length){ const e=$('.unit[data-u="'+us[0]+'"]'); e.click(); return 'unit'; } }
     main.click(); return 'end';
   }
   if(main&&!main.disabled&&(t.includes('结算')||t.includes('下一轮'))){ main.click(); return 'main'; }
@@ -74,10 +88,10 @@ for (const [name, w, h, mobile] of VIEWS) {
       const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
       if (r === "SELECT") break;
       if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${name}_FAIL_${n}`); break; }
-      if (r === "NOROW") { console.log("!! 菜单无句子"); await shot(`${name}_NOROW_${n}`); break; }
+      if (r === "NOROW" || r === "NOGO" || r.startsWith("NOCARD")) { console.log("!! 拖拽拼句卡住", r); await shot(`${name}_STUCK_${n}`); break; }
       if (r === "dialog" && n === BEATS[0] && !shotDlg) { await sleep(900); await shot(`${name}_4_dialog${sawBattle ? "_after" : ""}`); shotDlg = !sawBattle ? true : shotDlg; if (sawBattle) shotAfter = true; }
       if (r.startsWith("unit") && n === BEATS[0] && !shotGuide) { sawBattle = true; await sleep(600); await shot(`${name}_5_battle_guide`); shotGuide = true; }
-      if (r === "pick" && n === BEATS[0] && !shotMenu) { await sleep(300); await shot(`${name}_6_menu`); shotMenu = true; }
+      if (r === "pick" && n === BEATS[0] && !shotMenu) { await sleep(300); await shot(`${name}_6_composing`); shotMenu = true; }
       if (r === "main" && n === BEATS[0] && !shotRes) { const tx = await ev("document.querySelector('[data-a=main]').textContent"); void tx; }
       if (r === "dialog") { if (n === BEATS[0] && sawBattle && !shotAfter) { await sleep(500); await shot(`${name}_7_dialog_after`); shotAfter = true; } }
       last = r; steps++;
