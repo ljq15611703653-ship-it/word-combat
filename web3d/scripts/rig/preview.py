@@ -3,7 +3,7 @@ import sys, json, math
 import numpy as np
 from PIL import Image
 
-OUT = "D:/wc/wt_rig3/web3d/public/duanju/art"
+OUT = "D:/wc/wt_rig4/web3d/public/duanju/art"
 
 def mat(tx=0, ty=0, rot=0, sx=1, sy=1):
     c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))

@@ -95,13 +95,17 @@ def build(name):
         pd = dict(comps=e["c"], bone=b, pivot=e.get("pivot", "top"), ps=e.get("ps", 0.8), erase=e.get("erase", []),
                   off=([e["at"][0] - bones[b]["at"][0], e["at"][1] - bones[b]["at"][1]] if "at" in e else list(e.get("off", [0, 0]))))
         if e.get("peg"): pd["erase"] = list(pd["erase"]) + [{"peg": "both"}]
-        for k in ("rot", "glow", "clip", "alpha"):
+        for k in ("rot", "glow", "clip", "alpha", "sw"):
             if k in e: pd[k] = e[k]
         if "pivot_src" in e: pd["pivot"] = e["pivot_src"]
         add(e["n"], pd); z[e.get("z", "front")].append(e["n"])
     order = list(z["back"]) + (["hair_back"] if "hair_back" in parts else []) + list(z["hair"])
     order += list(reversed(af)) + list(z["armf"]) + list(reversed(lf)) + list(z["legf"]) + list(reversed(ln)) + list(z["legn"]) + list(z["mid"])
     order += ["torso"] + list(z["front"]) + ["head"] + list(reversed(an)) + list(z["armn"]) + list(z["top"])
+    if m.get("armf_front"):
+        order = [o for o in order if o not in af]; i = order.index("head"); order[i:i] = list(reversed(af))
+    if m.get("armn_back"):
+        order = [o for o in order if o not in an]; i = order.index("torso"); order[i:i] = list(reversed(an))
     if "order" in m: order = m["order"]
     order = [o for o in order if o in parts]
     spec = dict(grow=m.get("grow", 1), mina=m.get("mina", 300), ps=1.0, ref=f"D:/wc/art/q/cls/{name}/idle_raw.png",
