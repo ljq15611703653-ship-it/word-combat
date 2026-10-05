@@ -1,0 +1,46 @@
+/* 统一皮肤：所有按钮亮色纯色、方块都带缺角、词牌降低凸起、右侧面板更透明。最后加载，用 :root:root 提高优先级。 */
+:root {
+  --cut-s: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px));
+  --cut-m: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  --btn: #27d9f5; --btn-hi: #6af0ff; --btn-dk: #031018; --btn-on: #ff3fc0;
+}
+
+/* ---- 按钮：亮色纯色 + 缺角 ---- */
+:root:root .bt, :root:root .dk-btn, :root:root .su-chip, :root:root .su-pill, :root:root .dk-pill, :root:root .lib-sugbtn,
+:root:root .pop button, :root:root .st-door .door, :root:root .cbtns button, :root:root .en-btns button {
+  background: var(--btn); background-image: none; color: var(--btn-dk); border: 0; border-radius: 0; clip-path: var(--cut-s);
+  font-weight: 800; letter-spacing: .08em; text-shadow: none; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .28); text-decoration: none;
+}
+:root:root .bt:hover:not(:disabled), :root:root .dk-btn:hover:not(:disabled), :root:root .su-chip:hover, :root:root .su-pill:hover, :root:root .dk-pill:hover,
+:root:root .lib-sugbtn:hover, :root:root .pop button:hover, :root:root .st-door .door:hover:not(:disabled), :root:root .cbtns button:hover, :root:root .en-btns button:hover {
+  background: var(--btn-hi); color: var(--btn-dk); border: 0;
+}
+:root:root .bt.main, :root:root .bt.skip.on, :root:root .su-chip.on, :root:root .su-pill.on, :root:root .dk-pill.on, :root:root .cbtns .go, :root:root .su-go {
+  background: var(--btn-on); color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, .35); box-shadow: inset 0 -3px 0 rgba(0, 0, 0, .3);
+}
+:root:root .bt.main:hover:not(:disabled), :root:root .su-go:hover { background: #ff6ad0; color: #fff; }
+:root:root .bt:disabled, :root:root .dk-btn:disabled, :root:root .st-door .door:disabled, :root:root .cbtns button:disabled { background: #25445a; color: #7f9bb0; box-shadow: none; opacity: .75; }
+:root:root .pop button { display: block; width: 100%; margin: 2px 0; text-align: left; }
+
+/* ---- 方块缺角（原来是纯长方形的） ---- */
+:root:root .hud, :root:root .lib, :root:root .pop, :root:root .dj-modal .box, :root:root .st-card, :root:root .su-style, :root:root .su-tier,
+:root:root .en-card, :root:root .dk-panel, :root:root .dk-summary, :root:root .dk-detail, :root:root .dk-boardbox, :root:root .st-door .box, :root:root .banner, :root:root .lib-sug button {
+  border-radius: 0; clip-path: var(--cut-m);
+}
+:root:root .lib-sug button { clip-path: var(--cut-s); }
+:root:root .hud { border: 0; box-shadow: inset 0 0 0 1px rgba(80, 170, 220, .38), inset 0 2px 0 var(--cy); }
+:root:root .lib { border: 0; box-shadow: inset 0 0 0 1px rgba(80, 170, 220, .38); }
+:root:root .lib::before { display: none; }
+
+/* ---- 战斗右侧面板更透明 ---- */
+:root:root .hud { background: linear-gradient(180deg, rgba(8, 24, 42, .5), rgba(4, 12, 24, .5)); }
+:root:root .lib { background: linear-gradient(180deg, rgba(8, 24, 42, .5), rgba(4, 12, 24, .55)); }
+
+/* ---- 词牌：降低凸起 ---- */
+:root:root .cw { border-radius: 0; clip-path: var(--cut-s); border: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 65%, transparent), inset 0 -2px 0 rgba(0, 0, 0, .28); text-shadow: 0 1px 1px rgba(0, 0, 0, .55); transition: transform .12s, box-shadow .12s; }
+:root:root .cw::before { display: none; }
+:root:root .cw:hover:not(.off) { transform: translateY(-1px); box-shadow: inset 0 0 0 1px var(--k), inset 0 -2px 0 rgba(0, 0, 0, .28); }
+:root:root .cw:has(.bd) { clip-path: polygon(0 0, calc(100% - 24px) 0, calc(100% - 24px) -10px, calc(100% + 7px) -10px, calc(100% + 7px) 100%, 6px 100%, 0 calc(100% - 6px)); }
+:root:root .cw .bd { top: -8px; right: -5px; height: 14px; min-width: 15px; padding: 0 3px; border-radius: 0; clip-path: none; box-shadow: none; font: 800 9px/14px "Chakra Petch", monospace; }
+/* 下拉框/输入框也缺角 */
+:root:root select, :root:root input[type="text"], :root:root textarea { border: 0; border-radius: 0; clip-path: var(--cut-s); background: #0b1c33; color: #dfeaff; box-shadow: inset 0 0 0 1px rgba(80, 170, 220, .5); }

@@ -1,6 +1,7 @@
 // 《断·句》故事模式入口：序章漫画 → 选关页 → 每关（标题卡 → 关前漫画 → 对话 → 教学战斗 → 对话 → 关后漫画）。
 import "../ui.css";
 import "./story.css";
+import "../skin.css";
 import { backgroundFor } from "../art";
 import { loadComicData, playSegment, type ComicData } from "./comic";
 import { playDialog, type Line } from "./dialog/dialog";

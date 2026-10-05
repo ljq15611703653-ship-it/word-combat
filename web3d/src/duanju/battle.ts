@@ -13,6 +13,7 @@ const rigAll = () => typeof location !== "undefined" && new URLSearchParams(loca
 import { Dock } from "./dock";
 import { VfxCastPlayer } from "./vfx/player";
 import "./layout.css";
+import "./skin.css";
 import type { BattleView, CastPlayer, Guide, Settings } from "./types";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));

@@ -5,6 +5,7 @@ import { Battle } from "./battle";
 import { mountEnd } from "./end";
 import { bgUrl } from "./art";
 import type { Settings } from "./types";
+import "./skin.css";
 
 const root = document.getElementById("app")!;
 { const b = document.createElement("div"); b.className = "dj-build"; b.textContent = "build " + ((import.meta as any).env?.VITE_BUILD ?? ""); document.body.appendChild(b); }
