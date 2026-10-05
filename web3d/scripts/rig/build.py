@@ -33,6 +33,7 @@ EXTRA_BONES = dict(cape=("torso", "waist"), skirt=("hip", "waist"), strap=("hip"
 
 def build(name):
     m = json.load(open(f"{HERE}/maps2/{name}.json", encoding="utf-8-sig"))
+    if m.get("parts2"): os.environ["PARTS2"] = "1"
     J = {**DEF_J, **m.get("J", {})}
     bones = {
         "root": dict(at=J["root"]), "hip": dict(parent="root", at=J["waist"]),

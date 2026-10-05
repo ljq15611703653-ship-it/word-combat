@@ -7,7 +7,7 @@ from scipy import ndimage as ndi
 sys.path.insert(0, os.path.dirname(__file__))
 from cut import load
 
-OUT = "D:/wc/art/rig2"
+OUT = "D:/wc/art/rig3" if os.environ.get("PARTS2") else "D:/wc/art/rig2"
 
 def comps(alpha, grow=1, mina=300):
     m = ndi.binary_opening(alpha > 0.5, iterations=1)

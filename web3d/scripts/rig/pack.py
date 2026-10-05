@@ -12,7 +12,7 @@ from scipy import ndimage as ndi
 sys.path.insert(0, os.path.dirname(__file__))
 from cut import load
 
-OUT = "D:/wc/wt_rig2/web3d/public/duanju/art"
+OUT = "D:/wc/wt_rig3/web3d/public/duanju/art"
 HERE = os.path.dirname(__file__)
 
 def label(alpha, grow, mina):

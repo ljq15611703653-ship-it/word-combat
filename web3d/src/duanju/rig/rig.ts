@@ -60,7 +60,7 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
     else draw(cur, manual ? tManual : 0);
   });
   void ready;
-  let tManual = 0;
+  let tManual = 0, margin = -1;
   const world: Record<string, M> = {};
   function draw(anim: AnimName, t: number) {
     if (!asset) return;
@@ -69,7 +69,8 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
     // 视口：设计坐标 -> 画布；facing=-1 绕视图中线镜像
     const base: M = facing === 1 ? [sc, 0, 0, sc, -v[0] * sc, -v[1] * sc] : [-sc, 0, 0, sc, (v[0] + v[2]) * sc, -v[1] * sc];
-    const rootOff = pose.root ?? { x: 0, y: 0 };
+    const rootOff = { ...(pose.root ?? { x: 0, y: 0 }) };
+    if (margin >= 0) rootOff.x = Math.max(-margin, Math.min(margin, rootOff.x));
     for (const k in world) delete world[k];
     const W = (b: string): M => {
       if (world[b]) return world[b];
@@ -88,6 +89,8 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
       ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
       if (p.glow && glow > 0.01) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = Math.min(1, glow * 0.8); ctx.drawImage(img, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h); ctx.globalAlpha = 1; ctx.globalCompositeOperation = "source-over"; }
     }
+    // 击退不出画布：用静止帧量待机姿势离画布边的余量（设计坐标），之后把根骨骼位移夹在余量内
+    if (margin < 0 && Math.abs(rootOff.x) < 0.5 && anim === "idle") { try { const c0 = ctx.getImageData(0, 0, cv.width, cv.height).data; let mn = cv.width, mx = 0; for (let y = 0; y < cv.height; y += 2) for (let x = 0; x < cv.width; x++) if (c0[(y * cv.width + x) * 4 + 3] > 20) { if (x < mn) mn = x; if (x > mx) mx = x; } margin = mx >= mn ? Math.max(0, Math.min(mn, cv.width - 1 - mx) / sc - 4) : -1; } catch { margin = 1e9; } }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     if ((pose.flash ?? 0) > 0.01) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = `rgba(255,255,255,${pose.flash})`; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }
     if ((pose.tint ?? 0) > 0.01) { ctx.globalCompositeOperation = "source-atop"; ctx.fillStyle = `rgba(255,70,100,${pose.tint})`; ctx.fillRect(0, 0, cv.width, cv.height); ctx.globalCompositeOperation = "source-over"; }

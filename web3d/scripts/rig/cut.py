@@ -25,7 +25,7 @@ def matte(rgb):
     return a.astype(np.uint8), alpha
 
 def load(name):
-    p = f"D:/wc/art/q/cls/{name}/parts.png"
+    p = f"D:/wc/art/q/cls/{name}/parts{'2' if os.environ.get('PARTS2') else ''}.png"
     im = Image.open(p if os.path.exists(p) else f"{SRC}/{name}_parts.png").convert("RGB")
     return matte(np.array(im))
 
