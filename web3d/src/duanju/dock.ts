@@ -174,12 +174,17 @@ export class Dock {
     }
     buckets.set("num", buckets.get("num")!.sort((a, b) => +a - +b));
     buckets.set("tgt", buckets.get("tgt")!.sort((a, b) => (isUnit(a) ? +a[1] : 9) - (isUnit(b) ? +b[1] : 9)));
-    body.innerHTML = GROUPS.filter(([g]) => buckets.get(g)!.length).map(([g, name]) => `<div class="lib-grp g-${g}"><span class="gn">${name}</span><div class="gc">${buckets.get(g)!.map((t) => {
+    // 词牌库分两排：「目标」单独一排，「其它」（基础/进阶/数字/对象）一排；各词仍按原类别着色
+    const btns = (g: string) => buckets.get(g)!.map((t) => {
       const al = this.allowTok(t);
       const fz = al.ok && !idle ? this.slotsFor(u, base, t) : { slots: [] as number[], why: al.why ?? "" };
       const cnt = isAdvWord(t) ? `<small class="bd">×${left[t] ?? 0}</small>` : isNum(t) && +t >= 2 ? `<small class="bd">${cards.filter((c) => c.v >= +t && c.cd === 0).length}</small>` : "";
       return `<button class="cw k-${g}${fz.slots.length ? "" : " off"}${t === nextHint ? " hint" : ""}" data-t="${esc(t)}">${esc(tokenLabel(t, names))}${cnt}</button>`;
-    }).join("")}</div></div>`).join("");
+    }).join("");
+    const OTHER = ["base", "adv", "num", "obj"];
+    const tgtHtml = buckets.get("tgt")!.length ? `<div class="lib-grp g-tgt"><span class="gn">目标</span><div class="gc">${btns("tgt")}</div></div>` : "";
+    const otherHtml = OTHER.some((g) => buckets.get(g)!.length) ? `<div class="lib-grp g-other"><span class="gn">其它</span><div class="gc">${OTHER.map(btns).join("")}</div></div>` : "";
+    body.innerHTML = tgtHtml + otherHtml;
     this.paintWhy(); this.paintReady();
     this.el.querySelector<HTMLElement>(".lib-sugbtn")!.hidden = idle;
   }
