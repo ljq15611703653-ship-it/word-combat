@@ -1,0 +1,489 @@
+{
+ "name": "zhuang_ci",
+ "ps": 1.0,
+ "ref": "D:/wc/art/q/cls/zhuang_ci/idle_raw.png",
+ "view": [
+  195,
+  0,
+  780,
+  1254
+ ],
+ "gain": null,
+ "style": "ci",
+ "bones": {
+  "root": {
+   "at": [
+    610,
+    800
+   ]
+  },
+  "hip": {
+   "parent": "root",
+   "at": [
+    610,
+    730
+   ]
+  },
+  "torso": {
+   "parent": "hip",
+   "at": [
+    610,
+    730
+   ]
+  },
+  "neck": {
+   "parent": "torso",
+   "at": [
+    640,
+    478
+   ]
+  },
+  "head": {
+   "parent": "neck",
+   "at": [
+    640,
+    520
+   ]
+  },
+  "hair": {
+   "parent": "head",
+   "at": [
+    560,
+    372
+   ]
+  },
+  "cape": {
+   "parent": "torso",
+   "at": [
+    610,
+    730
+   ]
+  },
+  "skirt": {
+   "parent": "hip",
+   "at": [
+    610,
+    730
+   ]
+  },
+  "strap": {
+   "parent": "hip",
+   "at": [
+    610,
+    730
+   ]
+  },
+  "tail": {
+   "parent": "head",
+   "at": [
+    640,
+    478
+   ]
+  },
+  "holo": {
+   "parent": "root",
+   "at": [
+    900,
+    700
+   ]
+  },
+  "drone": {
+   "parent": "root",
+   "at": [
+    300,
+    400
+   ]
+  },
+  "sh_far": {
+   "parent": "torso",
+   "at": [
+    445,
+    545
+   ]
+  },
+  "el_far": {
+   "parent": "sh_far",
+   "at": [
+    385.0,
+    700.0
+   ]
+  },
+  "wr_far": {
+   "parent": "el_far",
+   "at": [
+    392.0,
+    790.0
+   ]
+  },
+  "sh_near": {
+   "parent": "torso",
+   "at": [
+    755,
+    570
+   ]
+  },
+  "el_near": {
+   "parent": "sh_near",
+   "at": [
+    825.0,
+    700.0
+   ]
+  },
+  "wr_near": {
+   "parent": "el_near",
+   "at": [
+    822.0,
+    790.0
+   ]
+  },
+  "hp_far": {
+   "parent": "hip",
+   "at": [
+    560,
+    730
+   ]
+  },
+  "kn_far": {
+   "parent": "hp_far",
+   "at": [
+    505.0,
+    950.0
+   ]
+  },
+  "an_far": {
+   "parent": "kn_far",
+   "at": [
+    470.0,
+    1212.0
+   ]
+  },
+  "hp_near": {
+   "parent": "hip",
+   "at": [
+    700,
+    730
+   ]
+  },
+  "kn_near": {
+   "parent": "hp_near",
+   "at": [
+    730.0,
+    950.0
+   ]
+  },
+  "an_near": {
+   "parent": "kn_near",
+   "at": [
+    790.0,
+    1210.0
+   ]
+  }
+ },
+ "parts": {
+  "head": {
+   "atlas": {
+    "x": 0,
+    "y": 0,
+    "w": 395,
+    "h": 358
+   },
+   "pivot": [
+    201.0,
+    342.0
+   ],
+   "bone": "head",
+   "off": [
+    0,
+    0
+   ],
+   "ps": 1.2
+  },
+  "hair_back": {
+   "atlas": {
+    "x": 397,
+    "y": 0,
+    "w": 363,
+    "h": 343
+   },
+   "pivot": [
+    181.5,
+    171.5
+   ],
+   "bone": "hair",
+   "off": [
+    -20,
+    -62
+   ],
+   "ps": 1.0
+  },
+  "torso": {
+   "atlas": {
+    "x": 177,
+    "y": 360,
+    "w": 251,
+    "h": 267
+   },
+   "pivot": [
+    123.7,
+    9.6
+   ],
+   "bone": "torso",
+   "off": [
+    30,
+    -252
+   ],
+   "ps": 1.15
+  },
+  "arm_far_up": {
+   "atlas": {
+    "x": 808,
+    "y": 360,
+    "w": 112,
+    "h": 220
+   },
+   "pivot": [
+    69.1,
+    9.6
+   ],
+   "bone": "sh_far",
+   "rot": 15.64,
+   "ps": 1.0703,
+   "sw": 1.15
+  },
+  "arm_far_fore": {
+   "atlas": {
+    "x": 390,
+    "y": 669,
+    "w": 77,
+    "h": 196
+   },
+   "pivot": [
+    17.0,
+    9.6
+   ],
+   "bone": "el_far",
+   "rot": 3.71,
+   "ps": 0.6489,
+   "sw": 1.15
+  },
+  "arm_far_hand": {
+   "atlas": {
+    "x": 850,
+    "y": 669,
+    "w": 104,
+    "h": 165
+   },
+   "pivot": [
+    32.7,
+    10.6
+   ],
+   "bone": "wr_far",
+   "ps": 0.9,
+   "sw": 1.15
+  },
+  "arm_near_up": {
+   "atlas": {
+    "x": 0,
+    "y": 669,
+    "w": 108,
+    "h": 214
+   },
+   "pivot": [
+    46.5,
+    9.6
+   ],
+   "bone": "sh_near",
+   "rot": -25.3,
+   "ps": 0.8858,
+   "sw": 1.15
+  },
+  "arm_near_fore": {
+   "atlas": {
+    "x": 733,
+    "y": 360,
+    "w": 73,
+    "h": 221
+   },
+   "pivot": [
+    23.5,
+    10.6
+   ],
+   "bone": "el_near",
+   "rot": 7.87,
+   "ps": 0.5044,
+   "sw": 1.15
+  },
+  "arm_near_hand": {
+   "atlas": {
+    "x": 631,
+    "y": 669,
+    "w": 102,
+    "h": 168
+   },
+   "pivot": [
+    37.5,
+    10.6
+   ],
+   "bone": "wr_near",
+   "ps": 0.9,
+   "sw": 1.15
+  },
+  "leg_far_up": {
+   "atlas": {
+    "x": 735,
+    "y": 669,
+    "w": 113,
+    "h": 168
+   },
+   "pivot": [
+    69.9,
+    9.6
+   ],
+   "bone": "hp_far",
+   "rot": 4.65,
+   "ps": 1.8509,
+   "sw": 1.0
+  },
+  "leg_far_lo": {
+   "atlas": {
+    "x": 110,
+    "y": 669,
+    "w": 145,
+    "h": 199
+   },
+   "pivot": [
+    61.8,
+    10.6
+   ],
+   "bone": "kn_far",
+   "rot": 15.25,
+   "ps": 1.6616,
+   "sw": 1.0
+  },
+  "leg_near_up": {
+   "atlas": {
+    "x": 0,
+    "y": 885,
+    "w": 103,
+    "h": 154
+   },
+   "pivot": [
+    69.5,
+    11.6
+   ],
+   "bone": "hp_near",
+   "rot": -16.15,
+   "ps": 2.0765,
+   "sw": 1.0
+  },
+  "leg_near_lo": {
+   "atlas": {
+    "x": 469,
+    "y": 669,
+    "w": 160,
+    "h": 196
+   },
+   "pivot": [
+    41.4,
+    9.6
+   ],
+   "bone": "kn_near",
+   "rot": 2.68,
+   "ps": 1.6414,
+   "sw": 1.0
+  },
+  "pelvis": {
+   "atlas": {
+    "x": 430,
+    "y": 360,
+    "w": 301,
+    "h": 242
+   },
+   "pivot": [
+    141.2,
+    9.6
+   ],
+   "bone": "hip",
+   "off": [
+    30,
+    -40
+   ],
+   "ps": 0.95
+  },
+  "flap_f": {
+   "atlas": {
+    "x": 762,
+    "y": 0,
+    "w": 157,
+    "h": 308
+   },
+   "pivot": [
+    140.9,
+    9.6
+   ],
+   "bone": "skirt",
+   "off": [
+    -100,
+    10
+   ],
+   "ps": 1.0
+  },
+  "flap_n": {
+   "atlas": {
+    "x": 0,
+    "y": 360,
+    "w": 175,
+    "h": 307
+   },
+   "pivot": [
+    14.8,
+    9.6
+   ],
+   "bone": "skirt",
+   "off": [
+    150,
+    10
+   ],
+   "ps": 1.0
+  },
+  "vials": {
+   "atlas": {
+    "x": 257,
+    "y": 669,
+    "w": 131,
+    "h": 199
+   },
+   "pivot": [
+    63.0,
+    9.6
+   ],
+   "bone": "strap",
+   "off": [
+    90,
+    -30
+   ],
+   "ps": 0.7,
+   "glow": 1
+  }
+ },
+ "order": [
+  "hair_back",
+  "arm_far_hand",
+  "arm_far_fore",
+  "arm_far_up",
+  "leg_far_lo",
+  "leg_far_up",
+  "leg_near_lo",
+  "leg_near_up",
+  "pelvis",
+  "flap_f",
+  "torso",
+  "flap_n",
+  "head",
+  "arm_near_hand",
+  "arm_near_fore",
+  "arm_near_up",
+  "vials"
+ ],
+ "anims": null
+}

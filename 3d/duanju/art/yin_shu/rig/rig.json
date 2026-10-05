@@ -1,0 +1,530 @@
+{
+ "name": "yin_shu",
+ "ps": 1.0,
+ "ref": "D:/wc/art/q/cls/yin_shu/idle_raw.png",
+ "view": [
+  195,
+  0,
+  780,
+  1254
+ ],
+ "gain": null,
+ "style": "shu",
+ "bones": {
+  "root": {
+   "at": [
+    610,
+    800
+   ]
+  },
+  "hip": {
+   "parent": "root",
+   "at": [
+    620,
+    770
+   ]
+  },
+  "torso": {
+   "parent": "hip",
+   "at": [
+    620,
+    770
+   ]
+  },
+  "neck": {
+   "parent": "torso",
+   "at": [
+    680,
+    490
+   ]
+  },
+  "head": {
+   "parent": "neck",
+   "at": [
+    680,
+    490
+   ]
+  },
+  "hair": {
+   "parent": "head",
+   "at": [
+    560,
+    330
+   ]
+  },
+  "cape": {
+   "parent": "torso",
+   "at": [
+    620,
+    770
+   ]
+  },
+  "skirt": {
+   "parent": "hip",
+   "at": [
+    620,
+    770
+   ]
+  },
+  "strap": {
+   "parent": "hip",
+   "at": [
+    620,
+    770
+   ]
+  },
+  "tail": {
+   "parent": "head",
+   "at": [
+    680,
+    490
+   ]
+  },
+  "holo": {
+   "parent": "root",
+   "at": [
+    900,
+    700
+   ]
+  },
+  "drone": {
+   "parent": "root",
+   "at": [
+    300,
+    400
+   ]
+  },
+  "sh_far": {
+   "parent": "torso",
+   "at": [
+    450,
+    575
+   ]
+  },
+  "el_far": {
+   "parent": "sh_far",
+   "at": [
+    400.0,
+    700.0
+   ]
+  },
+  "wr_far": {
+   "parent": "el_far",
+   "at": [
+    400.0,
+    840.0
+   ]
+  },
+  "sh_near": {
+   "parent": "torso",
+   "at": [
+    735,
+    585
+   ]
+  },
+  "el_near": {
+   "parent": "sh_near",
+   "at": [
+    770.0,
+    690.0
+   ]
+  },
+  "wr_near": {
+   "parent": "el_near",
+   "at": [
+    925.0,
+    535.0
+   ]
+  },
+  "hp_far": {
+   "parent": "hip",
+   "at": [
+    565,
+    790
+   ]
+  },
+  "kn_far": {
+   "parent": "hp_far",
+   "at": [
+    500.0,
+    960.0
+   ]
+  },
+  "an_far": {
+   "parent": "kn_far",
+   "at": [
+    460.0,
+    1212.0
+   ]
+  },
+  "hp_near": {
+   "parent": "hip",
+   "at": [
+    700,
+    790
+   ]
+  },
+  "kn_near": {
+   "parent": "hp_near",
+   "at": [
+    735.0,
+    960.0
+   ]
+  },
+  "an_near": {
+   "parent": "kn_near",
+   "at": [
+    800.0,
+    1207.0
+   ]
+  }
+ },
+ "parts": {
+  "head": {
+   "atlas": {
+    "x": 0,
+    "y": 0,
+    "w": 402,
+    "h": 369
+   },
+   "pivot": [
+    207.0,
+    355.0
+   ],
+   "bone": "head",
+   "ps": 1.2
+  },
+  "hair_back": {
+   "atlas": {
+    "x": 224,
+    "y": 371,
+    "w": 323,
+    "h": 337
+   },
+   "pivot": [
+    161.5,
+    168.5
+   ],
+   "bone": "hair",
+   "off": [
+    -20,
+    0
+   ],
+   "ps": 1.1
+  },
+  "torso": {
+   "atlas": {
+    "x": 404,
+    "y": 0,
+    "w": 310,
+    "h": 354
+   },
+   "pivot": [
+    139.9,
+    9.6
+   ],
+   "bone": "torso",
+   "off": [
+    0,
+    -280
+   ],
+   "ps": 1.1
+  },
+  "arm_far_up": {
+   "atlas": {
+    "x": 95,
+    "y": 718,
+    "w": 152,
+    "h": 174
+   },
+   "pivot": [
+    103.7,
+    9.6
+   ],
+   "bone": "sh_far",
+   "rot": 14.93,
+   "ps": 1.047
+  },
+  "arm_far_fore": {
+   "atlas": {
+    "x": 0,
+    "y": 718,
+    "w": 93,
+    "h": 189
+   },
+   "pivot": [
+    51.9,
+    9.6
+   ],
+   "bone": "el_far",
+   "rot": -3.38,
+   "ps": 0.9414
+  },
+  "arm_near_up": {
+   "atlas": {
+    "x": 249,
+    "y": 718,
+    "w": 112,
+    "h": 160
+   },
+   "pivot": [
+    44.6,
+    9.6
+   ],
+   "bone": "sh_near",
+   "rot": -18.92,
+   "ps": 0.976
+  },
+  "arm_near_fore": {
+   "atlas": {
+    "x": 881,
+    "y": 371,
+    "w": 92,
+    "h": 206
+   },
+   "pivot": [
+    43.0,
+    9.6
+   ],
+   "bone": "el_near",
+   "rot": -132.42,
+   "ps": 1.3318
+  },
+  "leg_far_up": {
+   "atlas": {
+    "x": 625,
+    "y": 718,
+    "w": 131,
+    "h": 152
+   },
+   "pivot": [
+    83.8,
+    9.6
+   ],
+   "bone": "hp_far",
+   "rot": 18.27,
+   "ps": 1.7243,
+   "sw": 0.9
+  },
+  "leg_far_lo": {
+   "atlas": {
+    "x": 549,
+    "y": 371,
+    "w": 144,
+    "h": 245
+   },
+   "pivot": [
+    61.6,
+    10.6
+   ],
+   "bone": "kn_far",
+   "rot": 15.7,
+   "ps": 1.2447
+  },
+  "leg_near_up": {
+   "atlas": {
+    "x": 493,
+    "y": 718,
+    "w": 130,
+    "h": 154
+   },
+   "pivot": [
+    53.6,
+    9.6
+   ],
+   "bone": "hp_near",
+   "rot": -13.3,
+   "ps": 1.6152,
+   "sw": 0.9
+  },
+  "leg_near_lo": {
+   "atlas": {
+    "x": 695,
+    "y": 371,
+    "w": 184,
+    "h": 239
+   },
+   "pivot": [
+    68.0,
+    9.6
+   ],
+   "bone": "kn_near",
+   "rot": -2.83,
+   "ps": 1.2555
+  },
+  "flap_f": {
+   "atlas": {
+    "x": 0,
+    "y": 371,
+    "w": 222,
+    "h": 345
+   },
+   "pivot": [
+    139.0,
+    9.6
+   ],
+   "bone": "skirt",
+   "off": [
+    -165,
+    45
+   ],
+   "ps": 0.6,
+   "sw": 1.5
+  },
+  "flap_n": {
+   "atlas": {
+    "x": 716,
+    "y": 0,
+    "w": 284,
+    "h": 352
+   },
+   "pivot": [
+    143.7,
+    10.6
+   ],
+   "bone": "skirt",
+   "off": [
+    160,
+    40
+   ],
+   "ps": 0.6,
+   "sw": 1.5
+  },
+  "p2": {
+   "atlas": {
+    "x": 363,
+    "y": 718,
+    "w": 128,
+    "h": 156
+   },
+   "pivot": [
+    64.0,
+    78.0
+   ],
+   "bone": "holo",
+   "off": [
+    -524,
+    -267
+   ],
+   "ps": 0.9,
+   "glow": 1
+  },
+  "p4": {
+   "atlas": {
+    "x": 758,
+    "y": 718,
+    "w": 141,
+    "h": 142
+   },
+   "pivot": [
+    70.5,
+    71.0
+   ],
+   "bone": "holo",
+   "off": [
+    -580,
+    -160
+   ],
+   "ps": 0.9,
+   "glow": 1
+  },
+  "p5": {
+   "atlas": {
+    "x": 0,
+    "y": 909,
+    "w": 133,
+    "h": 133
+   },
+   "pivot": [
+    66.5,
+    66.5
+   ],
+   "bone": "holo",
+   "off": [
+    -600,
+    -220
+   ],
+   "ps": 0.9,
+   "glow": 1
+  },
+  "p17": {
+   "atlas": {
+    "x": 364,
+    "y": 909,
+    "w": 113,
+    "h": 109
+   },
+   "pivot": [
+    56.5,
+    54.5
+   ],
+   "bone": "holo",
+   "off": [
+    -560,
+    15
+   ],
+   "ps": 0.9,
+   "glow": 1
+  },
+  "p16": {
+   "atlas": {
+    "x": 135,
+    "y": 909,
+    "w": 127,
+    "h": 133
+   },
+   "pivot": [
+    63.5,
+    66.5
+   ],
+   "bone": "holo",
+   "off": [
+    -3,
+    -185
+   ],
+   "ps": 0.8,
+   "glow": 1
+  },
+  "ring": {
+   "atlas": {
+    "x": 264,
+    "y": 909,
+    "w": 98,
+    "h": 132
+   },
+   "pivot": [
+    49.0,
+    66.0
+   ],
+   "bone": "holo",
+   "off": [
+    -50,
+    -60
+   ],
+   "ps": 0.7,
+   "glow": 1
+  }
+ },
+ "order": [
+  "hair_back",
+  "arm_far_fore",
+  "arm_far_up",
+  "leg_far_lo",
+  "leg_far_up",
+  "leg_near_lo",
+  "leg_near_up",
+  "flap_f",
+  "torso",
+  "flap_n",
+  "head",
+  "arm_near_fore",
+  "arm_near_up",
+  "p2",
+  "p4",
+  "p5",
+  "p17",
+  "p16",
+  "ring"
+ ],
+ "anims": null
+}
