@@ -20,7 +20,7 @@ export function buildShell(o: ShellOpts): SVGSVGElement {
   svg.appendChild(el("defs", {}, [el("clipPath", { id }, [el("ellipse", { cx, cy, rx, ry })]),
     el("radialGradient", { id: id + "g", cx: "50%", cy: "55%", r: "60%" }, [el("stop", { offset: "55%", "stop-color": c, "stop-opacity": 0 }), el("stop", { offset: "100%", "stop-color": c, "stop-opacity": 0.28 })])]));
   svg.appendChild(el("ellipse", { cx, cy, rx, ry, fill: `url(#${id}g)` }));
-  const g = el("g", { "clip-path": `url(#${id})`, fill: "none", stroke: c, "stroke-width": 1.2, "stroke-opacity": 0.75 });
+  const g = el("g", { class: "vx-pat", "clip-path": `url(#${id})`, fill: "none", stroke: c, "stroke-width": 1.2, "stroke-opacity": 0.75 });
   if (o.style === "bing") {
     const r = Math.max(13, w / 11), hw = r * 0.866;
     for (let row = -1; row * r * 1.5 < h + r; row++) for (let col = -1; col * hw * 2 < w + r; col++) {

@@ -218,6 +218,7 @@ export class VfxCastPlayer implements CastPlayer {
     shell.style.width = `${g.w}px`; shell.style.height = `${g.h}px`;
     shell.appendChild(buildShell({ w: g.w, h: g.h, style: sty, c, c2 }));
     shell.style.opacity = "0";
+    this.pulseShell(shell, g);
     const shellIn = this.A(shell, [{ opacity: 0, transform: px({ x: g.cx - g.w / 2, y: g.cy - g.h / 2 + g.h * 0.12 }, " scale(.85)") }, { opacity: 1, transform: px({ x: g.cx - g.w / 2, y: g.cy - g.h / 2 }, " scale(1)") }], 300);
     // 3 飞到盔甲壳旁
     const slots = this.slots(toks, g, src);
@@ -233,6 +234,20 @@ export class VfxCastPlayer implements CastPlayer {
     await this.deliver(seg, f, toks, sty, c, c2, grpEl);
     // 8 归位
     await this.returnHome(toks, shell, g, grpEl);
+  }
+
+  /** 演出期间壳的脉动：花纹绕中心缓慢转动，整体一呼一吸 + 描边明暗（只在演出时存在，随演出清理；关闭档/跳过时不加） */
+  private pulseShell(shell: HTMLElement, g: ReturnType<VfxCastPlayer["geo"]>) {
+    if (this.T(1000) <= 0) return;
+    const svg = shell.querySelector<SVGElement>(".vx-shell-svg"), pat = shell.querySelector<SVGElement>(".vx-pat");
+    if (pat) {
+      (pat.style as any).transformOrigin = `${g.w / 2}px ${g.h / 2}px`;
+      this.anims.add(pat.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(360deg)" }], { duration: this.T(9000), iterations: Infinity }));
+    }
+    if (svg) {
+      svg.style.transformOrigin = "50% 55%";
+      this.anims.add(svg.animate([{ transform: "scale(1)", filter: "brightness(1) drop-shadow(0 0 6px currentColor)" }, { transform: "scale(1.035)", filter: "brightness(1.5) drop-shadow(0 0 14px currentColor)" }, { transform: "scale(1)", filter: "brightness(1) drop-shadow(0 0 6px currentColor)" }], { duration: this.T(900), iterations: Infinity, easing: "ease-in-out" }));
+    }
   }
 
   /** 词牌飞回句子条，壳收起 */
@@ -294,7 +309,9 @@ export class VfxCastPlayer implements CastPlayer {
     const maxRow = Math.min(Math.max(g.w * 1.25, 150), vx1 - vx0), gap = 12;
     const rows: Tok[][] = [[]]; let rw = 0;
     for (const t of toks) { if (rw + t.w > maxRow && rows[rows.length - 1].length) { rows.push([]); rw = 0; } rows[rows.length - 1].push(t); rw += t.w + gap; }
-    const rh = 30, top = g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, off = (u < 3 ? 1 : -1) * g.w * 0.28;
+    const rh = 30;
+    // 词牌行放在头顶上方(盔甲壳穹顶顶部)，不盖住施法随从的脸；头顶没位置(贴近舞台顶)再退回壳内
+    const above = g.fig.y - rows.length * rh - 4, top = above >= 4 ? above : g.cy - g.ry * 0.5 - (rows.length * rh) / 2 + 2, off = (u < 3 ? 1 : -1) * g.w * 0.28;
     const out = new Map<Tok, Pt>();
     rows.forEach((row, ri) => {
       const tw = row.reduce((a, t) => a + t.w, 0) + gap * (row.length - 1); let x = Math.max(vx0, Math.min(vx1 - tw, g.cx + off - tw / 2));
