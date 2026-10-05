@@ -243,7 +243,8 @@
    ],
    "bone": "sh_far",
    "rot": 8.31,
-   "ps": 1.4105
+   "ps": 1.4105,
+   "sw": 0.85
   },
   "arm_far_fore": {
    "atlas": {
@@ -287,7 +288,8 @@
    ],
    "bone": "sh_near",
    "rot": -12.98,
-   "ps": 1.573
+   "ps": 1.573,
+   "sw": 0.85
   },
   "arm_near_fore": {
    "atlas": {
@@ -463,8 +465,6 @@
  },
  "order": [
   "hair_back",
-  "arm_far_hand",
-  "arm_far_fore",
   "arm_far_up",
   "leg_far_foot",
   "leg_far_lo",
@@ -475,10 +475,12 @@
   "flap_f",
   "flap_n",
   "torso",
+  "arm_far_hand",
+  "arm_far_fore",
   "head",
   "arm_near_hand",
-  "arm_near_fore",
   "arm_near_up",
+  "arm_near_fore",
   "chain"
  ],
  "anims": null

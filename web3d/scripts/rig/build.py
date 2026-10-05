@@ -99,9 +99,18 @@ def build(name):
             if k in e: pd[k] = e[k]
         if "pivot_src" in e: pd["pivot"] = e["pivot_src"]
         add(e["n"], pd); z[e.get("z", "front")].append(e["n"])
+    afo = list(reversed(af)); ano = list(reversed(an))
+    if m.get("fore_over"):  # 前臂(护腕/数字环)压在上臂之上: 绘制序 手 < 上臂 < 前臂
+        afo = [af[-1], af[0]] + af[1:2] if len(af) > 2 else afo; ano = [an[-1], an[0]] + an[1:2] if len(an) > 2 else ano
     order = list(z["back"]) + (["hair_back"] if "hair_back" in parts else []) + list(z["hair"])
-    order += list(reversed(af)) + list(z["armf"]) + list(reversed(lf)) + list(z["legf"]) + list(reversed(ln)) + list(z["legn"]) + list(z["mid"])
-    order += ["torso"] + list(z["front"]) + ["head"] + list(reversed(an)) + list(z["armn"]) + list(z["top"])
+    order += afo + list(z["armf"]) + list(reversed(lf)) + list(z["legf"]) + list(reversed(ln)) + list(z["legn"]) + list(z["mid"])
+    order += ["torso"] + list(z["front"]) + ["head"] + ano + list(z["armn"]) + list(z["top"])
+    if m.get("farfore_front"):  # 远侧前臂+手画在躯干之后(不被袖子盖住)
+        mv = [af[-1]] + af[1:2] if len(af) > 2 else af[1:]
+        order = [o for o in order if o not in mv]; i = order.index("torso") + 1; order[i:i] = mv
+    if m.get("far_front"):  # 指定的远侧臂段(下标 0上臂 1前臂 2手)画在躯干之后: 上臂不被躯干挡住
+        mv = [af[i] for i in m["far_front"] if i < len(af)]; mv = list(reversed(mv))
+        order = [o for o in order if o not in mv]; i = order.index("torso") + 1; order[i:i] = mv
     if m.get("armf_front"):
         order = [o for o in order if o not in af]; i = order.index("head"); order[i:i] = list(reversed(af))
     if m.get("armn_back"):
