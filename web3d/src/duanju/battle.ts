@@ -244,6 +244,8 @@ export class Battle {
     if (t.closest(".fold")) { this.collapsed.has(u) ? this.collapsed.delete(u) : this.collapsed.add(u); this.render(); e.stopPropagation(); return; }
     if (t.closest(".pass")) { e.stopPropagation(); const why = this.canPick(u) ? this.hooks?.beforePass?.(u, this.m) : null; if (why) { this.setStatus(why); this.hooks?.onTick?.(this); return; } if (this.canPick(u)) { this.dock.cancel(); this.m.pass(u); this.render(); this.waitHuman?.("act"); } return; }
     if (t.closest(".comp, .strip")) return;
+    // 点选目标：句子编辑中，场上被高亮为可选目标（cp-tgt）的随从，点一下就把它放进句子（也可以继续从词牌库拖「目标」词）
+    if (this.dock.isEditing() && this.unitEls[u]?.classList.contains("cp-tgt")) { e.stopPropagation(); this.dock.push("@" + u); return; }
     if (!this.canPick(u)) return;
     if (this.dock.unit === u) { this.dock.cancel(); this.render(); return; }
     this.dock.begin(u); this.render();
