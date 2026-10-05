@@ -6,14 +6,14 @@
 .vx-lift { opacity: .18; transition: opacity .15s; }
 .vx-shell { transform-origin: 50% 100%; }
 .vx-shell-svg { display: block; filter: drop-shadow(0 0 8px currentColor); }
-.vx-tok { padding: 2px 8px; font-size: 14px; font-weight: 800; line-height: 20px; color: #fff; background: rgba(11, 6, 20, .92); border: 1.5px solid var(--c, #fff); white-space: nowrap; box-shadow: 0 0 10px -2px var(--c, #fff); clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px)); }
-.vx-layer .vx-tok { border-color: #ffffffcc; }
-.vx-tok.s-bing { border-color: #ff4fa3; background: #2a0a1f; } .vx-tok.s-bing.snap { background: #ff4fa3; color: #14031c; }
-.vx-tok.s-yin { border-color: #22e6ff; border-style: dashed; border-radius: 12px; clip-path: none; background: #04222a; } .vx-tok.s-yin.lit { background: #22e6ff; color: #04222a; }
-.vx-tok.s-xian { border-color: #9a7bff; border-width: 2px; background: #1c1034; clip-path: none; } .vx-tok.s-xian.locked { border-color: #ff4fa3; box-shadow: 0 0 0 2px #1c1034, 0 0 0 4px #ff4fa3; }
-.vx-tok.s-zhuang { border-color: #3dffb0; border-radius: 10px 10px 14px 6px; clip-path: none; background: #08281c; }
+.vx-tok { --cut: 6px; padding: 3px 9px; font-size: 14px; font-weight: 900; line-height: 20px; letter-spacing: .06em; color: #fff; background: #0b0614; border-radius: 0; box-shadow: inset 0 0 0 2px var(--bc, #fff); white-space: nowrap; clip-path: polygon(0 0, calc(100% - var(--cut)) 0, 100% var(--cut), 100% 100%, var(--cut) 100%, 0 calc(100% - var(--cut))); }
+.vx-layer .vx-tok { --bc: #ffffffcc; }
+.vx-tok.s-bing { --bc: #ff4fa3; background: #2a0a1f; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); } .vx-tok.s-bing.snap { background: #ff4fa3; color: #14031c; }
+.vx-tok.s-yin { --bc: #22e6ff; background: linear-gradient(90deg, #22e6ff 0 3px, transparent 3px 5px, #22e6ff 5px 7px, transparent 7px), #04222a; padding-left: 12px; } .vx-tok.s-yin.lit { background: #22e6ff; color: #04222a; }
+.vx-tok.s-xian { --bc: #9a7bff; background: #1c1034; box-shadow: inset 0 0 0 2px var(--bc), inset 0 0 0 4px #1c1034, inset 0 0 0 5px #9a7bff88; } .vx-tok.s-xian.locked { --bc: #ff4fa3; box-shadow: inset 0 0 0 2px #ff4fa3, inset 0 0 0 4px #1c1034, inset 0 0 0 5px #ff4fa3; }
+.vx-tok.s-zhuang { --bc: #3dffb0; background: #08281c; clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 82% calc(100% - 3px), 66% 100%, 48% calc(100% - 3px), 30% 100%, 6px 100%, 0 calc(100% - 6px)); }
 .vx-tok.ghost { opacity: 0; } .vx-tok.fired { opacity: .35; } .vx-tok.pulse { background: #fff; color: #111; }
-.vx-tok.trig { border-color: #ffd23f; color: #ffd23f; } .vx-tok.victim { border-color: #ff5c7a; color: #ff9fb0; }
+.vx-tok.trig { --bc: #ffd23f; color: #ffd23f; } .vx-tok.victim { --bc: #ff5c7a; color: #ff9fb0; }
 .vx-pushtag { font-weight: 900; font-size: 14px; text-shadow: 0 0 6px #000; white-space: nowrap; }
 .vx-scan { width: 14px; background: linear-gradient(90deg, transparent, #fff, transparent); mix-blend-mode: screen; }
 .vx-sp { width: 8px; height: 8px; background: var(--c); } .vx-sp.sq { transform-origin: center; } .vx-sp.blob { border-radius: 50%; }
