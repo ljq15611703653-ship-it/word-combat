@@ -27,3 +27,6 @@ engine/api.ts 的 Match.resolve() 用 setTrace 收集，再按 sec 稳定排序�
 
 ## V1（VFX 分支，改的是手写的 api.ts，不是同步拷贝）
 - `ReplayEvent` 增加可选字段 `kinds / start / ptgt / pn`（仅 fire 事件）：结算前拷贝 `s.decl`，`clauseKinds()` 列出这句话的动作种类，供 `vfx/` 选演出；延后的目标随从按「对方宣告序第 ord 个」推测。引擎本体与 sync 脚本不变。
+
+## T2（教程分支，手改 ast.ts，同步脚本会覆盖，同步后要补回）
+- `OBJ_ZH` 增加 `dealt: "造成的伤害"`、`taken: "受到的伤害"`：引用量词的句子读法里不再出现英文 dealt/taken。

@@ -1,4 +1,4 @@
-// 开局页：职业风格 → 卡组 → 难度 → 先后手 → 规则配置 → 开始
+// 开局页：队伍配色 → 卡组 → 难度 → 先后手 → 规则配置 → 开始
 import { TIER_NAMES, configureRules, P2, type Deck } from "./engine/api";
 import { DeckBoard } from "./deck/board";
 import { presetDeck, presetsNow } from "./deck/words";
@@ -61,9 +61,9 @@ export function mountSetup(root: HTMLElement, st: Settings, onStart: (s: Setting
     el.style.setProperty("--accent", sty.accent);
     el.innerHTML = `
     <header class="su-title"><h1><span>断</span><i>·</i><span>句</span></h1><p>用句子当规则，打一局电脑</p></header>
-    <section class="su-sec"><h2><b>01</b>职业风格</h2>
+    <section class="su-sec"><h2><b>01</b>队伍配色</h2>
       <div class="su-styles">${STYLES.map((s) => `<button class="su-style${s.id === st.styleId ? " on" : ""}" data-style="${s.id}" style="--c:${s.accent};--c2:${s.accent2}"><img alt="" data-art="${s.id}" /><span class="n">${s.name}</span><span class="t">${esc(s.tag)}</span></button>`).join("")}</div>
-      <p class="su-note">选职业会载入该职业的推荐卡组；现在职业只改配色与立绘，规则暂不分职业。</p></section>
+      <p class="su-note">选一组配色与立绘，会载入对应的推荐卡组；规则不分组。</p></section>
     <section class="su-sec su-decksec"><h2><b>02</b>卡组与关键词 <small class="su-cost ok"></small></h2><div class="su-slot" data-slot="deck"></div></section>
     <section class="su-sec"><h2><b>03</b>对手卡组 <small>开局后战斗中看不到</small></h2>
       <div class="su-pills">${([["random", "随机"], ["preset", "选一套推荐"], ["custom", "自定义"]] as const).map(([k, l]) => `<button class="su-pill${st.foe.mode === k ? " on" : ""}" data-foe="${k}">${l}</button>`).join("")}</div>

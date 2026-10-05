@@ -1,11 +1,13 @@
+// 教程 10~13 关逐步引导端到端：node scripts/tut-steps.mjs <端口> <输出目录> [beats=10,11,12,13]
+// （基于 story-shots：用 ?beat=N&skip=1 直接进关，按引导真的拖拽词牌走完每一轮，每步截图。）
 // 故事模式端到端 + 截图（无头 Chrome + CDP）：node scripts/story-shots.mjs <端口> <输出目录> [beats=1]
 // 按引导高亮走完关卡（拖拽拼句）：标题卡 → 漫画 → 对话 → 教学战斗 → 对话 → 漫画 → 选关页。
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-const PORT = process.argv[2] ?? "5184", OUT = process.argv[3] ?? "D:/wc/story_shots", BEATS = (process.argv[4] ?? "1").split(",").map(Number), DBG = 9388;
+const PORT = process.argv[2] ?? "5184", OUT = process.argv[3] ?? "D:/wc/story_shots", BEATS = (process.argv[4] ?? "10,11,12,13").split(",").map(Number), DBG = 9391;
 mkdirSync(OUT, { recursive: true });
 const CHROME = process.env.CHROME ?? "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const proc = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${DBG}`, "--user-data-dir=D:/wc/ud_story", "--window-size=1440,900", "--no-first-run", "about:blank"], { stdio: "ignore" });
+const proc = spawn(CHROME, ["--headless=new", `--remote-debugging-port=${DBG}`, "--user-data-dir=D:/wc/ud_tut", "--window-size=1440,900", "--no-first-run", "about:blank"], { stdio: "ignore" });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let tabs; for (let i = 0; i < 60; i++) { try { tabs = await (await fetch(`http://127.0.0.1:${DBG}/json`)).json(); if (tabs.some((t) => t.type === "page")) break; } catch { /* */ } await sleep(300); }
 const ws = new WebSocket(tabs.find((t) => t.type === "page").webSocketDebuggerUrl); await new Promise((r) => ws.addEventListener("open", r));
@@ -64,54 +66,36 @@ const STEP = `(async()=>{
     if(!ses.scripted){ const us=b.m.myUnits().filter(u=>b.m.canAct(u)); if(us.length){ const e=$('.unit[data-u="'+us[0]+'"]'); e.click(); return 'unit'; } }
     main.click(); return 'end';
   }
-  if(main&&!main.disabled&&(t.includes('结算')||t.includes('下一轮'))){ main.click(); return 'main'; }
+  if(main&&!main.disabled&&(t.includes('结算')||t.includes('下一轮'))){ main.click(); return t.includes('结算')?'mainS':'mainN'; }
   return 'wait';
 })()`;
 
-const VIEWS = [["1440x810", 1440, 810, false], ["390x844", 390, 844, true]].filter((v) => !only || v[0] === only);
-for (const [name, w, h, mobile] of VIEWS) {
-  await cdp("Emulation.setDeviceMetricsOverride", { width: w, height: h, deviceScaleFactor: mobile ? 2 : 1, mobile });
-  const url = (qs) => `http://127.0.0.1:${PORT}/duanju-story.html?${qs || process.env.QS || ""}`;
-  await cdp("Page.navigate", { url: url("") }); await sleep(800);
-  await ev("localStorage.clear()");
-  await cdp("Page.navigate", { url: url("") }); await sleep(1200);
-  if (process.env.QS) { await until("!!document.querySelector('.st-select')"); } else {
-  await until("!!document.querySelector('.wc-root')");
-  for (let i = 0; i < 4; i++) { await ev("document.querySelector('.wc-view')?.click()"); await sleep(900); }
-  await sleep(700); await shot(`${name}_1_comic`);
-  await until("(()=>{ document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true})); return !!document.querySelector('.st-select'); })()");
-  await sleep(500); await shot(`${name}_2_select`); }
-  for (const n of BEATS) {
-    await clickEl(`.st-card[data-n="${n}"]`);
-    await until("!!document.querySelector('.st-title')"); await sleep(500); if (n === BEATS[0]) await shot(`${name}_3_title`);
-    await until("!!document.querySelector('.wc-root')", 8000);
-    if (n === BEATS[0]) { for (let i = 0; i < 3; i++) { await ev("document.querySelector('.wc-view')?.click()"); await sleep(1000); } await shot(`${name}_3b_comic_beat`); }
-    let steps = 0, last = "", shotDlg = false, shotGuide = false, shotMenu = false, shotAfter = false, shotRes = false, sawBattle = false;
-    const t0 = Date.now();
-    while (Date.now() - t0 < 240000) {
-      const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
-      if (r === "SELECT") break;
-      if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${name}_FAIL_${n}`); break; }
-      if (r === "NOROW" || r === "NOGO" || r.startsWith("NOCARD")) { console.log("!! 拖拽拼句卡住", r); await shot(`${name}_STUCK_${n}`); break; }
-      if (r === "dialog" && n === BEATS[0] && !shotDlg) { await sleep(900); await shot(`${name}_4_dialog${sawBattle ? "_after" : ""}`); shotDlg = !sawBattle ? true : shotDlg; if (sawBattle) shotAfter = true; }
-      if (r.startsWith("unit") && n === BEATS[0] && !shotGuide) { sawBattle = true; await sleep(600); await shot(`${name}_5_battle_guide`); shotGuide = true; }
-      if (r === "pick" && n === BEATS[0] && !shotMenu) { await sleep(300); await shot(`${name}_6_composing`); shotMenu = true; }
-      if (r === "main" && n === BEATS[0] && !shotRes) { const tx = await ev("document.querySelector('[data-a=main]').textContent"); void tx; }
-      if (r === "dialog") { if (n === BEATS[0] && sawBattle && !shotAfter) { await sleep(500); await shot(`${name}_7_dialog_after`); shotAfter = true; } }
-      if (process.env.ALLSHOTS && ["pick", "declare", "main", "unit"].some((k) => r.startsWith(k))) {
-        const rn = await ev("window.__tb?.m?.rnd ?? 0"), mt = await ev("document.querySelector('[data-a=main]')?.textContent ?? ''");
-        const tag = r === "main" ? (mt.includes("结算") ? "settle" : "next") : r.startsWith("unit") ? "guide" : r;
-        const key = `${n}_r${rn}_${tag}`; global.__seen ??= new Set();
-        if (r === "pick") { const k = await ev("window.__tb.dock.tokens.length"); if (k === 1 || k === 3) { const kk = key + k; if (!__seen.has(kk)) { __seen.add(kk); await sleep(250); await shot(`${name}_${kk}`); } } }
-        else if (!__seen.has(key)) { __seen.add(key); await sleep(r === "main" ? 500 : 300); await shot(`${name}_${key}`);
-          if (tag === "settle") { await sleep(1800); await shot(`${name}_${key}_playing`); await sleep(2200); await shot(`${name}_${key}_after`); } }
-      }
-      last = r; steps++;
-      await sleep(r === "wait" ? 250 : r === "dialog" ? 60 : 160);
-    }
-    console.log(name, "beat", n, "steps", steps, "last", last, "errors", await ev("__dj.errors.length"));
-    if (n === BEATS[0]) { await sleep(400); await shot(`${name}_8_select_after`); }
+
+const W = +(process.env.W ?? 1440), H = +(process.env.H ?? 810), tag = process.env.TAG ?? `${W}x${H}`;
+await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+const seen = new Set(); let allOk = true;
+for (const n of BEATS) {
+  await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/duanju-story.html?beat=${n}&skip=1&unlock=all` }); await sleep(1200);
+  let steps = 0, last = "", prevRnd = 0; const t0 = Date.now(); let bg = "", art = "";
+  while (Date.now() - t0 < 120000) {
+    { const mt0 = await ev("document.querySelector('[data-a=main]')?.textContent ?? ''"), rn0 = await ev("window.__tb?.m?.rnd ?? 0"); const k0 = `b${n}_r${rn0}_presettle`;
+      if (mt0.includes("结算") && !seen.has(k0)) { seen.add(k0); await sleep(500); await shot(`${tag}_${k0}`); } }
+    const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
+    if (r === "SELECT") break;
+    if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${tag}_b${n}_FAIL`); allOk = false; break; }
+    if (r === "NOROW" || r === "NOGO" || r.startsWith("NOCARD")) { console.log("!! 拖拽拼句卡住", r); await shot(`${tag}_b${n}_STUCK`); allOk = false; break; }
+    if (!bg) { bg = await ev("getComputedStyle(document.documentElement).getPropertyValue('--bg-url')"); art = await ev("[...document.querySelectorAll('.unit.me img')].map(i=>i.src.split('/').slice(-2).join('/')).join(',')"); }
+    const rn = await ev("window.__tb?.m?.rnd ?? 0");
+    const t = r === "mainS" ? "settle" : r === "mainN" ? "next" : r.startsWith("unit") ? "guide" : r;
+    const key = `b${n}_r${rn}_${t}`;
+    if (r === "pick") { const k = await ev("window.__tb.dock.tokens.length"); const kk = `${key}${k}`; if ((k === 1 || k === 3) && !seen.has(kk)) { seen.add(kk); await sleep(250); await shot(`${tag}_${kk}`); } }
+    else if (["guide", "declare"].includes(t) && !seen.has(key)) { seen.add(key); await sleep(350); await shot(`${tag}_${key}`); }
+    else if (t === "settle" && !seen.has(key)) { seen.add(key); await sleep(1300); await shot(`${tag}_${key}_playing`); await sleep(2500); await shot(`${tag}_${key}_after`); }
+    if (rn !== prevRnd) prevRnd = rn;
+    last = r; steps++;
+    await sleep(r === "wait" ? 250 : r === "dialog" ? 60 : 140);
   }
+  console.log("beat", n, "steps", steps, "last", last, "bg", bg, "art", art, "errors", await ev("__dj.errors.length"));
 }
-console.log("页面异常:", errs.length, errs.slice(0, 3), await ev("JSON.stringify(__dj.errors.slice(0,3))"));
-proc.kill(); process.exit(0);
+console.log(allOk ? "ALL OK" : "有失败", errs.length, await ev("JSON.stringify(__dj.errors.slice(0,3))"));
+proc.kill(); process.exit(allOk ? 0 : 1);

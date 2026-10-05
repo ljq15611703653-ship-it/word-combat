@@ -123,7 +123,7 @@ export class Battle {
         <div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>`;
       (side === "me" ? st.querySelector(".col.me") : st.querySelector(".col.foe"))!.appendChild(d);
       this.unitEls[u] = d;
-      loadArt(s.artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
+      loadArt(s.unitArt?.[u % 3] ?? s.artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
       d.addEventListener("click", (e) => this.onUnitClick(u, e));
     };
     [0, 1, 2, 3, 4, 5].forEach(mk);

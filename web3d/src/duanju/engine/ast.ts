@@ -203,7 +203,7 @@ export function windup(cl: Sentence, extra = 0): number {
 }
 
 // ---------- 读成中文 ----------
-const OBJ_ZH: Record<string, string> = { atk: "攻击词", dmg: "伤害", heal: "治疗词", hpchg: "生命变动", def: "防护词", guard: "防护", status: "状态词", struct: "结构词", any: "任意词" };
+const OBJ_ZH: Record<string, string> = { atk: "攻击词", dmg: "伤害", heal: "治疗词", hpchg: "生命变动", def: "防护词", guard: "防护", status: "状态词", struct: "结构词", any: "任意词", dealt: "造成的伤害", taken: "受到的伤害" };
 const objText = (o: Obj) => o.t === "word" ? `「${o.w}」` : o.t === "cat" ? (OBJ_ZH[o.c] ?? o.c) : o.t === "ev" ? ({ down: "倒下", hurt: "受到伤害", healed: "被恢复", decl: "宣告" }[o.e]) : o.t === "nth" ? `第${o.n}句` : `「${o.a}」先于「${o.b}」`;
 const whoText = (w: Who) => (w === "me" ? "我方" : "对方");
 const winText = (w: Win) => `${w.dir === "before" ? "之前" : "以后"}${w.n === 99 ? "全程" : w.n}${w.unit === "round" ? "轮" : "句"}`;
