@@ -2,7 +2,7 @@
 // 词（Token）就是字符串：数字 "3"、动词 "造成"、目标 "@4"（4 号随从）、对象 "类:atk" / "事:hurt" / "词:造成" / "第2句" 等。
 // 词表与语法见 README.md。同一个递归下降解析器既负责 tokensToAst，也负责告诉你「接下来可以写什么」（Stop.opts）。
 import type { Sentence, Clause, Eff, Tg, Amt, Obj, Win } from "../engine/ast";
-import { legal, advWordsOf, refKindsOf, sentenceCost, numsOf } from "../engine/ast";
+import { legal, advWordsOf, refKindsOf, sentenceCost, numsOf, classProblem, segCap } from "../engine/ast";
 import { P, P2, ADV } from "../engine/api";
 import { canAfford, resolveTgs, pickCards, alive, unitsOf, windupFor, type St } from "../engine/interp";
 
@@ -423,7 +423,18 @@ export function diagnose(ast: Sentence, ctx: Ctx, forTok?: Token): string | null
     for (const t of tgs) if (t.t === "unit" && !alive(s, t.u)) return "这个随从已经倒下，不能当目标";
   }
   const pos = P2.POS && unit >= 0 ? unit % 3 : -1;
-  const cost = sentenceCost(cl, s.rnd, pos);
+  const cx = P2.CLASSES ? s.cls[side] : null;   // 职业：与 canAfford 一致
+  if (cl.length > segCap(cx)) return `这一句最多 ${segCap(cx)} 段`;
+  const cp = classProblem(cl, cx);
+  if (cp) return cp.startsWith("限制流") ? `限制流：攻击句单次伤害最多 ${P2.CAP_LIM}（写成 ${P2.CAP_LIM} 以内，或用引用量——算出来的会被截到 ${P2.CAP_LIM}）` : cp.replace(":", "：");
+  if (cx === "状态") {
+    const kinds = new Map<number, string>(); let bad = false;
+    const note = (tgs: Sentence) => { for (const c of resolveTgs(s, side, tgs)) if (c.k === "status") for (const u of c.tg.t === "unit" ? [c.tg.u] : c.tg.t === "units" ? c.tg.us : []) { const k = kinds.get(u); if (k && k !== c.kind) bad = true; kinds.set(u, c.kind); } };
+    for (const d of s.decl) if (d.side === side) note(d.cl);
+    note(cl);
+    if (bad) return "状态流：同一轮对同一个目标只能挂一种状态";
+  }
+  const cost = sentenceCost(cl, s.rnd, pos, cx);
   if (cost > s.side[side].ap) return `行动点不够（这句要 ${cost}，只有 ${s.side[side].ap}）`;
   const dk = s.deck[side];
   const need: Record<string, number> = {};
@@ -434,7 +445,7 @@ export function diagnose(ast: Sentence, ctx: Ctx, forTok?: Token): string | null
   for (const k of refKindsOf(cl)) rk[k] = (rk[k] ?? 0) + 1;
   if (!(pos === 2 && P2.POS3 === "ref")) for (const [k, n] of Object.entries(rk)) if (s.refc[side][k].filter((cd) => cd === 0).length < n) return k === "all" ? "「全程」这个词本轮用完了（冷却中）" : "引用词（次数/累计…/事件/类别）本轮用完了（冷却中）";
   const bonus = pos === 1 ? P2.POS_NUM : 0;
-  const raw = cl.flatMap(numsOf), mx = Math.max(...raw, 0);
+  const raw = cl.flatMap((c) => numsOf(c, cx)), mx = Math.max(...raw, 0);
   let used = false;
   const nums = raw.map((n) => { if (P2.POS_NUM_ONE && bonus && n === mx && !used) { used = true; return n - bonus; } return P2.POS_NUM_ONE ? n : n - bonus; }).filter((n) => n >= 2);
   if (pickCards(s, side, nums) === null) {

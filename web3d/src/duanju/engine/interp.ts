@@ -3,10 +3,10 @@
 // @ts-nocheck
 // 句子解释器：一棵语法树 + 一份事件日志。窗口、存在/不存在、引用量全部是对日志的查询，没有写死的「陷阱句式」。
 import { P, type SideState } from "./lab-rules";
-import { P2, type Deck } from "./params";
+import { P2, type Deck, type Cls } from "./params";
 import {
   type Clause, type Eff, type Obj, type Query, type Amt, type Sentence, type Side, type Tg, type StatusKind,
-  wordsOf, catsOf, numsOf, sentenceCost, windup, advWordsOf, refKindsOf, legal, isDefSentence,
+  wordsOf, catsOf, numsOf, sentenceCost, windup, advWordsOf, refKindsOf, legal, isDefSentence, classProblem, segCap,
 } from "./ast";
 
 export interface Ev {
@@ -38,6 +38,7 @@ export interface St {
   sts: Status[];
   stand: Standing[]; decl: Decl[]; log: Ev[]; done: boolean[];
   first: Side; turn: Side; ord: number; win: -1 | 0 | 1 | 2;
+  cls: [Cls | null, Cls | null];                    // 职业（P2.CLASSES 开着才生效）
   kw: string[]; kwUsed: boolean[];                   // 关键词（首挡 / 不屈 / ""）与本轮是否已用掉
   redir: boolean[];                                  // 转移：本轮打向这个随从的敌方伤害转给出手的人
   dead: boolean[];                                   // 已经倒下（KOCHECK 下，hp ≤ 0 但本秒还没结束的随从还没倒下）
@@ -57,12 +58,13 @@ export const total = (s: St, side: Side) => unitsOf(side).reduce((a, u) => a + M
 export const nAlive = (s: St, side: Side) => unitsOf(side).filter((u) => s.hp[u] > 0).length;
 const stat = (s: St, k: string, n = 1) => { s.stats[k] = (s.stats[k] ?? 0) + n; };
 
-const mkRef = () => Object.fromEntries(REF_KINDS.map((k) => [k, Array(k === "all" ? 1 : P2.REFCOPIES).fill(0)])) as Record<string, number[]>;
-export function newGame(first: Side, decks: [Deck | null, Deck | null] = [null, null], record = false, kws?: [string[] | null, string[] | null]): St {
+const mkRef = (extra = 0) => Object.fromEntries(REF_KINDS.map((k) => [k, Array(k === "all" ? 1 : P2.REFCOPIES + extra).fill(0)])) as Record<string, number[]>;
+export function newGame(first: Side, decks: [Deck | null, Deck | null] = [null, null], record = false, kws?: [string[] | null, string[] | null], cls?: [Cls | null, Cls | null]): St {
+  const cx: [Cls | null, Cls | null] = P2.CLASSES && cls ? [cls[0], cls[1]] : [null, null];
   const mk = (): SideState => ({ ap: P.AP0, cards: P.CARDS0.map((v) => ({ v, cd: 0 })) });
   return {
     rnd: 1, sec: 0, seq: 0, sord: 0, hp: Array(6).fill(P.HP), sh: Array(6).fill(0), side: [mk(), mk()],
-    deck: [decks[0] ? { ...decks[0] } : null, decks[1] ? { ...decks[1] } : null], refc: [mkRef(), mkRef()], sts: [],
+    deck: [decks[0] ? { ...decks[0] } : null, decks[1] ? { ...decks[1] } : null], refc: [mkRef(cx[0] === "引用" ? P2.REF_PLUS : 0), mkRef(cx[1] === "引用" ? P2.REF_PLUS : 0)], sts: [], cls: cx,
     stand: [], decl: [], log: [], done: Array(6).fill(false), first, turn: first, ord: 0, win: -1, stats: {}, rs: 0x9e3779b9, rec: record ? [] : undefined,
     kw: Array.from({ length: 6 }, (_, u) => (P2.KW && kws?.[u < 3 ? 0 : 1]?.[u % 3]) || ""), kwUsed: Array(6).fill(false), redir: Array(6).fill(false), dead: Array(6).fill(false), pend: [],
   };
@@ -140,7 +142,9 @@ function fireStanding(s: St, st: Standing, ev: Ev) {
   const cnt = q.win.unit === "round" ? roundCount(s, st, q) : evalQ(s, q, sctx(st));
   if (cnt <= thr(q) || st.fired >= c.cap) return;
   st.fired++; stat(s, `s${st.owner}:fire`);
-  for (const e of c.effs) exec(s, st.owner, e, { src: ev.src, actor: st.unit, sord: st.sord, noTrig: true, ctx: sctx(st) });
+  const plus = c.forbid && clsOf(s, st.owner) === "限制" ? P2.FORBID_PLUS : 0;   // 限制流：不得的惩罚 +1
+  if (plus) stat(s, `s${st.owner}:t:不得加罚`);
+  for (const e of c.effs) exec(s, st.owner, plus && typeof e.n === "number" ? { ...e, n: e.n + plus } : e, { src: ev.src, actor: st.unit, sord: st.sord, noTrig: true, ctx: sctx(st) });
 }
 function lowest(s: St, side: Side): number {
   let b = -1;
@@ -232,7 +236,8 @@ function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
 /** 执行一个效果，返回「成功」（真的发生了） */
 function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
   const r: Run = typeof e.n === "number" ? r0 : { ...r0, derived: true };
-  const base = amount(s, e.n, r.ctx);
+  let base = amount(s, e.n, r.ctx);
+  if (emitUse && e.verb === "dmg" && clsOf(s, owner) === "限制" && base > P2.CAP_LIM) { base = P2.CAP_LIM; stat(s, `s${owner}:t:限制封顶`); }   // 限制流：攻击句单次伤害封顶（引用量算出来的也一样）
   const tg = targets(s, owner, e.verb, e.tg, r);
   if (!tg.length) return false;
   if (emitUse) emit(s, { sord: r.sord, side: owner, kind: "use", words: [e.verb === "dmg" ? "造成" : e.verb === "heal" ? "恢复" : "减伤"], cats: e.verb === "dmg" ? ["atk", "dmg", "hpchg"] : e.verb === "heal" ? ["heal", "hpchg"] : ["def", "guard"], amt: base, len: 0, segs: 0, src: r.actor, trig: r.noTrig, derived: r.derived });
@@ -260,12 +265,13 @@ function applyStatus(s: St, owner: Side, c: Extract<Clause, { k: "status" }>, r:
   const tg = targets(s, owner, "status", c.tg, r);
   if (!tg.length) return false;
   emit(s, { sord: r.sord, side: owner, kind: "use", words: [STATUS_WORD[c.kind]], cats: ["status"], amt: c.lvl, len: 0, segs: 0, src: r.actor, trig: false });
-  const lvl = Math.min(P2.STATUS_MAX, c.lvl);
+  const plus = clsOf(s, owner) === "状态" ? P2.ST_LVL_PLUS : 0;   // 状态流：新挂上的状态初始级别 +1
+  const lvl = Math.min(P2.STATUS_MAX, c.lvl + plus);
   for (const u of tg) {
     const cur = s.sts.find((x) => x.unit === u && x.kind === c.kind);
     if (P2.STAUTO) {
       // 真实：已经有 → 级别 +1、撑到更晚的那轮；没有 → 1 级，撑到「当前轮 + 持续数 − 1」，来源记第一个施放的人
-      if (cur) { cur.lvl += 1; cur.end = Math.max(cur.end ?? 0, s.rnd + c.dur - 1); } else s.sts.push({ unit: u, kind: c.kind, lvl: 1, left: c.dur, end: s.rnd + c.dur - 1, src: owner });
+      if (cur) { cur.lvl += 1; cur.end = Math.max(cur.end ?? 0, s.rnd + c.dur - 1); } else s.sts.push({ unit: u, kind: c.kind, lvl: 1 + plus, left: c.dur, end: s.rnd + c.dur - 1, src: owner });
     } else if (cur) { cur.lvl = Math.max(cur.lvl, lvl); cur.left = Math.max(cur.left, c.dur); } else s.sts.push({ unit: u, kind: c.kind, lvl, left: c.dur });
     TR({ t: "status", u, kind: c.kind, src: r.actor, sec: s.sec }); stat(s, `s${owner}:status`);
   }
@@ -296,8 +302,9 @@ function quantMax(s: St, side: Side, cl: Sentence): number {
   for (const c of cl) { if (c.k === "act") am(c.eff.n); else if (c.k === "when") c.effs.forEach((e) => am(e.n)); }
   return m;
 }
+const clsOf = (s: St | undefined, side: Side): Cls | null => (P2.CLASSES && s ? s.cls[side] : null);
 export const windupFor = (cl: Sentence, unit: number, s?: St) =>
-  Math.max(1, windup(cl, P2.QWIND && s ? quantMax(s, sideOf(unit), cl) : 0) - (posOf(unit) === 2 && P2.POS3 === "speed" ? P2.POS_SPEED : 0));
+  Math.max(1, windup(cl, P2.QWIND && s ? quantMax(s, sideOf(unit), cl) : 0, clsOf(s, sideOf(unit))) - (posOf(unit) === 2 && P2.POS3 === "speed" ? P2.POS_SPEED : 0));
 /** TGT_AT_DECL：把别名目标（最低血 / 全体 / 选择 N 个）解析成宣告那一刻的具体随从；不改传进来的句子 */
 export function resolveTgs(s: St, side: Side, cl: Sentence): Sentence {
   const foe = (1 - side) as Side;
@@ -328,13 +335,25 @@ export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: n
   if (!legal(cl)) return null;
   for (const c of cl) if (c.k === "postpone" && !s.decl.some((d) => d.ord === c.ord && d.side !== side)) return null;   // 延后要选对方本轮已经宣告的一句
   const pos = posOf(unit);
-  const cost = sentenceCost(cl, s.rnd, pos);
+  const cx = clsOf(s, side);
+  const rej = (why: string) => { stat(s, `s${side}:rej:${why}`); return null; };
+  if (cl.length > segCap(cx)) return rej("段数上限");
+  const cp = classProblem(cl, cx);
+  if (cp) return rej(cp);
+  if (cx === "状态") {   // 同一轮对同一目标只能挂一种状态（含这一轮已经宣告的）
+    const kinds = new Map<number, string>(); let bad = false;
+    const note = (tgs: Sentence) => { for (const c of resolveTgs(s, side, tgs)) if (c.k === "status") for (const u of c.tg.t === "unit" ? [c.tg.u] : c.tg.t === "units" ? c.tg.us : []) { const k = kinds.get(u); if (k && k !== c.kind) bad = true; kinds.set(u, c.kind); } };
+    for (const d of s.decl) if (d.side === side) note(d.cl);
+    note(cl);
+    if (bad) return rej("同轮同目标只能一种状态");
+  }
+  const cost = sentenceCost(cl, s.rnd, pos, cx);
   if (cost > s.side[side].ap) return null;
   const dk = s.deck[side];
   if (dk) for (const [w, n] of Object.entries(countOf(advFor(cl, pos)))) if ((dk[w] ?? 0) < n) return null;
   for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) if (!(pos === 2 && P2.POS3 === "ref") && s.refc[side][k].filter((cd) => cd === 0).length < n) return null;   // 引用位：引用词不冷却
   const bonus = pos === 1 ? P2.POS_NUM : 0;   // 数位：牌面 +N
-  const raw = cl.flatMap(numsOf);
+  const raw = cl.flatMap((c) => numsOf(c, cx));
   const mx = Math.max(...raw, 0);
   let used = false;
   const nums = raw.map((n) => { if (P2.POS_NUM_ONE && bonus && n === mx && !used) { used = true; return n - bonus; } return P2.POS_NUM_ONE ? n : n - bonus; }).filter((n) => n >= 2);
@@ -352,7 +371,7 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
   const dk = s.deck[side];
   const adv = advFor(cl, posOf(unit));
   if (dk) for (const w of adv) dk[w]--;
-  if (!(posOf(unit) === 2 && P2.POS3 === "ref")) for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) { let m = n; for (let i = 0; i < s.refc[side][k].length && m > 0; i++) if (s.refc[side][k][i] === 0) { s.refc[side][k][i] = 2; m--; } }
+  if (!(posOf(unit) === 2 && P2.POS3 === "ref")) for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) { let m = n; for (let i = 0; i < s.refc[side][k].length && m > 0; i++) if (s.refc[side][k][i] === 0) { s.refc[side][k][i] = clsOf(s, side) === "引用" ? 1 : 2; m--; } }
   s.side[side].ap -= a.cost; s.done[unit] = true;
   const sord = s.sord++, ord = s.ord++;
   s.decl.push({ side, unit, cl, ord, sord, cost: a.cost, nums: a.nums, start });
@@ -366,12 +385,17 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
     stat(s, `s${side}:${c.k}`);
   }
   for (const w of adv) stat(s, `s${side}:w:${w}`);
+  { const cx = clsOf(s, side);   // 职业天赋的实际发挥（每局统计）
+    if (cx === "并" && cl.length > 1) { stat(s, `s${side}:t:并多段`, cl.length - 1); stat(s, `s${side}:t:并省行动点`, cl.slice(1).filter((c) => !(c.k === "act" && c.ifPrev)).length * Math.max(0, P.AND - P2.AND_BING)); if (cl.length > P2.CLAUSE_MAX) stat(s, `s${side}:t:并超3段`); }
+    if (cx === "引用") { stat(s, `s${side}:t:引用全程`, refKindsOf(cl).filter((k) => k === "all").length); stat(s, `s${side}:t:引用词`, refKindsOf(cl).length); }
+    if (cx === "限制") stat(s, `s${side}:t:限制省牌`, cl.flatMap((c) => numsOf(c)).filter((n) => n >= 2).length - cl.flatMap((c) => numsOf(c, cx)).filter((n) => n >= 2).length);
+    if (cx === "状态") stat(s, `s${side}:t:状态省点`, cl.filter((c) => c.k === "status").length * Math.min(P2.STATUS_AP, P2.ST_AP_MINUS)); }
   const pos = posOf(unit);
   if (pos >= 0) {
     stat(s, `s${side}:pos${pos}`);
     // 位置加成真的发挥了多少：词位少付的行动点 / 数位省下的数字牌 / 引用位免冷却的引用词与全程半价
     if (pos === 0) stat(s, `s${side}:bon0`, Math.max(0, cl.length - 1) * Math.min(P2.POS_WORD, Math.max(P.AND, 0)));
-    if (pos === 1) stat(s, `s${side}:bon1`, cl.flatMap(numsOf).filter((n) => n >= 2).length - a.nums.length);
+    if (pos === 1) stat(s, `s${side}:bon1`, cl.flatMap((c) => numsOf(c, clsOf(s, side))).filter((n) => n >= 2).length - a.nums.length);
     if (pos === 0 && P2.POS_WORD_FREE && advWordsOf(cl).includes("并")) stat(s, `s${side}:bon0`, 1);
     if (pos === 2 && P2.POS3 === "ref") stat(s, `s${side}:bon2`, refKindsOf(cl).length);
   }

@@ -59,8 +59,7 @@
   "CAP_LIM": 4,
   "SUM_AP": 2,
   "TGT_AT_DECL": 1,
-  "CLASSES": 1,
-  "DICE": 1
+  "CLASSES": 1
  },
  "ADV": {
   "累计": {
