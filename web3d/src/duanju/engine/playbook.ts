@@ -18,7 +18,7 @@ const before1s = (who: "me" | "foe", obj: Obj, tight = 1) => query(win("before",
 export function playbookNamed(_e?: Env): Named[] {
   const o: Named[] = [];
   const add = (name: string, ...cl: Sentence) => o.push({ name, cl, group: ATKDEF.some((k) => name.startsWith(k)) ? "atkdef" : "other" });
-  const src: Tg = { t: "src" }, lowFoe: Tg = { t: "lowFoe" }, allMe: Tg = { t: "allMe" }, lowMe: Tg = { t: "lowMe" };
+  const src: Tg = { t: "src" }, lowFoe: Tg = { t: "lowFoe" }, allMe: Tg = { t: "some", n: 2, side: "me" }, lowMe: Tg = { t: "lowMe" };
 
   // ---- 限制：让对方「做不了」或「做了就疼」
   for (const pen of [2, 3]) {
@@ -94,8 +94,8 @@ export function playbookNamed(_e?: Env): Named[] {
   add("爽·易伤三连击", status("vuln", 3, 2, lowFoe), act(dmg(1, lowFoe)), act(dmg(1, lowFoe)), act(dmg(1, lowFoe)));
   add("爽·易伤二连重击", status("vuln", 3, 2, lowFoe), act(dmg(2, lowFoe)), act(dmg(2, lowFoe)));
   add("爽·三状态齐发", status("weak", 2, 2, lowFoe), status("burn", 3, 3, lowFoe), status("vuln", 2, 2, lowFoe));
-  add("爽·饱和攻击(敌方全体各2)", act(dmg(2, { t: "allFoe" })));
-  add("爽·饱和攻击(全体各3)", act(dmg(3, { t: "allFoe" })));
+  add("爽·饱和攻击(选择2个敌方各2)", act(dmg(2, { t: "some", n: 2, side: "foe" })));
+  add("爽·饱和攻击(选择3个敌方各3)", act(dmg(3, { t: "some", n: 3, side: "foe" })));
   add("爽·穿透连击", act(dmg(3, lowFoe, "shield")), act(dmg(3, lowFoe, "shield")));
   // 引用巨量
   add("爽·乘积放大(上轮累计×2)", act(dmg({ q: query(win("before", 1, "round"), "me", cat("dealt"), "sum"), mult: 2 }, lowFoe)));

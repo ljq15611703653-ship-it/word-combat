@@ -34,7 +34,7 @@ export function configureRules(kind: RulesKind, custom = ""): string | null {
   } catch (e) { return String((e as Error).message ?? e); }
 }
 
-export type ReplayType = "hit" | "heal" | "shield" | "absorb" | "status" | "down" | "standing" | "fire" | "heat";
+export type ReplayType = "hit" | "heal" | "shield" | "absorb" | "status" | "down" | "standing" | "fire" | "heat" | "dice";
 export interface ReplayEvent {
   sec: number; type: ReplayType; src: number; tgt: number; amount: number; text: string;
   /** 仅 fire：这句话含哪些动作（dmg/heal/shield/burn/vuln/weak/redirect/postpone/strip/nullify/delay/cash/forbid/standing/cond/quote） */
@@ -91,6 +91,7 @@ export class Match {
     this.myDeck0 = { ...o.myDeck };
     this.foeDeck0 = o.foeDeck ? { ...o.foeDeck } : pickFoeDeck(this.rng);
     this.s = newGame(o.first, [{ ...this.myDeck0 }, { ...this.foeDeck0 }], false, [o.kws && o.kws.length === 3 ? o.kws : randKws(this.rng), randKws(this.rng)]);
+    this.s.rs = (this.seed ^ 0x5bd1e995) >>> 0;   // 骰子的种子随机数（同 seed 同结果）
   }
   get rnd() { return this.s.rnd; }
   /** 轮到谁：0 我 / 1 电脑 / -1 本轮全部宣告完，可以结算 */
@@ -168,7 +169,7 @@ export class Match {
     try { resolveRound(s); } finally { setTrace(null); }
     raw.sort((a, b) => a.sec - b.sec || a._i - b._i);
     const ev: ReplayEvent[] = [];
-    const hp = pre.hp.slice(); const downed = new Set<number>();
+    const hp = pre.hp.slice(); const downed = new Set<number>(); const diceOf = new Map<number, ReplayEvent>();
     for (const e of raw) {
       switch (e.t) {
         case "fire": {
@@ -192,7 +193,8 @@ export class Match {
         case "absorb": ev.push({ sec: e.sec, type: "absorb", src: e.src, tgt: e.u, amount: e.amt, text: `挡${e.amt}` }); break;
         case "status": ev.push({ sec: e.sec, type: "status", src: e.src, tgt: e.u, amount: 1, text: STATUS_ZH[e.kind as keyof typeof STATUS_ZH] ?? e.kind }); break;
         case "standing": ev.push({ sec: e.sec, type: "standing", src: e.u, tgt: -1, amount: 0, text: zh(clauseText(e.c)) }); break;
-        case "down": downed.add(e.u); hp[e.u] = 0; ev.push({ sec: e.sec, type: "down", src: e.src, tgt: e.u, amount: 0, text: "倒下" }); break;
+        case "down": downed.add(e.u); hp[e.u] = 0; ev.push({ sec: e.sec, type: "down", src: e.src, tgt: e.u, amount: 0, text: "倒下" }); if (diceOf.has(e.u)) { ev.push(diceOf.get(e.u)!); diceOf.delete(e.u); } break;
+        case "dice": diceOf.set(e.u, { sec: e.sec, type: "dice", src: -1, tgt: e.u, amount: e.roll, text: `投骰 ${e.roll} → 获得数字牌 ${e.roll}` }); break;   // 等该随从的「倒下」事件之后再放
         case "heat":
           ev.push({ sec: e.sec, type: "heat", src: -1, tgt: -1, amount: e.amt, text: `过热 -${e.amt}` });
           for (let u = 0; u < 6; u++) if (hp[u] > 0) { const d = Math.min(hp[u], e.amt); hp[u] -= d; ev.push({ sec: e.sec, type: "hit", src: -1, tgt: u, amount: d, text: `-${d}` }); }
@@ -200,6 +202,7 @@ export class Match {
       }
     }
     for (let u = 0; u < 6; u++) if (s.hp[u] <= 0 && pre.hp[u] > 0 && !downed.has(u)) ev.push({ sec: P.TL + 1, type: "down", src: -1, tgt: u, amount: 0, text: "倒下" });
+    for (const d of diceOf.values()) ev.push(d);
     return ev;
   }
   nextRound() { nextRound(this.s); }
@@ -219,7 +222,7 @@ export class Match {
   }
   hud() {
     const s = this.s;
-    return { rnd: s.rnd, rounds: P.ROUNDS, ap: [s.side[0].ap, s.side[1].ap], myCards: s.side[0].cards.map((c) => ({ v: c.v, cd: c.cd })), foeCards: s.side[1].cards.length, first: s.first, heat: s.rnd >= P.HEAT_FROM ? s.rnd - 2 : 0 };
+    return { rnd: s.rnd, rounds: P.ROUNDS, ap: [s.side[0].ap, s.side[1].ap], myCards: s.side[0].cards.map((c) => ({ v: c.v, cd: c.cd, once: !!c.once })), foeCards: s.side[1].cards.length, first: s.first, heat: s.rnd >= P.HEAT_FROM ? s.rnd - 2 : 0 };
   }
   myDeckLeft(): Deck { return { ...(this.s.deck[0] ?? {}) }; }
   record() {

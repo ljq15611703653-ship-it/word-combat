@@ -44,3 +44,13 @@
 :root:root .cw .bd { top: -8px; right: -5px; height: 14px; min-width: 15px; padding: 0 3px; border-radius: 0; clip-path: none; box-shadow: none; font: 800 9px/14px "Chakra Petch", monospace; }
 /* 下拉框/输入框也缺角 */
 :root:root select, :root:root input[type="text"], :root:root textarea { border: 0; border-radius: 0; clip-path: var(--cut-s); background: #0b1c33; color: #dfeaff; box-shadow: inset 0 0 0 1px rgba(80, 170, 220, .5); }
+
+/* 骰牌（倒下投骰得到的一次性数字牌）与投骰演出：亮色缺角方块 */
+:root:root .card.once { background: #ffc94a; color: #1a1200; border: 0; clip-path: var(--cut-s); box-shadow: none; text-shadow: none; }
+:root:root .card .oz { position: absolute; left: 0; top: -1px; font: 800 8px/10px "Chakra Petch", sans-serif; background: #1a1200; color: #ffc94a; padding: 0 2px; }
+.dice-roll { position: absolute; left: 50%; top: 42%; width: 54px; height: 54px; margin-left: -27px; display: grid; place-items: center; z-index: 7; pointer-events: none;
+  font: 900 34px "Chakra Petch", monospace; background: #27d9f5; color: #031018; clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); animation: dicespin .28s linear infinite; }
+.dice-roll.foe { background: #ff3fc0; }
+.dice-roll.stop { animation: dicestop .3s ease-out both; background: #ffc94a; }
+@keyframes dicespin { 0% { transform: rotate(-12deg) translateY(0); } 50% { transform: rotate(10deg) translateY(-14px); } 100% { transform: rotate(-12deg) translateY(0); } }
+@keyframes dicestop { 0% { transform: scale(1.5); } 100% { transform: scale(1); } }

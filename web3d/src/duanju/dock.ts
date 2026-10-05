@@ -11,7 +11,7 @@ import type { Guide, Match, Sentence } from "./types";
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const isNum = (t: Token) => /^\d+$/.test(t), isUnit = (t: Token) => /^@\d$/.test(t);
 /** 词的类别：决定颜色。base 基础 / adv 进阶（占卡组张数）/ num 数字 / tgt 目标 / obj 对象 */
-const kindOf = (t: Token) => (isNum(t) ? "num" : isUnit(t) || t === "选择" || t === "来源" || /^(最低血|我方|敌方)/.test(t) && !/^我方$|^对方$/.test(t) ? "tgt" : /^(类|事|词):|^第\d+句$|^先后$/.test(t) ? "obj" : isAdvWord(t) ? "adv" : "base");
+const kindOf = (t: Token) => (isNum(t) ? "num" : isUnit(t) || t === "选择" || t === "来源" || /^(我方|敌方)随从$/.test(t) ? "tgt" : /^(类|事|词):|^第\d+句$|^先后$/.test(t) ? "obj" : isAdvWord(t) ? "adv" : "base");
 const GROUPS: [string, string][] = [["base", "基础"], ["adv", "进阶"], ["num", "数字"], ["tgt", "目标"], ["obj", "对象"]];
 const U = vocabulary();
 

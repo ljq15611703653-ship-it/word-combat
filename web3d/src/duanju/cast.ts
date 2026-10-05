@@ -1,5 +1,6 @@
 // 最小可用的结算动画：按秒推进，命中数字飘出、血条变化、受击闪动、倒下。
 // 词牌飞来飞去的完整演出由别的实现接，保持 CastPlayer.play(events, view) 接口即可替换（见 types.ts）。
+import { playDice } from "./dice";
 import type { BattleView, CastPlayer, ReplayEvent } from "./types";
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -39,6 +40,7 @@ export class SimpleCastPlayer implements CastPlayer {
         case "status": view.float(e.tgt, e.text, "status"); await wait(300); break;
         case "heat": view.banner("过热", `每个随从 −${e.amount}`); await wait(520); break;
         case "down": view.markDown(e.tgt); view.float(e.tgt, "倒下", "info"); await wait(520); break;
+        case "dice": if (!this.skipping) await playDice(view, e, (ms) => wait(ms)); break;
       }
     }
     view.clock(null);

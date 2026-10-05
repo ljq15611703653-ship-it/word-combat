@@ -2,6 +2,7 @@
 // 每个宣告句（起手秒顺序；同秒合并成一次镜头）：镜头拉近出手随从 → 句子条里的词牌被「拿起」→ 飞到盔甲壳旁，按职业的方式拼装 →
 // 按动作变成刃/护盾/光点/光环…… → 命中那一刻才应用结算（血条/数字/倒下）→ 词牌飞回句子条归位 → 镜头拉回。
 // 只通过 BattleView 改显示，不碰引擎状态。详见 README.md。
+import { playDice } from "../dice";
 import "./vfx.css";
 import { unitLabel } from "../engine/api";
 import type { BattleView, CastPlayer, ReplayEvent } from "../types";
@@ -555,6 +556,7 @@ export class VfxCastPlayer implements CastPlayer {
       case "status": v.float(e.tgt, e.text, "status"); break;
       case "heat": v.banner("过热", `每个随从 −${e.amount}`); break;
       case "down": v.markDown(e.tgt); v.float(e.tgt, "倒下", "info"); break;
+      case "dice": void playDice(v, e, (ms) => this.wait(ms)); break;
     }
   }
   /** 首挡 / 不屈 触发提示（根据面板上关键词标签是否已用判断，每个随从每轮只提示一次） */

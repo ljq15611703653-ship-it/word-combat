@@ -34,5 +34,5 @@ export type Clause =
   | { k: "remove"; cls: Cls | "any" };
 export interface Sentence { side: 0 | 1; unit: number; cl: Clause[]; ord: number; cost: number; nums: number[]; start: number }
 export interface Standing { owner: 0 | 1; unit: number; c: Clause; left: number; fired: number; age: number; cnt: number; from: number; lcnt: Record<string, number> }
-export interface Card { v: number; cd: number }
+export interface Card { v: number; cd: number; once?: boolean }   // once = 一次性牌（骰牌）：用掉就消失，不冷却
 export interface SideState { ap: number; cards: Card[] }

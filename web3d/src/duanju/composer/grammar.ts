@@ -22,7 +22,8 @@ export const CATS = ["atk", "dmg", "heal", "hpchg", "def", "guard", "status", "s
 export const EVS = ["down", "hurt", "healed", "decl"];
 export const OBJ_WORDS = ["造成", "恢复", "减伤", "灼烧", "易伤", "衰弱", "移除", "定时", "兑现", "不得", "转移", "延后", "无视"];
 export const NTHS = [1, 2, 3, 4, 5, 6];
-const ALIAS = ["最低血敌", "最低血我", "我方全体", "敌方全体", "敌方最低", "我方最低"];
+// 已取消「全体」「最低血」关键词：想打多个目标 = 选择 N 个 + 点选 N 个随从。"敌方随从/我方随从" 只在非 TGT_AT_DECL（自动选血量最低的 N 个）下出现
+const ALIAS = ["敌方随从", "我方随从"];
 const isAliasTok = (t: Token) => ALIAS.includes(t);
 const isUnitTok = (t: Token) => /^@[0-5]$/.test(t);
 const isNum = (t: Token) => /^\d+$/.test(t);
@@ -69,12 +70,10 @@ class Parser {
     if (isUnitTok(tok)) return { t: "unit", u: +tok[1] };
     switch (tok) {
       case "来源": return { t: "src" };
-      case "最低血敌": return { t: "lowFoe" }; case "最低血我": return { t: "lowMe" };
-      case "我方全体": return { t: "allMe" }; case "敌方全体": return { t: "allFoe" };
       case "选择": {
         const n = +this.req([{ c: "NUM", min: 2, cap: side }]);
-        const p = this.req([{ c: "TGT", side }, "敌方最低", "我方最低"]);
-        if (p === "敌方最低" || p === "我方最低") return { t: "some", n, side: p === "敌方最低" ? "foe" : "me" };
+        const p = this.req([{ c: "TGT", side }, "敌方随从", "我方随从"]);
+        if (p === "敌方随从" || p === "我方随从") return { t: "some", n, side: p === "敌方随从" ? "foe" : "me" };
         if (!isUnitTok(p)) throw new PErr("选择 N 个后面要接 N 个随从");
         const us = [+p[1]];
         while (us.length < n) { const q = this.req([{ c: "TGT", side }]); if (!isUnitTok(q)) throw new PErr("选择 N 个后面要接 N 个随从"); us.push(+q[1]); }
@@ -201,10 +200,9 @@ const tgTok = (t: Tg): Token[] => {
   switch (t.t) {
     case "unit": return ["@" + t.u];
     case "units": return t.us.length === 1 ? ["@" + t.us[0]] : ["选择", String(t.us.length), ...t.us.map((u) => "@" + u)];
-    case "some": return ["选择", String(t.n), t.side === "foe" ? "敌方最低" : "我方最低"];
+    case "some": return ["选择", String(t.n), t.side === "foe" ? "敌方随从" : "我方随从"];
     case "src": return ["来源"];
-    case "lowFoe": return ["最低血敌"]; case "lowMe": return ["最低血我"];
-    case "allMe": return ["我方全体"]; case "allFoe": return ["敌方全体"];
+    default: throw new Unsupported("已取消的目标写法 " + t.t);
   }
 };
 const objTok = (o: Obj): Token[] => o.t === "word" ? ["词:" + o.w] : o.t === "cat" ? ["类:" + o.c] : o.t === "ev" ? ["事:" + o.e] : o.t === "nth" ? [`第${o.n}句`] : ["先后", "词:" + o.a, "词:" + o.b];
@@ -314,7 +312,7 @@ function expand(specs: Spec[], ctx: Ctx, universe: Token[]): Set<Token> {
         case "NUM": if (isNum(t) && +t >= (sp.min ?? 1) && (sp.cap === undefined || +t <= sideUnits(ctx, sp.cap).filter((u) => alive(ctx.s, u)).length)) out.add(t); break;
         case "TGT":
           if (isUnitTok(t)) { const u = +t[1]; if ((sp.side === "any" || sideUnits(ctx, sp.side).includes(u))) out.add(t); }
-          else if (!P2.TGT_AT_DECL && isAliasTok(t) && !["敌方最低", "我方最低"].includes(t)) out.add(t);
+          else if (!P2.TGT_AT_DECL && isAliasTok(t) && !["敌方随从", "我方随从"].includes(t)) out.add(t);
           else if (t === "选择") out.add(t);
           else if (sp.src && t === "来源") out.add(t);
           break;
@@ -324,9 +322,9 @@ function expand(specs: Spec[], ctx: Ctx, universe: Token[]): Set<Token> {
       }
     }
   }
-  // 敌方最低 / 我方最低 只在非 TGT_AT_DECL 下出现（「选择 N 个」按血量最低的写法）
-  if (!P2.TGT_AT_DECL) for (const sp of specs) if (typeof sp === "string" && (sp === "敌方最低" || sp === "我方最低")) out.add(sp);
-  if (P2.TGT_AT_DECL) { out.delete("敌方最低"); out.delete("我方最低"); }
+  // 敌方随从 / 我方随从 只在非 TGT_AT_DECL 下出现（「选择 N 个」自动取血量最低的）
+  if (!P2.TGT_AT_DECL) for (const sp of specs) if (typeof sp === "string" && (sp === "敌方随从" || sp === "我方随从")) out.add(sp);
+  if (P2.TGT_AT_DECL) { out.delete("敌方随从"); out.delete("我方随从"); }
   return out;
 }
 const U = vocabulary();
