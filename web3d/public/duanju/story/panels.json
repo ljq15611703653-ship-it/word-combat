@@ -746,6 +746,397 @@
  },
  "panels": [
   {
+   "id": "L0-intro-1-1",
+   "chapter": "序章",
+   "level": 0,
+   "beat": 0,
+   "when": "pre",
+   "page": -1,
+   "layout": "B",
+   "slot": 1,
+   "ratio": "1:1",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     0.62,
+     0
+    ],
+    [
+     0.46,
+     1
+    ],
+    [
+     0,
+     1
+    ]
+   ],
+   "z": 1,
+   "safe": [
+    0.123,
+    0.187,
+    0.626,
+    0.626
+   ],
+   "image": "L0-intro-1-1.webp",
+   "camera": {
+    "move": "push-in",
+    "dur": 4.0
+   },
+   "lines": [
+    {
+     "who": "裴岚",
+     "text": "言枢招新兵啦！全程模拟，不流血。打满十四场就毕业，津贴从优。"
+    }
+   ],
+   "sfx": "全息广播的嗡鸣",
+   "blocks": [
+    {
+     "polygon": [
+      [
+       0.36,
+       0.8
+      ],
+      [
+       0.66,
+       0.74
+      ],
+      [
+       0.62,
+       1.05
+      ],
+      [
+       0.3,
+       1.05
+      ]
+     ],
+     "color": "#00d4ff",
+     "fill": "misregister",
+     "blend": "screen",
+     "bleed": true
+    }
+   ],
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
+  },
+  {
+   "id": "L0-intro-1-2",
+   "chapter": "序章",
+   "level": 0,
+   "beat": 0,
+   "when": "pre",
+   "page": -1,
+   "layout": "B",
+   "slot": 2,
+   "ratio": "4:3",
+   "polygon": [
+    [
+     0.66,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0.56
+    ],
+    [
+     0.58,
+     0.4
+    ]
+   ],
+   "z": 2,
+   "safe": [
+    0.235,
+    0.116,
+    0.626,
+    0.626
+   ],
+   "image": "L0-intro-1-2.webp",
+   "camera": {
+    "move": "hold",
+    "dur": 3.5
+   },
+   "lines": [
+    {
+     "who": "叶晴",
+     "text": "公司的招式，我们摸不透。总得有人进去学。"
+    },
+    {
+     "who": "叶栖",
+     "text": "我去。"
+    }
+   ],
+   "sfx": "",
+   "blocks": []
+  },
+  {
+   "id": "L0-intro-1-3",
+   "chapter": "序章",
+   "level": 0,
+   "beat": 0,
+   "when": "pre",
+   "page": -1,
+   "layout": "B",
+   "slot": 3,
+   "ratio": "16:9",
+   "polygon": [
+    [
+     0.6,
+     0.46
+    ],
+    [
+     1,
+     0.62
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0.5,
+     1
+    ]
+   ],
+   "z": 3,
+   "safe": [
+    0.256,
+    0.28,
+    0.589,
+    0.589
+   ],
+   "image": "L0-intro-1-3.webp",
+   "camera": {
+    "move": "push-in",
+    "dur": 3.0
+   },
+   "lines": [
+    {
+     "who": "叶晴",
+     "text": "编号三十七，名字是假的。别露馅。"
+    },
+    {
+     "who": "叶栖",
+     "text": "嗯。学完就回来。"
+    }
+   ],
+   "sfx": "",
+   "blocks": []
+  },
+  {
+   "id": "L0-intro-2-1",
+   "chapter": "序章",
+   "level": 0,
+   "beat": 0,
+   "when": "pre",
+   "page": 0,
+   "layout": "A",
+   "slot": 1,
+   "ratio": "16:9",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0.44
+    ],
+    [
+     0,
+     0.58
+    ]
+   ],
+   "z": 1,
+   "safe": [
+    0.178,
+    0.118,
+    0.644,
+    0.644
+   ],
+   "image": "L0-intro-2-1.webp",
+   "camera": {
+    "move": "hold",
+    "dur": 3.5
+   },
+   "lines": [
+    {
+     "who": "小满",
+     "text": "一、二、三……还是不够。毕业津贴，够下城我家那一片暖一整个冬天。"
+    }
+   ],
+   "sfx": "硬币碰撞声",
+   "blocks": [
+    {
+     "polygon": [
+      [
+       0.78,
+       -0.06
+      ],
+      [
+       1.04,
+       -0.06
+      ],
+      [
+       1.04,
+       0.3
+      ]
+     ],
+     "color": "#ff2d95",
+     "fill": "halftone",
+     "blend": "multiply",
+     "bleed": true
+    },
+    {
+     "polygon": [
+      [
+       0,
+       0.57
+      ],
+      [
+       1,
+       0.43
+      ],
+      [
+       1,
+       0.46
+      ],
+      [
+       0,
+       0.6
+      ]
+     ],
+     "color": "#ffe600",
+     "fill": "solid",
+     "blend": "normal",
+     "bleed": false
+    }
+   ],
+   "sfxText": "叮铃",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
+  },
+  {
+   "id": "L0-intro-2-2",
+   "chapter": "序章",
+   "level": 0,
+   "beat": 0,
+   "when": "pre",
+   "page": 0,
+   "layout": "A",
+   "slot": 2,
+   "ratio": "16:9",
+   "polygon": [
+    [
+     0,
+     0.63
+    ],
+    [
+     0.5,
+     0.56
+    ],
+    [
+     0.46,
+     1
+    ],
+    [
+     0,
+     1
+    ]
+   ],
+   "z": 2,
+   "safe": [
+    0.121,
+    0.181,
+    0.718,
+    0.718
+   ],
+   "image": "L0-intro-2-2.webp",
+   "camera": {
+    "move": "push-in",
+    "dur": 3.5
+   },
+   "lines": [
+    {
+     "who": "柯谦",
+     "text": "通告上说，毕业的人可以查回被删掉的档案。我丢过一些东西。想拿回来。"
+    }
+   ],
+   "sfx": "书页声",
+   "blocks": [],
+   "sfxText": "沙",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
+  },
+  {
+   "id": "L0-intro-2-3",
+   "chapter": "序章",
+   "level": 0,
+   "beat": 0,
+   "when": "pre",
+   "page": 0,
+   "layout": "A",
+   "slot": 3,
+   "ratio": "16:9",
+   "polygon": [
+    [
+     0.55,
+     0.55
+    ],
+    [
+     1,
+     0.49
+    ],
+    [
+     1,
+     1
+    ],
+    [
+     0.51,
+     1
+    ]
+   ],
+   "z": 3,
+   "safe": [
+    0.143,
+    0.152,
+    0.754,
+    0.754
+   ],
+   "image": "L0-intro-2-3.webp",
+   "camera": {
+    "move": "push-in",
+    "dur": 4.5
+   },
+   "lines": [
+    {
+     "who": "小满",
+     "text": "怕什么，反正是模拟。倒下了重来就是。"
+    },
+    {
+     "who": "柯谦",
+     "text": "通告上是这么写的。"
+    }
+   ],
+   "sfx": "",
+   "blocks": []
+  },
+  {
    "id": "L0-pre-1-1",
    "chapter": "序章",
    "level": 0,
