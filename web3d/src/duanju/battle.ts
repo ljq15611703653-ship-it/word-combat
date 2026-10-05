@@ -6,6 +6,10 @@ import { deckOk } from "./engine/api";
 import { presetDeck } from "./deck/words";
 import { STYLES, styleOf, type StyleDef } from "./styles";
 import { loadArt, type ArtSet } from "./art";
+import { createRig, type RigFigure } from "./rig/rig";
+/** 主角三人（词位/数位/速位）：教程（有 hooks）的我方，或地址栏带 ?rig=1 时使用立绘+骨骼小人 */
+const PROTAG = ["ye_qi", "lu_xiaoman", "ke_qian"];
+const rigAll = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("rig");
 import { Dock } from "./dock";
 import { VfxCastPlayer } from "./vfx/player";
 import "./layout.css";
@@ -63,6 +67,8 @@ export class Battle {
   private myStyle: StyleDef;
   private speedIdx = 0;
   private arts: ArtSet[] = [];
+  /** 有骨骼资源的角色用 Canvas 骨骼小人替换整图（没有则保持整图/剪影） */
+  private rigs: (RigFigure | undefined)[] = [];
   private waitHuman: ((a: "act" | "end") => void) | null = null;
   private waitBtn: ((v: void) => void) | null = null;
   hooks?: BattleHooks;
@@ -123,7 +129,10 @@ export class Battle {
         <div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>`;
       (side === "me" ? st.querySelector(".col.me") : st.querySelector(".col.foe"))!.appendChild(d);
       this.unitEls[u] = d;
-      loadArt(s.artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
+      const artDir = ((this.hooks && side === "me") || rigAll()) ? PROTAG[u % 3] : s.artDir;
+      loadArt(artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
+      this.rigs[u]?.destroy();
+      this.rigs[u] = createRig(artDir, d.querySelector<HTMLElement>(".fig")!, { onReady: () => { const im = d.querySelector("img"); if (im) im.style.display = "none"; }, onFail: () => { this.rigs[u] = undefined; } });
       d.addEventListener("click", (e) => this.onUnitClick(u, e));
     };
     [0, 1, 2, 3, 4, 5].forEach(mk);
@@ -204,6 +213,7 @@ export class Battle {
   // ---------- 交互 ----------
   /** 2D Q 版立绘有 cast / hurt 单张时临时换图，没有就保持 idle */
   private pose(u: number, p: "cast" | "hurt", ms: number) {
+    const rg = this.rigs[u]; if (rg) { rg.play(p); return; }
     const a = this.arts[u], img = this.unitEls[u]?.querySelector("img"); const url = a?.[p];
     if (!a || !img || !url) return;
     img.src = url; setTimeout(() => { img.src = a.idle; }, ms);

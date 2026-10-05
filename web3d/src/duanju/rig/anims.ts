@@ -1,4 +1,4 @@
-﻿// 关键帧动画：每个动作是一组 轨道 [骨骼, 属性, [[时间, 值], ...]]，相邻关键帧用余弦缓动插值。
+// 关键帧动画：每个动作是一组 轨道 [骨骼, 属性, [[时间, 值], ...]]，相邻关键帧用余弦缓动插值。
 // 角度单位度，正方向 = 顺时针（屏幕坐标 y 向下）；角色朝右，所以「向前抬臂」= 负角，「后仰」= 负角。
 export type AnimName = "idle" | "cast" | "hurt";
 export type Prop = "x" | "y" | "rot" | "sx" | "sy";
@@ -19,7 +19,7 @@ const wave = (amp: number, ph = 0, d = 3.2, n = 8): Key[] => Array.from({ length
 export const ANIMS: Record<AnimName, Anim> = {
   idle: {
     dur: 3.2, loop: true, tracks: [
-      ["hip", "y", wave(-4, 0)], ["torso", "rot", wave(-0.9, 0.05)], ["torso", "sy", wave(0.008, 0)],
+      ["hip", "y", wave(-4, 0)], ["torso", "rot", wave(-0.9, 0.05)], ["torso", "sy", wave(0.008, 0).map(([t, v]) => [t, 1 + v] as Key)],
       ["head", "rot", wave(1.6, -0.12)], ["hair", "rot", wave(3.6, -0.28)], ["neck", "rot", wave(0.8, -0.1)],
       ["sh_far", "rot", wave(2.2, -0.1)], ["el_far", "rot", wave(2, -0.2)], ["wr_far", "rot", wave(3, -0.3)],
       ["sh_near", "rot", wave(-2.4, -0.1)], ["el_near", "rot", wave(-2.4, -0.2)], ["wr_near", "rot", wave(-3, -0.3)],
@@ -59,10 +59,10 @@ export const ANIMS: Record<AnimName, Anim> = {
   },
 };
 
-export function samplePose(name: AnimName, t: number): Pose {
+export function samplePose(name: AnimName, t: number, gain?: Record<string, number>): Pose {
   const a = ANIMS[name], pose: Pose = { bones: {} };
   for (const [bone, prop, keys] of a.tracks) {
-    const v = sample(keys, t);
+    let v = sample(keys, t); if (gain && bone && prop === "rot") v *= gain[bone] ?? 1;
     if (!bone) { (pose as any)[prop] = v; continue; }
     if (prop === ("glow" as any)) continue;
     (pose.bones[bone] ??= {})[prop as Prop] = v;

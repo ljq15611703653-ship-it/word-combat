@@ -10,6 +10,8 @@ export interface RigData {
   bones: Record<string, { parent?: string; at: [number, number] }>;
   parts: Record<string, { atlas: { x: number; y: number; w: number; h: number }; pivot: [number, number]; bone: string; rot?: number; off?: [number, number]; ps?: number; glow?: number }>;
   order: string[];
+  /** 各骨骼旋转幅度倍率（没有肩骨的角色，把肘骨动作放大） */
+  gain?: Record<string, number>;
 }
 export interface RigAsset { data: RigData; img: HTMLImageElement }
 const cache = new Map<string, Promise<RigAsset | null>>();
@@ -41,16 +43,16 @@ const mul = (p: M, q: M): M => [p[0] * q[0] + p[2] * q[1], p[1] * q[0] + p[3] * 
 const trs = (x: number, y: number, rot: number, sx: number, sy: number): M => { const c = Math.cos(rot * Math.PI / 180), s = Math.sin(rot * Math.PI / 180); return [c * sx, s * sx, -s * sy, c * sy, x, y]; };
 
 /** 在 container 里创建骨骼小人（canvas，类名 rig，铺满容器、底对齐）。资源异步加载，加载完前 canvas 空白；加载失败 onFail 回调 */
-export function createRig(artDir: string, container: HTMLElement, opts: { onFail?: () => void; scale?: number; paused?: boolean } = {}): RigFigure {
+export function createRig(artDir: string, container: HTMLElement, opts: { onFail?: () => void; onReady?: () => void; scale?: number; paused?: boolean } = {}): RigFigure {
   const cv = document.createElement("canvas"); cv.className = "rig"; cv.setAttribute("aria-hidden", "true");
-  container.appendChild(cv);
+  container.insertBefore(cv, container.firstChild);
   const ctx = cv.getContext("2d")!;
   let asset: RigAsset | null = null, facing: 1 | -1 = 1, dead = false, raf = 0;
   let cur: AnimName = "idle", t0 = performance.now(), queued: AnimName | null = null, manual = false;
   const ready = loadRig(artDir).then((a) => {
     if (dead) return;
     if (!a) { cv.remove(); opts.onFail?.(); return; }
-    asset = a; const v = a.data.view, sc = opts.scale ?? 0.5;
+    asset = a; opts.onReady?.(); const v = a.data.view, sc = opts.scale ?? 0.5;
     cv.width = Math.round(v[2] * sc); cv.height = Math.round(v[3] * sc);
     if (!manual && !opts.paused) loop();
     else draw(cur, manual ? tManual : 0);
@@ -61,7 +63,7 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
   function draw(anim: AnimName, t: number) {
     if (!asset) return;
     const { data, img } = asset, v = data.view, sc = cv.width / v[2];
-    const pose: Pose = samplePose(anim, t);
+    const pose: Pose = samplePose(anim, t, data.gain);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
     // 视口：设计坐标 -> 画布；facing=-1 绕视图中线镜像
     const base: M = facing === 1 ? [sc, 0, 0, sc, -v[0] * sc, -v[1] * sc] : [-sc, 0, 0, sc, (v[0] + v[2]) * sc, -v[1] * sc];

@@ -4,6 +4,7 @@ import { ANIMS, type AnimName } from "./anims";
 const q = new URLSearchParams(location.search);
 const chars = (q.get("c") ?? "ye_qi").split(",");
 const root = document.getElementById("root")!;
+document.documentElement.style.setProperty("--h", (q.get("h") ?? "360") + "px");
 const done = () => { document.title = "ready"; (window as any).__ready = true; };
 const sheet = q.get("sheet") as AnimName | null, live = q.get("live");
 const jobs: Promise<void>[] = [];

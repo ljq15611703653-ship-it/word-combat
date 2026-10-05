@@ -13,8 +13,8 @@
 .unit.me.pos2 { left: calc(var(--uw) / 2 + 8px); bottom: 45%; --s: .86; } .unit.me.pos1 { left: calc(var(--uw) / 2 + 8px + var(--dx)); bottom: 24%; --s: .93; } .unit.me.pos0 { left: calc(var(--uw) / 2 + 8px + var(--dx) * 2); bottom: 3%; }
 .unit.foe.pos2 { left: calc(100% - var(--uw) / 2 - 8px); bottom: 45%; --s: .86; } .unit.foe.pos1 { left: calc(100% - var(--uw) / 2 - 8px - var(--dx)); bottom: 24%; --s: .93; } .unit.foe.pos0 { left: calc(100% - var(--uw) / 2 - 8px - var(--dx) * 2); bottom: 3%; }
 .fig { position: relative; flex: 0 0 auto; width: calc(var(--fh, clamp(120px, 25vh, 200px)) * .62 * var(--s)); height: calc(var(--fh, clamp(120px, 25vh, 200px)) * var(--s)); margin-top: 4px; }
-.fig img { position: absolute; left: 0; bottom: 8%; width: 100%; height: 92%; object-fit: contain; object-position: 50% 100%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .55)); transition: filter .2s, transform .35s; }
-.unit.foe .fig img { transform: scaleX(-1); }
+.fig img, .fig canvas.rig { position: absolute; left: 0; bottom: 8%; width: 100%; height: 92%; object-fit: contain; object-position: 50% 100%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .55)); transition: filter .2s, transform .35s; }
+.unit.foe .fig img, .unit.foe .fig canvas.rig { transform: scaleX(-1); }
 /* 底座：冷色发光环 + 内圈 */
 .fig .base { position: absolute; left: -34%; right: -34%; bottom: 0; height: 17%; border-radius: 50%; background: radial-gradient(ellipse at 50% 50%, color-mix(in srgb, var(--c) 40%, #031018) 0, #061424 58%, transparent 72%); border: 2px solid var(--c); box-shadow: 0 0 18px -2px var(--c), inset 0 0 14px rgba(0, 0, 0, .75), 0 4px 0 -1px rgba(0, 0, 0, .5); }
 .fig .base::after { content: ""; position: absolute; inset: 22% 18%; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--c) 70%, transparent); opacity: .7; }
@@ -22,13 +22,13 @@
 .fl { position: absolute; left: 50%; top: 18%; font-weight: 900; font-size: 26px; letter-spacing: .04em; text-shadow: 0 2px 0 #000, 0 0 12px currentColor; animation: flup 1.2s ease-out forwards; white-space: nowrap; transform: translateX(var(--dx)); z-index: 6; }
 .fl.hit { color: #ff6384; font-size: 32px; } .fl.heal { color: var(--ok); } .fl.shield { color: var(--cy); } .fl.status { color: var(--ye); font-size: 20px; } .fl.info { color: #fff; font-size: 18px; }
 @keyframes flup { 0% { opacity: 0; margin-top: 20px; scale: .6; } 15% { opacity: 1; scale: 1.15; } 100% { opacity: 0; margin-top: -60px; scale: 1; } }
-.unit.fx-hit .fig img { animation: shake .35s; filter: brightness(2.2) saturate(0) drop-shadow(0 0 12px #ff3d63); }
-.unit.fx-heal .fig img { filter: brightness(1.4) drop-shadow(0 0 12px var(--ok)); }
-.unit.fx-shield .fig img { filter: drop-shadow(0 0 14px var(--cy)); }
-.unit.fx-cast .fig img { filter: drop-shadow(0 0 16px var(--c)) brightness(1.3); transform: translateY(-6px); }
-.unit.foe.fx-cast .fig img { transform: scaleX(-1) translateY(-6px); }
+.unit.fx-hit .fig img, .unit.fx-hit .fig canvas.rig { animation: shake .35s; filter: brightness(2.2) saturate(0) drop-shadow(0 0 12px #ff3d63); }
+.unit.fx-heal .fig img, .unit.fx-heal .fig canvas.rig { filter: brightness(1.4) drop-shadow(0 0 12px var(--ok)); }
+.unit.fx-shield .fig img, .unit.fx-shield .fig canvas.rig { filter: drop-shadow(0 0 14px var(--cy)); }
+.unit.fx-cast .fig img, .unit.fx-cast .fig canvas.rig { filter: drop-shadow(0 0 16px var(--c)) brightness(1.3); transform: translateY(-6px); }
+.unit.foe.fx-cast .fig img, .unit.foe.fx-cast .fig canvas.rig { transform: scaleX(-1) translateY(-6px); }
 @keyframes shake { 0%, 100% { translate: 0 } 20% { translate: -8px 0 } 40% { translate: 7px 0 } 60% { translate: -5px 0 } 80% { translate: 3px 0 } }
-.unit.dead .fig img { filter: grayscale(1) brightness(.5); } .unit.dead .panel { opacity: .55; } .unit.fall .fig img { transform: rotate(80deg) translate(10%, 20%); transition: transform .5s; } .unit.foe.fall .fig img { transform: scaleX(-1) rotate(80deg) translate(10%, 20%); }
+.unit.dead .fig img, .unit.dead .fig canvas.rig { filter: grayscale(1) brightness(.5); } .unit.dead .panel { opacity: .55; } .unit.fall .fig img, .unit.fall .fig canvas.rig { transform: rotate(80deg) translate(10%, 20%); transition: transform .5s; } .unit.foe.fall .fig img, .unit.foe.fall .fig canvas.rig { transform: scaleX(-1) rotate(80deg) translate(10%, 20%); }
 .unit.absent { display: none; }
 
 /* 名牌（句子条）：玻璃 + 顶部发光线 + 向下的引线 */

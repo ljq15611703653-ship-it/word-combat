@@ -1,4 +1,4 @@
-﻿"""按 maps/<角色>.json 把连通域切成部件, 输出 透明 PNG(rig/parts) + atlas.png/atlas.json + rig.json。
+"""按 maps/<角色>.json 把连通域切成部件, 输出 透明 PNG(rig/parts) + atlas.png/atlas.json + rig.json。
 maps 格式见 maps/ye_qi.json。
   comps: [id | "r:x0,y0,x1,y1"]  连通域序号(GROW 标注图上的编号) 或 矩形(选中心落在矩形内的所有小连通域)
   erase: [[x0,y0,x1,y1],...]    部件内抹掉的矩形(源图坐标; 用于去掉被相邻部件盖住的灰色接口)
@@ -48,6 +48,8 @@ def main(name):
                     if x0 <= cx <= x1 and y0 <= cy <= y1: mask |= lab == i
             else:
                 mask |= lab == int(c)
+        if "clip" in pd:  # 同一连通域内按矩形再切 (例如 Lu 的腿由球关节连成一体)
+            cx0, cy0, cx1, cy1 = pd["clip"]; cm = np.zeros_like(mask); cm[cy0:cy1, cx0:cx1] = True; mask &= cm
         # 软边: 取 mask 膨胀 2px 范围内的原始 alpha (保留抗锯齿边)
         grown = ndi.binary_dilation(mask, iterations=2)
         a = np.where(grown, alpha, 0.0)
@@ -119,7 +121,7 @@ def main(name):
             r = math.radians(pd["rot"]); sx = (vx * math.cos(r) - vy * math.sin(r)) * pd["ps"]; sy = (vx * math.sin(r) + vy * math.cos(r)) * pd["ps"]
             b["at"] = [round(par["at"][0] + sx - 0 + (bones[pd["bone"]]["at"][0] - par["at"][0]) * 0, 1), 0]
             b["at"] = [round(bones[pd["bone"]]["at"][0] + sx, 1), round(bones[pd["bone"]]["at"][1] + sy, 1)]
-    rig = dict(name=name, ps=spec.get("ps", 1.9), ref=spec.get("ref"), view=spec.get("view"), bones=spec["bones"], parts={}, order=spec["order"], anims=spec.get("anims"))
+    rig = dict(name=name, ps=spec.get("ps", 1.9), ref=spec.get("ref"), view=spec.get("view"), gain=spec.get("gain"), bones=spec["bones"], parts={}, order=spec["order"], anims=spec.get("anims"))
     for pn, pd in spec["parts"].items():
         p = dict(atlas=aj[pn], pivot=parts[pn]["pivot"], bone=pd["bone"])
         for k in ("rot", "off", "ps", "glow", "alpha", "blend", "sway"):
