@@ -4,14 +4,15 @@
 const BASE = (import.meta as any).env?.BASE_URL ?? "/";
 const TUTORIAL_BG = ["calibrate", "echo", "wake", "probe", "streetlamp", "rainnight", "rooftop", "oldfactory", "darkcorner", "mirrorhall", "candlehall", "dicehall", "crimsonarena", "graduate"];
 /** 背景数据驱动：mode = "battle"（打电脑）或教程节拍序号 1..14 */
+const VER = ((import.meta as any).env?.VITE_BUILD ?? "") as string;
 export function backgroundFor(mode: "battle" | number = "battle"): string {
-  if (mode === "battle") return `${BASE}duanju/bg/bg_battle.webp`;
+  if (mode === "battle") return `${BASE}duanju/bg/bg_battle.webp?v=${VER}`;
   const n = Math.max(1, Math.min(TUTORIAL_BG.length, mode));
-  return `${BASE}duanju/bg/bg_${String(n).padStart(2, "0")}_${TUTORIAL_BG[n - 1]}.webp`;
+  return `${BASE}duanju/bg/bg_${String(n).padStart(2, "0")}_${TUTORIAL_BG[n - 1]}.webp?v=${VER}`;
 }
 export const bgUrl = () => backgroundFor("battle");
 export type ArtState = "idle" | "cast" | "hurt";
-export const artUrl = (artDir: string, state: ArtState = "idle") => `${BASE}duanju/art/${artDir}/battle_${state}.png`;
+export const artUrl = (artDir: string, state: ArtState = "idle") => `${BASE}duanju/art/${artDir}/battle_${state}.png?v=${VER}`;
 
 const cache = new Map<string, Promise<ArtSet>>();
 function tryImage(url: string): Promise<string | null> {
