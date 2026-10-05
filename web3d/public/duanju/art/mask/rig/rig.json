@@ -1,0 +1,165 @@
+{
+ "name": "mask",
+ "ps": 1.0,
+ "ref": "D:/wc/art/q/cls/mask/idle_raw.png",
+ "view": [
+  195,
+  0,
+  780,
+  1254
+ ],
+ "gain": {
+  "torso": 0.3,
+  "hip": 0.3,
+  "head": 0.6,
+  "el_far": 0.6,
+  "el_near": 0.6
+ },
+ "style": "shu",
+ "bones": {
+  "root": {
+   "at": [
+    610,
+    1200
+   ]
+  },
+  "hip": {
+   "parent": "root",
+   "at": [
+    630,
+    800
+   ]
+  },
+  "torso": {
+   "parent": "hip",
+   "at": [
+    630,
+    800
+   ]
+  },
+  "neck": {
+   "parent": "torso",
+   "at": [
+    610,
+    495
+   ]
+  },
+  "head": {
+   "parent": "neck",
+   "at": [
+    610,
+    495
+   ]
+  },
+  "hair": {
+   "parent": "head",
+   "at": [
+    610,
+    495
+   ]
+  },
+  "el_far": {
+   "parent": "torso",
+   "at": [
+    416,
+    655
+   ]
+  },
+  "wr_far": {
+   "parent": "el_far",
+   "at": [
+    395,
+    790
+   ]
+  },
+  "el_near": {
+   "parent": "torso",
+   "at": [
+    805,
+    690
+   ]
+  },
+  "wr_near": {
+   "parent": "el_near",
+   "at": [
+    840,
+    815
+   ]
+  }
+ },
+ "parts": {
+  "legs": {
+   "atlas": {
+    "x": 516,
+    "y": 0,
+    "w": 503,
+    "h": 438
+   },
+   "pivot": [
+    238,
+    10
+   ],
+   "bone": "hip"
+  },
+  "torso": {
+   "atlas": {
+    "x": 0,
+    "y": 473,
+    "w": 434,
+    "h": 385
+   },
+   "pivot": [
+    256,
+    355
+   ],
+   "bone": "torso"
+  },
+  "arm_far_fore": {
+   "atlas": {
+    "x": 560,
+    "y": 473,
+    "w": 103,
+    "h": 250
+   },
+   "pivot": [
+    61,
+    15
+   ],
+   "bone": "el_far"
+  },
+  "arm_near_fore": {
+   "atlas": {
+    "x": 436,
+    "y": 473,
+    "w": 122,
+    "h": 270
+   },
+   "pivot": [
+    30,
+    15
+   ],
+   "bone": "el_near"
+  },
+  "head": {
+   "atlas": {
+    "x": 0,
+    "y": 0,
+    "w": 514,
+    "h": 471
+   },
+   "pivot": [
+    246,
+    461
+   ],
+   "bone": "head"
+  }
+ },
+ "order": [
+  "legs",
+  "arm_far_fore",
+  "torso",
+  "head",
+  "arm_near_fore"
+ ],
+ "anims": null
+}

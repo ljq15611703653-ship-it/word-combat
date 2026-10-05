@@ -109,7 +109,7 @@ def build(name):
     if "order" in m: order = m["order"]
     order = [o for o in order if o in parts]
     spec = dict(grow=m.get("grow", 1), mina=m.get("mina", 300), ps=1.0, ref=f"D:/wc/art/q/cls/{name}/idle_raw.png",
-                view=m.get("view", [195, 0, 780, 1254]), style=name.split("_")[1], bones=bones, order=order, parts=parts, gain=m.get("gain"))
+                view=m.get("view", [195, 0, 780, 1254]), style=m.get("style", name.split("_")[-1]), bones=bones, order=order, parts=parts, gain=m.get("gain"))
     return spec
 
 if __name__ == "__main__":

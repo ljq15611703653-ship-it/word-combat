@@ -16,7 +16,7 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
     const holder = document.createElement("div"); holder.className = "dj-root battle story-battle"; holder.style.position = "absolute";
     host.appendChild(holder);
     const me = { ...STYLES.find((s) => s.id === "yin")!, names: ses.cur.base.me as [string, string, string], unitArt: ["ye_qi", "lu_xiaoman", "ke_qian"] as [string, string, string] };
-    const foe = { ...STYLES.find((s) => s.id === "zhuang")!, names: beat.foeNames as [string, string, string] };
+    const foe = { ...STYLES.find((s) => s.id === "zhuang")!, names: beat.foeNames as [string, string, string], artDir: "mask", unitArt: ["mask", "mask", "mask"] as [string, string, string] };
     let warn: { text: string; t: number } | null = null;
     let timer = 0, finished = false;
     const done = (r: BattleOutcome) => { if (finished) return; finished = true; clearInterval(timer); b.destroy(); holder.remove(); resolve(r); };
