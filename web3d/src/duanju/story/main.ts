@@ -115,7 +115,7 @@ function selectPage(justDone?: number) {
   const el = document.createElement("div"); el.className = "st-select"; root.appendChild(el);
   const nextN = cur.beats.find((b) => !prog.done.includes(b.beat))?.beat;
   el.innerHTML = `<header><h1><span>断</span>·句 <small>余烬</small></h1><p>十四次“模拟实验”。每一关教一个新东西。</p>
-    <div class="st-tools"><button class="bt" data-a="prologue">重看序章</button><button class="bt" data-a="reset">清除进度</button></div></header>
+    <div class="st-tools">${prog.done.includes(14) || q.get("unlock") === "all" ? `<a class="bt" href="duanju-train.html">四职业特训</a>` : ""}<button class="bt" data-a="prologue">重看序章</button><button class="bt" data-a="reset">清除进度</button></div></header>
     <div class="st-grid">${cur.beats.map((b) => {
       const done = prog.done.includes(b.beat), open = unlocked(b.beat), now = b.beat === nextN;
       return `<button class="st-card${done ? " done" : ""}${open ? "" : " lock"}${now ? " now" : ""}${b.beat === justDone ? " just" : ""}" data-n="${b.beat}" ${open ? "" : "disabled"}>

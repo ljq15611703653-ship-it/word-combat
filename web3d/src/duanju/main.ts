@@ -6,6 +6,7 @@ import { mountEnd } from "./end";
 import { bgUrl } from "./art";
 import type { Settings } from "./types";
 import "./skin.css";
+import { mountNav } from "./nav";
 
 const root = document.getElementById("app")!;
 { const b = document.createElement("div"); b.className = "dj-build"; b.textContent = "build " + ((import.meta as any).env?.VITE_BUILD ?? ""); document.body.appendChild(b); }
@@ -51,5 +52,6 @@ function play() {
   battle = b; dj.battle = b;
   b.run().catch((e) => { dj.errors.push(String(e?.stack ?? e)); console.error(e); });
 }
+mountNav(q.get("unlock") === "all");
 setup();
 if (q.get("start") === "1") play();
