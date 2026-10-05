@@ -193,8 +193,3 @@ body.hs-dragging, body.hs-dragging * { cursor: grabbing !important; }
 .fig .base { z-index: 0; }
 .fig img, .fig canvas.rig { z-index: 1; }
 .fig .floats { z-index: 3; }
-
-/* 底座旁常驻的淡盔甲穹顶：在底座之上、人物之下 */
-.fig .armor { position: absolute; left: 50%; bottom: 1%; width: 150%; height: 108%; transform: translateX(-50%); opacity: .7; z-index: 0; pointer-events: none; transition: opacity .3s; }
-.fig .armor svg { width: 100%; height: 100%; display: block; }
-.unit.cp-tgt .fig .armor, .unit.editing .fig .armor { opacity: 1; }

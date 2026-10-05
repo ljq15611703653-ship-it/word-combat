@@ -12,7 +12,6 @@ const PROTAG = ["ye_qi", "lu_xiaoman", "ke_qian"];
 const rigAll = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("rig");
 import { Dock } from "./dock";
 import { VfxCastPlayer } from "./vfx/player";
-import { buildShell } from "./vfx/shell";
 import "./layout.css";
 import type { BattleView, CastPlayer, Guide, Settings } from "./types";
 
@@ -132,10 +131,6 @@ export class Battle {
         <div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>`;
       (side === "me" ? st.querySelector(".col.me") : st.querySelector(".col.foe"))!.appendChild(d);
       this.unitEls[u] = d;
-      { // 底座外面常驻一层很淡的半透明盔甲穹顶（职业材质与演出时的盔甲壳一致）
-        const ar = document.createElement("div"); ar.className = "armor"; ar.appendChild(buildShell({ w: 240, h: 250, style: s.id, c: s.accent, c2: s.accent2 }) as unknown as Element);
-        d.querySelector(".fig")!.insertBefore(ar, d.querySelector(".fig .base")!.nextSibling);
-      }
       const artDir = ((this.hooks && side === "me") || rigAll()) ? PROTAG[u % 3] : (s.unitArt?.[u % 3] ?? s.artDir);
       loadArt(artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
       this.rigs[u]?.destroy();
