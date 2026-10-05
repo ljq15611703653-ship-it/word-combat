@@ -110,3 +110,10 @@
   .dk.has-drawer.drawer .dk-drawerbtn { bottom: calc(56vh + 12px); }
   .dk.has-drawer { padding-bottom: 60px; }
 }
+
+/* 载荷板词块：层次（投影 + 顶部高光 + 底部色条）与字体质感 */
+.dk .blk { filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .45)) drop-shadow(0 0 7px color-mix(in srgb, var(--c) 35%, transparent)); }
+.dk .face { background: linear-gradient(180deg, color-mix(in srgb, var(--c) 38%, #0d1c34) 0%, color-mix(in srgb, var(--c) 14%, #081426) 55%, color-mix(in srgb, var(--c) 6%, #050c18) 100%); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), inset 0 -3px 0 color-mix(in srgb, var(--c) 70%, #000), inset 0 0 14px color-mix(in srgb, var(--c) 22%, transparent); }
+.dk .bn { font-size: 20px; letter-spacing: .14em; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 80%, transparent), 0 2px 0 rgba(0, 0, 0, .55); }
+.dk .blk .ic { font-size: 13px; text-shadow: 0 0 6px var(--c); }
+.dk .blk .bk { padding: 0 5px; border-radius: 2px; background: rgba(0, 0, 0, .4); font-weight: 700; letter-spacing: .04em; opacity: 1; }
