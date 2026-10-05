@@ -193,3 +193,22 @@ body.hs-dragging, body.hs-dragging * { cursor: grabbing !important; }
 .fig .base { z-index: 0; }
 .fig img, .fig canvas.rig { z-index: 1; }
 .fig .floats { z-index: 3; }
+
+/* ===== 头顶名牌：与载荷板词块同一套风格（切角面、内高光、底部色条、发光字） ===== */
+.unit.pos0 { z-index: 3; } .unit.pos1 { z-index: 2; } .unit.pos2 { z-index: 1; }   /* 前排压后排 */
+.unit.editing { z-index: 8; }
+.panel { border: 0; border-radius: 0; padding: 8px 11px 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 30%, #0d1c34) 0%, color-mix(in srgb, var(--c) 11%, #081426) 55%, color-mix(in srgb, var(--c) 5%, #050c18) 100%);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 11px 100%, 0 calc(100% - 11px));
+  box-shadow: inset 0 0 0 1.5px var(--c), inset 0 1px 0 rgba(255, 255, 255, .32), inset 0 -3px 0 color-mix(in srgb, var(--c) 70%, #000), inset 0 0 16px color-mix(in srgb, var(--c) 22%, transparent); }
+.panel::after { display: none; }
+.p-head .nm { font-size: 15px; letter-spacing: .16em; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 80%, transparent), 0 2px 0 rgba(0, 0, 0, .55); }
+.p-head .pos { border-radius: 0; background: var(--c); color: #04101a; font-weight: 900; padding: 1px 7px; clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 100%, 0 100%); box-shadow: none; }
+.p-head .pass { border-radius: 0; padding: 1px 9px; font-weight: 800; letter-spacing: .08em; color: #eaf6ff; background: rgba(0, 0, 0, .45); border: 0; clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 70%, transparent); }
+.hpbar { height: 14px; margin: 6px 0 5px; background: #040a14; border: 0; border-radius: 0; clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 100%, 5px 100%); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 45%, transparent); }
+.hpfill { background: repeating-linear-gradient(115deg, color-mix(in srgb, var(--c) 82%, #fff) 0 7px, color-mix(in srgb, var(--c) 55%, #000) 7px 9px); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 65%, transparent); }
+.hptxt { text-shadow: 0 1px 0 #000, 0 0 4px #000; font-weight: 800; }
+.chips em { border: 0; border-radius: 0; padding: 1px 8px; font-weight: 800; letter-spacing: .06em; background: rgba(0, 0, 0, .45); clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%); box-shadow: inset 0 0 0 1px rgba(120, 190, 235, .45); }
+.chips em.kw { color: var(--ye); box-shadow: inset 0 0 0 1px var(--ye), inset 0 -2px 0 rgba(255, 200, 87, .55); }
+.chips em.st { color: #ff9ccc; box-shadow: inset 0 0 0 1px var(--mag), inset 0 -2px 0 rgba(255, 79, 163, .55); }
+.dj-build { position: fixed; left: 8px; bottom: 4px; font: 10px/1 "Chakra Petch", monospace; color: rgba(190, 220, 255, .45); pointer-events: none; z-index: 5; }

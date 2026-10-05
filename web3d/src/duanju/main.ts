@@ -7,6 +7,7 @@ import { bgUrl } from "./art";
 import type { Settings } from "./types";
 
 const root = document.getElementById("app")!;
+{ const b = document.createElement("div"); b.className = "dj-build"; b.textContent = "build " + ((import.meta as any).env?.VITE_BUILD ?? ""); document.body.appendChild(b); }
 document.documentElement.style.setProperty("--bg-url", `url(${bgUrl()})`);
 const q = new URLSearchParams(location.search);
 const AUTO_GAMES = +(q.get("auto") ?? 0);          // ?auto=N：电脑代打 N 局（冒烟测试用）
