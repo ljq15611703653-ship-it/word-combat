@@ -30,8 +30,10 @@ const CSS = `
 .wc-block canvas,.wc-block .f{position:absolute;display:block}
 .wc-pop{position:absolute;pointer-events:none;filter:drop-shadow(6px 8px 0 rgba(0,0,0,.5))}
 .wc-pop>*{display:block;width:100%;height:auto}
-.wc-sfx{position:absolute;font-weight:900;font-style:italic;line-height:1;white-space:nowrap;pointer-events:none;letter-spacing:.04em;
- color:#ffd23f;-webkit-text-stroke:9px ${INK};paint-order:stroke fill;text-shadow:5px 6px 0 ${INK};
+.wc-sfx{position:absolute;pointer-events:none;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 0 0 transparent)}
+.wc-sfx svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wc-sfxt{position:relative;font-weight:900;font-style:italic;line-height:1;white-space:nowrap;letter-spacing:.02em;transform:skewX(-6deg);
+ -webkit-text-stroke:7px ${INK};paint-order:stroke fill;text-shadow:3px 4px 0 ${INK};
  font-family:"Alibaba PuHuiTi","Noto Sans SC","Microsoft YaHei",sans-serif}
 .wc-caps{position:absolute;inset:0;z-index:200;pointer-events:none}
 .wc-cap{position:absolute;box-sizing:border-box;color:${INK};font-weight:700;font-size:27px;line-height:1.5;letter-spacing:.03em;text-align:left}
@@ -522,17 +524,31 @@ export function playComic(container, data, opts = {}) {
       const inner = pe; inner.style.opacity = 0;
       setTimeout(() => { inner.style.opacity = 1; inner.animate([{ transform: 'scale(.55) rotate(-6deg)', opacity: 0 }, { transform: 'scale(1.08) rotate(1.5deg)', opacity: 1, offset: .6 }, { transform: 'none', opacity: 1 }], { duration: 440 / sp, easing: 'cubic-bezier(.2,.9,.3,1)' }); }, wd * .55);
     }
-    // 拟声词
-    if (panel.sfx) {
-      const sf = el('div', 'wc-sfx', pg.el); sf.textContent = panel.sfx; sf.style.zIndex = 190;
-      const fs = clamp(Math.min(bb.w, bb.h) * .24, 56, 120); sf.style.fontSize = fs + 'px';
-      const rot = (hash(panel.id) % 2 ? -1 : 1) * (5 + hash(panel.id + 'r') % 8);
-      sf.style.visibility = 'hidden';
-      const sw = sf.offsetWidth, sh = sf.offsetHeight;
-      const pos = place(sw, sh, { poly, bb, safe, avoid: pg.avoid, loose: true, noTopBias: true });
-      sf.style.left = pos.x + 'px'; sf.style.top = pos.y + 'px'; sf.style.visibility = 'visible'; sf.style.opacity = 0; sf.style.transform = `rotate(${rot}deg)`;
-      pg.avoid.push({ x: pos.x, y: pos.y, w: sw, h: sh });
-      setTimeout(() => { sf.style.opacity = 1; sf.animate([{ transform: `rotate(${rot * 3}deg) scale(.1)`, opacity: 0 }, { transform: `rotate(${rot}deg) scale(1.3)`, opacity: 1, offset: .55 }, { transform: `rotate(${rot}deg) scale(1)`, opacity: 1 }], { duration: 420 / sp, easing: 'cubic-bezier(.2,1,.3,1)' }); }, wd * .6);
+    // 拟声词(漫画式: 短字 + 彩色爆炸/斜切/色块底 + 粗描边)
+    if (panel.sfxText) {
+      const txt = panel.sfxText, big = !!panel.sfxBig, bg = panel.sfxColor || '#ffd23f', fg = panel.sfxInk || '#fff7d6';
+      const sty = panel.sfxStyle || 'burst';
+      const fs = clamp(Math.min(bb.w, bb.h) * (big ? .2 : .13), 40, big ? 104 : 72);
+      const tw = fs * Math.max(1, txt.length) * 1.02, th = fs * 1.05;
+      const sw = Math.round(tw + fs * 1.1), sh = Math.round(th + fs * .9);
+      const sf = el('div', 'wc-sfx', pg.el); sf.style.zIndex = 190; sf.style.width = sw + 'px'; sf.style.height = sh + 'px';
+      let shape;
+      if (sty === 'burst') { // 锯齿爆炸星形
+        const N = 14, pts = []; for (let i = 0; i < N * 2; i++) { const a = Math.PI * i / N + .2, r = i % 2 ? .78 + (hash(panel.id + i) % 8) / 100 : 1; pts.push((50 + Math.cos(a) * 50 * r).toFixed(1) + ',' + (50 + Math.sin(a) * 50 * r).toFixed(1)); }
+        shape = pts.join(' ');
+      } else if (sty === 'slash') shape = '6,22 100,0 94,78 0,100'; // 斜切色块
+      else shape = '4,8 96,0 100,88 8,100 0,40'; // 不规则色块
+      const sd = sv('svg', { viewBox: '0 0 100 100', preserveAspectRatio: 'none' }, sf);
+      sv('polygon', { points: shape, fill: INK, transform: 'translate(5,6)' }, sd);
+      sv('polygon', { points: shape, fill: bg, stroke: INK, 'stroke-width': 3, 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }, sd);
+      sd.querySelectorAll('polygon')[1].setAttribute('stroke-width', '5');
+      const t = el('span', 'wc-sfxt', sf); t.textContent = txt; t.style.fontSize = fs + 'px'; t.style.color = fg;
+      const rot = (hash(panel.id) % 2 ? -1 : 1) * (6 + hash(panel.id + 'r') % 9);
+      const pos = place(sw, sh, { poly, bb, safe, avoid: pg.avoid, loose: false, noTopBias: true });
+      const m = 14, px = clamp(pos.x, bb.x + m, Math.max(bb.x + m, bb.x + bb.w - sw - m)), py = clamp(pos.y, bb.y + m, Math.max(bb.y + m, bb.y + bb.h - sh - m));
+      sf.style.left = px + 'px'; sf.style.top = py + 'px'; sf.style.opacity = 0; sf.style.transform = `rotate(${rot}deg)`;
+      pg.avoid.push({ x: px, y: py, w: sw, h: sh });
+      setTimeout(() => { sf.style.opacity = 1; sf.animate([{ transform: `rotate(${rot * 3}deg) scale(.1)`, opacity: 0 }, { transform: `rotate(${rot}deg) scale(1.25)`, opacity: 1, offset: .55 }, { transform: `rotate(${rot}deg) scale(1)`, opacity: 1 }], { duration: 420 / sp, easing: 'cubic-bezier(.2,1,.3,1)' }); }, wd * .6);
     }
     pg.revealed[idx] = { poly, bb, safe, panel };
   }

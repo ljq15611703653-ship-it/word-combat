@@ -832,7 +832,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "哗",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L0-pre-1-2",
@@ -885,7 +890,12 @@
     }
    ],
    "sfx": "锅里的咕嘟声",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "咕嘟",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L0-pre-1-3",
@@ -999,7 +1009,12 @@
      4,
      1
     ]
-   }
+   },
+   "sfxText": "啪嗒",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L0-pre-2-1",
@@ -1073,7 +1088,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "啪",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L0-pre-2-2",
@@ -1179,7 +1199,12 @@
     }
    ],
    "sfx": "书页翻动",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "唰",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L0-pre-3-1",
@@ -1273,7 +1298,12 @@
      "blend": "normal",
      "bleed": false
     }
-   ]
+   ],
+   "sfxText": "叮",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L0-pre-3-2",
@@ -1322,7 +1352,12 @@
     }
    ],
    "sfx": "仪器滴答",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "嗒",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L0-pre-3-3",
@@ -1465,7 +1500,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L1-pre-1-2",
@@ -1591,7 +1631,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "嗯",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L1-pre-2-2",
@@ -1640,7 +1685,12 @@
     }
    ],
    "sfx": "滴——",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "滴",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L1-post-1-1",
@@ -1721,7 +1771,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "哗啦",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L1-post-1-2",
@@ -1774,7 +1829,12 @@
     }
    ],
    "sfx": "哼唱渐弱",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "嗯",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L1-post-2-1",
@@ -2142,7 +2202,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L2-pre-2-2",
@@ -2195,7 +2260,12 @@
     }
    ],
    "sfx": "击掌声",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "啪",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L2-post-1-1",
@@ -2296,7 +2366,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "咚",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L2-post-1-2",
@@ -2344,7 +2419,12 @@
    },
    "lines": [],
    "sfx": "轻敲声 嗒、嗒",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "嗒",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L2-post-2-1",
@@ -2471,7 +2551,12 @@
     }
    ],
    "sfx": "键盘轻响",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "哒",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L3-pre-1-1",
@@ -2745,7 +2830,12 @@
     }
    ],
    "sfx": "笔尖沙沙",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "沙",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L3-post-1-1",
@@ -2826,7 +2916,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "叮",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L3-post-1-2",
@@ -3030,7 +3125,12 @@
     }
    ],
    "sfx": "仪器滴答",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "嗒",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L4-pre-1-1",
@@ -3255,7 +3355,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L4-pre-2-2",
@@ -3404,7 +3509,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "咔啦",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L4-post-1-2",
@@ -3461,7 +3571,12 @@
     }
    ],
    "sfx": "杯子轻碰",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "叮",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L4-post-2-1",
@@ -3584,7 +3699,12 @@
     }
    ],
    "sfx": "笔尖声",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "沙",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L5-pre-1-1",
@@ -3678,7 +3798,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "哗",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L5-pre-1-2",
@@ -3808,7 +3933,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "叮",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L5-pre-2-2",
@@ -3942,7 +4072,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "噼啪",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L5-post-1-2",
@@ -3991,7 +4126,12 @@
     }
    ],
    "sfx": "硬币滚动、停下",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "咕噜",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L5-post-2-1",
@@ -4358,7 +4498,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "滴",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L6-pre-2-2",
@@ -4406,7 +4551,12 @@
    },
    "lines": [],
    "sfx": "嗒嗒嗒",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "嗒",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L6-post-1-1",
@@ -4507,7 +4657,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "嗖",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L6-post-1-2",
@@ -4560,7 +4715,12 @@
     }
    ],
    "sfx": "两个声音完美重叠",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "铿",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L6-post-2-1",
@@ -4785,7 +4945,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "呼",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L7-pre-1-2",
@@ -5042,7 +5207,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "轰",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L7-post-1-2",
@@ -5232,7 +5402,12 @@
    },
    "lines": [],
    "sfx": "笔尖沙沙",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "沙",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L8-pre-1-1",
@@ -5306,7 +5481,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "哐啷",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L8-pre-1-2",
@@ -5448,7 +5628,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "噼啪",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L8-pre-2-2",
@@ -5496,7 +5681,12 @@
    },
    "lines": [],
    "sfx": "雨声",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "哗",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L8-post-1-1",
@@ -5597,7 +5787,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L8-post-1-2",
@@ -6148,7 +6343,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "刺啦",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L9-post-1-2",
@@ -6426,7 +6626,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L10-pre-1-2",
@@ -6616,7 +6821,12 @@
    },
    "lines": [],
    "sfx": "回声叠加",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "嗡",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L10-post-1-1",
@@ -6717,7 +6927,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "砰砰",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L10-post-1-2",
@@ -6999,7 +7214,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "滋",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L11-pre-1-2",
@@ -7250,7 +7470,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "滋",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L11-post-1-2",
@@ -7440,7 +7665,12 @@
    },
    "lines": [],
    "sfx": "水声",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "哗",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L12-pre-1-1",
@@ -7514,7 +7744,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "咕噜",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L12-pre-1-2",
@@ -7563,7 +7798,12 @@
     }
    ],
    "sfx": "硬币清响",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "叮",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L12-pre-2-1",
@@ -7700,7 +7940,12 @@
    },
    "lines": [],
    "sfx": "骰子旋转声",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "咕噜",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L12-post-1-1",
@@ -7801,7 +8046,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "啪",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L12-post-1-2",
@@ -7854,7 +8104,12 @@
     }
    ],
    "sfx": "叮",
-   "blocks": []
+   "blocks": [],
+   "sfxText": "叮",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L12-post-2-1",
@@ -8079,7 +8334,12 @@
      "blend": "screen",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "咚",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L13-pre-1-2",
@@ -8339,7 +8599,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "咚咚",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L13-post-1-2",
@@ -8612,7 +8877,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "铛",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L14-pre-1-2",
@@ -8913,7 +9183,12 @@
      1,
      2
     ]
-   }
+   },
+   "sfxText": "轰",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L14-post-1-2",
@@ -9044,7 +9319,12 @@
      "blend": "multiply",
      "bleed": true
     }
-   ]
+   ],
+   "sfxText": "嗯",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L14-post-2-2",
@@ -9200,7 +9480,12 @@
      2
     ]
    },
-   "section": "reveal"
+   "section": "reveal",
+   "sfxText": "轰隆",
+   "sfxBig": 1,
+   "sfxStyle": "burst",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L15-reveal-1-2",
@@ -9299,7 +9584,12 @@
    "lines": [],
    "sfx": "线断的细响",
    "blocks": [],
-   "section": "reveal"
+   "section": "reveal",
+   "sfxText": "啪",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L15-reveal-2-1",
@@ -9565,7 +9855,12 @@
      "bleed": true
     }
    ],
-   "section": "reveal"
+   "section": "reveal",
+   "sfxText": "叮叮",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   },
   {
    "id": "L15-reveal-3-2",
@@ -9714,7 +10009,12 @@
      "bleed": true
     }
    ],
-   "section": "ending_A"
+   "section": "ending_A",
+   "sfxText": "啪啪",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#2fd36b",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L15-endA-1-2",
@@ -9863,7 +10163,12 @@
    ],
    "sfx": "雨声渐远",
    "blocks": [],
-   "section": "ending_A"
+   "section": "ending_A",
+   "sfxText": "哗",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff2d95",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L15-endB-1-1",
@@ -9992,7 +10297,12 @@
    ],
    "sfx": "线轻轻摩擦声",
    "blocks": [],
-   "section": "ending_B"
+   "section": "ending_B",
+   "sfxText": "沙",
+   "sfxBig": 0,
+   "sfxStyle": "burst",
+   "sfxColor": "#ffd23f",
+   "sfxInk": "#e8112d"
   },
   {
    "id": "L15-endB-1-3",
@@ -10046,7 +10356,12 @@
    ],
    "sfx": "嗒嗒声",
    "blocks": [],
-   "section": "ending_B"
+   "section": "ending_B",
+   "sfxText": "嗒嗒",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#19c3d6",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L15-endB-2-1",
@@ -10125,7 +10440,12 @@
      "bleed": true
     }
    ],
-   "section": "ending_B"
+   "section": "ending_B",
+   "sfxText": "嗯",
+   "sfxBig": 0,
+   "sfxStyle": "slash",
+   "sfxColor": "#ff7a1a",
+   "sfxInk": "#fff7d6"
   },
   {
    "id": "L15-endB-2-2",
@@ -10175,7 +10495,12 @@
    ],
    "sfx": "远处的人声、雨声",
    "blocks": [],
-   "section": "ending_B"
+   "section": "ending_B",
+   "sfxText": "哗",
+   "sfxBig": 0,
+   "sfxStyle": "block",
+   "sfxColor": "#7b4dff",
+   "sfxInk": "#ffe600"
   }
  ]
 }
