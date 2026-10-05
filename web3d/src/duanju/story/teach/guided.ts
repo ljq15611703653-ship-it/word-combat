@@ -9,6 +9,7 @@ import type { TeachSession } from "./session";
 
 export function guideFor(ses: TeachSession, m: Match, u: number): Guide {
   const allowed = ses.allowed(m, u), want = ses.wantsFn(m, u);
+  if ((ses.beat as { open?: boolean }).open) return { allowed };   // 特训的开放关：不锁词牌、不给提示
   const fixed = ses.stepFor(m, u)?.words;
   if (fixed) return { allowed, hint: fixed.slice(), lockWords: [...new Set(fixed)], denyText: "还差几张词牌：照着发亮的那张，一张一张接着拖。" };
   const all = m.legalSentences(u, 400).filter((c) => allowed(c.cl));
