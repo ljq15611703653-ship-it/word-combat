@@ -27,12 +27,11 @@ export function playSegment(container: HTMLElement, data: ComicData, level: numb
   if (!hasSegment(data, level, when)) return { done: Promise.resolve(), handle: null };
   let resolve!: () => void;
   const done = new Promise<void>((r) => (resolve = r));
-  const hasAssets = !!data.assets;
   const handle = playComic(container, data, {
     segment: { level, when }, onDone: () => { container.innerHTML = ""; resolve(); },
     auto: opts.auto, speed: opts.speed,
-    imageBase: `${STORY_BASE}img/`, assetBase: `${STORY_BASE}img/`,
-    forcePlaceholder: !hasAssets,
+    imageBase: `${STORY_BASE}panels/`, assetBase: `${STORY_BASE}img/`,
+    forcePlaceholder: false,
     assets: data.assets,
   }) as ComicHandle;
   return { done, handle };
