@@ -43,6 +43,7 @@ export interface St {
   dead: boolean[];                                   // 已经倒下（KOCHECK 下，hp ≤ 0 但本秒还没结束的随从还没倒下）
   pend: { u: number; src: number; sord: number; trig: boolean; derived?: boolean }[];
   stats: Record<string, number>;
+  rs: number;                                        // [补丁 T4] 引擎种子随机数状态（骰子用，Match 构造时由 seed 定）
   rec?: { side: Side; rnd: number; unit: number; cl: Sentence }[];   // 只在真实对局里记录（克隆不带）
 }
 /** [补丁 T1] 结算追踪：duanju/engine/api.ts 用它生成回放事件 */
@@ -62,7 +63,7 @@ export function newGame(first: Side, decks: [Deck | null, Deck | null] = [null, 
   return {
     rnd: 1, sec: 0, seq: 0, sord: 0, hp: Array(6).fill(P.HP), sh: Array(6).fill(0), side: [mk(), mk()],
     deck: [decks[0] ? { ...decks[0] } : null, decks[1] ? { ...decks[1] } : null], refc: [mkRef(), mkRef()], sts: [],
-    stand: [], decl: [], log: [], done: Array(6).fill(false), first, turn: first, ord: 0, win: -1, stats: {}, rec: record ? [] : undefined,
+    stand: [], decl: [], log: [], done: Array(6).fill(false), first, turn: first, ord: 0, win: -1, stats: {}, rs: 0x9e3779b9, rec: record ? [] : undefined,
     kw: Array.from({ length: 6 }, (_, u) => (P2.KW && kws?.[u < 3 ? 0 : 1]?.[u % 3]) || ""), kwUsed: Array(6).fill(false), redir: Array(6).fill(false), dead: Array(6).fill(false), pend: [],
   };
 }
@@ -166,8 +167,18 @@ function targets(s: St, owner: Side, verb: Eff["verb"] | "status" | "redir" | "s
   }
 }
 /** 随从倒下：清掉它挂着的长期句子和状态，发「倒下」事件 */
+/** [补丁 T4] 己方随从倒下：投 d6（走 s.rs，可复现），得到一张该点数的一次性数字牌 */
+export function rollDown(s: St, u: number) {
+  if (!P2.DICE) return;
+  s.rs = (s.rs + 0x6D2B79F5) >>> 0;
+  let t = s.rs; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  const v = 1 + Math.floor((((t ^ (t >>> 14)) >>> 0) / 4294967296) * 6);
+  s.side[sideOf(u)].cards.push({ v, cd: 0, once: true });
+  stat(s, `s${sideOf(u)}:dice`);
+  TR({ t: "dice", u, roll: v, side: sideOf(u), sec: s.sec });
+}
 function koNow(s: St, u: number, src: number, sord: number, trig: boolean, derived?: boolean) {
-  s.hp[u] = 0; s.dead[u] = true; s.redir[u] = false;
+  s.hp[u] = 0; s.dead[u] = true; s.redir[u] = false; rollDown(s, u);
   TR({ t: "down", u, src, sec: s.sec }); emit(s, { sord, side: sideOf(u), kind: "down", words: [], cats: [], amt: 1, len: 0, segs: 0, src, trig, derived });
   s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u));
   s.sts = s.sts.filter((x) => x.unit !== u);
@@ -337,6 +348,7 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
   start = Math.max(start, windupFor(cl, unit, s));
   if (start > P.TL) return false;   // 时间轴只有 TL 秒（真实：start > TIMELINE 不能宣告）
   for (const i of pickCards(s, side, a.nums)!) s.side[side].cards[i].cd = 2;
+  s.side[side].cards = s.side[side].cards.filter((c) => !(c.once && c.cd > 0));   // 一次性牌：用掉就消失
   const dk = s.deck[side];
   const adv = advFor(cl, posOf(unit));
   if (dk) for (const w of adv) dk[w]--;
@@ -488,7 +500,7 @@ export function resolveRound(s: St) {
       if (s.hp[u] > 0) {
         if (s.hp[u] - hd <= 0 && endure(s, u)) continue;   // 不屈对过热也有效
         s.hp[u] = Math.max(0, s.hp[u] - hd);
-        if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u)); s.sts = s.sts.filter((x) => x.unit !== u); }
+        if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; rollDown(s, u); s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u)); s.sts = s.sts.filter((x) => x.unit !== u); }
       }
     }
   }

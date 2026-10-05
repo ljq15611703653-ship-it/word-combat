@@ -26,7 +26,7 @@ const WORDS = ["造成", "恢复", "减伤", "灼烧", "易伤", "衰弱", "移�
 export interface Env { s: St; side: Side; unit: number; r: Rng; maxN: number; foes: number[]; mine: number[] }
 const num = (e: Env, hi = e.maxN) => 1 + Math.floor(e.r() * Math.max(1, Math.min(hi, e.maxN)));
 const foeTg = (e: Env): Tg => (chance(e.r, 0.6) ? { t: "lowFoe" } : { t: "unit", u: pick(e.r, e.foes) });
-const mineTg = (e: Env): Tg => (chance(e.r, 0.5) ? { t: "lowMe" } : chance(e.r, 0.5) ? { t: "allMe" } : { t: "unit", u: pick(e.r, e.mine) });
+const mineTg = (e: Env): Tg => (chance(e.r, 0.5) ? { t: "lowMe" } : chance(e.r, 0.5) ? { t: "some", n: 2, side: "me" } : { t: "unit", u: pick(e.r, e.mine) });
 
 function genObj(e: Env): Obj {
   const x = e.r();
@@ -42,7 +42,7 @@ function genAmt(e: Env, hi: number): Amt {
 /** 与「谁触发」相称的效果：对方的事 → 反击来源或我方防护；我方的事 → 追加进攻或自保 */
 function genEffFor(e: Env, who: "me" | "foe"): Eff {
   const x = e.r();
-  if (who === "foe") return x < 0.45 ? dmg(genAmt(e, 3), { t: "src" }) : x < 0.75 ? heal(num(e, 3), { t: "allMe" }) : shield(num(e, 3), { t: "allMe" });
+  if (who === "foe") return x < 0.45 ? dmg(genAmt(e, 3), { t: "src" }) : x < 0.75 ? heal(num(e, 3), { t: "some", n: 2, side: "me" }) : shield(num(e, 3), { t: "some", n: 2, side: "me" });
   return x < 0.55 ? dmg(genAmt(e, 3), { t: "lowFoe" }, chance(e.r, 0.2) ? "shield" : undefined) : x < 0.8 ? heal(num(e, 3), { t: "lowMe" }) : shield(num(e, 3), { t: "lowMe" });
 }
 function genWin(e: Env, dir: "before" | "after") { return win(dir, 1 + Math.floor(e.r() * 3), chance(e.r, dir === "after" ? 0.15 : 0.4) ? "sent" : "round"); }

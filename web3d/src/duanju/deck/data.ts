@@ -12,7 +12,7 @@ export const WORD_INFO: Record<string, WordInfo> = {
   "cat": "core",
   "icon": "▽",
   "desc": "给目标一层护盾，本轮能吸收一定数量的伤害，轮末消失。",
-  "example": "我方最低血 减伤3"
+  "example": "选择2个我方随从 减伤3"
  },
  "先后": {
   "cat": "core",
@@ -102,7 +102,7 @@ export const WORD_INFO: Record<string, WordInfo> = {
   "cat": "time",
   "icon": "◔",
   "desc": "N 轮后统一结算：伤害 = 这段时间某件事的次数 × 倍率（要带「次数」）。",
-  "example": "2轮后：对敌方最低血 造成 对方攻击词次数×2"
+  "example": "2轮后：对选择的敌方随从 造成 对方攻击词次数×2"
  },
  "兑现": {
   "cat": "time",

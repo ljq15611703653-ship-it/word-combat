@@ -183,7 +183,7 @@ export class Battle {
     this.stage.querySelector<HTMLElement>(".hud")!.innerHTML = `
       <div class="h-top"><b>第 ${h.rnd}<small>/${h.rounds}</small> 轮</b><span class="fst">${h.first === 0 ? "我先手" : "电脑先手"}</span>${h.heat ? `<span class="heat" title="过热：每轮每个随从受伤">过热 −${h.heat}</span>` : ""}</div>
       <div class="h-ap"><span class="me">我 ⚡<b>${h.ap[0]}</b></span><span class="foe">敌 ⚡<b>${h.ap[1]}</b></span></div>
-      <div class="h-cards"><span class="lb">我方数字牌</span>${h.myCards.map((c) => `<i class="card${c.cd ? " cd" : ""}" title="${c.cd ? `冷却 ${c.cd} 轮` : "可用"}">${c.v}${c.cd ? `<small>${c.cd}</small>` : ""}</i>`).join("")}</div>
+      <div class="h-cards"><span class="lb">我方数字牌</span>${h.myCards.map((c) => `<i class="card${c.cd ? " cd" : ""}${c.once ? " once" : ""}" title="${c.once ? "骰牌：倒下投骰所得，用一次就消失" : c.cd ? `冷却 ${c.cd} 轮` : "可用"}">${c.v}${c.once ? `<b class="oz">骰</b>` : c.cd ? `<small>${c.cd}</small>` : ""}</i>`).join("")}</div>
       <div class="h-foe"><span class="lb">对手数字牌</span><b>${h.foeCards}</b> 张</div>`;
     this.renderMain();
   }
