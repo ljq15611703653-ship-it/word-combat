@@ -6,8 +6,7 @@ import {
 } from "./interp";
 import { sentenceText, clauseText, advWordsOf, type Sentence, type Clause } from "./ast";
 import { candidates, mulberry32, type Rng } from "./gen";
-import { think, type AiCfg } from "./ai";
-import { TIERS, TIER_NAMES } from "./tiers";
+import { think, TIERS, TIER_NAMES, type Ai2Cfg as AiCfg } from "./ai2";
 import { randDeck, randKws } from "./deck";
 import rulesDefault from "./rules.default.json";
 import rulesReal from "./rules.real.json";
