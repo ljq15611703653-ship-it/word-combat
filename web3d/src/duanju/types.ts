@@ -65,5 +65,5 @@ export interface Settings {
   kws: string[];
   customRules: string;
   /** 对手卡组：random（每局 randDeck）/ preset（选一套推荐）/ custom（自定义 deck） */
-  foe: { mode: "random" | "preset" | "custom"; preset: string; deck: Record<string, number> };
+  foe: { mode: "random" | "preset" | "custom"; preset: string; deck: Record<string, number>; /** 对手职业（缺省随机一个职业） */ styleId?: string };
 }

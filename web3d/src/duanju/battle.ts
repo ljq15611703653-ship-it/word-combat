@@ -90,7 +90,7 @@ export class Battle {
     const first = st.first === "random" ? (Math.random() < 0.5 ? 0 : 1) : st.first === "me" ? 0 : 1;
     this.myStyle = styleOf(st.styleId);
     const others = STYLES.filter((s) => s.id !== st.styleId);
-    this.foeStyle = opts.hooks?.styles?.foe ?? others[Math.floor(Math.random() * others.length)];
+    this.foeStyle = opts.hooks?.styles?.foe ?? (st.foe?.styleId && STYLES.some((s) => s.id === st.foe.styleId) ? styleOf(st.foe.styleId) : others[Math.floor(Math.random() * others.length)]);
     if (opts.hooks?.styles) this.myStyle = opts.hooks.styles.me;
     setUnitNames(this.myStyle.names, this.foeStyle.names);
     const kws = (st.kws ?? []).map((k) => (k === "首挡" || k === "不屈" ? k : ["首挡", "不屈"][Math.floor(Math.random() * 2)]));

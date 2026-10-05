@@ -2,7 +2,7 @@
 // 资源：public/duanju/art/<角色>/rig/{rig.json, atlas.png}，由 scripts/rig/pack.py 生成。
 //   rig.json: bones{name:{parent,at[设计坐标]}}  parts{name:{atlas{x,y,w,h},pivot,bone,rot,off,ps,glow}}  order[绘制序，远→近]  view[x,y,w,h]
 //   部件像素中的 pivot 点落在骨骼 at 处；骨骼局部变换 = 平移(at - parent.at + 动画) · 旋转 · 缩放
-import { ANIMS, type AnimName, type Pose, samplePose } from "./anims";
+import { ANIMS, type AnimName, type Pose, type RigStyle, samplePose, speedOf } from "./anims";
 
 const BASE = (import.meta as any).env?.BASE_URL ?? "/";
 export interface RigData {
@@ -12,6 +12,8 @@ export interface RigData {
   order: string[];
   /** 各骨骼旋转幅度倍率（没有肩骨的角色，把肘骨动作放大） */
   gain?: Record<string, number>;
+  /** 位置风格（词位/数位/速位），影响动作幅度/速度/腕盘发光 */
+  style?: RigStyle;
 }
 export interface RigAsset { data: RigData; img: HTMLImageElement }
 const cache = new Map<string, Promise<RigAsset | null>>();
@@ -63,7 +65,7 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
   function draw(anim: AnimName, t: number) {
     if (!asset) return;
     const { data, img } = asset, v = data.view, sc = cv.width / v[2];
-    const pose: Pose = samplePose(anim, t, data.gain);
+    const pose: Pose = samplePose(anim, t, data.gain, data.style);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
     // 视口：设计坐标 -> 画布；facing=-1 绕视图中线镜像
     const base: M = facing === 1 ? [sc, 0, 0, sc, -v[0] * sc, -v[1] * sc] : [-sc, 0, 0, sc, (v[0] + v[2]) * sc, -v[1] * sc];
@@ -92,9 +94,9 @@ export function createRig(artDir: string, container: HTMLElement, opts: { onFail
   }
   function loop() {
     if (dead) return;
-    const now = performance.now(); let t = (now - t0) / 1000; const a = ANIMS[cur];
-    if (!a.loop && t >= a.dur) { cur = queued ?? "idle"; queued = null; t0 = now; t = 0; }
-    draw(cur, ANIMS[cur].loop ? t % ANIMS[cur].dur : t);
+    const now = performance.now(); let t = (now - t0) / 1000; const a = ANIMS[cur]; const sp = speedOf(asset?.data.style);
+    if (!a.loop && t * sp >= a.dur) { cur = queued ?? "idle"; queued = null; t0 = now; t = 0; }
+    draw(cur, ANIMS[cur].loop ? t % (ANIMS[cur].dur / sp) : t);
     raf = requestAnimationFrame(loop);
   }
   return {

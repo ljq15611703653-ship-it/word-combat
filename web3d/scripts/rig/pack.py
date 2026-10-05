@@ -136,7 +136,7 @@ def main(name, spec=None):
             r = math.radians(pd["rot"]); sx = (vx * math.cos(r) - vy * math.sin(r)) * pd["ps"]; sy = (vx * math.sin(r) + vy * math.cos(r)) * pd["ps"]
             b["at"] = [round(par["at"][0] + sx - 0 + (bones[pd["bone"]]["at"][0] - par["at"][0]) * 0, 1), 0]
             b["at"] = [round(bones[pd["bone"]]["at"][0] + sx, 1), round(bones[pd["bone"]]["at"][1] + sy, 1)]
-    rig = dict(name=name, ps=spec.get("ps", 1.9), ref=spec.get("ref"), view=spec.get("view"), gain=spec.get("gain"), bones=spec["bones"], parts={}, order=spec["order"], anims=spec.get("anims"))
+    rig = dict(name=name, ps=spec.get("ps", 1.9), ref=spec.get("ref"), view=spec.get("view"), gain=spec.get("gain"), style=spec.get("style"), bones=spec["bones"], parts={}, order=spec["order"], anims=spec.get("anims"))
     for pn, pd in spec["parts"].items():
         p = dict(atlas=aj[pn], pivot=parts[pn]["pivot"], bone=pd["bone"])
         for k in ("rot", "off", "ps", "glow", "alpha", "blend", "sway", "sw"):

@@ -49,7 +49,7 @@ def build(name):
     h = m["head"]; add("head", dict(comps=h["c"], bone="head", pivot=h.get("pivot", "bot"), ps=h.get("ps", 1.1), erase=h.get("erase", []), clip=h["clip"]) if "clip" in h else dict(comps=h["c"], bone="head", pivot=h.get("pivot", "bot"), ps=h.get("ps", 1.1), erase=h.get("erase", [])))
     if "off" in h: parts["head"]["off"] = h["off"]
     if "hair_back" in m:
-        hb = m["hair_back"]; add("hair_back", dict(comps=hb["c"], bone="head", pivot="mid", ps=hb.get("ps", 1.0), off=[hb["at"][0] - bones["head"]["at"][0], hb["at"][1] - bones["head"]["at"][1]], erase=hb.get("erase", [])))
+        hb = m["hair_back"]; add("hair_back", dict(comps=hb["c"], bone="hair", pivot="mid", ps=hb.get("ps", 1.0), off=[hb["at"][0] - bones["hair"]["at"][0], hb["at"][1] - bones["hair"]["at"][1]], erase=hb.get("erase", [])))
     t = m["torso"]; add("torso", dict(comps=t["c"], bone="torso", pivot="top", ps=t.get("ps", 0.8), off=[J["torso"][0] - bones["torso"]["at"][0], J["torso"][1] - bones["torso"]["at"][1]], erase=list(t.get("erase", [])) + ([{"peg": "both"}] if m.get("peg") else [])))
     if "pivot" in t: parts["torso"]["pivot"] = t["pivot"]
 
@@ -104,7 +104,7 @@ def build(name):
     if "order" in m: order = m["order"]
     order = [o for o in order if o in parts]
     spec = dict(grow=m.get("grow", 1), mina=m.get("mina", 300), ps=1.0, ref=f"D:/wc/art/q/cls/{name}/idle_raw.png",
-                view=m.get("view", [195, 0, 780, 1254]), bones=bones, order=order, parts=parts, gain=m.get("gain"))
+                view=m.get("view", [195, 0, 780, 1254]), style=name.split("_")[1], bones=bones, order=order, parts=parts, gain=m.get("gain"))
     return spec
 
 if __name__ == "__main__":
