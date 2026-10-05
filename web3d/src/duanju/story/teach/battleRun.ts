@@ -22,6 +22,7 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
     const done = (r: BattleOutcome) => { if (finished) return; finished = true; clearInterval(timer); b.destroy(); holder.remove(); resolve(r); };
     const dlgOpts = { history: hist, onSkipAll: o.onSkipAll, speed: o.fast ? 0 : 1 };
     const bubble = document.createElement("div"); bubble.className = "tb-bubble"; bubble.hidden = true;
+    const goal = document.createElement("div"); goal.className = "tb-goal"; goal.hidden = true;
     const hooks: BattleHooks = {
       styles: { me, foe }, foeDeck: ses.foeDeck(), absent: ses.absent(), guide: (m, u) => guideFor(ses, m, u),
       setup: (m) => ses.setup(m),
@@ -29,7 +30,7 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
       beforeDeclare: (u, cl, start, m) => { const e = ses.check(u, cl, start, m); if (e) warn = { text: e, t: Date.now() }; else warn = null; return e; },
       beforeEnd: (m) => { const e = ses.beforeEnd(m); if (e) warn = { text: e, t: Date.now() }; return e; },
       undo: true,
-      onMount: (bb) => { bb.stage.appendChild(bubble); timer = window.setInterval(() => tick(bb), 200); },
+      onMount: (bb) => { bb.stage.appendChild(bubble); bb.stage.appendChild(goal); timer = window.setInterval(() => tick(bb), 200); },
       onTick: (bb) => tick(bb),
       onRoundStart: async (bb) => {
         const r = dlg?.rounds.find((x) => x.round === bb.m.rnd);
@@ -48,11 +49,23 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
     (window as any).__tb = b; (window as any).__ses = ses;
     b.run().catch((e) => { (window as any).__dj?.errors.push(String(e?.stack ?? e)); console.error(e); });
 
+    // ---- 小目标条：脚本关每一轮一个小目标（左上角），声明完这一轮的步骤后打勾 ----
+    function paintGoal(bb: Battle) {
+      const m = bb.m, rs = ses.beat.rounds, g = ses.inScript(m) ? ses.round(m)?.goal : undefined;
+      if (!rs || !g) { goal.hidden = true; return; }
+      goal.hidden = false;
+      const done = ses.pending(m).length === 0 && !!ses.round(m)?.steps?.length;
+      goal.classList.toggle("done", done);
+      goal.classList.toggle("end", !!bb.stage.querySelector('[data-a="main"]')?.textContent?.includes("结束宣告"));
+      const txt = `<small>小目标 ${Math.min(m.rnd, rs.length)}/${rs.length}</small><b>${g}</b>`;
+      if (goal.dataset.t !== txt) { goal.dataset.t = txt; goal.innerHTML = txt; }
+    }
     // ---- 引导气泡 ----
     function tick(bb: Battle) {
       const st = bb.stage; if (!st || !st.isConnected) return;
       const clearHl = () => st.querySelectorAll(".guide-hl").forEach((e) => e.classList.remove("guide-hl"));
-      if (document.querySelector(".sd-root")) { bubble.hidden = true; clearHl(); return; }
+      if (document.querySelector(".sd-root")) { bubble.hidden = true; goal.hidden = true; clearHl(); return; }
+      paintGoal(bb);
       const m = bb.m;
       const main = st.querySelector<HTMLElement>('[data-a="main"]')!;
       const mt = main?.textContent ?? "";

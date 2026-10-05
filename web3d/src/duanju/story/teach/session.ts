@@ -1,13 +1,16 @@
 // 教学战斗的纯逻辑（无 DOM）：规则配置、开局调整、脚本化对手、引导步骤校验。浏览器与 scripts/story-smoke 共用。
 import { DECK_WORDS, type Match, type Sentence } from "../../engine/api";
 import rulesDefault from "../../engine/rules.default.json";
+import { astToTokens } from "../../composer/grammar";
 import { buildSentence, matchSentence, allowedFn, type Allow, type ClauseSpec } from "./spec";
 import type { Settings } from "../../types";
 
 export interface StepSay { unit?: string; menu?: string; wrong?: string; start?: string; end?: string }
-export interface Step { unit: number; want?: ClauseSpec[]; startMin?: number; startMax?: number; say?: StepSay }
+/** words：整句的词序列（拖拽用的词牌，目标写 "@3"）。适合「并 / 每当 / 不得 / 引用量词」这类 ClauseSpec 写不下的句子；有 words 时 want 可省略 */
+export interface Step { unit: number; want?: ClauseSpec[]; words?: string[]; startMin?: number; startMax?: number; say?: StepSay }
 export interface FoeMove { unit: number; s: ClauseSpec[]; start: number }
-export interface RoundScript { foe: FoeMove[]; steps?: Step[] }
+/** goal：这一轮的小目标（战斗界面左上角的目标条，如「拼出带「并」的两段句」） */
+export interface RoundScript { foe: FoeMove[]; steps?: Step[]; goal?: string }
 export interface Beat {
   beat: number; name: string; teach: string[]; foeNames: string[]; first: "me" | "foe"; seed: number;
   rules?: string | { P?: Record<string, unknown>; P2?: Record<string, unknown> };
@@ -26,6 +29,8 @@ const KINDS: Record<string, (cl: Sentence) => boolean> = {
   forbid: (cl) => cl.some((c) => c.k === "when" && !!c.forbid),
   quote: (cl) => cl.some((c) => (c.k === "act" && typeof c.eff.n !== "number")),
 };
+
+const sameWords = (cl: Sentence, words: string[]): boolean => { try { const t = astToTokens(cl); return t.length === words.length && t.every((x, i) => x === words[i]); } catch { return false; } };
 
 export class TeachSession {
   allow: (cl: Sentence) => boolean;
@@ -89,6 +94,7 @@ export class TeachSession {
   }
   wantsFn(m: Match, u: number): ((cl: Sentence) => boolean) | null {
     const st = this.stepFor(m, u);
+    if (st?.words) return (cl) => sameWords(cl, st.words!);
     if (st?.want) return (cl) => matchSentence(cl, st.want!);
     const k = this.beat.hintKind; if (k && KINDS[k] && !this.scripted) return KINDS[k];
     return null;
@@ -96,12 +102,15 @@ export class TeachSession {
   /** 菜单/拼句允许的句子（课程表开放的词） */
   allowed(m: Match, u: number): (cl: Sentence) => boolean {
     if (this.scripted && this.inScript(m) && !this.stepFor(m, u)) return () => false;
+    const w = this.stepFor(m, u)?.words;
+    if (w) return (cl) => sameWords(cl, w);
     return this.allow;
   }
   check(u: number, cl: Sentence, start: number, m: Match): string | null {
     if (!this.allowed(m, u)(cl)) return this.scripted && this.inScript(m) && !this.stepFor(m, u) ? "这轮这位先不说话，点「不出手」。" : "这句话这一关还用不上。";
     const st = this.stepFor(m, u);
     if (st) {
+      if (st.words && !sameWords(cl, st.words)) return st.say?.wrong ?? "这一轮要说另一句话，照着高亮的词牌一张一张拖。";
       if (st.want && !matchSentence(cl, st.want)) return st.say?.wrong ?? "这一轮要说另一句话，看高亮的那条。";
       if (st.startMin !== undefined && start < st.startMin) return st.say?.start ?? `起手秒要 ≥ ${st.startMin}。`;
       if (st.startMax !== undefined && start > st.startMax) return st.say?.start ?? `起手秒要 ≤ ${st.startMax}。`;
@@ -118,7 +127,8 @@ export class TeachSession {
   }
   /** 给 composer 的 hint 词序列（目标用 "@编号"） */
   hintWords(m: Match, u: number): string[] | undefined {
-    const w = this.stepFor(m, u)?.want; if (!w) return undefined;
+    const sw = this.stepFor(m, u); if (sw?.words) return sw.words.slice();
+    const w = sw?.want; if (!w) return undefined;
     const out: string[] = [];
     for (const c of w) {
       if (c.kind === "status") out.push(c.status === "burn" ? "灼烧" : c.status === "vuln" ? "易伤" : "衰弱");

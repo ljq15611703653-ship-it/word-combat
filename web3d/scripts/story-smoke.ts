@@ -3,6 +3,9 @@
 import { readFileSync } from "node:fs";
 import { Match, configureRules, setUnitNames } from "../src/duanju/engine/api";
 import { TeachSession, type Curriculum } from "../src/duanju/story/teach/session";
+import { tokensToAst, diagnose } from "../src/duanju/composer/grammar";
+import { windupFor } from "../src/duanju/engine/interp";
+import { sentenceText } from "../src/duanju/engine/api";
 import { matchSentence } from "../src/duanju/story/teach/spec";
 
 const cur: Curriculum = JSON.parse(readFileSync("public/duanju/story/curriculum.json", "utf8"));
@@ -22,7 +25,7 @@ for (const beat of cur.beats) {
     const w = m.who();
     if (w === -1) {
       const ev = m.resolve();
-      log.push(`r${m.rnd} hp[${m.s.hp.join(",")}] ev${ev.length}`);
+      log.push(`r${m.rnd} hp[${m.s.hp.join(",")}] ev${ev.length} ${ev.map((e: any) => e.type + (e.amount ?? e.n ?? "")).join(" ")}`);
       if (!m.over()) m.nextRound();
     } else if (w === 1) {
       const mv = ses.foeMove(m) ?? m.aiMove();
@@ -31,6 +34,17 @@ for (const beat of cur.beats) {
       const pend = ses.pending(m);
       let done = false;
       for (const step of pend) {
+        if (step.words) {
+          // 固定词序列的步骤：按词牌拼出整句（和玩家拖拽拼出的是同一棵语法树）
+          const cl = tokensToAst(step.words);
+          if (!cl) { errs.push(`beat${beat.beat} r${m.rnd} unit${step.unit}: 词序列拼不成句 ${step.words.join(" ")}`); m.pass(step.unit); done = true; break; }
+          const start = Math.max(windupFor(cl, step.unit, m.s), step.startMin ?? 1);
+          const err = ses.check(step.unit, cl, start, m);
+          if (err) { errs.push(`beat${beat.beat} r${m.rnd} unit${step.unit}: check 拒绝 ${err} (${step.words.join(" ")} @${start})`); m.pass(step.unit); done = true; break; }
+          if (!m.declare(step.unit, cl, start)) { errs.push(`beat${beat.beat} r${m.rnd}: declare 失败：${diagnose(cl, { s: m.s, side: 0, unit: step.unit } as any) ?? "?"} ｜ ${step.words.join(" ")}`); m.pass(step.unit); done = true; break; }
+          log.push(`  我 u${step.unit}: ${sentenceText(cl)} @${start}`);
+          done = true; break;
+        }
         const cands = m.legalSentences(step.unit, 400).filter((c) => ses.allowed(m, step.unit)(c.cl) && (!step.want || matchSentence(c.cl, step.want)));
         const c = cands[0];
         if (!c) { errs.push(`beat${beat.beat} r${m.rnd} unit${step.unit}: 没有符合的句子 want=${JSON.stringify(step.want)}`); m.pass(step.unit); done = true; break; }
@@ -55,7 +69,7 @@ for (const beat of cur.beats) {
   }
   const out = m.outcome();
   const ok = scriptedOk(beat.beat, out);
-  function scriptedOk(b: number, o: string | null) { return b <= 9 ? o === "win" : o !== null; }
+  function scriptedOk(b: number, o: string | null) { return b <= 13 ? o === "win" : o !== null; }
   if (!ok) bad++;
   console.log(`beat ${beat.beat} ${beat.name}: ${out} 轮数${m.rnd} ${ok ? "OK" : "FAIL"}`);
   if (!ok || process.env.V) console.log(log.join("\n"));

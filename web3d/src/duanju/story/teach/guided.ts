@@ -9,6 +9,8 @@ import type { TeachSession } from "./session";
 
 export function guideFor(ses: TeachSession, m: Match, u: number): Guide {
   const allowed = ses.allowed(m, u), want = ses.wantsFn(m, u);
+  const fixed = ses.stepFor(m, u)?.words;
+  if (fixed) return { allowed, hint: fixed.slice(), lockWords: [...new Set(fixed)], denyText: "这一步只用发亮的那几张词牌，一张一张拖到句子条上。" };
   const all = m.legalSentences(u, 400).filter((c) => allowed(c.cl));
   const pool = want ? all.filter((c) => want(c.cl)) : all;
   const use = pool.length ? pool : all;
