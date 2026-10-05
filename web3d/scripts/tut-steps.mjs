@@ -72,7 +72,7 @@ const STEP = `(async()=>{
 
 
 const W = +(process.env.W ?? 1440), H = +(process.env.H ?? 810), tag = process.env.TAG ?? `${W}x${H}`;
-await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+await cdp("Emulation.setDeviceMetricsOverride", { width: W, height: H, deviceScaleFactor: 1, mobile: !!process.env.MOBILE });
 const seen = new Set(); let allOk = true;
 for (const n of BEATS) {
   await cdp("Page.navigate", { url: `http://127.0.0.1:${PORT}/duanju-story.html?beat=${n}&skip=1&unlock=all${process.env.FAST ? "&fast=1" : ""}` }); await sleep(1200);
@@ -90,7 +90,9 @@ for (const n of BEATS) {
       console.log("FAILTEST beat", n, JSON.stringify(locked), JSON.stringify(wrong));
       await ev("__tb.dock.cancel(); __tb.render()"); await sleep(300);
     }
-    const r = await ev(STEP); if (process.env.TRACE) console.log("  step", r);
+    if (process.env.VFXLOG && !(await ev("!!window.__vfxLog"))) await ev("window.__vfxLog=[]; window.__vfxMark=" + (process.env.MARK ? 1 : 0));
+    const r = await ev(STEP); if (r === "mainS" && process.env.VFXLOG && !process.env.DENSE) { await sleep(9000); console.log("VFXLOG", await ev("JSON.stringify(window.__vfxLog.splice(0))")); }
+    if (process.env.TRACE) console.log("  step", r);
     if (r === "SELECT") break;
     if (r === "RETRY") { console.log("!! 失败重来出现 beat", n); await shot(`${tag}_b${n}_FAIL`); allOk = false; break; }
     if (r === "NOROW" || r === "NOGO" || r.startsWith("NOCARD")) { console.log("!! 拖拽拼句卡住", r); await shot(`${tag}_b${n}_STUCK`); allOk = false; break; }
@@ -100,6 +102,7 @@ for (const n of BEATS) {
     const key = `b${n}_r${rn}_${t}`;
     if (r === "pick") { const k = await ev("(window.__tb?.dock?.tokens?.length ?? 0)"); const kk = `${key}${k}`; if ((k === 1 || k === 3) && !seen.has(kk)) { seen.add(kk); await sleep(250); await shot(`${tag}_${kk}`); } }
     else if (["guide", "declare"].includes(t) && !seen.has(key)) { seen.add(key); await sleep(350); await shot(`${tag}_${key}`); }
+    else if (t === "settle" && !seen.has(key) && process.env.DENSE) { seen.add(key); for (let q = 0; q < 16; q++) { await sleep(q === 0 ? 400 : 260); await shot(`${tag}_${key}_p${String(q).padStart(2, "0")}`); } }
     else if (t === "settle" && !seen.has(key)) { seen.add(key); await sleep(1300); await shot(`${tag}_${key}_playing`); await sleep(2500); await shot(`${tag}_${key}_after`); }
     if (rn !== prevRnd) prevRnd = rn;
     last = r; steps++;

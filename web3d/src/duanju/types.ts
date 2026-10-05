@@ -45,6 +45,10 @@ export interface BattleView {
   clock(sec: number | null): void;
   /** 动画速度倍率（>1 更快） */
   speed(): number;
+  /** 可选：骨骼小人锚点（视口 client 坐标）。atRelease=true 取 cast 出手瞬间的姿态；没有骨骼小人返回 null（调用方回退到旧位置） */
+  anchor?(u: number, which: "hand" | "torso" | "head", atRelease?: boolean): { x: number; y: number } | null;
+  /** 可选：cast 动作的关键时刻（秒）；没有骨骼小人返回 null */
+  castMoments?(u: number): { charge: number; release: number; dur: number } | null;
 }
 /** 结算演出。别的助手会实现「词牌飞来飞去」的完整版；接口保持 play(events) */
 export interface CastPlayer {
