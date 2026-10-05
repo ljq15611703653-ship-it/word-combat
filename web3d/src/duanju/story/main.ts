@@ -16,9 +16,9 @@ const sj: { errors: string[]; state: string; beat: number } = { errors: [], stat
 addEventListener("error", (e) => sj.errors.push(String(e.message)));
 addEventListener("unhandledrejection", (e) => sj.errors.push(String((e as PromiseRejectionEvent).reason)));
 
-interface Progress { prologue: boolean; done: number[] }
+interface Progress { prologue: boolean; done: number[]; ending?: "A" | "B" }
 const KEY = "duanju.story.v1";
-const loadP = (): Progress => { try { const j = JSON.parse(localStorage.getItem(KEY) ?? "null"); if (j) return { prologue: !!j.prologue, done: j.done ?? [] }; } catch { /* */ } return { prologue: false, done: [] }; };
+const loadP = (): Progress => { try { const j = JSON.parse(localStorage.getItem(KEY) ?? "null"); if (j) return { prologue: !!j.prologue, done: j.done ?? [], ending: j.ending }; } catch { /* */ } return { prologue: false, done: [] }; };
 const saveP = (p: Progress) => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* */ } };
 let prog = loadP();
 const fast = q.get("fast") === "1";
@@ -30,10 +30,11 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const unlocked = (n: number) => q.get("unlock") === "all" || n === 1 || prog.done.includes(n - 1);
 
 function layer(cls: string): HTMLElement { const d = document.createElement("div"); d.className = cls; root.appendChild(d); return d; }
-async function comicSeg(level: number, when: "pre" | "post") {
+async function comicSeg(level: number, when: "pre" | "post", idPrefix?: string) {
   if (skipStory) return;
   const l = layer("st-comic");
-  const { done } = playSegment(l, comic, level, when, { auto: false });
+  const data = idPrefix ? { ...comic, panels: comic.panels.filter((p) => String(p.id).startsWith(idPrefix)) } : comic;
+  const { done } = playSegment(l, data, level, when, { auto: false });
   await done; l.remove();
 }
 async function dialogSeg(lines: Line[] | undefined, hist: Line[], n = 0) {
@@ -81,7 +82,28 @@ async function playLevel(n: number) {
   await dialogSeg(dlg?.outro, hist, n);
   await comicSeg(n, "post");
   if (!prog.done.includes(n)) { prog.done.push(n); saveP(prog); }
+  if (n === 14 && !q.get("nofinale")) { await finale(); return; }
   selectPage(n);
+}
+
+// 终章：揭示 → 三道门 → 结局 A/B（C 暂未开放）→ 回选关页
+function chooseDoor(): Promise<"A" | "B"> {
+  return new Promise((res) => {
+    const l = layer("st-door"); l.className = "st-door";
+    l.innerHTML = `<div class="box"><h2>请选择</h2>
+      <button class="bt door" data-k="A">跪下。做公司的狗。</button>
+      <button class="bt door" data-k="B">假装顺从，暗中破坏。</button>
+      <button class="bt door" disabled>拒绝。<small>（之后开放）</small></button></div>`;
+    l.addEventListener("click", (e) => { const k = (e.target as HTMLElement).closest<HTMLElement>("[data-k]")?.dataset.k as "A" | "B" | undefined; if (k) { l.remove(); res(k); } });
+  });
+}
+async function finale() {
+  sj.state = "finale";
+  await comicSeg(15, "post", "L15-reveal");
+  const k = await chooseDoor();
+  await comicSeg(15, "post", k === "A" ? "L15-endA" : "L15-endB");
+  prog.ending = k; saveP(prog);
+  selectPage(14);
 }
 
 function selectPage(justDone?: number) {
@@ -113,6 +135,7 @@ async function boot() {
     loadComicData(),
   ]);
   const jump = +(q.get("beat") ?? 0);
+  if (q.get("finale") === "1") { root.className = "dj-root story"; await finale(); return; }
   if (q.get("unlock") === "all") { /* 调试：全部解锁 */ }
   if (!prog.prologue && !skipStory && !jump) {
     root.className = "dj-root story";
