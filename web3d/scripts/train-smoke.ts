@@ -47,7 +47,7 @@ function play(lv: TrainLevel, idle: boolean) {
     const w = m.who();
     if (w === -1) {
       const ev = m.resolve();
-      log.push(`r${m.rnd} hp[${m.s.hp.join(",")}] ap[${m.s.side[0].ap},${m.s.side[1].ap}] ${ev.filter((e) => e.type !== "fire").map((e) => e.type + (e.amount || "") + "@" + e.tgt).join(" ")}`);
+      log.push(`r${m.rnd} hp[${m.s.hp.join(",")}] ap[${m.s.side[0].ap},${m.s.side[1].ap}] ${ev.filter((e) => e.type !== "fire").map((e) => e.type + (e.amount || "") + (e.src >= 0 ? ":" + e.src : "") + ">" + e.tgt).join(" ")}`);
       if (!m.over()) m.nextRound();
     } else if (w === 1) { ses.foeMove(m) ?? m.aiMove(); }
     else {
@@ -70,6 +70,7 @@ function play(lv: TrainLevel, idle: boolean) {
       if (cp) errs.push(`${tag} r${m.rnd} u${step.unit}: 职业限制 ${cp}（${toks.join(" ")}）`);
       if (!m.declare(step.unit, cl, start)) { errs.push(`${tag} r${m.rnd} u${step.unit}: declare 失败：${diagnose(cl, { s: m.s, side: 0, unit: step.unit } as any) ?? "?"} ｜ ${toks.join(" ")}`); m.pass(step.unit); continue; }
       roundDecls.push(cl);
+      if (process.env.TALENT === "1" && lv.cls === "limit") { for (const sd of m.s.stand as any[]) if (sd.c?.forbid && sd.owner === 0 && !sd._p) { sd._p = 1; sd.c.effs[0].n += 1; } }   // 模拟限制流天赋：不得惩罚 +1
       log.push(`  我 u${step.unit}: ${sentenceText(cl)} @${start} ap${m.s.side[0].ap}`);
     }
   }

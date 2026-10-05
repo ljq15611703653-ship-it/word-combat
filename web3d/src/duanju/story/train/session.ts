@@ -46,8 +46,14 @@ export class TrainSession extends TeachSession {
     m.pass(mv.unit);
     return { unit: mv.unit, passed: true, text: "", start: 0 };
   }
-  stepFor(m: Match, u: number): Step | null { return this.beat.open ? null : super.stepFor(m, u); }
-  pending(m: Match): Step[] { return this.beat.open ? [] : super.pending(m); }
+  /** 这一步只针对已经倒下的敌人（比如职业天赋让罚款/状态提前把它打倒了）→ 这一步作废，免得卡住 */
+  private void_(st: Step | null, m: Match): boolean {
+    if (!st) return false;
+    const foes = (st.words ?? []).filter((w) => /^@[3-5]$/.test(w)).map((w) => +w[1]);
+    return foes.length > 0 && foes.every((u) => !m.unitAlive(u));
+  }
+  stepFor(m: Match, u: number): Step | null { if (this.beat.open) return null; const st = super.stepFor(m, u); return this.void_(st, m) ? null : st; }
+  pending(m: Match): Step[] { return this.beat.open ? [] : super.pending(m).filter((s) => !this.void_(s, m)); }
   allowed(m: Match, u: number): (cl: Sentence) => boolean { return this.beat.open ? this.allow : super.allowed(m, u); }
   check(u: number, cl: Sentence, start: number, m: Match): string | null {
     if (this.beat.open) return this.allow(cl) ? null : "这句话这一关还用不上。";
