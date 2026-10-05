@@ -1,5 +1,6 @@
 // 四职业特训：在教程的 TeachSession 上加一点点——指定我方数字牌 / 行动点、开放关（不给分步引导，只有目标条）。
 import type { Match, Sentence } from "../../engine/api";
+import rulesDefault from "../../engine/rules.default.json";
 import { TeachSession, type Beat, type Curriculum, type RoundScript, type Step } from "../teach/session";
 import { tokensToAst } from "../../composer/grammar";
 
@@ -28,9 +29,17 @@ export class TrainSession extends TeachSession {
   declare beat: TrainBeat;
   constructor(beat: TrainBeat, cur: Curriculum) { super(beat, cur); }
   get scripted() { return !!this.beat.rounds && !this.beat.open; }
+  /** 特训用真实对局的规则（rules.default.json，CLASSES 开着），不做任何规则开关；beat.rules 不应再覆盖参数 */
+  rulesJson(): string {
+    const j = JSON.parse(JSON.stringify(rulesDefault)) as { P: Record<string, unknown>; P2: Record<string, unknown> };
+    const r = typeof this.beat.rules === "object" ? this.beat.rules : {};
+    Object.assign(j.P, this.cur.base.rules.P, r.P ?? {}); Object.assign(j.P2, this.cur.base.rules.P2, r.P2 ?? {});
+    return JSON.stringify(j);
+  }
   setup(m: Match) {
     const b = this.beat;
     super.setup(m);
+    m.s.kw = m.s.kw.map(() => "");   // 关键词是装备选择不是规则：特训不带（关卡数据级差异）
     if (b.rounds) m.s.side[1].cards = [4, 4, 4, 4, 4].map((v) => ({ v, cd: 0 }));
     if (b.meCards) m.s.side[0].cards = b.meCards.map((v) => ({ v, cd: 0 }));
     if (b.meAp !== undefined) m.s.side[0].ap = b.meAp;
