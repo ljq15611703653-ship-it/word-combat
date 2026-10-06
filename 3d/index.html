@@ -1,1 +1,57 @@
-<meta charset="utf-8"><meta http-equiv="refresh" content="0;url=./duanju.html"><title>断·句</title><a href="./duanju.html">进入断·句</a>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>词战 · 3D 原型</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<script>if(/[?&]style=classic(&|$)/.test(location.search))document.documentElement.classList.add("classic")</script>
+  <script type="module" crossorigin src="./assets/main-DdgFd9p9.js"></script>
+  <link rel="modulepreload" crossorigin href="./assets/modulepreload-polyfill-B5Qt9EMX.js">
+  <link rel="modulepreload" crossorigin href="./assets/shaders-CJDGqmZk.js">
+  <link rel="modulepreload" crossorigin href="./assets/castShow-DUaf6ADH.js">
+  <link rel="stylesheet" crossorigin href="./assets/castShow-BoPPciwp.css">
+  <link rel="stylesheet" crossorigin href="./assets/main-CYdOEtsq.css">
+</head>
+<body>
+  <div id="app"></div>
+  <header class="hud top">
+    <span class="round">第 3 轮</span>
+    <span class="score"><b class="b">42</b><i>:</i><b class="r">36</b></span>
+    <span class="dim">你 · 对手　先到 150</span>
+    <span class="sp"></span>
+    <span class="dim pts">剩 73 点</span>
+    <button class="cta">出招</button>
+    <details class="panel">
+      <summary aria-label="菜单（效果调试）">≡</summary>
+      <label for="distort">屏幕失真 <input id="distort" type="range" min="0" max="1.5" step="0.05" value="0.4"></label>
+      <label for="off">关闭屏幕效果（看原图） <input id="off" type="checkbox"></label>
+      <label for="green">绿色荧光 <input id="green" type="range" min="0" max="1" step="0.02" value="0.15"></label>
+      <div class="row"><button id="fullgame">⚔ 对战电脑（完整规则）</button></div>
+      <div class="row"><button id="auto">▶ 引擎自动对局</button></div>
+      <div class="row" id="live-log" style="font-size:12px;opacity:.8"></div>
+      <div class="row"><button id="play">播放结算（第 2–3 秒）</button><button id="reset">重置</button></div>
+      <p class="dim">点我方的卡开始拼句；拼的词会落进卡旁的插槽。</p>
+    </details>
+  </header>
+  <div class="tl" id="tl" aria-label="时间轴">
+    <div class="tl-track"></div>
+    <div class="tl-ticks" id="tl-ticks"></div>
+    <div class="tl-marks" id="tl-marks"></div>
+  </div>
+  <section id="kb" class="kb" hidden aria-label="拼句键盘">
+    <div class="kb-head">
+      <span>给 <b id="kb-who">蓝二</b> 拼一句</span>
+      <span class="dim" id="kb-cost"></span>
+      <span class="sp"></span>
+      <span class="dim">点场上的卡 = 把它当目标</span>
+      <button id="kb-back" class="ghost">⌫ 退一个</button>
+      <button id="kb-done" class="done">完成 ✓</button>
+    </div>
+    <div class="cands" id="kb-cands"><span class="dim">整句</span></div>
+    <div class="keys" id="kb-keys"></div>
+  </section>
+</body>
+</html>
