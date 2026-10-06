@@ -29,7 +29,10 @@ let attempts = 0, invalid = 0, dup = 0;
 function tryAdd(cl0: Sentence | null, src: string): boolean {
   attempts++;
   if (!cl0) { invalid++; return false; }
-  const cl = fixup(jclone(cl0), r);
+  const cl2 = fixup(jclone(cl0), r);
+  // 规则：取消「全体」关键词，打全体必须写「选择 N 个（N=2 或 3）」（要占数字牌）。fixup 之后把 allFoe/allMe 改写成 some(3)
+  const nSel = () => (r() < 0.5 ? 2 : 3); // 选 2 个还是 3 个：各占一半，数字小更省牌
+  const cl: Sentence | null = cl2 && JSON.parse(JSON.stringify(cl2).replace(/\{"t":"allFoe"\}/g, () => `{"t":"some","n":${nSel()},"side":"foe"}`).replace(/\{"t":"allMe"\}/g, () => `{"t":"some","n":${nSel()},"side":"me"}`));
   if (!cl || !playable(cl)) { invalid++; return false; }
   const key = normKey(cl);
   if (lib.has(key)) { dup++; return false; }

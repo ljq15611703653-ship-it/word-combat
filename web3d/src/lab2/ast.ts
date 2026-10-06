@@ -186,13 +186,20 @@ export function advWordsOf(cl: Sentence): string[] {
   });
   return out;
 }
+/** 句子里「累计」量出现几处（只数数值位置） */
+export function sumCount(cl: Sentence): number {
+  let n = 0;
+  const am = (x: Amt) => { if (typeof x !== "number" && x.q.agg === "sum") n++; };
+  for (const c of cl) { if (c.k === "act") am(c.eff.n); else if (c.k === "when" || c.k === "delay") c.effs.forEach((e) => am(e.n)); }
+  return n;
+}
 /** pos：随从位置（0 词位 / 1 数位 / 2 引用位），-1 = 不分位置 */
 export function sentenceCost(cl: Sentence, rnd = 1, pos = -1, cx: Cls | null = null): number {
   const ks = refKindsOf(cl);
   // 优先级：职业先定「每多一段」的底价（并流 AND_BING），位置（词位）再在上面减；全程半价只算一次（引用流 或 引用位，不叠加）
   const seg = (c: Clause) => { let x = isChain(c) ? P2.CHAINAP : P.AND; if (cx === "并") x = Math.min(x, P2.AND_BING); return pos === 0 ? Math.max(0, x - P2.POS_WORD) : x; };
   const allCost = (pos === 2 && P2.POS3 === "ref") || cx === "引用" ? Math.max(1, Math.ceil(Math.max(2, rnd) / 2)) : Math.max(2, rnd);
-  return (P2.COSTREAL ? P.BASE : 0) + cl.reduce((t, c, i) => t + clauseCost(c, cx) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + ks.filter((k) => k === "all").length * allCost;
+  return (P2.COSTREAL ? P.BASE : 0) + cl.reduce((t, c, i) => t + clauseCost(c, cx) + (i > 0 ? seg(c) : 0), 0) + ks.length * P2.REFAP + sumCount(cl) * P2.SUM_AP + ks.filter((k) => k === "all").length * allCost;
 }
 /** 起手时间：段越多、数字越大越晚 */
 export function windup(cl: Sentence, extra = 0, cx: Cls | null = null): number {
