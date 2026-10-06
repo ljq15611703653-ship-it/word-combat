@@ -384,53 +384,60 @@ function numVals(spec: { c: "NUM"; min?: number; cap?: "foe" | "me" }, ctx: Ctx)
   const mx = Math.max(1, ...ctx.s.side[ctx.side].cards.filter((c) => c.cd === 0).map((c) => c.v)) + (P2.POS ? P2.POS_NUM : 0) + 1;
   return [...expand([spec], ctx, U)].filter((x) => +x <= Math.min(9, mx)).sort((x, y) => +x - +y);
 }
-/** 缺省补全：把一个未完成的前缀补成「说得出口」的完整句（找不到就返回第一个补出来的句子和它的拒绝原因）。
- *  数字位置按从小到大试（有预算上限），其余位置取最便宜的默认。nextLegal 用它判断「这个词放进去还说得出口吗」 */
+/** Try alternative verbs, targets and numbers before rejecting an unfinished sentence.
+ * A search limit is uncertainty, not proof that the user's continuation is illegal.
+ * Completed sentences always go through the full diagnose check. */
 function completeBest(prefix: Token[], ctx: Ctx): { ast: Sentence | null; reason: string | null } {
-  let budget = 40; let first = null as { ast: Sentence; reason: string | null } | null;
-  const rec = (t0: Token[]): Sentence | null => {
-    const t = t0.slice();
-    for (let n = 0; n < 80; n++) {
-      const r = parseTokens(t);
-      if (r.complete) {
-        const d = diagnose(r.ast!, ctx);
-        if (!first) first = { ast: r.ast!, reason: d };
-        budget--;
-        return d === null ? r.ast : null;
-      }
-      if (r.err) return null;
-      let pick: Token | null = null;
-      const cand = expand(r.req, ctx, U);
-      for (const sp of r.req) {
-        if (typeof sp === "string") { if (cand.has(sp)) { pick = sp; break; } continue; }
-        if (sp.c === "NUM") {
-          for (const v of numVals(sp, ctx)) { if (budget <= 0) return null; const x = rec([...t, v]); if (x) return x; }
-          return null;
-        }
-        if (sp.c === "NTH") { for (const d of ctx.s.decl.filter((x) => x.side !== ctx.side)) { const x = rec([...t, `第${d.ord + 1}句`]); if (x) return x; } return null; }
-        const list = [...expand([sp], ctx, U)];
-        const live = sp.c === "TGT" ? list.filter((x) => !isUnitTok(x) || alive(ctx.s, +x[1])) : list;
-        if (sp.c === "OBJ") pick = live.includes("类:atk") ? "类:atk" : live[0] ?? null;
-        else if (sp.c === "WORD") pick = "词:造成";
-        else pick = live.find((x) => isUnitTok(x)) ?? live[0] ?? null;
-        if (pick) break;
-      }
-      if (!pick) return null;
-      t.push(pick);
-      if (pick === "选择") {   // 选择 N：先试 2，再试 3；补满 N 个互不相同的随从
-        const v = [...t].reverse().find((x) => (VERBS as readonly string[]).includes(x) || x in STATUS_OF || x === "转移" || x === "移除");
-        const side = v === "造成" || (v && v in STATUS_OF) || v === "移除" ? "foe" : "me";
-        const pool = sideUnits(ctx, side).filter((u) => alive(ctx.s, u));
-        for (let k = 2; k <= Math.min(3, pool.length); k++) { if (budget <= 0) return null; const x = rec([...t, String(k), ...pool.slice(0, k).map((u) => "@" + u)]); if (x) return x; }
+  let budget = 600, exhausted = false;
+  let first: { ast: Sentence; reason: string | null } | null = null;
+  let resourceReason: string | null = null;
+  const rec = (tokens: Token[], depth = 0): Sentence | null => {
+    if (--budget < 0 || depth > 80) { exhausted = true; return null; }
+    // These already-entered words cannot disappear when a suffix is appended.
+    // 收紧/至多 at value 1 are free, so leave those to the full AST check.
+    const deck = ctx.s.deck[ctx.side];
+    if (deck) {
+      const used: Record<string, number> = {};
+      for (const t of tokens) if (isAdvWord(t) && t !== '收紧' && t !== '至多') used[t] = (used[t] ?? 0) + 1;
+      if (P2.POS && ctx.unit % 3 === 0 && P2.POS_WORD_FREE && used['并']) used['并']--;
+      const shortage = Object.entries(used).find(([word, n]) => n > (deck[word] ?? 0));
+      if (shortage) {
+        const [word, n] = shortage, cds = ctx.s.advCooling?.[ctx.side]?.[word] ?? [];
+        resourceReason ??= `「${word}」可用 ${deck[word] ?? 0} 张，这句至少要 ${n} 张${cds.length ? `；冷却中，最早第 ${ctx.s.rnd + Math.min(...cds)} 轮恢复` : ''}`;
         return null;
       }
     }
+    const r = parseTokens(tokens);
+    if (r.err) return null;
+    if (r.complete) {
+      const reason = diagnose(r.ast!, ctx);
+      first ??= { ast: r.ast!, reason };
+      return reason === null ? r.ast : null;
+    }
+    const choices = new Set<Token>();
+    for (const spec of r.req) {
+      const values = typeof spec === 'object' && spec.c === 'NUM'
+        ? (spec.cap ? [...expand([spec], ctx, U)].filter(isNum).sort((a,b)=>+a-+b) : numVals(spec, ctx))
+        : [...expand([spec], ctx, U)];
+      for (const token of values) {
+        if (isUnitTok(token) && !alive(ctx.s, +token[1])) continue;
+        if (typeof spec === 'object' && spec.c === 'NTH' && !ctx.s.decl.some(d=>d.side!==ctx.side && token===`第${d.ord+1}句`)) continue;
+        choices.add(token);
+      }
+    }
+    for (const token of choices) {
+      const found = rec([...tokens, token], depth + 1);
+      if (found) return found;
+      if (exhausted) break;
+    }
     return null;
   };
-  const ok = rec(prefix);
-  if (ok) return { ast: ok, reason: null };
-  return first ? { ast: first.ast, reason: first.reason } : { ast: null, reason: "接上这个词之后写不下去（没有合适的目标/对象）" };
+  const ast = rec(prefix);
+  if (ast) return { ast, reason: null };
+  if (exhausted) return { ast: null, reason: null };
+  return first ?? { ast: null, reason: resourceReason ?? '接上这个词之后写不下去（没有可支付的合法后续）' };
 }
+
 const CAT_ZH: Record<string, string> = { atk: "攻击词", dmg: "伤害", heal: "治疗词", hpchg: "生命变动", def: "防护词", guard: "防护", status: "状态词", struct: "结构词", any: "任意词", dealt: "造成的伤害", taken: "受到的伤害" };
 const EV_ZH: Record<string, string> = { down: "倒下", hurt: "受到伤害", healed: "被恢复", decl: "宣告" };
 /** 词的显示文字（句子条/手牌条） */
@@ -489,7 +496,11 @@ export function diagnose(ast: Sentence, ctx: Ctx, forTok?: Token): string | null
   const need: Record<string, number> = {};
   const adv = advWordsOf(cl); if (pos === 0 && P2.POS_WORD_FREE) { const i = adv.indexOf("并"); if (i >= 0) adv.splice(i, 1); }
   for (const w of adv) need[w] = (need[w] ?? 0) + 1;
-  if (dk) for (const [w, n] of Object.entries(need)) if ((dk[w] ?? 0) < n) return (dk[w] ?? 0) === 0 ? `卡组里没有「${w}」了` : `卡组里「${w}」只剩 ${dk[w]} 张，这句要 ${n} 张`;
+  if (dk) for (const [w, n] of Object.entries(need)) if ((dk[w] ?? 0) < n) {
+    const cds = s.advCooling?.[side]?.[w] ?? [];
+    if (cds.length) return `「${w}」可用 ${dk[w] ?? 0} 张，这句要 ${n} 张；${cds.length} 张冷却中，最早第 ${s.rnd + Math.min(...cds)} 轮恢复`;
+    return `卡组里「${w}」可用 ${dk[w] ?? 0} 张，这句要 ${n} 张`;
+  }
   const rk: Record<string, number> = {};
   for (const k of refKindsOf(cl)) rk[k] = (rk[k] ?? 0) + 1;
   if (!(pos === 2 && P2.POS3 === "ref")) for (const [k, n] of Object.entries(rk)) if (s.refc[side][k].filter((cd) => cd === 0).length < n) return k === "all" ? "「全程」这个词本轮用完了（冷却中）" : "引用词（次数/累计…/事件/类别）本轮用完了（冷却中）";
