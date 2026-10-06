@@ -246,6 +246,7 @@ export class Battle {
     if (t.closest(".comp, .strip")) return;
     // 点选目标：句子编辑中，场上被高亮为可选目标（cp-tgt）的随从，点一下就把它放进句子（也可以继续从词牌库拖「目标」词）
     if (this.dock.isEditing() && this.unitEls[u]?.classList.contains("cp-tgt")) { e.stopPropagation(); this.dock.push("@" + u); return; }
+    if (this.dock.isEditing() && this.dock.targetPending) { e.stopPropagation(); return; }   // 正在选目标：点其他随从没反应
     if (!this.canPick(u)) return;
     if (this.dock.unit === u) { this.dock.cancel(); this.render(); return; }
     this.dock.begin(u); this.render();

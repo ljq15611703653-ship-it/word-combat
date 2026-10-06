@@ -47,6 +47,8 @@ export class Dock {
   private comp: HTMLElement | null = null;
   private off: (() => void) | null = null;
 
+  /** 当前句正等着选目标（battle 用它让点其他随从没反应） */
+  targetPending = false;
   constructor(private api: DockApi) {
     this.el.className = "lib";
     this.el.innerHTML = `<div class="lib-head"><b>词牌库</b><span class="lib-ap"></span><button class="lib-sugbtn" data-a="sug" title="列出此刻说得出口的几句话，点一句直接填进句子条">推荐句</button></div>
@@ -89,7 +91,7 @@ export class Dock {
     this.refresh();
     return true;
   }
-  cancel() { this.clearUnitDom(); this.unit = -1; this.tokens = []; this.guide = null; this.sugOpen = false; this.slots = null; this.hot = -1; this.refresh(); }
+  cancel() { this.targetPending = false; this.clearUnitDom(); this.unit = -1; this.tokens = []; this.guide = null; this.sugOpen = false; this.slots = null; this.hot = -1; this.refresh(); }
   /** 战斗界面回合变化时调用：没轮到我就收起 */
   sync() { if (this.unit >= 0 && !this.api.canPick(this.unit)) this.cancel(); else this.refresh(); }
   private clearUnitDom() {
@@ -222,6 +224,14 @@ export class Dock {
     const GH: Record<string, string> = { 造成: "伤害", 恢复: "生命" }, nt = this.tokens.length;
     if (nt >= 2 && /^\d+$/.test(this.tokens[nt - 1]) && GH[this.tokens[nt - 2]]) h += `<span class="w-ghost" aria-hidden="true">${GH[this.tokens[nt - 2]]}</span>`;
     h += `<span class="cp-end${hinting ? " hint" : ""}"></span></span>`;
+    // 选目标提示：下一步能放随从时，在悬浮面板里提示；「选择 N」按已选个数提示
+    const tgtOk = (x: number) => L.ok.has("@" + x) && (!this.guide?.lockWords || this.guide.lockWords.includes("@" + x));
+    this.targetPending = [0, 1, 2, 3, 4, 5].some(tgtOk);
+    if (this.targetPending) {
+      const si = this.tokens.lastIndexOf("选择"), CN = ["零", "一", "两", "三", "四", "五", "六"];
+      const need = si >= 0 && isNum(this.tokens[si + 1] ?? "") ? +this.tokens[si + 1] : 0, got = si >= 0 ? this.tokens.slice(si + 2).filter(isUnit).length : 0;
+      h += `<div class="tgt-hint"><b>此时可选择目标</b>${need && got > 0 && got < need ? `，已选${CN[got]}个` : ""}，请点击或拖拽词卡。</div>`;
+    }
     decl.innerHTML = h;
     decl.querySelectorAll<HTMLElement>(".strip .w").forEach((w) => w.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); this.startDrag(e, this.tokens[+w.dataset.i!], { plate: +w.dataset.i! }, null); }));
     // 读法 / 花费 / 起手
