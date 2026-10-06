@@ -12,7 +12,7 @@ export function talentOf(cls: Cls): TalentText {
       };
     case "引用":
       return {
-        talent: `「全程」半价；每种引用词（次数/累计等）多带 ${P2.REF_PLUS} 张，当轮用完不能再用、下一轮立刻恢复`,
+        talent: `「全程」半价；引用的条件、窗口、对象等使用额度各多 ${P2.REF_PLUS} 份，用后下一轮恢复；携带的进阶词牌仍隔一轮恢复`,
         limit: "一句里最多一个引用量词（累计/次数/词数/段数）",
       };
     case "限制":
