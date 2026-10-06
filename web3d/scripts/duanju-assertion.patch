@@ -1,8 +1,8 @@
 diff --git a/web3d/src/duanju/engine/ast.ts b/web3d/src/duanju/engine/ast.ts
-index 3161929..2fb3aca 100644
+index 3161929..747c9c9 100644
 --- a/web3d/src/duanju/engine/ast.ts
 +++ b/web3d/src/duanju/engine/ast.ts
-@@ -39,7 +39,26 @@ export type Tg =
+@@ -39,11 +39,30 @@ export type Tg =
  export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield"; rep?: number }   // rep = 重复 M（真实引擎：打 M 次每次 N，数字占牌）
  export type StatusKind = "burn" | "vuln" | "weak";
  
@@ -29,6 +29,20 @@ index 3161929..2fb3aca 100644
    | { k: "act"; eff: Eff; ifPrev?: "ok" | "fail" }       // 造成 / 恢复 / 减伤，可接「成功/失败」
    | { k: "when"; q: Query; judge: "exist" | "absent"; effs: Eff[]; cap: number; forbid?: boolean }
    //    before 窗口：宣告生效那一刻判断一次；after 窗口：留在场上，窗口里发生了才触发（至多 cap 次/轮）
+-  | { k: "delay"; wait: number; effs: Eff[] }            // N 轮后结算；Eff 的 Amt 里可引用「等待期间」的量
++  | { k: "delay"; wait: number; effs: Eff[] }            // 生效后第 N 次轮末结算；Eff 的 Amt 里可引用「等待期间」的量
+   | { k: "status"; kind: StatusKind; lvl: number; dur: number; tg: Tg }   // 灼烧：轮末掉 lvl；易伤：受伤 +lvl；衰弱：出手伤害 −lvl
+   | { k: "ignore"; cat: "stand"; win: number }           // 无视：这几轮里对面长期句子的效果落不到我方
+   | { k: "cash" }                                        // 兑现：提前结算我方定时句
+@@ -79,7 +98,7 @@ export const unless = (who: Who, obj: Obj, n: number, effs: Eff[]): Clause =>
+ /** 不得：违者受罚。以后 N 轮里对方每次 obj，对其本人造成 pen 点 */
+ export const forbid = (obj: Obj, n: number, pen: number, cap = 1): Clause =>
+   ({ k: "when", q: query(win("after", n), "foe", obj, "count", 99), judge: "exist", effs: [dmg(pen, { t: "src" })], cap, forbid: true });
+-/** 定时：N 轮后，对面最低血量随从受到「等待期间 obj 次数 × mult」 */
++/** 定时：生效后第 N 次轮末，对面最低血量随从受到「等待期间 obj 次数 × mult」 */
+ export const timer = (wait: number, obj: Obj, who: Who, mult: number): Clause =>
+   ({ k: "delay", wait, effs: [dmg({ q: query(win("after", 99), who, obj), mult })] });
+ 
 @@ -91,6 +110,7 @@ const verbCats = (e: Eff) => (e.verb === "dmg" ? ["atk", "dmg", "hpchg"] : e.ver
  /** 一个子句里出现的词（按出现顺序，用于「带有 xx 词的句子」「先于/后于」） */
  export function wordsOf(c: Clause): string[] {
@@ -102,15 +116,46 @@ index 3161929..2fb3aca 100644
    const am = (x: Amt) => { if (typeof x !== "number" && x.q.agg === "sum") n++; };
    for (const c of cl) { if (c.k === "act") am(c.eff.n); else if (c.k === "when" || c.k === "delay") c.effs.forEach((e) => am(e.n)); }
    return n;
-@@ -224,6 +252,7 @@ const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.w
- const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `重复${e.rep}次` : ""}`;
+@@ -220,24 +248,35 @@ const aggText = (a: Query["agg"]) => ({ count: "次数", sum: "累计", len: "
+ /** 显式目标的可读名：甲/乙方（0~2 号随从是甲方，3~5 号是乙方）+ 位置名（词位/数位/速位）+ 序号 */
+ export const unitName = (u: number) => `${u < 3 ? "甲" : "乙"}方${u % 3 + 1}号${["词位", "数位", "速位"][u % 3]}随从`;
+ const tgText = (t: Tg) => t.t === "some" ? `选择${t.n}个${t.side === "foe" ? "敌方" : "我方"}随从` : t.t === "unit" ? unitName(t.u) : t.t === "units" ? t.us.map(unitName).join("、") : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
+-const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.who)}${objText(a.q.obj)}${aggText(a.q.agg)}×${a.mult}`);
+-const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `重复${e.rep}次` : ""}`;
++const amText = (a: Amt) => (typeof a === "number" ? String(a) : `（${winText(a.q.win)}，${whoText(a.q.who)}${objText(a.q.obj)}的${aggText(a.q.agg)}）${a.mult > 1 ? `×${a.mult}倍` : ""}`);
++const effText = (e: Eff) => `${tgText(e.tg)}${e.tg.t === "units" || e.tg.t === "some" ? "各" : ""}${{ dmg: "受伤", heal: "恢复", shield: "获得减伤" }[e.verb]}${amText(e.n)}点${e.verb === "heal" ? "生命" : e.verb === "dmg" ? "伤害" : ""}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `（共执行${e.rep}次）` : ""}`;
++const thresholdText = (q: Query) => {
++  const base = q.agg === "count" ? (q.win.dir === "before" ? 0 : P.THR0) : q.agg === "sum" ? P2.THR_SUM : q.agg === "len" ? P2.THR_LEN : P2.THR_SEGS;
++  return `${aggText(q.agg)}至少${Math.max(0, base - ((q.tight ?? 1) - 1)) + 1}`;
++};
  export function clauseText(c: Clause): string {
    switch (c.k) {
-+    case "assert": return `断言 ${c.scope === "side" ? `${whoText(c.who as Who)}${winText(c.win)}` : `${winText(c.win)}${c.who === "all" ? "全部" : whoText(c.who)}`} ${c.judge === "absent" ? "不存在" : "存在"}${objText(c.obj)}，奖励 ${assertionBranch(c,true).map(clauseText).join(" 并 ")}${c.otherwise || c.alternatives ? `；否则 ${assertionBranch(c,false).map(clauseText).join(" 并 ")}` : ""}`;
++    case "assert": return `断言：${c.win.unit === "sent" ? (c.scope === "side" ? `${whoText(c.who as Who)}接下来${c.win.n}句宣告中` : `接下来双方${c.win.n}句宣告中，${c.who === "all" ? "任意一方" : whoText(c.who)}`) : `生效后${c.win.n}轮内，${c.who === "all" ? "任意一方" : whoText(c.who)}`} ${c.judge === "absent" ? "不存在" : "存在"}${objText(c.obj)}，奖励 ${assertionBranch(c,true).map(clauseText).join(" 并 ")}${c.otherwise || c.alternatives ? `；否则 ${assertionBranch(c,false).map(clauseText).join(" 并 ")}` : ""}`;
      case "act": return `${c.ifPrev ? (c.ifPrev === "ok" ? "若成功，" : "若失败，") : ""}${effText(c.eff)}`;
-     case "when": return `${c.forbid ? "不得：" : c.q.win.dir === "after" ? "每当" : "若"} ${winText(c.q.win)} ${whoText(c.q.who)}${c.judge === "absent" ? "不存在" : "存在"}${objText(c.q.obj)}${(c.q.tight ?? 1) > 1 && !c.forbid ? `(收紧${c.q.tight})` : ""}，则 ${c.effs.map(effText).join("并")}${c.cap > 1 ? `（至多${c.cap}次）` : ""}`;
-     case "delay": return `${c.wait}轮后：${c.effs.map(effText).join("并")}`;
-@@ -238,6 +267,7 @@ export function clauseText(c: Clause): string {
+-    case "when": return `${c.forbid ? "不得：" : c.q.win.dir === "after" ? "每当" : "若"} ${winText(c.q.win)} ${whoText(c.q.who)}${c.judge === "absent" ? "不存在" : "存在"}${objText(c.q.obj)}${(c.q.tight ?? 1) > 1 && !c.forbid ? `(收紧${c.q.tight})` : ""}，则 ${c.effs.map(effText).join("并")}${c.cap > 1 ? `（至多${c.cap}次）` : ""}`;
+-    case "delay": return `${c.wait}轮后：${c.effs.map(effText).join("并")}`;
+-    case "status": return `${tgText(c.tg)}${STATUS_WORD[c.kind]}${c.lvl}级持续${c.dur}轮`;
+-    case "ignore": return `无视 长期句子 ${c.win}轮`;
+-    case "cash": return "兑现";
+-    case "remove": return `移除 ${objText(c.obj)}`;
+-    case "redirect": return `${tgText(c.tg)}转移`;
+-    case "postpone": return `延后 第${c.ord + 1}句 ${c.n}秒`;
+-    case "strip": return `移除 ${tgText(c.tg)}的减伤/转移/长期句`;
++    case "when": {
++      if (c.forbid) return `生效后${c.q.win.n}轮内（含本轮），对方触发${objText(c.q.obj)}时，其来源承受处罚：${c.effs.map(effText).join("，并") }（每轮至多${c.cap}次；限制流惩罚另加${P2.FORBID_PLUS}点）`;
++      const after = c.q.win.dir === "after";
++      const window = after && c.judge === "absent" ? `每轮末检查本轮生效后的记录${c.q.win.unit === "round" ? `，持续${c.q.win.n}轮（含本轮）` : `（此判断按轮检查；${c.q.win.n}句窗口不参与缺席判断）`}` : `${winText(c.q.win)}${after && c.q.win.unit === "round" ? "（含本轮；每轮重新计数）" : ""}`;
++      return `${after ? "每当" : "若"} ${window}，${whoText(c.q.who)}${c.judge === "absent" ? "不存在" : "存在"}${objText(c.q.obj)}${c.judge === "exist" ? `（${thresholdText(c.q)}）` : ""}，则 ${c.effs.map(effText).join("，并")}${after ? `（每轮至多${c.cap}次）` : ""}`;
++    }
++    case "delay": return `定时：生效后第${c.wait}次轮末兑现：${c.effs.map(effText).join("，并")}`;
++    case "status": return `对${tgText(c.tg)}施加${STATUS_WORD[c.kind]}${P2.STAUTO ? "" : `${c.lvl}级`}，持续${c.dur}轮（含本轮）`;
++    case "ignore": return `${c.win}轮内（含本轮），抵挡敌方长期句对我方随从造成的伤害（不防状态）`;
++    case "cash": return "提前兑现我方所有已生效的定时句";
++    case "remove": return `移除含${objText(c.obj)}的长期句或对应状态`;
++    case "redirect": return `本轮将打向${tgText(c.tg)}、经减伤与首挡后剩余的敌方伤害返还出手者`;
++    case "postpone": return `将对方本轮编号${c.ord + 1}的句子起手延后${c.n}秒（编号按双方宣告顺序）`;
++    case "strip": return `移除${tgText(c.tg)}的减伤、转移及其施放的长期句（保留灼烧、易伤、衰弱）`;
+   }
  }
  /** 玩家拼不出来的句子：「全程」只能读已发生的事，不能写成「以后全程」（长期句子的窗口 ≥99、无视 ≥99 都不合法）；定时内部用的 99 不算 */
  export function legal(cl: Sentence): boolean {
@@ -118,7 +163,7 @@ index 3161929..2fb3aca 100644
    return cl.every((c) => !(c.k === "when" && c.q.win.dir === "after" && c.q.win.n >= 99) && !(c.k === "ignore" && c.win >= 99) && !(c.k === "status" && c.dur >= 99)
      && !(c.k === "redirect" && !P2.REDIR) && !(c.k === "postpone" && !P2.POSTPONE) && !(c.k === "strip" && !P2.RMREAL) && !(c.k === "remove" && P2.RMREAL)
      && !((c.k === "act" && (c.eff.rep ?? 1) > 1 && !P2.REP) || (c.k === "act" && (c.eff.rep ?? 1) > 1 && c.eff.verb === "shield")));
-@@ -248,6 +278,7 @@ export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");
+@@ -248,6 +287,7 @@ export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");
  /** 一个子句的「动作词」：并流一句里同一个动作词只能出现一次 */
  export function actionWordOf(c: Clause): string {
    switch (c.k) {
@@ -126,7 +171,7 @@ index 3161929..2fb3aca 100644
      case "act": return verbWord(c.eff);
      case "status": return STATUS_WORD[c.kind];
      case "redirect": return "转移";
-@@ -262,7 +293,9 @@ export function actionWordOf(c: Clause): string {
+@@ -262,7 +302,9 @@ export function actionWordOf(c: Clause): string {
  const QUANT_WORDS = ["累计", "次数", "词数", "段数"];
  /** 职业对句子的限制：返回拒绝原因（空串 = 通过） */
  export function classProblem(cl: Sentence, cx: Cls | null): string {

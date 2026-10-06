@@ -5,7 +5,7 @@
 //   教程用 setGuide(Guide)：lockWords 之外的词拿不起来，hint 里的下一个词在词牌库里脉冲提示，句子条末尾亮「放这里」。
 import { zh, unitLabel, sentenceText, P2, KIND_ORDER } from "./engine/api";
 import { canAfford, windupFor, resolveTgs } from "./engine/interp";
-import { astToTokens, nextLegal, tokenLabel, isAdvWord, prefixWhy, structOk, vocabulary, normAst, fillAssertionReward, type Token } from "./composer/grammar";
+import { astToTokens, nextLegal, tokenLabel, isAdvWord, prefixWhy, structOk, vocabulary, normAst, fillAssertionReward, ghostWords, type Token } from "./composer/grammar";
 import type { Guide, Match, Sentence } from "./types";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -222,9 +222,7 @@ export class Dock {
     let h = `<i>本轮</i><span class="strip${this.slots ? " dragon" : ""}">`;
     const slot = (i: number) => (this.slots?.has(i) ? `<i class="slot${i === this.hot ? " hot" : ""}" data-i="${i}"></i>` : "");
     if (!this.tokens.length) h += `${slot(0)}<span class="strip-empty">${this.api.match.s.done[u] ? "" : "把词牌拖到这里"}</span>`;
-    else { this.tokens.forEach((t, i) => { h += t === "奖励" ? `${slot(i)}<span class="w-ghost" title="条件完整后自动填入">奖励</span>` : `${slot(i)}<span class="w k-${kindOf(t)}${i === this.lifted ? " lifted" : ""}" data-i="${i}">${esc(tokenLabel(t, names))}</span>`; }); h += slot(this.tokens.length); }
-    const GH: Record<string, string> = { 造成: "伤害", 恢复: "生命" }, nt = this.tokens.length;
-    if (nt >= 2 && /^\d+$/.test(this.tokens[nt - 1]) && GH[this.tokens[nt - 2]]) h += `<span class="w-ghost" aria-hidden="true">${GH[this.tokens[nt - 2]]}</span>`;
+    else { const ghosts = ghostWords(this.tokens); const gray = (at: number) => (ghosts[at] ?? []).map(t => `<span class="w-ghost">${esc(t)}</span>`).join(""); h += gray(0); this.tokens.forEach((t, i) => { h += t === "奖励" ? `${slot(i)}<span class="w-ghost" title="条件完整后自动填入">奖励</span>` : `${slot(i)}<span class="w k-${kindOf(t)}${i === this.lifted ? " lifted" : ""}" data-i="${i}">${esc(tokenLabel(t, names))}</span>`; h += gray(i + 1); }); h += slot(this.tokens.length); }
     h += `<span class="cp-end${hinting ? " hint" : ""}"></span></span>`;
     // 选目标提示：下一步能放随从时，在悬浮面板里提示；「选择 N」按已选个数提示
     const tgtOk = (x: number) => L.ok.has("@" + x) && (!this.guide?.lockWords || this.guide.lockWords.includes("@" + x));

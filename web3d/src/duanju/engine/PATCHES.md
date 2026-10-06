@@ -46,3 +46,7 @@ engine/api.ts 的 Match.resolve() 用 setTrace 收集，再按 sec 稳定排序�
 - T4：击倒投骰（interp.ts St.rs / rollDown / koNow / 过热倒下 / declare 清一次性牌；params.ts DICE；lab-rules.ts Card.once），脚本施加。
 - S1：gen.ts / playbook.ts 的 allMe / allFoe 改成 `some`（选择N个），含 classExtras；deck-words.json 示例去掉「最低血」。
 - api.ts（手写）：MatchOpts.cls 传给 newGame；composer/grammar.ts diagnose 对齐 canAfford 的职业逻辑。
+
+## 2026-10-06 可读性与实际结算对齐
+
+完整预览修复在游戏覆盖补丁 `scripts/duanju-assertion.patch` 中维护；词牌说明覆盖来自 `scripts/duanju-word-copy.json`，由同步脚本写入 deck-words.json。拼句条灰词在 grammar.ts 与 dock.ts 中维护，不改引擎规则。定时、状态期限、转移余量、移除范围、无视仅防长期伤害、全局宣告编号与每轮触发上限均有真实结算检查。原有“每当不存在＋句窗口”按本轮记录在轮末判断，显示明确提示这一现有行为，未悄悄改成断言语义。

@@ -40,7 +40,9 @@ export interface Parsed { ast: Sentence | null; opts: Spec[]; req: Spec[]; compl
 const num = (min = 1): Spec => ({ c: "NUM", min });
 class Parser {
   i = 0; acc: Spec[] = []; branchDepth = 0;
-  constructor(public t: Token[]) {}
+  ghosts: Record<number, string[]> = {};
+  constructor(public t: Token[], private decorate = false) {}
+  ghost(text: string, at = this.i) { if (this.decorate) (this.ghosts[at] ??= []).push(text); }
   private ok(s: Spec, tok: Token): boolean {
     if (typeof s === "string") return s === tok;
     switch (s.c) {
@@ -73,6 +75,7 @@ class Parser {
       case "来源": return { t: "src" };
       case "选择": {
         const n = +this.req([{ c: "NUM", min: 2, cap: side }]);
+        this.ghost("个目标：");
         const p = this.req([{ c: "TGT", side }, "敌方随从", "我方随从"]);
         if (p === "敌方随从" || p === "我方随从") return { t: "some", n, side: p === "敌方随从" ? "foe" : "me" };
         if (!isUnitTok(p)) throw new PErr("选择 N 个后面要接 N 个随从");
@@ -106,23 +109,26 @@ class Parser {
   amt(): Amt {
     const tok = this.req([num(1), ...AGGS]);
     if (isNum(tok)) return +tok;
+    this.ghost("（", this.i - 1);
     const agg = AGG_OF[tok];
     const dir = this.req(["之前", "以后"]) === "之前" ? "before" : "after";
     const win = this.winTail(dir);
     const who = this.req(["我方", "对方"]) === "我方" ? "me" : "foe";
     const q = this.qTail(win, who, agg);
     let mult = 1;
-    if (this.opt(["×"])) mult = this.n(2);
+    if (this.opt(["×"])) { mult = this.n(2); this.ghost("倍"); }
+    this.ghost("）");
     return { q, mult };
   }
   /** 一个效果：动词已读，接 数字/引用量 + 目标 + [重复 n] + [无视] */
   eff(verbTok: string, src = this.branchDepth > 0): Eff {
     const verb = VERB_OF[verbTok];
     const n = this.amt();
+    this.ghost(verb === "dmg" ? "点伤害，给予" : verb === "heal" ? "点生命，给予" : "点，给予");
     const tg = this.tg(verb === "dmg" ? "foe" : "me", src);
     const e: Eff = { verb, n, tg };
-    if (this.opt(["重复"])) e.rep = this.n(2);
-    if (this.opt(["无视"])) e.ignore = "shield";
+    if (this.opt(["重复"])) { e.rep = this.n(2); this.ghost("次（总次数）"); }
+    if (this.opt(["无视"])) { e.ignore = "shield"; this.ghost("减伤"); }
     return e;
   }
   effs(src: boolean): Eff[] {
@@ -133,12 +139,12 @@ class Parser {
   clause(): Clause {
     const tok = this.req([...VERBS, ...STATUS_KINDS, "断言", "每当", "若", "不得", "定时", "无视", "兑现", "移除", "转移", "延后"]);
     if (tok === "断言") {
-      const head = this.req(["全部", "我方", "对方", "敌方", "以后"]);
+      const head = this.req(["任意", "全部", "我方", "对方", "敌方", "以后"]);
       const scope = head === "我方" || head === "对方" || head === "敌方" ? "side" : "all";
       if (head !== "以后") this.req(["以后"]);
       const win = this.winTail("after");
-      const whoTok = head === "以后" ? this.req(["全部", "我方", "对方", "敌方"]) : head;
-      const who = whoTok === "全部" ? "all" : whoTok === "我方" ? "me" : "foe";
+      const whoTok = head === "以后" ? this.req(["任意", "全部", "我方", "对方", "敌方"]) : head;
+      const who = whoTok === "任意" || whoTok === "全部" ? "all" : whoTok === "我方" ? "me" : "foe";
       const judge = this.req(["存在", "不存在"]) === "存在" ? "exist" : "absent";
       const obj = this.obj();
       this.req(["奖励"]);
@@ -150,10 +156,13 @@ class Parser {
     if (tok in STATUS_OF) {
       const tg = this.tg("foe");
       const lvl = P2.STAUTO ? 1 : this.n(1);
-      const dur = this.n(1);
+      if (!P2.STAUTO) this.ghost("级");
+      this.ghost("持续");
+      const dur = this.n(1); this.ghost("轮（含本轮）");
       return { k: "status", kind: STATUS_OF[tok], lvl, dur, tg };
     }
     if (tok === "每当" || tok === "若") {
+      this.ghost(tok === "每当" ? "生效后" : "之前");
       const win = this.winTail(tok === "每当" ? "after" : "before");
       const who = this.req(["我方", "对方"]) === "我方" ? "me" : "foe";
       const judge = this.req(["存在", "不存在"]) === "存在" ? "exist" : "absent";
@@ -161,26 +170,26 @@ class Parser {
       const q = this.qTail(win, who, aggTok ? AGG_OF[aggTok] : "count");
       this.req(["则"]);
       const effs = this.effs(true);
-      const cap = this.opt(["至多"]) ? this.n(2) : 1;
+      const cap = this.opt(["至多"]) ? (() => { this.ghost("每轮"); const n = this.n(2); this.ghost("次"); return n; })() : 1;
       return { k: "when", q: { ...q, tight: q.tight }, judge, effs, cap } as Clause;
     }
     if (tok === "不得") {
-      const n = this.n(1);
+      const n = this.n(1); this.ghost("轮内（含本轮），对方触发");
       const obj = this.obj();
       this.req(["罚"]);
-      const pen = this.n(1);
-      const cap = this.opt(["至多"]) ? this.n(2) : 1;
+      const pen = this.n(1); this.ghost("点伤害（由触发来源承受）");
+      const cap = this.opt(["至多"]) ? (() => { this.ghost("每轮"); const n = this.n(2); this.ghost("次"); return n; })() : 1;
       return { k: "when", q: { win: { dir: "after", n, unit: "round" }, who: "foe", obj, agg: "count", tight: 99 }, judge: "exist", effs: [{ verb: "dmg", n: pen, tg: { t: "src" } }], cap, forbid: true };
     }
-    if (tok === "定时") { const wait = this.n(1); return { k: "delay", wait, effs: this.effs(false) }; }
-    if (tok === "无视") return { k: "ignore", cat: "stand", win: this.n(1) };
-    if (tok === "兑现") return { k: "cash" };
-    if (tok === "转移") return { k: "redirect", tg: this.tg("me") };
-    if (tok === "延后") { const o = this.req([{ c: "NTH" }]); return { k: "postpone", ord: +o.slice(1, -1) - 1, n: this.n(1) }; }
+    if (tok === "定时") { this.ghost("生效后第"); const wait = this.n(1); this.ghost("次轮末："); return { k: "delay", wait, effs: this.effs(false) }; }
+    if (tok === "无视") { this.ghost("敌方长期句伤害，持续"); const win = this.n(1); this.ghost("轮（含本轮）"); return { k: "ignore", cat: "stand", win }; }
+    if (tok === "兑现") { this.ghost("我方已生效的所有定时句"); return { k: "cash" }; }
+    if (tok === "转移") { const tg = this.tg("me"); this.ghost("的敌方受击余量，返还出手者"); return { k: "redirect", tg }; }
+    if (tok === "延后") { const o = this.req([{ c: "NTH" }]); const n = this.n(1); this.ghost("秒"); return { k: "postpone", ord: +o.slice(1, -1) - 1, n }; }
     // 移除：后面是随从 = 拆敌人（strip）；是对象 = 删一句带该词的话（remove）
     const nx = this.req([{ c: "TGT", side: "foe" }, { c: "OBJ" }]);
     this.i--;
-    if (isUnitTok(nx) || isAliasTok(nx) || nx === "选择") return { k: "strip", tg: this.tg("foe") };
+    if (isUnitTok(nx) || isAliasTok(nx) || nx === "选择") { const tg = this.tg("foe"); this.ghost("的防护与其施放的长期句"); return { k: "strip", tg }; }
     return { k: "remove", obj: this.obj() };
   }
   branch(): Sentence {
@@ -219,6 +228,12 @@ export function parseTokens(tokens: Token[]): Parsed {
     throw e;
   }
 }
+/** 只装饰显示；解析器记录词的语法角色，灰字不进入词牌或资源计算。 */
+export function ghostWords(tokens: Token[]): Record<number, string[]> {
+  const p = new Parser(tokens, true);
+  try { p.sentence(); } catch (e) { if (!(e instanceof Stop) && !(e instanceof PErr)) throw e; }
+  return p.ghosts;
+}
 export function tokensToAst(tokens: Token[]): Sentence | null { const r = parseTokens(tokens); return r.complete ? r.ast : null; }
 /** 只自动填无选择的连接词；条件对象没有写完时不会提前填。 */
 export function fillAssertionReward(tokens: Token[]): Token[] {
@@ -249,7 +264,7 @@ const effTok = (e: Eff): Token[] => [VERB_TOK[e.verb], ...amtTok(e.n), ...tgTok(
 const clauseTok = (c: Clause): Token[] => {
   switch (c.k) {
     case "assert": {
-      const who = c.who === "all" ? "全部" : c.who === "me" ? "我方" : "对方";
+      const who = c.who === "all" ? "任意" : c.who === "me" ? "我方" : "对方";
       return ["断言", ...(c.scope === "side" ? [who, "以后", ...winTok(c.win)] : ["以后", ...winTok(c.win), who]), c.judge === "exist" ? "存在" : "不存在", ...objTok(c.obj), "奖励", ...astToTokens(assertionBranch(c,true)), ...(c.otherwise || c.alternatives ? ["否则", ...astToTokens(assertionBranch(c,false))] : [])];
     }
     case "act": return effTok(c.eff);
@@ -332,7 +347,7 @@ export interface Legal {
 /** 全词表（palette 用）：按此刻的局面列出所有可能出现的词 */
 export function vocabulary(): Token[] {
   const t: Token[] = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-  t.push(...VERBS, ...STATUS_KINDS, "并", "断言", "奖励", "否则", "全部", "敌方", "若成功", "若失败", "重复", "无视", "兑现", "移除", "转移", "延后", "定时", "不得", "罚", "每当", "若", "存在", "不存在", "则", "且", "至多", "收紧", "×", "之前", "以后", "轮", "句", "全程", "我方", "对方", "选择", "来源", ...AGGS, "先后");
+  t.push(...VERBS, ...STATUS_KINDS, "并", "断言", "奖励", "否则", "任意", "敌方", "若成功", "若失败", "重复", "无视", "兑现", "移除", "转移", "延后", "定时", "不得", "罚", "每当", "若", "存在", "不存在", "则", "且", "至多", "收紧", "×", "之前", "以后", "轮", "句", "全程", "我方", "对方", "选择", "来源", ...AGGS, "先后");
   for (let u = 0; u < 6; u++) t.push("@" + u);
   t.push(...CATS.map((c) => "类:" + c), ...EVS.map((e) => "事:" + e), ...OBJ_WORDS.map((w) => "词:" + w), ...NTHS.map((n) => `第${n}句`));
   return t;

@@ -92,7 +92,7 @@ test("clone evaluation does not consume live assertion", () => {
   resolveRound(clone(s)); assert.equal(s.stand[0].fired, 0); assert.equal(s.hp[4], 12); resolveRound(s); assert.equal(s.hp[4], 9);
 });
 const suffix = ["存在", "词:造成", "奖励", "造成", "1", "@4", "否则", "恢复", "1", "@0"];
-for (const head of [["对方", "以后", "1", "句"], ["我方", "以后", "1", "句"], ["以后", "1", "句", "对方"], ["以后", "1", "句", "全部"], ["全部", "以后", "1", "轮"]]) {
+for (const head of [["对方", "以后", "1", "句"], ["我方", "以后", "1", "句"], ["以后", "1", "句", "对方"], ["以后", "1", "句", "任意"], ["任意", "以后", "1", "轮"]]) {
   test("grammar roundtrip " + head.join(" "), () => {
     game(); const ts = ["断言", ...head, ...suffix]; const cl = tokensToAst(ts)!; assert.ok(cl);
     assert.equal(normAst(tokensToAst(astToTokens(cl))!), normAst(cl));
@@ -193,4 +193,3 @@ test("otherwise 不得 preserves legal punishment above direct-attack cap", () =
   assert.equal(canAfford(s,0,tokensToAst([...prefix,"造成","3","@4"])!,0),null);
 });
 console.log(`断言测试通过：${checks} 项`);
-
