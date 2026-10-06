@@ -398,7 +398,9 @@ function completeBest(prefix: Token[], ctx: Ctx): { ast: Sentence | null; reason
     const deck = ctx.s.deck[ctx.side];
     if (deck) {
       const used: Record<string, number> = {};
-      for (const t of tokens) if (isAdvWord(t) && t !== '收紧' && t !== '至多') used[t] = (used[t] ?? 0) + 1;
+      // 无视 inside a when/delay effect and 先后 inside a quoted amount have
+      // context-dependent charging in the existing engine; do not infer it here.
+      for (const t of tokens) if (isAdvWord(t) && !['收紧', '至多', '无视', '先后', ...AGGS].includes(t)) used[t] = (used[t] ?? 0) + 1;
       if (P2.POS && ctx.unit % 3 === 0 && P2.POS_WORD_FREE && used['并']) used['并']--;
       const shortage = Object.entries(used).find(([word, n]) => n > (deck[word] ?? 0));
       if (shortage) {

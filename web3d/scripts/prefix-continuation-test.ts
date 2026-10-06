@@ -22,4 +22,8 @@ assert.equal(nextLegal(['易伤','@3','1'],{s:state,side:0,unit:1}).canEnd,false
 const exhausted=newGame(0,[{},{}]);
 assert.equal(nextLegal(['减伤','1','@0'],{s:exhausted,side:0,unit:0}).canEnd,false);
 assert.ok(tokensToAst(['造成','1','@3','若失败','恢复','1','@0']));
+// The existing interpreter does not charge the ignore modifier inside a standing
+// effect. The UI must match it, rather than infer cost from the bare token.
+const standing=newGame(0,[{},{}]);
+check(['每当','1','轮','我方','不存在','类:def','则','造成','1','@3','无视'],{s:standing,side:0,unit:0});
 console.log(`逐词后续检查通过：${checks}个合法步骤；重复动作、数字超支、状态冲突与缺牌仍不能宣告。`);
