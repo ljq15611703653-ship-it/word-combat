@@ -1,5 +1,8 @@
 # 《断·句》状态摘要（2026-10-06，最新，放在最前）
 
+> **接手请先读 `docs/断句-接手文档.md`**（极详细：现状、操作手册、决策与踩坑、未决问题、用户偏好）；规则与内容全览见 `docs/断句-项目介绍.md`。主线 `claude/duanju` = GitHub `main`，Pages 在 `gh-pages:3d/`。
+
+
 > 完整介绍：[docs/断句-项目介绍.md](docs/断句-项目介绍.md)（规则、模式与 URL 参数、内容清单、架构、试玩指南、出图流程、平衡数据、已知问题）。攻略：[docs/guide/攻略.md](docs/guide/攻略.md)、[决策表](docs/guide/决策表.md)。下面第 1 节起是旧版「词战」交接内容，仍保留。
 
 - **主线分支 `claude/duanju`**（git worktree 在 `D:/wc/game`），各功能分支（duanju-engine/composer/deck/vfx/rig*/story/train/tutorial/comic/cls/polish*/bgs/bgfix/ai/layout/fix）已合并；文档分支 `duanju-doc`（工作树 `D:/wc/wt_doc`）。**全部未推送 GitHub**（`main` 仍是旧版词战）。
