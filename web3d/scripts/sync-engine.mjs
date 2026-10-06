@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyCooldownPatch } from './engine-cooldown-patch.mjs';
 import { applyGamePatch } from "./engine-game-patch.mjs";
 
 const LAB = process.env.LAB_DIR ?? "D:/wc/nc_lab/web3d/src";
@@ -83,7 +84,7 @@ function koNow(`);
     t = must(f, t, "if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; s.stand", "if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; rollDown(s, u); s.stand");
   }
   if (f === "deck") {}
-  writeFileSync(`${OUT}/${f}.ts`, applyGamePatch(f, header(`lab2/${f}.ts`) + t));
+  writeFileSync(`${OUT}/${f}.ts`, applyCooldownPatch(f, applyGamePatch(f, header(`lab2/${f}.ts`) + t)));
 }
 let r = fix(readFileSync(`${LAB}/lab/rules.ts`, "utf8"));
 r = must("lab-rules", r, "export interface Card { v: number; cd: number }", "export interface Card { v: number; cd: number; once?: boolean }   // once = 一次性牌（骰牌）：用掉就消失，不冷却");
@@ -97,9 +98,9 @@ const RD = process.env.REAL_DIR ?? "D:/wc/out_real";
 // 默认 = 最终定稿（out_final2/duanju_final.json）+ 目标在宣告时定（玩家点选）+ 职业开启 + 击倒投骰（游戏专有）
 const FINAL = process.env.FINAL_RULES ?? "D:/wc/out_final2/duanju_final.json";
 const fj = J(FINAL);
-writeFileSync(`${OUT}/rules.default.json`, JSON.stringify(toRules(fj.LAB, { ...fj.LAB2, TGT_AT_DECL: 1, CLASSES: 1, DICE: 1 }), null, 1));
+writeFileSync(`${OUT}/rules.default.json`, JSON.stringify(toRules({ ...fj.LAB, CARDS0: [2, 2, 2, 3] }, { ...fj.LAB2, TGT_AT_DECL: 1, CLASSES: 1, DICE: 1 }), null, 1));
 // 教程规则：同默认，但职业关（教程完全不提职业）
-writeFileSync(`${OUT}/rules.tutorial.json`, JSON.stringify(toRules(fj.LAB, { ...fj.LAB2, TGT_AT_DECL: 1, CLASSES: 0, DICE: 1 }), null, 1));
+writeFileSync(`${OUT}/rules.tutorial.json`, JSON.stringify(toRules({ ...fj.LAB, CARDS0: [2, 2, 2, 3] }, { ...fj.LAB2, TGT_AT_DECL: 1, CLASSES: 0, DICE: 1 }), null, 1));
 // 对照用：不带骰子的最终规则（与模拟器逐局比较用）
 writeFileSync(`${OUT}/rules.final-nodice.json`, JSON.stringify(toRules(fj.LAB, { ...fj.LAB2, TGT_AT_DECL: 1, CLASSES: 1 }), null, 1));
 const dj = J(`${RD}/duanju.json`);

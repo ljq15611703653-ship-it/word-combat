@@ -182,7 +182,8 @@ export class Dock {
     const btns = (g: string) => buckets.get(g)!.map((t) => {
       const al = this.allowTok(t);
       const fz = al.ok && !idle ? this.slotsFor(u, base, t) : { slots: [] as number[], why: al.why ?? "" };
-      const cnt = isAdvWord(t) ? `<small class="bd">×${left[t] ?? 0}</small>` : isNum(t) && +t >= 2 ? `<small class="bd">${cards.filter((c) => c.v >= +t && c.cd === 0).length}</small>` : "";
+      const cooling = m.s.advCooling[0][t] ?? [];
+      const cnt = isAdvWord(t) ? `<small class="bd" title="可用 ${left[t] ?? 0} 张；冷却 ${cooling.length} 张。用后隔一轮恢复。">×${left[t] ?? 0}${cooling.length ? ` · 冷${cooling.length}` : ''}</small>` : isNum(t) && +t >= 2 ? `<small class="bd">${cards.filter((c) => c.v >= +t && c.cd === 0).length}</small>` : "";
       return `<button class="cw k-${g}${fz.slots.length ? "" : " off"}${t === nextHint ? " hint" : ""}" data-t="${esc(t)}">${esc(tokenLabel(t, names))}${cnt}</button>`;
     }).join("");
     const OTHER = ["base", "adv", "num", "obj"];

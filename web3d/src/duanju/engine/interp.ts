@@ -36,6 +36,7 @@ export interface St {
   hp: number[]; sh: number[];
   side: [SideState, SideState];
   deck: [Deck | null, Deck | null];                  // 进阶词剩余张数（null = 不限，测试用）
+  advCooling: [Record<string, number[]>, Record<string, number[]>];
   refc: [Record<string, number[]>, Record<string, number[]>];   // 自指词：每张的冷却
   sts: Status[];
   stand: Standing[]; decl: Decl[]; log: Ev[]; done: boolean[];
@@ -66,6 +67,7 @@ export function newGame(first: Side, decks: [Deck | null, Deck | null] = [null, 
   const mk = (): SideState => ({ ap: P.AP0, cards: P.CARDS0.map((v) => ({ v, cd: 0 })) });
   return {
     rnd: 1, sec: 0, seq: 0, sord: 0, hp: Array(6).fill(P.HP), sh: Array(6).fill(0), side: [mk(), mk()],
+    advCooling: [{}, {}],
     deck: [decks[0] ? { ...decks[0] } : null, decks[1] ? { ...decks[1] } : null], refc: [mkRef(cx[0] === "引用" ? P2.REF_PLUS : 0), mkRef(cx[1] === "引用" ? P2.REF_PLUS : 0)], sts: [], cls: cx,
     stand: [], decl: [], log: [], done: Array(6).fill(false), first, turn: first, ord: 0, win: -1, stats: {}, rs: 0x9e3779b9, rec: record ? [] : undefined,
     kw: Array.from({ length: 6 }, (_, u) => (P2.KW && kws?.[u < 3 ? 0 : 1]?.[u % 3]) || ""), kwUsed: Array(6).fill(false), redir: Array(6).fill(false), dead: Array(6).fill(false), pend: [],
@@ -76,6 +78,7 @@ export function clone(s: St): St {
   const rf = (r: Record<string, number[]>) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v.slice()]));
   return {
     ...s, hp: s.hp.slice(), sh: s.sh.slice(), side: [sd(s.side[0]), sd(s.side[1])],
+    advCooling: [rf(s.advCooling[0]), rf(s.advCooling[1])],
     deck: [s.deck[0] ? { ...s.deck[0] } : null, s.deck[1] ? { ...s.deck[1] } : null], refc: [rf(s.refc[0]), rf(s.refc[1])], sts: s.sts.map((x) => ({ ...x })),
     stand: s.stand.map((x) => ({ ...x })), decl: s.decl.slice(), log: s.log.slice(), done: s.done.slice(), stats: { ...s.stats }, rec: undefined,
     kwUsed: s.kwUsed.slice(), redir: s.redir.slice(), dead: s.dead.slice(), pend: s.pend.map((x) => ({ ...x })),
@@ -419,7 +422,7 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
   s.side[side].cards = s.side[side].cards.filter((c) => !(c.once && c.cd > 0));   // 一次性牌：用掉就消失
   const dk = s.deck[side];
   const adv = advFor(cl, posOf(unit));
-  if (dk) for (const w of adv) dk[w]--;
+  if (dk) for (const w of adv) { dk[w]--; (s.advCooling[side][w] ??= []).push(2); }
   if (!(posOf(unit) === 2 && P2.POS3 === "ref")) for (const [k, n] of Object.entries(countOf(refKindsOf(cl)))) { let m = n; for (let i = 0; i < s.refc[side][k].length && m > 0; i++) if (s.refc[side][k][i] === 0) { s.refc[side][k][i] = clsOf(s, side) === "引用" ? 1 : 2; m--; } }
   s.side[side].ap -= a.cost; s.done[unit] = true;
   const sord = s.sord++, ord = s.ord++;
@@ -606,6 +609,11 @@ export function nextRound(s: St) {
   s.first = (1 - s.first) as Side; s.turn = s.first; s.ord = 0;
   for (const sd of [0, 1] as const) {
     const S = s.side[sd]; S.ap = Math.min(P.APCAP, S.ap + P.APINC);
+    for (const [w, cds] of Object.entries(s.advCooling[sd])) {
+      const next = cds.map(cd => cd - 1);
+      if (s.deck[sd]) s.deck[sd][w] = (s.deck[sd][w] ?? 0) + next.filter(cd => cd === 0).length;
+      s.advCooling[sd][w] = next.filter(cd => cd > 0);
+    }
     for (const c of S.cards) if (c.cd > 0) c.cd--;
     for (const k of REF_KINDS) s.refc[sd][k] = s.refc[sd][k].map((cd) => (cd > 0 ? cd - 1 : 0));
     for (const v of P.SCHEDULE[s.rnd] ?? []) S.cards.push({ v, cd: 0 });
