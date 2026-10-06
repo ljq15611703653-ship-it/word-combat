@@ -39,7 +39,26 @@ export type Tg =
 export interface Eff { verb: "dmg" | "heal" | "shield"; n: Amt; tg: Tg; ignore?: "shield"; rep?: number }   // rep = 重复 M（真实引擎：打 M 次每次 N，数字占牌）
 export type StatusKind = "burn" | "vuln" | "weak";
 
+/** 断言只判断一次；scope 决定先数双方句子，还是先筛选指定一方。 */
+export interface Assertion {
+  k: "assert"; win: Win; who: Who | "all"; scope: "all" | "side";
+  obj: Obj; judge: "exist" | "absent"; effs: Eff[]; otherwise?: Eff[]; rewards?: Sentence; alternatives?: Sentence;
+}
+export const assertionBranch = (c: Assertion, yes: boolean): Sentence => yes ? (c.rewards ?? c.effs.map(eff => ({ k: "act", eff }))) : (c.alternatives ?? (c.otherwise ?? []).map(eff => ({ k: "act", eff })));
+export const assertionClauses = (c: Assertion): Sentence => [...assertionBranch(c, true), ...assertionBranch(c, false)];
+export const allClauses = (cl: Sentence): Sentence => cl.flatMap(c => c.k === "assert" ? [c, ...allClauses(assertionClauses(c))] : [c]);
+/** 互斥分支分别检查，不能把奖励和否则当作同时挂上的状态。 */
+export function statusPaths(cl: Sentence): Sentence[] {
+  let paths: Sentence[] = [[]];
+  for (const c of cl) {
+    const parts = c.k === "assert" ? [...statusPaths(assertionBranch(c,true)), ...statusPaths(assertionBranch(c,false))] : [[c]];
+    paths = paths.flatMap(path => parts.map(part => [...path,...part]));
+  }
+  return paths;
+}
+export const assertionEffs = (c: Assertion): Eff[] => assertionClauses(c).flatMap(x => x.k === "act" ? [x.eff] : x.k === "assert" ? assertionEffs(x) : x.k === "when" || x.k === "delay" ? x.effs : []);
 export type Clause =
+  | Assertion
   | { k: "act"; eff: Eff; ifPrev?: "ok" | "fail" }       // 造成 / 恢复 / 减伤，可接「成功/失败」
   | { k: "when"; q: Query; judge: "exist" | "absent"; effs: Eff[]; cap: number; forbid?: boolean }
   //    before 窗口：宣告生效那一刻判断一次；after 窗口：留在场上，窗口里发生了才触发（至多 cap 次/轮）
@@ -91,6 +110,7 @@ const verbCats = (e: Eff) => (e.verb === "dmg" ? ["atk", "dmg", "hpchg"] : e.ver
 /** 一个子句里出现的词（按出现顺序，用于「带有 xx 词的句子」「先于/后于」） */
 export function wordsOf(c: Clause): string[] {
   switch (c.k) {
+    case "assert": return ["断言", c.judge === "absent" ? "不存在" : "存在", "奖励", ...assertionBranch(c, true).flatMap(wordsOf), ...((c.otherwise || c.alternatives) ? ["否则", ...assertionBranch(c, false).flatMap(wordsOf)] : [])];
     case "act": return [verbWord(c.eff), ...(c.eff.ignore ? ["无视"] : [])];
     case "when": return [c.judge === "absent" ? "不存在" : "存在", c.forbid ? "不得" : c.q.win.dir === "after" ? "每当" : "若", ...c.effs.map(verbWord)];
     case "delay": return ["定时", ...c.effs.map(verbWord)];
@@ -105,7 +125,7 @@ export function wordsOf(c: Clause): string[] {
 export function catsOf(c: Clause): string[] {
   const out = new Set<string>(["any"]);
   if (c.k === "act") verbCats(c.eff).forEach((k) => out.add(k));
-  else if (c.k === "when" || c.k === "delay") { out.add("struct"); c.effs.forEach((e) => verbCats(e).forEach((k) => out.add(k))); }
+  else if (c.k === "when" || c.k === "delay" || c.k === "assert") { out.add("struct"); if (c.k === "assert") assertionClauses(c).flatMap(catsOf).forEach(k => out.add(k)); else c.effs.forEach((e) => verbCats(e).forEach((k) => out.add(k))); }
   else if (c.k === "status") out.add("status");
   else if (c.k === "redirect") { out.add("def"); out.add("guard"); }
   else out.add("struct");
@@ -119,6 +139,7 @@ const amNums = (a: Amt): number[] => (typeof a === "number" ? [a] : [a.q.win.n >
 export function numsOf(c: Clause, cx?: Cls | null): number[] {
   const lim = cx === "限制";   // 限制流：「以后 N 轮 / 之前 N 句」的窗口数字、「至多」次数不占数字牌（flatMap 会把下标塞进第二个参数，所以要判类型）
   switch (c.k) {
+    case "assert": return [lim ? 1 : c.win.n, ...assertionClauses(c).flatMap(x => numsOf(x,cx))];
     case "act": return effNums(c.eff);
     case "when": return [lim ? 1 : c.q.win.n === 99 ? 1 : c.q.win.n, lim ? 1 : c.cap, c.q.tight === 99 ? 1 : c.q.tight ?? 1, ...c.effs.flatMap(effNums)];
     case "delay": return [c.wait, ...c.effs.flatMap(effNums)];
@@ -132,6 +153,7 @@ export function numsOf(c: Clause, cx?: Cls | null): number[] {
 export function clauseCost(c: Clause, cx?: Cls | null): number {
   const ec = (x: Eff) => (P2.COSTREAL ? (x.ignore ? P.PIERCE : 0) : x.verb === "dmg" ? P.BASE + (x.ignore ? P.PIERCE : 0) : x.verb === "heal" ? P.HEALC : P.SHC) + (tgN(x.tg) > 1 ? P2.AOE * (tgN(x.tg) - 1) : 0);
   switch (c.k) {
+    case "assert": return P.STAND + Math.max(...[assertionBranch(c,true), assertionBranch(c,false)].map(cs => cs.reduce((n,x,i) => n + clauseCost(x,cx) + (i > 0 && !isChain(x) ? Math.max(0,P.AND - (cx === "并" ? P2.AND_BING : 0)) : 0), 0)));
     case "act": return ec(c.eff);
     case "when": return P.STAND + (c.q.obj.t === "cat" && c.q.obj.c === "any" ? P.ANYCLS : 0);
     case "delay": case "ignore": return P.STAND;
@@ -144,7 +166,7 @@ export function clauseCost(c: Clause, cx?: Cls | null): number {
   }
 }
 /** 真实引擎里的「纯防御句」：每一段都是减伤 / 转移 / 恢复。同一秒里它们先生效 */
-export const isDefSentence = (cl: Sentence) => cl.every((c) => c.k === "redirect" || (c.k === "act" && c.eff.verb !== "dmg"));
+export const isDefSentence = (cl: Sentence) => cl.every((c) => c.k === "redirect" || (c.k === "act" && c.eff.verb !== "dmg") || (c.k === "assert" && isDefSentence(assertionClauses(c))));
 const isChain = (c: Clause) => c.k === "act" && !!c.ifPrev;
 const AGG_WORD = { count: "次数", sum: "累计", len: "词数", segs: "段数" } as const;
 /** 全程 = 之前窗口里的 99（只许「之前」）；价格 = 当前轮数，不低于 2 */
@@ -159,7 +181,8 @@ export function refKindsOf(cl: Sentence): string[] {
   };
   const am = (a: Amt) => { if (typeof a !== "number") q(a.q); };
   for (const c of cl) {
-    if (c.k === "when") { out.push("cond", "judge"); q(c.q); c.effs.forEach((e) => am(e.n)); }
+    if (c.k === "assert") { out.push("cond", "judge", "win", "ref", ...refKindsOf(assertionClauses(c))); }
+    else if (c.k === "when") { out.push("cond", "judge"); q(c.q); c.effs.forEach((e) => am(e.n)); }
     else if (c.k === "delay") c.effs.forEach((e) => am(e.n));
     else if (c.k === "act") am(c.eff.n);
     else if (c.k === "remove" && !(c.obj.t === "cat" && c.obj.c === "any")) out.push("ref");
@@ -174,6 +197,11 @@ export function advWordsOf(cl: Sentence): string[] {
     if (c.k === "act") am(c.eff.n); else if (c.k === "when" || c.k === "delay") c.effs.forEach((e) => am(e.n));
     if (i > 0 && !isChain(c)) out.push("并");
     if (c.k === "act") { if (c.eff.verb === "shield") out.push("减伤"); if (c.eff.ignore) out.push("无视"); }
+    else if (c.k === "assert") {
+      out.push("断言");
+      if (c.obj.t === "order") out.push("先后");
+      out.push(...advWordsOf(assertionBranch(c,true)), ...advWordsOf(assertionBranch(c,false)));
+    }
     else if (c.k === "when") {
       if (c.forbid) out.push("不得"); else if ((c.q.tight ?? 1) > 1) out.push("收紧");
       if (c.cap > 1) out.push("至多");
@@ -191,7 +219,7 @@ export function advWordsOf(cl: Sentence): string[] {
 }
 /** 句子里「累计」量出现几处（只数数值位置） */
 export function sumCount(cl: Sentence): number {
-  let n = 0;
+  let n = cl.filter(c => c.k === "assert").reduce((n,c) => n + sumCount(assertionClauses(c as Assertion)),0);
   const am = (x: Amt) => { if (typeof x !== "number" && x.q.agg === "sum") n++; };
   for (const c of cl) { if (c.k === "act") am(c.eff.n); else if (c.k === "when" || c.k === "delay") c.effs.forEach((e) => am(e.n)); }
   return n;
@@ -224,6 +252,7 @@ const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.w
 const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `重复${e.rep}次` : ""}`;
 export function clauseText(c: Clause): string {
   switch (c.k) {
+    case "assert": return `断言 ${c.scope === "side" ? `${whoText(c.who as Who)}${winText(c.win)}` : `${winText(c.win)}${c.who === "all" ? "全部" : whoText(c.who)}`} ${c.judge === "absent" ? "不存在" : "存在"}${objText(c.obj)}，奖励 ${assertionBranch(c,true).map(clauseText).join(" 并 ")}${c.otherwise || c.alternatives ? `；否则 ${assertionBranch(c,false).map(clauseText).join(" 并 ")}` : ""}`;
     case "act": return `${c.ifPrev ? (c.ifPrev === "ok" ? "若成功，" : "若失败，") : ""}${effText(c.eff)}`;
     case "when": return `${c.forbid ? "不得：" : c.q.win.dir === "after" ? "每当" : "若"} ${winText(c.q.win)} ${whoText(c.q.who)}${c.judge === "absent" ? "不存在" : "存在"}${objText(c.q.obj)}${(c.q.tight ?? 1) > 1 && !c.forbid ? `(收紧${c.q.tight})` : ""}，则 ${c.effs.map(effText).join("并")}${c.cap > 1 ? `（至多${c.cap}次）` : ""}`;
     case "delay": return `${c.wait}轮后：${c.effs.map(effText).join("并")}`;
@@ -238,6 +267,7 @@ export function clauseText(c: Clause): string {
 }
 /** 玩家拼不出来的句子：「全程」只能读已发生的事，不能写成「以后全程」（长期句子的窗口 ≥99、无视 ≥99 都不合法）；定时内部用的 99 不算 */
 export function legal(cl: Sentence): boolean {
+  if (cl.some((c) => c.k === "assert" && (c.win.dir !== "after" || !Number.isInteger(c.win.n) || c.win.n < 1 || c.win.n >= 99 || !["all", "me", "foe"].includes(c.who) || !["all", "side"].includes(c.scope) || (c.scope === "side" && c.who === "all") || !assertionBranch(c,true).length || ((c.otherwise || c.alternatives) && !assertionBranch(c,false).length) || (c.win.unit === "sent" && c.obj.t === "ev" && c.obj.e !== "decl") || ![assertionBranch(c,true), assertionBranch(c,false)].every(cs => !cs.length || (legal(cs)))))) return false;
   return cl.every((c) => !(c.k === "when" && c.q.win.dir === "after" && c.q.win.n >= 99) && !(c.k === "ignore" && c.win >= 99) && !(c.k === "status" && c.dur >= 99)
     && !(c.k === "redirect" && !P2.REDIR) && !(c.k === "postpone" && !P2.POSTPONE) && !(c.k === "strip" && !P2.RMREAL) && !(c.k === "remove" && P2.RMREAL)
     && !((c.k === "act" && (c.eff.rep ?? 1) > 1 && !P2.REP) || (c.k === "act" && (c.eff.rep ?? 1) > 1 && c.eff.verb === "shield")));
@@ -248,6 +278,7 @@ export const sentenceText = (cl: Sentence) => cl.map(clauseText).join(" 并 ");
 /** 一个子句的「动作词」：并流一句里同一个动作词只能出现一次 */
 export function actionWordOf(c: Clause): string {
   switch (c.k) {
+    case "assert": return "断言";
     case "act": return verbWord(c.eff);
     case "status": return STATUS_WORD[c.kind];
     case "redirect": return "转移";
@@ -262,7 +293,9 @@ export function actionWordOf(c: Clause): string {
 const QUANT_WORDS = ["累计", "次数", "词数", "段数"];
 /** 职业对句子的限制：返回拒绝原因（空串 = 通过） */
 export function classProblem(cl: Sentence, cx: Cls | null): string {
+  for (const c of cl) if (c.k === "assert") for (const branch of [assertionBranch(c,true),assertionBranch(c,false)]) if (branch.length > segCap(cx)) return "断言分支超过段数限制";
   if (!P2.CLASSES || !cx) return "";
+  for (const c of cl) if (c.k === "assert") for (const branch of [assertionBranch(c,true),assertionBranch(c,false)]) { const problem = classProblem(branch,cx); if (branch.length > segCap(cx)) return "分支超过职业段数限制"; if (problem) return problem; }
   if (cx === "并") { const seen = new Set<string>(); for (const c of cl) { const w = actionWordOf(c); if (seen.has(w)) return "并流:同一动作词只能用一次"; seen.add(w); } }
   else if (cx === "引用") { if (advWordsOf(cl).filter((w) => QUANT_WORDS.includes(w)).length > 1) return "引用流:最多一个引用量词"; }
   else if (cx === "限制") { for (const c of cl) if (c.k === "act" && c.eff.verb === "dmg" && typeof c.eff.n === "number" && c.eff.n > P2.CAP_LIM) return "限制流:单次伤害不能超过上限"; }

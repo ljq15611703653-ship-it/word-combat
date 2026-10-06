@@ -58,6 +58,7 @@ if ((((globalThis as any).process?.env) ?? {}).LAB2) Object.assign(P2, JSON.pars
 
 /** 进阶词：价格 / 每副卡组最多几张 */
 export const ADV: Record<string, { price: number; max: number }> = {
+  断言: { price: 3, max: 2 },
   并: { price: 2, max: 3 }, 减伤: { price: 2, max: 3 }, 定时: { price: 3, max: 2 }, 移除: { price: 3, max: 2 },
   兑现: { price: 2, max: 1 }, 无视: { price: 3, max: 2 }, 不得: { price: 3, max: 2 }, 收紧: { price: 2, max: 3 },
   至多: { price: 2, max: 2 }, 先后: { price: 3, max: 1 }, 灼烧: { price: 2, max: 2 }, 易伤: { price: 2, max: 2 }, 衰弱: { price: 2, max: 2 },

@@ -117,6 +117,12 @@ for (const n of BEATS) {
     if (r === "NOROW" || r === "NOGO" || r.startsWith("NOCARD")) { console.log("!! 拖拽拼句卡住", r); await shot(`${tag}_b${n}_STUCK`); allOk = false; break; }
     if (!bg) { bg = await ev("getComputedStyle(document.documentElement).getPropertyValue('--bg-url')"); art = await ev("[...document.querySelectorAll('.unit.me img')].map(i=>i.src.split('/').slice(-2).join('/')).join(',')"); }
     const rn = await ev("window.__tb?.m?.rnd ?? 0");
+    if (await ev("!!document.querySelector('.unit.me.editing') && !!window.__tb?.dock?.tokens.includes('奖励')")) {
+      const auto = await ev("[...document.querySelectorAll('.strip .w-ghost')].some(e=>e.textContent==='奖励') && !document.querySelector('.lib [data-t=奖励]')");
+      if (!auto) { console.log("!! 奖励未作为自动灰色提示词显示"); allOk = false; break; }
+      const ak = `auto-reward-${rn}`;
+      if (!seen.has(ak)) { seen.add(ak); console.log("自动灰色奖励 OK", rn); await shot(`${tag}_b${n}_r${rn}_auto_reward`); }
+    }
     const t = r === "mainS" ? "settle" : r === "mainN" ? "next" : r.startsWith("unit") ? "guide" : r;
     const key = `b${n}_r${rn}_${t}`;
     if (r === "pick") { const k = await ev("(window.__tb?.dock?.tokens?.length ?? 0)"); const kk = `${key}${k}`; if ((k === 1 || k === 3) && !seen.has(kk)) { seen.add(kk); await sleep(250); await shot(`${tag}_${kk}`); } }
@@ -127,6 +133,7 @@ for (const n of BEATS) {
     last = r; steps++;
     await sleep(r === "wait" ? 250 : r === "dialog" ? 60 : 140);
   }
+  if (last !== "SELECT" && !(await ev("!!document.querySelector('.st-select')"))) { allOk = false; console.log("!! 未完成关卡", n, last); }
   console.log("beat", n, "steps", steps, "last", last, "bg", bg, "art", art, "errors", await ev("__dj.errors.length"));
 }
 console.log(allOk ? "ALL OK" : "有失败", errs.length, await ev("JSON.stringify(__dj.errors.slice(0,3))"));

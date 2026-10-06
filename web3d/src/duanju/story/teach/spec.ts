@@ -1,5 +1,6 @@
 // 课程表里的「句子规格」：构造 AST（电脑脚本用）、匹配 AST（引导步骤用）、按允许词表过滤。
 import { act, dmg, heal, shield, status, unit, redirect, postpone, strip, type Sentence, type Clause, type Tg } from "../../engine/ast";
+import { assertionBranch } from "../../engine/ast";
 
 export interface ClauseSpec {
   verb?: "dmg" | "heal" | "shield"; n?: number; rep?: number;
@@ -14,7 +15,7 @@ export interface ClauseSpec {
 }
 export interface Allow {
   verbs?: ("dmg" | "heal" | "shield")[];
-  kinds?: ("status" | "redirect" | "postpone" | "strip" | "when" | "delay")[];
+  kinds?: ("status" | "redirect" | "postpone" | "strip" | "when" | "delay" | "assert")[];
   statuses?: ("burn" | "vuln" | "weak")[];
   maxN?: number; maxClauses?: number; rep?: boolean; quote?: boolean;
   /** 允许的目标随从；空 = 不限 */
@@ -90,6 +91,7 @@ export function allowedFn(a: Allow): (cl: Sentence) => boolean {
       if (c.k === "strip") return !!a.kinds?.includes("strip") && tgList(c.tg).length === 1;
       if (c.k === "when") return !!a.kinds?.includes("when");
       if (c.k === "delay") return !!a.kinds?.includes("delay");
+      if (c.k === "assert") return !!a.kinds?.includes("assert") && [assertionBranch(c,true),assertionBranch(c,false)].every(branch => !branch.length || allowedFn(a)(branch));
       return false;
     });
   };

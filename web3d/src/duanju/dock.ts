@@ -5,7 +5,7 @@
 //   教程用 setGuide(Guide)：lockWords 之外的词拿不起来，hint 里的下一个词在词牌库里脉冲提示，句子条末尾亮「放这里」。
 import { zh, unitLabel, sentenceText, P2, KIND_ORDER } from "./engine/api";
 import { canAfford, windupFor, resolveTgs } from "./engine/interp";
-import { astToTokens, nextLegal, tokenLabel, isAdvWord, prefixWhy, structOk, vocabulary, normAst, type Token } from "./composer/grammar";
+import { astToTokens, nextLegal, tokenLabel, isAdvWord, prefixWhy, structOk, vocabulary, normAst, fillAssertionReward, type Token } from "./composer/grammar";
 import type { Guide, Match, Sentence } from "./types";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
@@ -146,6 +146,7 @@ export class Dock {
 
   // ---------------------------------------------------------------- 刷新
   refresh() {
+    if (this.unit >= 0) this.tokens = fillAssertionReward(this.tokens);
     this.cache.clear();
     const m = this.api.match, pk = this.probe();
     const idle = pk < 0;
@@ -168,6 +169,7 @@ export class Dock {
     if (hint && hint.length > base.length && base.every((t, i) => t === hint[i])) nextHint = hint[base.length];
     const buckets = new Map<string, Token[]>(GROUPS.map(([g]) => [g, []]));
     for (const t of U) {
+      if (t === "奖励") continue; // 自动连接词，无需手拖
       if (isNum(t) && +t > maxCard) continue;
       // 只摆语法上放得进当前句某个缝的词
       let any = false;
@@ -220,7 +222,7 @@ export class Dock {
     let h = `<i>本轮</i><span class="strip${this.slots ? " dragon" : ""}">`;
     const slot = (i: number) => (this.slots?.has(i) ? `<i class="slot${i === this.hot ? " hot" : ""}" data-i="${i}"></i>` : "");
     if (!this.tokens.length) h += `${slot(0)}<span class="strip-empty">${this.api.match.s.done[u] ? "" : "把词牌拖到这里"}</span>`;
-    else { this.tokens.forEach((t, i) => { h += `${slot(i)}<span class="w k-${kindOf(t)}${i === this.lifted ? " lifted" : ""}" data-i="${i}">${esc(tokenLabel(t, names))}</span>`; }); h += slot(this.tokens.length); }
+    else { this.tokens.forEach((t, i) => { h += t === "奖励" ? `${slot(i)}<span class="w-ghost" title="条件完整后自动填入">奖励</span>` : `${slot(i)}<span class="w k-${kindOf(t)}${i === this.lifted ? " lifted" : ""}" data-i="${i}">${esc(tokenLabel(t, names))}</span>`; }); h += slot(this.tokens.length); }
     const GH: Record<string, string> = { 造成: "伤害", 恢复: "生命" }, nt = this.tokens.length;
     if (nt >= 2 && /^\d+$/.test(this.tokens[nt - 1]) && GH[this.tokens[nt - 2]]) h += `<span class="w-ghost" aria-hidden="true">${GH[this.tokens[nt - 2]]}</span>`;
     h += `<span class="cp-end${hinting ? " hint" : ""}"></span></span>`;
@@ -233,7 +235,7 @@ export class Dock {
       h += `<div class="tgt-hint"><b>此时可选择目标</b>${need && got > 0 && got < need ? `，已选${CN[got]}个` : ""}，请点击或拖拽词卡。</div>`;
     }
     decl.innerHTML = h;
-    decl.querySelectorAll<HTMLElement>(".strip .w").forEach((w) => w.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); this.startDrag(e, this.tokens[+w.dataset.i!], { plate: +w.dataset.i! }, null); }));
+    decl.querySelectorAll<HTMLElement>(".strip .w").forEach((w) => { if (this.tokens[+w.dataset.i!] === "奖励") { w.title = "条件完整后自动填入的连接词"; return; } w.addEventListener("pointerdown", (e) => { if (e.button !== 0) return; e.preventDefault(); e.stopPropagation(); this.startDrag(e, this.tokens[+w.dataset.i!], { plate: +w.dataset.i! }, null); }); });
     // 读法 / 花费 / 起手
     const c = this.comp, q = <T extends HTMLElement>(s: string) => c.querySelector<T>(s)!;
     const slider = q<HTMLInputElement>("input"), read = q(".cread"), meta = q(".cmeta"), go = q<HTMLButtonElement>(".go");
@@ -259,7 +261,7 @@ export class Dock {
     // 目标：场上能当目标的随从亮边
     this.api.stage.querySelectorAll<HTMLElement>(".unit").forEach((e) => { const t = "@" + e.dataset.u; e.classList.toggle("cp-tgt", this.cur!.ok.has(t) && (!this.guide?.lockWords || this.guide.lockWords.includes(t))); });
   }
-  private back() { this.say(""); this.tokens.pop(); this.refresh(); }
+  private back() { this.say(""); if (this.tokens.at(-1) === "奖励") this.tokens.pop(); this.tokens.pop(); this.refresh(); }
   /** 程序化确认（测试/教程） */
   confirm(): boolean {
     if (this.unit < 0 || !this.comp) return false;

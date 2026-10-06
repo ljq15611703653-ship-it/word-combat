@@ -90,6 +90,9 @@ function extras(s: St, side: Side, u: number, r: Rng, k: number): Sentence[] {
   const maxN = Math.max(1, ...ready) + (P2.POS && u % 3 === 1 ? P2.POS_NUM : 0);
   const e: Env = { s, side, unit: u, r, maxN, foes, mine };
   const raw: Sentence[] = [];
+  if ((s.deck[side]?.断言 ?? 0) > 0) for (const f of foes) raw.push([
+    { k: "assert", scope: "side", who: "foe", win: { dir: "after", unit: "sent", n: 1 }, obj: { t: "word", w: "造成" }, judge: "exist", effs: [shield(1, unit(u))], otherwise: [dmg(1, unit(f))] },
+  ]);
   const cap = Math.min(maxN, 6);
   for (const f of foes) for (let n = 4; n <= cap; n++) raw.push([act(dmg(n, unit(f)))]);                 // 大单击（骰牌 / 数位）
   for (const N of [2, 3]) {                                                                               // 选择 N 个：N 本身占数字牌（牌面 ≥ N）

@@ -4,7 +4,7 @@ import { P } from "./lab-rules";
 import {
   newGame, declare, passUnit, nextSide, resolveRound, nextRound, canAfford, windupFor, alive, unitsOf, setTrace, type St,
 } from "./interp";
-import { sentenceText, clauseText, advWordsOf, type Sentence, type Clause } from "./ast";
+import { sentenceText, clauseText, advWordsOf, assertionClauses, type Sentence, type Clause } from "./ast";
 import { candidates, mulberry32, type Rng } from "./gen";
 import { think, TIERS, TIER_NAMES, type Ai2Cfg as AiCfg } from "./ai2";
 import { randDeck, randKws } from "./deck";
@@ -58,6 +58,7 @@ const sText = (cl: Sentence) => zh(sentenceText(cl));
 const STATUS_ZH = { burn: "灼烧", vuln: "易伤", weak: "衰弱" } as const;
 
 export function sentenceKind(cl: Sentence): string {
+  if (cl.some((c) => c.k === "assert")) return "条件";
   if (cl.some((c: Clause) => c.k === "when" && c.forbid)) return "限制";
   if (cl.some((c) => c.k === "when" && c.q.win.dir === "after")) return "长期";
   if (cl.some((c) => c.k === "when")) return "条件";
@@ -193,6 +194,7 @@ export class Match {
         case "absorb": ev.push({ sec: e.sec, type: "absorb", src: e.src, tgt: e.u, amount: e.amt, text: `挡${e.amt}` }); break;
         case "status": ev.push({ sec: e.sec, type: "status", src: e.src, tgt: e.u, amount: 1, text: STATUS_ZH[e.kind as keyof typeof STATUS_ZH] ?? e.kind }); break;
         case "standing": ev.push({ sec: e.sec, type: "standing", src: e.u, tgt: -1, amount: 0, text: zh(clauseText(e.c)) }); break;
+        case "assertion": ev.push({ sec: e.sec, type: "standing", src: e.u, tgt: -1, amount: 0, text: e.yes ? "断言成立：执行奖励分支" : "断言不成立：执行否则分支" }); break;
         case "down": downed.add(e.u); hp[e.u] = 0; ev.push({ sec: e.sec, type: "down", src: e.src, tgt: e.u, amount: 0, text: "倒下" }); if (diceOf.has(e.u)) { ev.push(diceOf.get(e.u)!); diceOf.delete(e.u); } break;
         case "dice": diceOf.set(e.u, { sec: e.sec, type: "dice", src: -1, tgt: e.u, amount: e.roll, text: `投骰 ${e.roll} → 获得数字牌 ${e.roll}` }); break;   // 等该随从的「倒下」事件之后再放
         case "heat":
@@ -215,7 +217,7 @@ export class Match {
     return {
       hp: s.hp[u], sh: s.sh[u], alive: s.hp[u] > 0, kw: s.kw[u] || "", kwUsed: s.kwUsed[u], redir: s.redir[u],
       sts: s.sts.filter((x) => x.unit === u).map((x) => ({ kind: STATUS_ZH[x.kind], lvl: x.lvl, left: P2.STAUTO ? Math.max(0, (x.end ?? 0) - s.rnd + 1) : x.left })),
-      standing: s.stand.filter((x) => x.owner === (u < 3 ? 0 : 1) && x.unit === u).map((x) => ({ text: zh(clauseText(x.c)), left: x.left, active: x.active })),
+      standing: s.stand.filter((x) => x.owner === (u < 3 ? 0 : 1) && x.unit === u && x.left !== -1).map((x) => ({ text: zh(clauseText(x.c)), left: x.left, active: x.active })),
       decl: s.decl.filter((d) => d.unit === u).map((d): DeclView => ({ side: d.side, unit: d.unit, text: sText(d.cl), start: d.start, cost: d.cost }))[0] ?? null,
       done: s.done[u],
     };
@@ -236,6 +238,7 @@ function clauseKinds(cl: Sentence): string[] {
   const eff = (e: any) => { out.push(e.verb); if (typeof e.n !== "number") out.push("quote"); if (e.ignore) out.push("nullify"); };
   for (const c of cl as any[]) {
     switch (c.k) {
+      case "assert": out.push("cond", ...clauseKinds(assertionClauses(c))); break;
       case "act": eff(c.eff); break;
       case "when": out.push(c.forbid ? "forbid" : c.q.win.dir === "after" ? "standing" : "cond"); c.effs.forEach(eff); break;
       case "delay": out.push("delay"); c.effs.forEach(eff); break;

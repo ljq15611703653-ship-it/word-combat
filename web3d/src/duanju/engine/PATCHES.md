@@ -1,6 +1,14 @@
 # 对 lab2 引擎拷贝的补丁（全部由 scripts/sync-engine.mjs 自动施加；lab2 原文件没有被改）
 
-想合回 lab2 的话，只需要 T1。其余是为了在浏览器里跑的机械替换。
+游戏还包含独立规则补丁；同步时必须保留下面的 T5。
+
+## T5 断言／奖励／否则（游戏专有）
+
+`scripts/duanju-assertion.patch` 保存 ast/interp/params 的规则变更。`sync-engine.mjs` 在旧机械补丁之后通过 `engine-game-patch.mjs` 应用；上下文不一致会报错，不能静默覆盖。更新游戏规则后重新生成这三个文件的差异，并用 `ENGINE_DIR` 指向临时目录验证同步结果，不改 lab2 仓库。
+
+断言只有未来有限窗口；只判一次，成立选奖励，否则选否则。双方下一句与单方下一句由词序决定。两条分支可以包含任意合法子句，按原规则检查职业、目标、数字、词牌及段数；宣告预付两边资源，行动点按较贵分支计。句窗口不足本轮失效；轮窗口末判定。分支创建的定时/长期句从实际选择时开始生效，仍随施法者死亡清除。
+
+验证：`node node_modules/tsx/dist/cli.mjs scripts/duanju-assertion-test.ts`，以及主线、特训冒烟。词表和断言预设也由同步脚本补入，不能只修改生成文件。
 
 ## 机械替换（每个文件）
 - `"../lab/rules"` 改成 `"./lab-rules"`（lab/rules.ts 同步拷成 engine/lab-rules.ts）

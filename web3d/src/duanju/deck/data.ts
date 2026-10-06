@@ -2,6 +2,11 @@
 export interface WordInfo { cat: string; icon: string; desc: string; example: string }
 export const CATEGORIES = [{"id":"core","name":"攻防结构","color":"#ff4fa3"},{"id":"quote","name":"引用量","color":"#22e6ff"},{"id":"state","name":"状态","color":"#ffc857"},{"id":"limit","name":"限制与条件","color":"#a98bff"},{"id":"time","name":"时机与清除","color":"#3dffb0"}] as const;
 export const WORD_INFO: Record<string, WordInfo> = {
+ "断言": {
+  "cat": "limit", "icon": "◇",
+  "desc": "一次判断，二选一：成立执行奖励，不成立执行否则。先写我方/对方再写以后N句，只数指定方；先写以后N句再写全部/我方/对方，先数双方再筛选。句子窗口从宣告后计数，后果在起手秒生效；没等到足够宣告，本轮失效。轮窗口结束后判断。两个分支均可接任意合法子句，用并组合；两边资源在宣告时预付，行动点按较贵分支计。否则只接断言，施法者倒下会清除。",
+  "example": "断言 对方 以后1句 存在「造成」，奖励 减伤2；否则 恢复2"
+ },
  "并": {
   "cat": "core",
   "icon": "＋",
@@ -120,5 +125,7 @@ export const WORD_INFO: Record<string, WordInfo> = {
 
 /** 推荐配置（deckbuilder PRESETS；cls-* 是四个职业的推荐卡组） */
 export const PRESETS: { id: string; name: string; deck: Record<string, number> }[] = [{"id":"newbie","name":"新手攻防","deck":{"并":2,"减伤":2,"无视":1,"至多":1,"收紧":1}},{"id":"forbid","name":"「不得」卡组","deck":{"不得":2,"收紧":2,"移除":1,"并":1,"至多":1}},{"id":"quote","name":"「引用」卡组","deck":{"累计":1,"次数":1,"词数":1,"段数":1,"并":1}},{"id":"state","name":"「状态」卡组","deck":{"灼烧":2,"易伤":2,"衰弱":1,"并":2,"兑现":1}},{"id":"cls-bing","name":"「并」·推荐","deck":{"并":3,"减伤":2,"易伤":2,"灼烧":1,"衰弱":1}},{"id":"cls-quote","name":"「引用」·推荐","deck":{"累计":1,"次数":1,"定时":1,"词数":1,"并":1}},{"id":"cls-limit","name":"「不得」·推荐","deck":{"不得":2,"收紧":2,"至多":2,"移除":1}},{"id":"cls-state","name":"「状态」·推荐","deck":{"灼烧":2,"易伤":2,"衰弱":2,"并":3}},{"id":"balance","name":"均衡","deck":{"并":1,"减伤":1,"定时":1,"不得":1,"灼烧":1,"易伤":1,"次数":1}}];
+
+PRESETS.push({ id: "assert", name: "「断言」·攻守分支", deck: { "断言": 2, "减伤": 2, "并": 1, "灼烧": 1, "移除": 1 } });
 
 export const KEYWORDS: { name: string; desc: string }[] = [{"name":"首挡","desc":"每轮第一次被敌人打中，整下挡掉（先过减伤，再挡；灼烧、过热不算被打中）。"},{"name":"不屈","desc":"每轮第一次被打到 0 血，留 1 血（秒末判定；过热、灼烧打到 0 也有效）。"}];

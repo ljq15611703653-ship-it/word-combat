@@ -4,9 +4,10 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { applyGamePatch } from "./engine-game-patch.mjs";
 
 const LAB = process.env.LAB_DIR ?? "D:/wc/nc_lab/web3d/src";
-const OUT = resolve(dirname(fileURLToPath(import.meta.url)), "../src/duanju/engine");
+const OUT = process.env.ENGINE_DIR ?? resolve(dirname(fileURLToPath(import.meta.url)), "../src/duanju/engine");
 mkdirSync(OUT, { recursive: true });
 const FILES = ["ast", "interp", "params", "gen", "playbook", "ai", "tiers", "deck", "arena"];
 const ENVSHIM = '(((globalThis as any).process?.env) ?? {})';
@@ -82,7 +83,7 @@ function koNow(`);
     t = must(f, t, "if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; s.stand", "if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; rollDown(s, u); s.stand");
   }
   if (f === "deck") {}
-  writeFileSync(`${OUT}/${f}.ts`, header(`lab2/${f}.ts`) + t);
+  writeFileSync(`${OUT}/${f}.ts`, applyGamePatch(f, header(`lab2/${f}.ts`) + t));
 }
 let r = fix(readFileSync(`${LAB}/lab/rules.ts`, "utf8"));
 r = must("lab-rules", r, "export interface Card { v: number; cd: number }", "export interface Card { v: number; cd: number; once?: boolean }   // once = 一次性牌（骰牌）：用掉就消失，不冷却");
@@ -111,6 +112,9 @@ writeFileSync(`${OUT}/rules.real.json`, JSON.stringify(toRules(rl.LAB, { TGT_AT_
 // 卡组词表 / 推荐配置（D:/wc/deckbuilder/words.js）
 const wj = await import(pathToFileURL("D:/wc/deckbuilder/words.js").href);
 const EX = { "我方最低血 减伤3": "选择2个我方随从 减伤3", "2轮后：对敌方最低血 造成 对方攻击词次数×2": "2轮后：对选择的敌方随从 造成 对方攻击词次数×2" };   // S1：示例里不出现「最低血」
-writeFileSync(`${OUT}/deck-words.json`, JSON.stringify({ presets: wj.PRESETS, words: wj.WORDS.map((w) => ({ name: w.name, area: w.area, max: w.max, cat: w.cat, desc: w.desc, example: EX[w.example] ?? w.example })), cats: wj.CATEGORIES }, null, 1));
+const words = wj.WORDS.map((w) => ({ name: w.name, area: w.area, max: w.max, cat: w.cat, desc: w.desc, example: EX[w.example] ?? w.example }));
+words.push({ name: "断言", area: 3, max: 2, cat: "limit", desc: "未来窗口只判断一次：成立执行奖励，不成立执行否则。先写我方/对方只数指定方；先写以后N句数双方，再筛选。否则只接断言，可写任意合法子句或组合。", example: "断言 对方 以后1句 存在造成 奖励减伤2 否则恢复2" });
+const presets = [...wj.PRESETS, { id: "assert", name: "「断言」·攻守分支", deck: { "断言": 2, "减伤": 2, "并": 1, "灼烧": 1, "移除": 1 } }];
+writeFileSync(`${OUT}/deck-words.json`, JSON.stringify({ presets, words, cats: wj.CATEGORIES }, null, 1));
 console.log(bad ? `完成，但有 ${bad} 处补丁没对上` : "同步完成 →", OUT);
 process.exit(bad ? 1 : 0);

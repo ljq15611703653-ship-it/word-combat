@@ -1,10 +1,11 @@
+import { assertionBranch } from "../engine/ast";
 // 逐词拼句的「词语言」：词序列 <-> lab2 语法树（AST）的双向转换 + nextLegal（此刻允许的下一个词）。
 // 词（Token）就是字符串：数字 "3"、动词 "造成"、目标 "@4"（4 号随从）、对象 "类:atk" / "事:hurt" / "词:造成" / "第2句" 等。
 // 词表与语法见 README.md。同一个递归下降解析器既负责 tokensToAst，也负责告诉你「接下来可以写什么」（Stop.opts）。
 import type { Sentence, Clause, Eff, Tg, Amt, Obj, Win } from "../engine/ast";
 import { legal, advWordsOf, refKindsOf, sentenceCost, numsOf, classProblem, segCap } from "../engine/ast";
 import { P, P2, ADV } from "../engine/api";
-import { canAfford, resolveTgs, pickCards, alive, unitsOf, windupFor, type St } from "../engine/interp";
+import { canAfford, resolveTgs, statusConflict, pickCards, alive, unitsOf, windupFor, type St } from "../engine/interp";
 
 export type Token = string;
 
@@ -20,7 +21,7 @@ const AGG_OF: Record<string, "sum" | "count" | "len" | "segs"> = { 累计: "sum"
 const AGG_TOK = { sum: "累计", count: "次数", len: "词数", segs: "段数" } as const;
 export const CATS = ["atk", "dmg", "heal", "hpchg", "def", "guard", "status", "struct", "any", "dealt", "taken"];
 export const EVS = ["down", "hurt", "healed", "decl"];
-export const OBJ_WORDS = ["造成", "恢复", "减伤", "灼烧", "易伤", "衰弱", "移除", "定时", "兑现", "不得", "转移", "延后", "无视"];
+export const OBJ_WORDS = ["造成", "恢复", "减伤", "灼烧", "易伤", "衰弱", "移除", "定时", "兑现", "不得", "转移", "延后", "无视", "断言", "奖励", "否则"];
 export const NTHS = [1, 2, 3, 4, 5, 6];
 // 已取消「全体」「最低血」关键词：想打多个目标 = 选择 N 个 + 点选 N 个随从。"敌方随从/我方随从" 只在非 TGT_AT_DECL（自动选血量最低的 N 个）下出现
 const ALIAS = ["敌方随从", "我方随从"];
@@ -38,7 +39,7 @@ export interface Parsed { ast: Sentence | null; opts: Spec[]; req: Spec[]; compl
 
 const num = (min = 1): Spec => ({ c: "NUM", min });
 class Parser {
-  i = 0; acc: Spec[] = [];
+  i = 0; acc: Spec[] = []; branchDepth = 0;
   constructor(public t: Token[]) {}
   private ok(s: Spec, tok: Token): boolean {
     if (typeof s === "string") return s === tok;
@@ -115,7 +116,7 @@ class Parser {
     return { q, mult };
   }
   /** 一个效果：动词已读，接 数字/引用量 + 目标 + [重复 n] + [无视] */
-  eff(verbTok: string, src = false): Eff {
+  eff(verbTok: string, src = this.branchDepth > 0): Eff {
     const verb = VERB_OF[verbTok];
     const n = this.amt();
     const tg = this.tg(verb === "dmg" ? "foe" : "me", src);
@@ -130,7 +131,21 @@ class Parser {
     return out;
   }
   clause(): Clause {
-    const tok = this.req([...VERBS, ...STATUS_KINDS, "每当", "若", "不得", "定时", "无视", "兑现", "移除", "转移", "延后"]);
+    const tok = this.req([...VERBS, ...STATUS_KINDS, "断言", "每当", "若", "不得", "定时", "无视", "兑现", "移除", "转移", "延后"]);
+    if (tok === "断言") {
+      const head = this.req(["全部", "我方", "对方", "敌方", "以后"]);
+      const scope = head === "我方" || head === "对方" || head === "敌方" ? "side" : "all";
+      if (head !== "以后") this.req(["以后"]);
+      const win = this.winTail("after");
+      const whoTok = head === "以后" ? this.req(["全部", "我方", "对方", "敌方"]) : head;
+      const who = whoTok === "全部" ? "all" : whoTok === "我方" ? "me" : "foe";
+      const judge = this.req(["存在", "不存在"]) === "存在" ? "exist" : "absent";
+      const obj = this.obj();
+      this.req(["奖励"]);
+      const rewards = this.branch();
+      const alternatives = this.opt(["否则"]) ? this.branch() : undefined;
+      return { k: "assert", win, who, scope, obj, judge, effs: [], rewards, ...(alternatives ? { alternatives } : {}) };
+    }
     if (tok in VERB_OF) return { k: "act", eff: this.eff(tok) };
     if (tok in STATUS_OF) {
       const tg = this.tg("foe");
@@ -168,6 +183,18 @@ class Parser {
     if (isUnitTok(nx) || isAliasTok(nx) || nx === "选择") return { k: "strip", tg: this.tg("foe") };
     return { k: "remove", obj: this.obj() };
   }
+  branch(): Sentence {
+    this.branchDepth++;
+    const cl = [this.clause()];
+    for (;;) {
+      const j = this.opt(["并", "且", "若成功", "若失败"]);
+      if (!j) break;
+      if (j === "并" || j === "且") cl.push(this.clause());
+      else cl.push({ k: "act", eff: this.eff(this.req([...VERBS])), ifPrev: j === "若成功" ? "ok" : "fail" });
+    }
+    this.branchDepth--;
+    return cl;
+  }
   sentence(): Sentence {
     const cl: Clause[] = [this.clause()];
     for (;;) {
@@ -193,6 +220,11 @@ export function parseTokens(tokens: Token[]): Parsed {
   }
 }
 export function tokensToAst(tokens: Token[]): Sentence | null { const r = parseTokens(tokens); return r.complete ? r.ast : null; }
+/** 只自动填无选择的连接词；条件对象没有写完时不会提前填。 */
+export function fillAssertionReward(tokens: Token[]): Token[] {
+  const p = parseTokens(tokens);
+  return !p.complete && !p.err && p.req.length === 1 && p.req[0] === "奖励" ? [...tokens,"奖励"] : tokens;
+}
 
 // ---------------------------------------------------------------- AST -> 词
 export class Unsupported extends Error {}
@@ -216,6 +248,10 @@ const amtTok = (a: Amt): Token[] => {
 const effTok = (e: Eff): Token[] => [VERB_TOK[e.verb], ...amtTok(e.n), ...tgTok(e.tg), ...((e.rep ?? 1) > 1 ? ["重复", String(e.rep)] : []), ...(e.ignore ? ["无视"] : [])];
 const clauseTok = (c: Clause): Token[] => {
   switch (c.k) {
+    case "assert": {
+      const who = c.who === "all" ? "全部" : c.who === "me" ? "我方" : "对方";
+      return ["断言", ...(c.scope === "side" ? [who, "以后", ...winTok(c.win)] : ["以后", ...winTok(c.win), who]), c.judge === "exist" ? "存在" : "不存在", ...objTok(c.obj), "奖励", ...astToTokens(assertionBranch(c,true)), ...(c.otherwise || c.alternatives ? ["否则", ...astToTokens(assertionBranch(c,false))] : [])];
+    }
     case "act": return effTok(c.eff);
     case "status": return [STATUS_TOK[c.kind], ...tgTok(c.tg), ...(P2.STAUTO ? [] : [String(c.lvl)]), String(c.dur)];
     case "when": {
@@ -296,7 +332,7 @@ export interface Legal {
 /** 全词表（palette 用）：按此刻的局面列出所有可能出现的词 */
 export function vocabulary(): Token[] {
   const t: Token[] = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-  t.push(...VERBS, ...STATUS_KINDS, "并", "若成功", "若失败", "重复", "无视", "兑现", "移除", "转移", "延后", "定时", "不得", "罚", "每当", "若", "存在", "不存在", "则", "且", "至多", "收紧", "×", "之前", "以后", "轮", "句", "全程", "我方", "对方", "选择", "来源", ...AGGS, "先后");
+  t.push(...VERBS, ...STATUS_KINDS, "并", "断言", "奖励", "否则", "全部", "敌方", "若成功", "若失败", "重复", "无视", "兑现", "移除", "转移", "延后", "定时", "不得", "罚", "每当", "若", "存在", "不存在", "则", "且", "至多", "收紧", "×", "之前", "以后", "轮", "句", "全程", "我方", "对方", "选择", "来源", ...AGGS, "先后");
   for (let u = 0; u < 6; u++) t.push("@" + u);
   t.push(...CATS.map((c) => "类:" + c), ...EVS.map((e) => "事:" + e), ...OBJ_WORDS.map((w) => "词:" + w), ...NTHS.map((n) => `第${n}句`));
   return t;
@@ -414,12 +450,14 @@ export function diagnose(ast: Sentence, ctx: Ctx, forTok?: Token): string | null
       if (c.k === "postpone" && !P2.POSTPONE) return "当前规则没有「延后」";
       if (c.k === "strip" && !P2.RMREAL) return "当前规则没有这种「移除」";
       if (c.k === "remove" && P2.RMREAL) return "「移除」后面要写要拆的敌方随从";
+      if (c.k === "assert") return "断言需要有限的以后窗口和合法的两条效果分支；句子窗口只判断宣告内容，受伤/倒下等事件请用轮窗口";
     }
     return "这个写法在当前规则下不合法";
   }
   for (const c of cl) {
     if (c.k === "postpone" && !s.decl.some((d) => d.ord === c.ord && d.side !== side)) return `「延后」要选对方本轮已经宣告的一句（第${c.ord + 1}句 现在没有）`;
-    const tgs: Tg[] = c.k === "act" ? [c.eff.tg] : c.k === "when" || c.k === "delay" ? c.effs.map((e) => e.tg) : c.k === "status" || c.k === "redirect" || c.k === "strip" ? [c.tg] : [];
+    if (c.k === "assert") for (const branch of [assertionBranch(c,true), assertionBranch(c,false)]) { if (!branch.length) continue; const err = diagnose(branch, ctx); if (err) return err; }
+    const tgs: Tg[] = c.k === "act" ? [c.eff.tg] : c.k === "assert" ? [...c.effs, ...(c.otherwise ?? [])].map((e) => e.tg) : c.k === "when" || c.k === "delay" ? c.effs.map((e) => e.tg) : c.k === "status" || c.k === "redirect" || c.k === "strip" ? [c.tg] : [];
     for (const t of tgs) if (t.t === "unit" && !alive(s, t.u)) return "这个随从已经倒下，不能当目标";
   }
   const pos = P2.POS && unit >= 0 ? unit % 3 : -1;
@@ -428,11 +466,7 @@ export function diagnose(ast: Sentence, ctx: Ctx, forTok?: Token): string | null
   const cp = classProblem(cl, cx);
   if (cp) return cp.startsWith("限制流") ? `限制流：攻击句单次伤害最多 ${P2.CAP_LIM}（写成 ${P2.CAP_LIM} 以内，或用引用量——算出来的会被截到 ${P2.CAP_LIM}）` : cp.replace(":", "：");
   if (cx === "状态") {
-    const kinds = new Map<number, string>(); let bad = false;
-    const note = (tgs: Sentence) => { for (const c of resolveTgs(s, side, tgs)) if (c.k === "status") for (const u of c.tg.t === "unit" ? [c.tg.u] : c.tg.t === "units" ? c.tg.us : []) { const k = kinds.get(u); if (k && k !== c.kind) bad = true; kinds.set(u, c.kind); } };
-    for (const d of s.decl) if (d.side === side) note(d.cl);
-    note(cl);
-    if (bad) return "状态流：同一轮对同一个目标只能挂一种状态";
+    if (statusConflict(s,side,cl)) return "状态流：同一轮对同一个目标只能挂一种状态";
   }
   const cost = sentenceCost(cl, s.rnd, pos, cx);
   if (cost > s.side[side].ap) return `行动点不够（这句要 ${cost}，只有 ${s.side[side].ap}）`;

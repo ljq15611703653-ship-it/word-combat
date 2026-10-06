@@ -1,3 +1,4 @@
+import { assertionBranch, allClauses, statusPaths } from "./ast";
 // 自动同步自 lab2/interp.ts（scripts/sync-engine.mjs），请勿手改；补丁见 PATCHES.md
 /* eslint-disable */
 // @ts-nocheck
@@ -6,7 +7,7 @@ import { P, type SideState } from "./lab-rules";
 import { P2, type Deck, type Cls } from "./params";
 import {
   type Clause, type Eff, type Obj, type Query, type Amt, type Sentence, type Side, type Tg, type StatusKind,
-  wordsOf, catsOf, numsOf, sentenceCost, windup, advWordsOf, refKindsOf, legal, isDefSentence, classProblem, segCap,
+  wordsOf, catsOf, numsOf, sentenceCost, windup, advWordsOf, refKindsOf, legal, isDefSentence, classProblem, segCap, assertionEffs,
 } from "./ast";
 
 export interface Ev {
@@ -25,6 +26,7 @@ export interface Standing {
   fromSeq: number; fromRnd: number;
   rseq: number;                     // 本轮起算的日志位置（按轮计数的触发用）
   age: number; left: number; fired: number;
+  assertionSeq?: number;           // 嵌套断言从分支实际生成时开始观察，不能回读外层之后的旧宣告
 }
 export interface Status { unit: number; kind: StatusKind; lvl: number; left: number; end?: number; src?: Side }   // end/src：STAUTO（真实）下用，状态撑到第 end 轮
 export interface Decl { side: Side; unit: number; cl: Sentence; ord: number; sord: number; cost: number; nums: number[]; start: number; fired?: boolean; gone?: boolean }
@@ -146,6 +148,45 @@ function fireStanding(s: St, st: Standing, ev: Ev) {
   if (plus) stat(s, `s${st.owner}:t:不得加罚`);
   for (const e of c.effs) exec(s, st.owner, plus && typeof e.n === "number" ? { ...e, n: e.n + plus } : e, { src: ev.src, actor: st.unit, sord: st.sord, noTrig: true, ctx: sctx(st) });
 }
+/** 句子窗口从断言宣告之后开始计数；全部先数再筛，指定方先筛再数。 */
+function assertionDecision(s: St, st: Standing, atEnd = false): { yes: boolean; src: number } | undefined {
+  const c = st.c; if (c.k !== "assert" || st.fired || st.left === -1) return;
+  const side = c.who === "all" ? null : c.who === "me" ? st.owner : (1 - st.owner);
+  const relevant = (e: Ev) => side === null || e.side === side;
+  let events: Ev[];
+  if (c.win.unit === "sent") {
+    const decls = s.log.filter((e) => e.kind === "decl" && (st.assertionSeq === undefined ? e.sord > st.sord : e.seq >= st.assertionSeq));
+    const window = (c.scope === "side" ? decls.filter(relevant) : decls).slice(0, c.win.n);
+    if (window.length < c.win.n) return;
+    events = window.filter(relevant);
+  } else {
+    if (!atEnd || s.rnd < st.fromRnd + c.win.n - 1) return;
+    events = s.log.filter((e) => e.seq >= st.fromSeq && e.rnd < st.fromRnd + c.win.n && relevant(e) && !e.derived);
+  }
+  const matched = events.filter((e) => c.win.unit === "sent" && c.obj.t === "cat" ? c.obj.c === "any" || e.cats.includes(c.obj.c) : c.obj.t === "word" ? e.kind === (c.win.unit === "sent" ? "decl" : "use") && match(e, c.obj) : match(e, c.obj));
+  return { yes: c.judge === "exist" ? matched.length > 0 : matched.length === 0, src: (matched.at(-1) ?? events.at(-1))?.src ?? -1 };
+}
+function fireAssertion(s: St, st: Standing, atEnd = false) {
+  if (!st.active || !s.stand.includes(st) || (P2.FIZZLE && isDown(s, st.unit))) return;
+  const decision = assertionDecision(s, st, atEnd);
+  if (!decision || st.c.k !== "assert") return;
+  st.fired = 1; st.left = -1;   // 判定先锁定；效果成功与否都不重新选择分支。
+  const effects = assertionBranch(st.c,decision.yes);
+  TR({ t: "assertion", u: st.unit, yes: decision.yes, sec: s.sec });
+  const d: Decl = { side: st.owner, unit: st.unit, cl: effects, ord: -1, sord: st.sord, cost: 0, nums: [], start: s.sec };
+  const r: Run = { src: decision.src, actor: st.unit, sord: st.sord, noTrig: true, ctx: sctx(st) };
+  const prev = { ok: true };
+  for (const c of effects) {
+    if (P2.FIZZLE && isDown(s, st.unit)) break;
+    if (isStanding(c)) {
+      const child: Standing = { owner: st.owner, unit: st.unit, c, sord: st.sord, words: wordsOf(c), cats: catsOf(c), active: true, from: s.sec, fromSeq: s.seq, rseq: s.seq, fromRnd: s.rnd, age: 0, fired: 0, left: c.k === "when" ? (c.q.win.unit === "round" ? c.q.win.n : 99) : c.k === "assert" ? (c.win.unit === "round" ? c.win.n : 1) : c.k === "delay" ? c.wait : c.k === "ignore" ? c.win : 1 };
+      child.assertionSeq = s.seq;
+      if (s.sec > P.TL && c.k !== "delay") { child.fromRnd++; child.left++; }
+      s.stand.push(child); TR({ t: "standing", u: st.unit, c, side: st.owner, sec: s.sec });
+      if (c.k === "assert") fireAssertion(s,child);
+    } else runClause(s,d,c,prev,r);
+  }
+}
 function lowest(s: St, side: Side): number {
   let b = -1;
   for (const u of unitsOf(side)) if (alive(s, u) && (b < 0 || s.hp[u] < s.hp[b])) b = u;
@@ -264,7 +305,7 @@ const STATUS_WORD: Record<StatusKind, string> = { burn: "灼烧", vuln: "易伤"
 function applyStatus(s: St, owner: Side, c: Extract<Clause, { k: "status" }>, r: Run): boolean {
   const tg = targets(s, owner, "status", c.tg, r);
   if (!tg.length) return false;
-  emit(s, { sord: r.sord, side: owner, kind: "use", words: [STATUS_WORD[c.kind]], cats: ["status"], amt: c.lvl, len: 0, segs: 0, src: r.actor, trig: false });
+  emit(s, { sord: r.sord, side: owner, kind: "use", words: [STATUS_WORD[c.kind]], cats: ["status"], amt: c.lvl, len: 0, segs: 0, src: r.actor, trig: r.noTrig });
   const plus = clsOf(s, owner) === "状态" ? P2.ST_LVL_PLUS : 0;   // 状态流：新挂上的状态初始级别 +1
   const lvl = Math.min(P2.STATUS_MAX, c.lvl + plus);
   for (const u of tg) {
@@ -299,7 +340,7 @@ const posOf = (unit: number) => (P2.POS && unit >= 0 ? unit % 3 : -1);
 function quantMax(s: St, side: Side, cl: Sentence): number {
   let m = 0;
   const am = (a: Amt) => { if (typeof a !== "number" && a.q.win.dir === "before") m = Math.max(m, Math.min(P2.QCAP, Math.floor(evalQ(s, a.q, { owner: side, sord: s.sord }) * a.mult))); };
-  for (const c of cl) { if (c.k === "act") am(c.eff.n); else if (c.k === "when") c.effs.forEach((e) => am(e.n)); }
+  for (const c of cl) { if (c.k === "act") am(c.eff.n); else if (c.k === "assert") assertionEffs(c).forEach((e) => am(e.n)); else if (c.k === "when") c.effs.forEach((e) => am(e.n)); }
   return m;
 }
 const clsOf = (s: St | undefined, side: Side): Cls | null => (P2.CLASSES && s ? s.cls[side] : null);
@@ -322,6 +363,7 @@ export function resolveTgs(s: St, side: Side, cl: Sentence): Sentence {
   return cl.map((c): Clause => {
     switch (c.k) {
       case "act": return { ...c, eff: re(c.eff) };
+      case "assert": return { ...c, effs: c.effs.map(re), otherwise: c.otherwise?.map(re), rewards: c.rewards && resolveTgs(s,side,c.rewards), alternatives: c.alternatives && resolveTgs(s,side,c.alternatives) };
       case "when": case "delay": return { ...c, effs: c.effs.map(re) } as Clause;
       case "status": return { ...c, tg: rt(c.tg, "status") };
       case "redirect": return { ...c, tg: rt(c.tg, "redir") };
@@ -330,10 +372,21 @@ export function resolveTgs(s: St, side: Side, cl: Sentence): Sentence {
     }
   });
 }
+export function statusConflict(s: St, side: Side, cl: Sentence): boolean {
+  const all = [...s.decl.filter(d => d.side === side).flatMap(d => d.cl), ...cl];
+  return statusPaths(resolveTgs(s,side,all)).some(path => {
+    const kinds = new Map<number,string>();
+    for (const c of path) if (c.k === "status") for (const u of c.tg.t === "unit" ? [c.tg.u] : c.tg.t === "units" ? c.tg.us : []) {
+      if (kinds.has(u) && kinds.get(u) !== c.kind) return true;
+      kinds.set(u,c.kind);
+    }
+    return false;
+  });
+}
 export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: number; nums: number[] } | null {
   if (P2.TGT_AT_DECL) cl = resolveTgs(s, side, cl);
   if (!legal(cl)) return null;
-  for (const c of cl) if (c.k === "postpone" && !s.decl.some((d) => d.ord === c.ord && d.side !== side)) return null;   // 延后要选对方本轮已经宣告的一句
+  for (const c of allClauses(cl)) if (c.k === "postpone" && !s.decl.some((d) => d.ord === c.ord && d.side !== side)) return null;   // 延后要选对方本轮已经宣告的一句
   const pos = posOf(unit);
   const cx = clsOf(s, side);
   const rej = (why: string) => { stat(s, `s${side}:rej:${why}`); return null; };
@@ -341,11 +394,7 @@ export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: n
   const cp = classProblem(cl, cx);
   if (cp) return rej(cp);
   if (cx === "状态") {   // 同一轮对同一目标只能挂一种状态（含这一轮已经宣告的）
-    const kinds = new Map<number, string>(); let bad = false;
-    const note = (tgs: Sentence) => { for (const c of resolveTgs(s, side, tgs)) if (c.k === "status") for (const u of c.tg.t === "unit" ? [c.tg.u] : c.tg.t === "units" ? c.tg.us : []) { const k = kinds.get(u); if (k && k !== c.kind) bad = true; kinds.set(u, c.kind); } };
-    for (const d of s.decl) if (d.side === side) note(d.cl);
-    note(cl);
-    if (bad) return rej("同轮同目标只能一种状态");
+    if (statusConflict(s,side,cl)) return rej("同轮同目标只能一种状态");
   }
   const cost = sentenceCost(cl, s.rnd, pos, cx);
   if (cost > s.side[side].ap) return null;
@@ -359,7 +408,7 @@ export function canAfford(s: St, side: Side, cl: Sentence, unit = -1): { cost: n
   const nums = raw.map((n) => { if (P2.POS_NUM_ONE && bonus && n === mx && !used) { used = true; return n - bonus; } return P2.POS_NUM_ONE ? n : n - bonus; }).filter((n) => n >= 2);
   return pickCards(s, side, nums) === null ? null : { cost, nums };
 }
-const isStanding = (c: Clause) => (c.k === "when" && c.q.win.dir === "after") || c.k === "delay" || c.k === "ignore";
+const isStanding = (c: Clause) => (c.k === "when" && c.q.win.dir === "after") || c.k === "delay" || c.k === "ignore" || c.k === "assert";
 export function declare(s: St, side: Side, unit: number, cl: Sentence, start = windupFor(cl, unit, s)): boolean {
   if (P2.TGT_AT_DECL) cl = resolveTgs(s, side, cl);
   const a = canAfford(s, side, cl, unit);
@@ -380,7 +429,7 @@ export function declare(s: St, side: Side, unit: number, cl: Sentence, start = w
   emit(s, { sord, rord: ord + 1, side, kind: "decl", words, cats, amt: a.cost, len: words.length, segs: cl.length, src: unit });
   for (const c of cl) {
     if (isStanding(c)) {
-      s.stand.push({ owner: side, unit, c, sord, words: wordsOf(c), cats: catsOf(c), active: false, from: start, fromSeq: 0, rseq: 0, fromRnd: s.rnd, age: 0, fired: 0, left: c.k === "when" ? (c.q.win.unit === "round" ? c.q.win.n : 99) : c.k === "delay" ? c.wait : c.k === "ignore" ? c.win : 1 });
+      s.stand.push({ owner: side, unit, c, sord, words: wordsOf(c), cats: catsOf(c), active: false, from: start, fromSeq: 0, rseq: 0, fromRnd: s.rnd, age: 0, fired: 0, left: c.k === "when" ? (c.q.win.unit === "round" ? c.q.win.n : 99) : c.k === "assert" ? (c.win.unit === "round" ? c.win.n : 1) : c.k === "delay" ? c.wait : c.k === "ignore" ? c.win : 1 });
     }
     stat(s, `s${side}:${c.k}`);
   }
@@ -421,10 +470,10 @@ function cashStanding(s: St, st: Standing) {
 /** 本轮正在结算的宣告（副本：延后会改它们的起手秒，不能动 s.decl 里共享的对象） */
 let CUR: Decl[] = [];
 const isDown = (s: St, u: number) => (P2.KOCHECK ? s.dead[u] : !alive(s, u));
-function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }) {
+function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }, inherited?: Run) {
   if (P2.FIZZLE && !P2.ORDER && isDown(s, d.unit)) { stat(s, `s${d.side}:fizzle`); return; }   // 出手的人先倒下，这句落空
   const me = d.side, foe = (1 - me) as Side;
-  const r: Run = { src: d.unit, actor: d.unit, sord: d.sord, noTrig: false, ctx: { owner: me, sord: d.sord } };
+  const r: Run = inherited ?? { src: d.unit, actor: d.unit, sord: d.sord, noTrig: false, ctx: { owner: me, sord: d.sord } };
   if (c.k === "act") {
     if (c.ifPrev === "ok" && !prev.ok) return;
     if (c.ifPrev === "fail" && prev.ok) return;
@@ -433,11 +482,11 @@ function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }) {
     prev.ok = applyStatus(s, me, c, r);
   } else if (c.k === "redirect") {
     const tg = targets(s, me, "redir", c.tg, r);
-    emit(s, { sord: d.sord, side: me, kind: "use", words: ["转移"], cats: ["def", "guard"], amt: 1, len: 0, segs: 0, src: d.unit, trig: false });
+    emit(s, { sord: d.sord, side: me, kind: "use", words: ["转移"], cats: ["def", "guard"], amt: 1, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
     for (const u of tg) s.redir[u] = true;
     stat(s, `s${me}:redir`); prev.ok = tg.length > 0;
   } else if (c.k === "postpone") {
-    emit(s, { sord: d.sord, side: me, kind: "use", words: ["延后"], cats: ["struct"], amt: c.n, len: 0, segs: 0, src: d.unit, trig: false });
+    emit(s, { sord: d.sord, side: me, kind: "use", words: ["延后"], cats: ["struct"], amt: c.n, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
     const b = CUR.find((x) => x.ord === c.ord && x.side !== me && !x.fired && !x.gone);
     if (b) {
       b.start += c.n; stat(s, `s${me}:postpone`); prev.ok = true;
@@ -445,18 +494,21 @@ function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }) {
     } else { stat(s, `s${me}:postponeMiss`); prev.ok = false; }
   } else if (c.k === "strip") {
     const u = targets(s, me, "strip", c.tg, r)[0];
-    emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: false });
+    emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
     if (u === undefined) { prev.ok = false; return; }
     const had = s.sh[u] > 0 || s.redir[u] || s.stand.some((x) => x.owner === sideOf(u) && x.unit === u);
     s.sh[u] = 0; s.redir[u] = false;
     s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u));
     stat(s, had ? `s${me}:removed` : `s${me}:removeMiss`); prev.ok = had;
+  } else if (c.k === "assert") {
+    const st = s.stand.find((x) => x.sord === d.sord && x.c === c);
+    if (st) fireAssertion(s, st);
   } else if (c.k === "when") {
     const cnt = evalQ(s, c.q, r.ctx);   // before 窗口：宣告生效那一刻判断一次
     const yes = c.judge === "exist" ? cnt > thr(c.q) : cnt === 0;
     if (yes) { stat(s, `s${me}:fire`); for (const e of c.effs) exec(s, me, e, r, false); }
   } else if (c.k === "remove") {
-    emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: false });
+    emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
     if (c.obj.t === "cat" && c.obj.c === "status") { const n = s.sts.filter((x) => sideOf(x.unit) === me).length; s.sts = s.sts.filter((x) => sideOf(x.unit) !== me); stat(s, n ? `s${me}:removed` : `s${me}:removeMiss`); return; }
     const cand = s.stand.filter((x) => x.owner === foe && standingMatches(x, c.obj)).sort((a, b) => b.left - a.left)[0];
     if (cand) { s.stand = s.stand.filter((x) => x !== cand); stat(s, `s${me}:removed`); } else stat(s, `s${me}:removeMiss`);
@@ -469,11 +521,16 @@ export function resolveRound(s: St) {
   const jobs: Job[] = [];
   const ds: Decl[] = s.decl.map((d) => ({ ...d }));
   CUR = ds;
+  // 轮末分支新建的句窗口断言，从下一轮宣告开始观察，并在第1秒兑现。
+  for (const st of s.stand.filter(x => x.active && x.from === 0 && x.c.k === "assert" && x.c.win.unit === "sent")) {
+    const d: Decl = { side: st.owner, unit: st.unit, cl: [st.c], ord: -1, sord: st.sord, cost: 0, nums: [], start: 1 };
+    jobs.push({ d, ph: isDefSentence(d.cl) ? 0 : 1, ord: -1, run: () => fireAssertion(s,st) });
+  }
   for (const d of ds) {
     for (const st of s.stand.filter((x) => x.sord === d.sord && !x.active)) jobs.push({ d, ph: -1, ord: d.ord, run: () => { st.from = d.start; st.active = true; TR({ t: "standing", u: d.unit, c: st.c, side: d.side, sec: d.start }); st.fromSeq = s.seq; st.rseq = s.seq; st.fromRnd = s.rnd; } });
     if (P2.ORDER) {
       // 真实引擎：一句话整句一起生效；同一秒里纯防御句（减伤/转移/恢复）先，其余按宣告先后
-      const runnable = d.cl.filter((c) => !isStanding(c));
+      const runnable = d.cl.filter((c) => !isStanding(c) || c.k === "assert");
       if (runnable.length) jobs.push({ d, ph: isDefSentence(d.cl) ? 0 : 1, ord: d.ord, run: () => {
         if (P2.FIZZLE && isDown(s, d.unit)) { stat(s, `s${d.side}:fizzle`); return; }
         const prev = { ok: true }; for (const c of runnable) runClause(s, d, c, prev);
@@ -482,7 +539,7 @@ export function resolveRound(s: St) {
     }
     const chain = d.cl.some((c) => c.k === "act" && c.ifPrev);
     if (chain) { jobs.push({ d, ph: phaseOf(d.cl[0]), ord: d.ord, run: () => { const prev = { ok: true }; for (const c of d.cl) runClause(s, d, c, prev); } }); continue; }
-    for (const c of d.cl) if (!isStanding(c)) jobs.push({ d, ph: c.k === "status" ? 0.5 : phaseOf(c), ord: d.ord, run: () => runClause(s, d, c, { ok: true }) });
+    for (const c of d.cl) if (!isStanding(c) || c.k === "assert") jobs.push({ d, ph: c.k === "status" ? 0.5 : phaseOf(c), ord: d.ord, run: () => runClause(s, d, c, { ok: true }) });
   }
   // 按（起手秒, 阶段, 宣告序）依次跑；延后会在途中改起手秒，所以每次现挑
   let lastSec = -1;
@@ -508,6 +565,7 @@ export function resolveRound(s: St) {
     if (!st.active) continue;
     st.age++;
     const c = st.c;
+    if (c.k === "assert") { if (c.win.unit === "round") fireAssertion(s, st, true); else st.left = -1; continue; }
     if (c.k === "when" && c.q.win.dir === "after" && c.judge === "absent" && roundCount(s, st, c.q) === 0) {
       st.fired++; stat(s, `s${st.owner}:fire`);
       for (const e of c.effs) exec(s, st.owner, e, { src: -1, actor: st.unit, sord: st.sord, noTrig: true, ctx: sctx(st) });
@@ -542,7 +600,7 @@ export function nextRound(s: St) {
   // 长期句子：新的一轮从第 0 秒起生效、本轮触发次数清零
   s.stand.forEach((x) => { x.fired = 0; x.from = 0; x.rseq = s.seq; });
   // 日志只留最近 13 轮（还没到期的定时句要看的部分也保留）
-  const keepSeq = Math.min(...s.stand.filter((x) => x.c.k === "delay").map((x) => x.fromSeq), Infinity);
+  const keepSeq = Math.min(...s.stand.filter((x) => x.c.k === "delay" || x.c.k === "assert").map((x) => x.fromSeq), Infinity);
   if (s.rnd > 14) s.log = s.log.filter((e) => e.rnd > s.rnd - 14 || e.seq >= keepSeq);
   s.decl = []; s.done = Array(6).fill(false);
   s.first = (1 - s.first) as Side; s.turn = s.first; s.ord = 0;
