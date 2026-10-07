@@ -1,1102 +1,171 @@
 [
- {
-  "level": 1,
-  "beat": 1,
-  "intro": [
-   {
-    "who": "回声",
-    "text": "实验一，校准。请开口说话。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "小满",
-    "text": "别眨眼啊，我数着呢！",
-    "expr": "smile",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "叶栖",
-    "text": "……你哼的什么调子？",
-    "expr": "sad",
-    "side": "left"
-   },
-   {
-    "who": "回声",
-    "text": "靶体无语言能力。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "这调子……我在哪听过？",
-    "expr": "neutral",
-    "side": "left"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "小满",
-      "text": "一。我最喜欢的数字。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "回声",
-      "text": "柯谦倒了。倒下的随从会掷骰，换你一张一次性数字牌。手里带「骰」记号的那张，用掉就没了。",
-      "expr": "neutral",
-      "side": "right"
-     },
-     {
-      "who": "叶栖",
-      "text": "……他哼得有点跑调。",
-      "expr": "sad",
-      "side": "left"
-     }
+  {
+    "level": 1,
+    "beat": 1,
+    "intro": [],
+    "outro": [],
+    "rounds": [
+      {
+        "round": 1,
+        "say": [
+          {
+            "who": "叶晴",
+            "text": "我给你开防护。你先打左边那台，侦察机掩护撤离。",
+            "expr": "neutral",
+            "side": "right"
+          }
+        ],
+        "after": [
+          {
+            "who": "叶栖",
+            "text": "侦察机被打坏了……这张牌哪来的？",
+            "expr": "neutral",
+            "side": "left"
+          },
+          {
+            "who": "叶晴",
+            "text": "己方单位被击倒，终端会投一次应急骰，给张一次性数字牌。机器还是得修，别靠损失它换牌。",
+            "expr": "neutral",
+            "side": "right"
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "say": [
+          {
+            "who": "阿豆",
+            "text": "防御用掉了！剩下那台，赶紧打。",
+            "expr": "neutral",
+            "side": "right"
+          }
+        ]
+      }
     ]
-   }
-  ],
-  "hints": [
-   "对手倒下前哼了一段调子，叶栖随后无意识地跟着哼（宋伯面摊的调子）。"
-  ]
- },
- {
-  "level": 2,
-  "beat": 2,
-  "intro": [
-   {
-    "who": "小满",
-    "text": "睡不着就数数，数到三我就困了。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "有句话我记得：说到第三遍，多半是真怕了。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "小满",
-    "text": "你刚才，是在跟她打招呼吧？",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "……手滑。",
-    "expr": "sad",
-    "side": "left"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "小满",
-      "text": "数到三啦！",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "（左手腕轻敲两下）",
-      "expr": "neutral",
-      "side": "left"
-     },
-     {
-      "who": "小满",
-      "text": "你又打招呼了。",
-      "expr": "smirk",
-      "side": "right"
-     }
+  },
+  {
+    "level": 2,
+    "beat": 2,
+    "intro": [],
+    "outro": [],
+    "rounds": [
+      {
+        "round": 1,
+        "say": [
+          {
+            "who": "老蔡",
+            "text": "我把它的行动往后推。你用数字牌，打重一点。",
+            "expr": "neutral",
+            "side": "right"
+          }
+        ]
+      },
+      {
+        "round": 2,
+        "say": [
+          {
+            "who": "童乔",
+            "text": "刚用过的牌在冷却。别等它恢复，换个句子。",
+            "expr": "neutral",
+            "side": "right"
+          }
+        ]
+      },
+      {
+        "round": 3,
+        "say": [
+          {
+            "who": "老蔡",
+            "text": "这次免费的一点就够。打完带货走。",
+            "expr": "neutral",
+            "side": "right"
+          }
+        ]
+      }
     ]
-   }
-  ],
-  "hints": [
-   "对手敲两下左手腕，叶栖下意识回敲——起义军“我没事”的暗号。"
-  ]
- },
- {
-  "level": 3,
-  "beat": 3,
-  "intro": [
-   {
-    "who": "裴岚",
-    "text": "断联不疼，就是会忘几分钟。",
-    "expr": "sad",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "我最近老忘事。",
-    "expr": "sad",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "柯谦",
-    "text": "我们刚才赢了吗？我好像丢了一段。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "荔枝糖纸……整个下城，就一个摊子在卖。",
-    "expr": "neutral",
-    "side": "left"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "有句话我记得：别忘了回头。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "柯谦",
-      "text": "我刚才……说到哪儿了？",
-      "expr": "sad",
-      "side": "right"
-     },
-     {
-      "who": "小满",
-      "text": "说到我帮你数着呢。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "对手口袋里掉出荔枝糖纸；柯谦断联后真的丢了记忆。"
-  ]
- },
- {
-  "level": 4,
-  "beat": 4,
-  "intro": [
-   {
-    "who": "顾衡",
-    "text": "我是顾衡。你们说得漂亮，也得学会扛。",
-    "expr": "smile",
-    "side": "right"
-   },
-   {
-    "who": "回声",
-    "text": "实验四。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "顾衡",
-    "text": "你很会收着力。是怕伤着谁吗？",
-    "expr": "smile",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "……没有。",
-    "expr": "sad",
-    "side": "left"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "顾衡",
-      "text": "别怕。肯扛，也是一种说话。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "光幕上那个印子……",
-      "expr": "shock",
-      "side": "left"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "光幕边缘闪过一枚火星涂鸦（起义军标记）；顾衡开始观察叶栖。"
-  ]
- },
- {
-  "level": 5,
-  "beat": 5,
-  "intro": [
-   {
-    "who": "小满",
-    "text": "开打前吃瓣橘子，酸的人先赢。",
-    "expr": "smirk",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "这说法没出处。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "小满",
-    "text": "现在有了。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "靶体",
-    "text": "……到时候再说。",
-    "expr": "sad",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "这话……不是模拟编得出来的。",
-    "expr": "neutral",
-    "side": "left"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "小满",
-      "text": "开打前吃瓣橘子，酸的人先赢。",
-      "expr": "smirk",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "靶体",
-      "text": "到时候再说。",
-      "expr": "smirk",
-      "side": "right"
-     },
-     {
-      "who": "叶栖",
-      "text": "……别说了。",
-      "expr": "sad",
-      "side": "left"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "对手口头禅“到时候再说”；硬币滚到叶栖脚边。"
-  ]
- },
- {
-  "level": 6,
-  "beat": 6,
-  "intro": [
-   {
-    "who": "小满",
-    "text": "我赌这局谁先开口。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "我赌你。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "靶体（齐声）",
-    "text": "再来一次？",
-    "expr": "smirk",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "模拟体……也有双胞胎吗？",
-    "expr": "neutral",
-    "side": "left"
-   },
-   {
-    "who": "回声",
-    "text": "样本取自历史语料。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "小满",
-      "text": "我赌这局谁先开口。",
-      "expr": "smile",
-      "side": "right"
-     },
-     {
-      "who": "柯谦",
-      "text": "我赌你。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "靶体（齐声）",
-      "text": "再来一次？",
-      "expr": "smirk",
-      "side": "right"
-     }
-    ]
-   },
-   {
-    "round": 2,
-    "say": [
-     {
-      "who": "叶栖",
-      "text": "他们说话的拍子……",
-      "expr": "shock",
-      "side": "left"
-     }
-    ],
-    "after": [
-     {
-      "who": "小满",
-      "text": "双胞胎都这样。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "两个对手完全同步地说话——双胞胎。"
-  ]
- },
- {
-  "level": 7,
-  "beat": 7,
-  "intro": [
-   {
-    "who": "小满",
-    "text": "下城的灯，没这儿亮，可是暖。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "你怎么知道暖？",
-    "expr": "neutral",
-    "side": "left"
-   }
-  ],
-  "outro": [
-   {
-    "who": "叶栖",
-    "text": "（回了同样的礼）",
-    "expr": "neutral",
-    "side": "left"
-   },
-   {
-    "who": "小满",
-    "text": "我也有些事，没跟你说。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "小满",
-      "text": "下城的灯，暖。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "左手盖右拳……",
-      "expr": "shock",
-      "side": "left"
-     },
-     {
-      "who": "小满",
-      "text": "别说出来。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "对手左手覆右拳行礼，叶栖本能回礼；小满也在隐瞒。"
-  ]
- },
- {
-  "level": 8,
-  "beat": 8,
-  "intro": [
-   {
-    "who": "回声",
-    "text": "实验八。场景样本：下城旧厂。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "我没来过。可我知道墙上有道裂。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "靶体",
-    "text": "再接一句就好……对吧，栖？",
-    "expr": "smirk",
-    "side": "right"
-   },
-   {
-    "who": "回声",
-    "text": "检测到语料污染，已清除。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "顾衡",
-    "text": "语料是你们自己的。",
-    "expr": "smile",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "左边有道裂。我也不知道怎么知道的。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "靶体",
-      "text": "再接一句就好……",
-      "expr": "sad",
-      "side": "right"
-     },
-     {
-      "who": "叶栖",
-      "text": "别这么叫我。",
-      "expr": "angry",
-      "side": "left"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "对手说出叶栖的口头禅并叫他“栖”；顾衡用“语料污染”搪塞。"
-  ]
- },
- {
-  "level": 9,
-  "beat": 9,
-  "intro": [
-   {
-    "who": "顾衡",
-    "text": "有些东西挡在人前头，是为了藏点什么。",
-    "expr": "smile",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "我好像认得这种拆法。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "靶体",
-    "text": "……账，得算清楚。",
-    "expr": "sad",
-    "side": "right"
-   },
-   {
-    "who": "裴岚",
-    "text": "要是谁对模拟动了感情，请记住，那只是拟合。",
-    "expr": "smile",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "顾衡",
-      "text": "挡着的东西，别急着拆。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "靶体",
-      "text": "账，得算清楚。",
-      "expr": "neutral",
-      "side": "right"
-     },
-     {
-      "who": "柯谦",
-      "text": "这口气我认得。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "对手机械手缺两根手指，口头禅“账要算清”；裴岚提前给三人打预防针。"
-  ]
- },
- {
-  "level": 10,
-  "beat": 10,
-  "intro": [
-   {
-    "who": "回声",
-    "text": "第四章，编队测试。实验十。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "小满",
-    "text": "同时开口的人，我听过。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "叶栖",
-    "text": "鹿鸣。",
-    "expr": "neutral",
-    "side": "left"
-   },
-   {
-    "who": "回声",
-    "text": "未识别。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "小满",
-    "text": "双胞胎都这样，一起开口。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "小满",
-      "text": "同时开口的，我听过。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "鹿鸣。",
-      "expr": "shock",
-      "side": "left"
-     },
-     {
-      "who": "回声",
-      "text": "未识别。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ]
-   },
-   {
-    "round": 2,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "他们靠得很近。书上说：默契，就是不用商量的话。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "……他们在笑。",
-      "expr": "sad",
-      "side": "left"
-     }
-    ]
-   },
-   {
-    "round": 3,
-    "say": [
-     {
-      "who": "小满",
-      "text": "最后一下，你来。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "回声",
-      "text": "实验十，完成。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "叶栖叫出了对手的名字，被回声否认；小满说谎。"
-  ]
- },
- {
-  "level": 11,
-  "beat": 11,
-  "intro": [
-   {
-    "who": "回声",
-    "text": "实验十一。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "柯谦",
-    "text": "艾草。有个人老在腰上挂着炉子。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "小满",
-    "text": "先把历史和未来分清。若回看过去；断言看以后，猜中拿奖励，猜错走否则。词序还会决定你是在数谁的下一句话。",
-    "expr": "neutral",
-    "side": "left"
-   }
-  ],
-  "outro": [
-   {
-    "who": "叶栖",
-    "text": "是样本。是复制品。",
-    "expr": "sad",
-    "side": "left"
-   },
-   {
-    "who": "小满",
-    "text": "对，是复制品。",
-    "expr": "sad",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 6,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "艾草，腰上挂炉子的那个人。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "是样本。",
-      "expr": "sad",
-      "side": "left"
-     },
-     {
-      "who": "小满",
-      "text": "对，是样本。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ]
-   },
-   {
-    "round": 7,
-    "say": [
-     {
-      "who": "小满",
-      "text": "烛火慢慢烧，不急。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "这味道……",
-      "expr": "shock",
-      "side": "left"
-     }
-    ]
-   },
-   {
-    "round": 8,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "灯还亮着，该收尾了。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "回声",
-      "text": "实验十一，完成。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "艾草香、提灯手柄上的红线；叶栖靠“复制品”说服自己。"
-  ]
- },
- {
-  "level": 12,
-  "beat": 12,
-  "intro": [
-   {
-    "who": "回声",
-    "text": "实验十二。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "靶体",
-    "text": "到时候再说。",
-    "expr": "smirk",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "叶栖",
-    "text": "这枚硬币，是我的。",
-    "expr": "neutral",
-    "side": "left"
-   },
-   {
-    "who": "柯谦",
-    "text": "他们的档案被剪过三次。跟我一样。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "靶体",
-      "text": "到时候再说。",
-      "expr": "smirk",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "这枚硬币，是我的。",
-      "expr": "shock",
-      "side": "left"
-     }
-    ]
-   },
-   {
-    "round": 2,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "他们的档案，被剪过。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "小满",
-      "text": "跟你一样。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ]
-   },
-   {
-    "round": 3,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "陷阱摆好了，等他自己踩进来。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "他真踩进来了。",
-      "expr": "sad",
-      "side": "left"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "硬币是叶栖很久以前输给贺云的那枚；柯谦发现档案被剪过。"
-  ]
- },
- {
-  "level": 13,
-  "beat": 13,
-  "intro": [
-   {
-    "who": "裴岚",
-    "text": "最后一场预赛。拿下这一分，你们就毕业了。",
-    "expr": "smile",
-    "side": "right"
-   },
-   {
-    "who": "靶体",
-    "text": "这一场，别留手。",
-    "expr": "smirk",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "莫问",
-    "text": "……你长高了。",
-    "expr": "sad",
-    "side": "right"
-   },
-   {
-    "who": "裴岚",
-    "text": "重置完成。他们不会记得。",
-    "expr": "smile",
-    "side": "right"
-   },
-   {
-    "who": "小满",
-    "text": "别看。再撑一下，就快完了。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "莫问",
-      "text": "这一场，别留手。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "莫问",
-      "text": "……你长高了。",
-      "expr": "sad",
-      "side": "right"
-     },
-     {
-      "who": "小满",
-      "text": "别看。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ]
-   },
-   {
-    "round": 2,
-    "say": [
-     {
-      "who": "裴岚",
-      "text": "拿下这一分，就毕业了。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶栖",
-      "text": "……我知道了。",
-      "expr": "angry",
-      "side": "left"
-     }
-    ]
-   },
-   {
-    "round": 3,
-    "say": [
-     {
-      "who": "柯谦",
-      "text": "前面发生的事，都记下来。",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "小满",
-      "text": "差一点点……再撑一下。",
-      "expr": "sad",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "面具掉落，莫问认出了叶栖；裴岚说“他们不会记得”。"
-  ]
- },
- {
-  "level": 14,
-  "beat": 14,
-  "intro": [
-   {
-    "who": "回声",
-    "text": "最终实验，毕业考。对手：最高保真样本。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "叶栖",
-    "text": "……姐。",
-    "expr": "sad",
-    "side": "left"
-   },
-   {
-    "who": "小满",
-    "text": "是模拟。这话是你自己说的。",
-    "expr": "neutral",
-    "side": "right"
-   }
-  ],
-  "outro": [
-   {
-    "who": "叶晴",
-    "text": "再接一句就好……栖？",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "宋伯",
-    "text": "这面……还没煮好呢。",
-    "expr": "neutral",
-    "side": "right"
-   },
-   {
-    "who": "叶晴",
-    "text": "你是谁？",
-    "expr": "shock",
-    "side": "right"
-   }
-  ],
-  "rounds": [
-   {
-    "round": 1,
-    "say": [
-     {
-      "who": "叶晴",
-      "text": "来吧，新兵。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "叶晴",
-      "text": "再接一句就好……栖？",
-      "expr": "sad",
-      "side": "right"
-     }
-    ]
-   },
-   {
-    "round": 2,
-    "say": [
-     {
-      "who": "宋伯",
-      "text": "这面，还没煮好呢。",
-      "expr": "smile",
-      "side": "right"
-     }
-    ],
-    "after": [
-     {
-      "who": "阿豆",
-      "text": "叶栖哥哥？",
-      "expr": "shock",
-      "side": "right"
-     },
-     {
-      "who": "叶晴",
-      "text": "你是谁？",
-      "expr": "neutral",
-      "side": "right"
-     }
-    ]
-   }
-  ],
-  "hints": [
-   "最终对手是叶晴、宋伯、阿豆；倒下后叶晴失去了对叶栖的记忆。"
-  ]
- }
+  },
+  {
+    "level": 3,
+    "beat": 3,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 4,
+    "beat": 4,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 5,
+    "beat": 5,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 6,
+    "beat": 6,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 7,
+    "beat": 7,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 8,
+    "beat": 8,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 9,
+    "beat": 9,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 10,
+    "beat": 10,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 11,
+    "beat": 11,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 12,
+    "beat": 12,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 13,
+    "beat": 13,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  },
+  {
+    "level": 14,
+    "beat": 14,
+    "intro": [],
+    "outro": [],
+    "rounds": []
+  }
 ]
