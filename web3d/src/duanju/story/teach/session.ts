@@ -2,6 +2,7 @@
 import { DECK_WORDS, type Match, type Sentence } from "../../engine/api";
 import rulesDefault from "../../engine/rules.default.json";
 import { astToTokens } from "../../composer/grammar";
+import { windupFor } from "../../engine/interp";
 import { buildSentence, matchSentence, allowedFn, type Allow, type ClauseSpec } from "./spec";
 import type { Settings } from "../../types";
 
@@ -10,9 +11,10 @@ export interface StepSay { unit?: string; menu?: string; wrong?: string; start?:
 export interface Step { unit: number; want?: ClauseSpec[]; words?: string[]; startMin?: number; startMax?: number; say?: StepSay }
 export interface FoeMove { unit: number; s: ClauseSpec[]; start: number }
 /** goal：这一轮的小目标（战斗界面左上角的目标条，如「拼出带「并」的两段句」） */
-export interface RoundScript { foe: FoeMove[]; steps?: Step[]; goal?: string }
+export interface RoundScript { foe: FoeMove[]; allies?: FoeMove[]; steps?: Step[]; goal?: string }
 export interface Beat {
   beat: number; name: string; teach: string[]; foeNames: string[]; first: "me" | "foe"; seed: number;
+  meNames?: [string, string, string]; meArt?: [string, string, string]; foeArt?: [string, string, string]; background?: string;
   rules?: string | { P?: Record<string, unknown>; P2?: Record<string, unknown> };
   me?: { units: number[]; hp?: Record<string, number>; deck?: Record<string, number> };
   foe?: { units: number[]; hp?: Record<string, number>; deck?: Record<string, number> };
@@ -82,6 +84,16 @@ export class TeachSession {
     }
     m.pass(u);
     return { unit: u, passed: true, text: "", start: 0 };
+  }
+  /** 序章同伴自行行动，新人只操作叶栖与侦察机。仍走真实引擎宣告与资源消耗。 */
+  allyMove(m: Match) {
+    const enemy = m.s.decl.find(d => d.side === 1);
+    const mv = this.round(m)?.allies?.find(x => m.canAct(x.unit) && (!x.s.some(c => c.kind === "postpone") || !!enemy));
+    if (!mv) return null;
+    const cl = buildSentence(mv.s.map(c => c.kind === "postpone" ? {...c,ord:enemy!.ord} : c)), start = Math.max(mv.start, windupFor(cl,mv.unit,m.s));
+    const ok = m.declare(mv.unit, cl, start);
+    if (!ok) { (globalThis as any).__storyErr?.(`同伴宣告失败 beat${this.beat.beat} r${m.rnd} u${mv.unit}`); m.pass(mv.unit); }
+    return { unit: mv.unit, passed: !ok, text: ok ? m.history[m.history.length - 1].text : "", start };
   }
   stepFor(m: Match, u: number): Step | null {
     if (!this.inScript(m)) return null;

@@ -25,7 +25,7 @@ let battle: Battle | null = null;
 // 教程通关（第 14 关毕业）之前不能打电脑；?unlock=all / 自动测试可绕过
 function tutorialDone(): boolean {
   if (q.get("unlock") === "all" || AUTO_GAMES > 0 || q.get("start") === "1") return true;
-  try { return (JSON.parse(localStorage.getItem("duanju.story.v1") ?? "null")?.done ?? []).includes(14); } catch { return false; }
+  return ["duanju.story.v2","duanju.story.v1"].some(key => { try { return (JSON.parse(localStorage.getItem(key) ?? "null")?.done ?? []).includes(14); } catch { return false; } });
 }
 function mountLocked() {
   dj.state = "locked"; root.className = "dj-root setup";

@@ -49,7 +49,7 @@ function draw(who: string, expr: string): string {
   return c.toDataURL("image/png");
 }
 /** 对白里的称呼 -> 立绘文件名（文件名 = 全名）；括号备注（全角/半角）先去掉 */
-const ALIAS: Record<string, string> = { 小满: "陆小满", 叶栖: "叶栖", 柯谦: "柯谦" };
+const ALIAS: Record<string, string> = { 小满: "陆小满", 叶栖: "叶栖", 柯谦: "柯谦", 老蔡: "v2-老蔡", 童乔: "v2-童乔" };
 export const portraitName = (who: string) => { const w = who.replace(/[（(].*[）)]?/, "").trim(); return ALIAS[w] ?? w; };
 /** 返回半身像的 URL：<名>_<表情>.webp -> .png -> <名>_neutral.webp -> .png -> 程序占位 */
 export function portraitUrl(who0: string, expr: string): Promise<string> {

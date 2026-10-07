@@ -12,12 +12,14 @@ export type BattleOutcome = "win" | "lose" | "exit";
 export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelDialog | undefined, hist: Line[], o: { onSkipAll?: () => void; fast?: boolean } = {}): Promise<BattleOutcome> {
   return new Promise((resolve) => {
     const beat = ses.beat;
-    document.documentElement.style.setProperty("--bg-url", `url(${backgroundFor(beat.beat)})`);
+    const base = (import.meta as any).env?.BASE_URL ?? "/";
+    document.documentElement.style.setProperty("--bg-url", `url(${beat.background ? base + beat.background : backgroundFor(beat.beat)})`);
     const holder = document.createElement("div"); holder.className = "dj-root battle story-battle"; holder.style.position = "absolute";
     host.appendChild(holder);
     const ms = (beat as { meStyle?: string }).meStyle, fs = (beat as { foeStyle?: string }).foeStyle;   // 特训：按职业配色/立绘（教程不设，保持原样）
-    const me = ms ? { ...STYLES.find((s) => s.id === ms)!, names: ses.cur.base.me as [string, string, string] } : { ...STYLES.find((s) => s.id === "yin")!, names: ses.cur.base.me as [string, string, string], unitArt: ["ye_qi", "lu_xiaoman", "ke_qian"] as [string, string, string] };
-    const foe = { ...STYLES.find((s) => s.id === (fs ?? "zhuang"))!, names: beat.foeNames as [string, string, string], ...(fs ? {} : { artDir: "mask", unitArt: ["mask", "mask", "mask"] as [string, string, string] }) };
+    const names = beat.meNames ?? ses.cur.base.me as [string, string, string];
+    const me = ms ? { ...STYLES.find((s) => s.id === ms)!, names } : { ...STYLES.find((s) => s.id === "yin")!, names, unitArt: beat.meArt ?? ["ye_qi", "mask", "mask"] as [string, string, string] };
+    const foe = { ...STYLES.find((s) => s.id === (fs ?? "zhuang"))!, names: beat.foeNames as [string, string, string], ...(fs ? {} : { artDir: "mask", unitArt: beat.foeArt ?? ["mask", "mask", "mask"] as [string, string, string] }) };
     let warn: { text: string; t: number } | null = null;
     let timer = 0, finished = false;
     const done = (r: BattleOutcome) => { if (finished) return; finished = true; clearInterval(timer); b.destroy(); holder.remove(); resolve(r); };
@@ -28,6 +30,7 @@ export function runTeachBattle(host: HTMLElement, ses: TeachSession, dlg: LevelD
       styles: { me, foe }, useClass: !!ms, foeDeck: ses.foeDeck(), absent: ses.absent(), guide: (m, u) => guideFor(ses, m, u),
       setup: (m) => ses.setup(m),
       foeMove: (m) => ses.foeMove(m),
+      allyMove: (m) => ses.allyMove(m),
       beforeDeclare: (u, cl, start, m) => { const e = ses.check(u, cl, start, m); if (e) warn = { text: e, t: Date.now() }; else warn = null; return e; },
       beforePass: (u, m) => { const e = ses.beforePass(u, m); if (e) warn = { text: e, t: Date.now() }; return e; },
       beforeEnd: (m) => { const e = ses.beforeEnd(m); if (e) warn = { text: e, t: Date.now() }; return e; },

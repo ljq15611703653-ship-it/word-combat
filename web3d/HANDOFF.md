@@ -1,15 +1,16 @@
-# 《断·句》状态摘要（2026-10-06，最新，放在最前）
+# 《断·句》状态摘要（2026-10-07，最新，放在最前）
 
 > **接手请先读 `docs/断句-接手文档.md`**（极详细：现状、操作手册、决策与踩坑、未决问题、用户偏好）；规则与内容全览见 `docs/断句-项目介绍.md`。主线 `claude/duanju` = GitHub `main`，Pages 在 `gh-pages:3d/`。
 
 
 > 完整介绍：[docs/断句-项目介绍.md](docs/断句-项目介绍.md)（规则、模式与 URL 参数、内容清单、架构、试玩指南、出图流程、平衡数据、已知问题）。攻略：[docs/guide/攻略.md](docs/guide/攻略.md)、[决策表](docs/guide/决策表.md)。下面第 1 节起是旧版「词战」交接内容，仍保留。
 
-- **主线分支 `claude/duanju`**（git worktree 在 `D:/wc/game`），各功能分支（duanju-engine/composer/deck/vfx/rig*/story/train/tutorial/comic/cls/polish*/bgs/bgfix/ai/layout/fix）已合并；文档分支 `duanju-doc`（工作树 `D:/wc/wt_doc`）。**全部未推送 GitHub**（`main` 仍是旧版词战）。
-- **当前主线包含**：规则引擎（lab2 同步 + AI v2）、拖拽拼句 composer、卡组构筑页、技能演出 vfx（四职业）、骨骼小人（主角 3 + 职业 12）、序章+14 关教程+终章三道门（结局 A/B）、漫画 139 格、对白与半身像、14 张背景、四职业特训 20 关（37 句式）、打电脑。入口 `duanju.html`、`duanju-story.html`、`duanju-train.html`、`duanju-rig.html`。
+- **主线分支 `claude/duanju`**（git worktree 在 `D:/wc/game`），各功能分支（duanju-engine/composer/deck/vfx/rig*/story/train/tutorial/comic/cls/polish*/bgs/bgfix/ai/layout/fix）已合并；文档分支 `duanju-doc`（工作树 `D:/wc/wt_doc`）。主线同步 GitHub `main`，网页构建发布到 `gh-pages:3d/`。
+- **2026-10-07 主线重写**：仍为 14 关。新增 4 页明确背景介绍，前两关是反抗军劫车与撤离，后续进入公司课程，最后公开叶栖远程控制机械杀死同伴的录像。取消旧版断联失忆与三道门结局。66 页（143 格）漫画分格对白，干净画风；四名同伴各有露脸/面具骨骼版本，每个 16 部件，接入现有 idle/cast/hurt 与特效锚点。叶栖始终露脸。新进度键 `duanju.story.v2`，旧 v1 留作特训解锁兼容。制作源 `scripts/story-v2-content.mjs`，打包 `scripts/install-story-v2.mjs`，核验 `story-v2-audit.mjs`、`story-rig-qa.mjs`、`story-v2-integration-qa.mjs`。当前主线和 Pages 均由 Git 发布。
 - **约定**：新功能开分支、合并回 `claude/duanju`；推主分支前必须同步更新本文件；引擎文件别手改，规则变了跑 `node scripts/sync-engine.mjs`；图片换了要重新构建（`?v=VITE_BUILD` 缓存破坏）。
 - **下一步建议**：1) 把特训规则对齐 `rules.default.json` 并复核各关文字/通关性（现在特训用自己一套规则，如并流多接一段不花行动点在真实对局里不成立）；2) 手机竖屏适配；3) 结局 C、冒险模式、教学模式（决策表蒸馏）；4) 真人调数值（并流最强、限制/状态偏弱）并验证第 14 关；5) 核实 duanju-smoke 默认规则下全输、vfx smoke 血量差 1~5；6) 改标题为《断·句》。
 - 未覆盖/待核实项见介绍文档 §11。
+- **分镜保持**：14 关的 112 个关前/关后格子保留旧版几何、顺序和镜头运动，只更换图与对白。`art/story-v2/shot-crops.json` 记录每格裁切来源；`scripts/crop-story-shots.py` 可重做裁切。素材检查拼图的方格不是游戏内排版。战斗场景继续使用已有代码生成背景，不使用新生成的战斗背景图。
 
 ---
 

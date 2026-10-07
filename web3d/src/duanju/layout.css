@@ -190,6 +190,8 @@ body.hs-dragging, body.hs-dragging * { cursor: grabbing !important; }
 
 /* 骨骼小人：脚落在底座中心（画布底部有留白） */
 .fig canvas.rig { bottom: 4%; }
+/* 新同伴的骨骼画布包含完整出手范围，扩大画布显示而不缩小人物。 */
+.unit.story-actor .fig canvas.rig { width: 150%; left: -25%; }
 /* 层级：底座在最下，人物在上，飘字最上 */
 .fig .base { z-index: 0; }
 .fig img, .fig canvas.rig { z-index: 1; }

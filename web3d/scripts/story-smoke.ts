@@ -16,7 +16,7 @@ for (const beat of cur.beats) {
   const ses = new TeachSession(beat, cur);
   const st = ses.settings();
   configureRules("custom", st.customRules);
-  setUnitNames(cur.base.me as [string, string, string], beat.foeNames as [string, string, string]);
+  setUnitNames(beat.meNames ?? cur.base.me as [string, string, string], beat.foeNames as [string, string, string]);
   const m = new Match({ first: st.first === "me" ? 0 : 1, myDeck: {}, tier: st.tier, seed: beat.seed, foeDeck: ses.foeDeck() });
   ses.setup(m);
   const log: string[] = [];
@@ -31,6 +31,7 @@ for (const beat of cur.beats) {
       const mv = ses.foeMove(m) ?? m.aiMove();
       void mv;
     } else if (ses.scripted) {
+      if (ses.allyMove(m)) continue;
       const pend = ses.pending(m);
       let done = false;
       for (const step of pend) {

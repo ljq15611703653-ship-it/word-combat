@@ -18,7 +18,7 @@ addEventListener("error", (e) => sj.errors.push(String(e.message)));
 addEventListener("unhandledrejection", (e) => sj.errors.push(String((e as PromiseRejectionEvent).reason)));
 
 interface Progress { prologue: boolean; done: number[]; ending?: "A" | "B" }
-const KEY = "duanju.story.v1";
+const KEY = "duanju.story.v2";
 const loadP = (): Progress => { try { const j = JSON.parse(localStorage.getItem(KEY) ?? "null"); if (j) return { prologue: !!j.prologue, done: j.done ?? [], ending: j.ending }; } catch { /* */ } return { prologue: false, done: [] }; };
 const saveP = (p: Progress) => { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* */ } };
 let prog = loadP();
@@ -90,23 +90,11 @@ async function playLevel(n: number) {
   selectPage(n);
 }
 
-// 终章：揭示 → 三道门 → 结局 A/B（C 暂未开放）→ 回选关页
-function chooseDoor(): Promise<"A" | "B"> {
-  return new Promise((res) => {
-    const l = layer("st-door"); l.className = "st-door";
-    l.innerHTML = `<div class="box"><h2>请选择</h2>
-      <button class="bt door" data-k="A">跪下。做公司的狗。</button>
-      <button class="bt door" data-k="B">假装顺从，暗中破坏。</button>
-      <button class="bt door" disabled>拒绝。<small>（之后开放）</small></button></div>`;
-    l.addEventListener("click", (e) => { const k = (e.target as HTMLElement).closest<HTMLElement>("[data-k]")?.dataset.k as "A" | "B" | undefined; if (k) { l.remove(); res(k); } });
-  });
-}
+// 终章：战后才公开真实录像，随后归队。没有旧版选门分支。
 async function finale() {
   sj.state = "finale";
-  await comicSeg(15, "post", "L15-reveal");
-  const k = await chooseDoor();
-  await comicSeg(15, "post", k === "A" ? "L15-endA" : "L15-endB");
-  prog.ending = k; saveP(prog);
+  await comicSeg(15, "post");
+  prog.ending = "A"; saveP(prog);
   selectPage(14);
 }
 
@@ -114,7 +102,7 @@ function selectPage(justDone?: number) {
   sj.state = "select"; root.className = "dj-root story select"; root.innerHTML = "";
   const el = document.createElement("div"); el.className = "st-select"; root.appendChild(el);
   const nextN = cur.beats.find((b) => !prog.done.includes(b.beat))?.beat;
-  el.innerHTML = `<header><h1><span>断</span>·句 <small>余烬</small></h1><p>十四次“模拟实验”。每一关教一个新东西。</p>
+  el.innerHTML = `<header><h1><span>断</span>·句 <small>余烬</small></h1><p>从一场劫车开始，学会用词语操作机械。</p>
     <div class="st-tools">${prog.done.includes(14) || q.get("unlock") === "all" ? `<a class="bt" href="duanju-train.html">四职业特训</a>` : ""}<button class="bt" data-a="prologue">重看序章</button><button class="bt" data-a="reset">清除进度</button></div></header>
     <div class="st-grid">${cur.beats.map((b) => {
       const done = prog.done.includes(b.beat), open = unlocked(b.beat), now = b.beat === nextN;

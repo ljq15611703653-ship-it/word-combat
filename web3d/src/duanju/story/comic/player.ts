@@ -64,6 +64,22 @@ const CSS = `
 .wc-root.portrait .wc-hint{display:none}
 .wc-root.portrait .wc-bar{gap:6px;padding:4px 10px}
 .wc-root.portrait .wc-stat{width:100%;margin:0}
+.wc-root.clean-story .wc-page::before,.wc-root.clean-story .wc-page::after{display:none}
+.wc-root.clean-story .wc-cam{left:0;top:0;width:100%;height:100%}
+.wc-root.clean-story .wc-slot{filter:none}
+.wc-root.clean-story .wc-cap{font-size:30px;line-height:1.55;max-width:none!important;width:calc(100% - 128px)!important;box-sizing:border-box;border:0;border-radius:4px;background:#07121eef;color:#f2f7ff;padding:18px 24px;box-shadow:0 3px 20px #0004}
+.wc-root.clean-story .wc-cap.nar{background:#07121ee8;color:#f2f7ff}
+.wc-root.clean-story .wc-cap .tl{display:none}
+.wc-root.clean-story .wc-dock{background:#07121e;color:#f2f7ff;border-top:2px solid #22dfff;font-size:18px;line-height:1.65;overflow:auto;min-height:160px}
+.wc-root.clean-story .wc-dock .tx.nar{color:#f2f7ff}
+.wc-root.clean-comic .wc-page::before,.wc-root.clean-comic .wc-page::after{display:none}
+.wc-root.clean-comic .wc-slot{filter:none}
+.wc-root.clean-comic .wc-cam{left:0;top:0;width:100%;height:100%}
+.wc-root.clean-comic .wc-cap{background:#07121eef;color:#f2f7ff;box-shadow:0 2px 12px #0005;border:1px solid #a3c8dd66;line-height:1.5}
+.wc-root.clean-comic .wc-cap.nar{background:#07121ee8;color:#f2f7ff}
+.wc-root.clean-comic .wc-dock{background:#07121e;color:#f2f7ff;font-size:18px;line-height:1.65;overflow:auto}
+.wc-root.clean-comic .wc-dock .tx.nar{color:#f2f7ff}
+.wc-root.clean-comic .wc-cap .tl{background:#07121e}
 `;
 function injectCss() {
   if (document.getElementById('wc-player-css')) return;
@@ -345,6 +361,10 @@ export function playComic(container, data, opts = {}) {
   if (assets) all.forEach(p => { for (const k of [p.id, p.id + '_pop']) if (assets[k]) loadImg(aBase + assets[k].src).catch(() => { }); });
   container.innerHTML = '';
   const root = el('div', 'wc-root', container); root.tabIndex = 0;
+  const cleanStory = data.presentation === 'clean-story';
+  const cleanComic = data.presentation === 'clean-comic';
+  root.classList.toggle('clean-story',cleanStory);
+  root.classList.toggle('clean-comic',cleanComic);
   const view = el('div', 'wc-view', root), world = el('div', 'wc-world', view);
   const hint = el('div', 'wc-hint', view); hint.textContent = '点击 / 空格 继续';
   const dock = el('div', 'wc-dock', root);
@@ -365,9 +385,9 @@ export function playComic(container, data, opts = {}) {
     const rw = root.clientWidth, rh = root.clientHeight;
     S.portrait = rw < 700 && rw / rh < 0.8;
     root.classList.toggle('portrait', S.portrait);
-    if (S.portrait) view.style.height = Math.min(rw * 1.08, rh * 0.6) + 'px'; else view.style.height = '';
+    if (S.portrait) view.style.height = Math.min(rw * (cleanStory ? 9/16 : 1.08), rh * 0.6) + 'px'; else view.style.height = '';
     const vw = view.clientWidth, vh = view.clientHeight;
-    if (S.portrait) { S.s = Math.max(vh / H, vw / W); S.vw = vw; S.vh = vh; focusPan(true); }
+    if (S.portrait) { S.s = cleanStory ? Math.min(vh / H, vw / W) : Math.max(vh / H, vw / W); S.vw = vw; S.vh = vh; focusPan(true); }
     else { S.s = Math.min(vw / W, vh / H); world.classList.remove('pan'); world.style.transform = `translate(${(vw - W * S.s) / 2}px,${(vh - H * S.s) / 2}px) scale(${S.s})`; }
   }
   function focusPan(instant, bb) {
@@ -467,10 +487,11 @@ export function playComic(container, data, opts = {}) {
     const img = new Image(); img.src = (opts.imageBase || '') + panel.image; img.draggable = false;
     const ph = mkPH(); ph.style.cssText = ''; // 占位先顶着,图片加载成功再替换
     const holder = el('div'); holder.style.cssText = 'width:100%;height:100%;position:relative'; holder.appendChild(ph);
-    img.onload = () => { img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0'; holder.appendChild(img); };
+    img.onload = () => { img.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0'; if(panel.focus)img.style.objectPosition=panel.focus.map(x=>x*100+'%').join(' '); holder.appendChild(img); };
     return holder;
   }
   function cameraKF(c, safeO) {
+    if (cleanStory) return [{ transform:'none' },{ transform:'none' }];
     const mv = (c && c.move) || 'hold';
     switch (mv) {
       case 'push-in': return [{ transform: 'scale(1)' }, { transform: 'scale(1.2)' }];
@@ -496,7 +517,7 @@ export function playComic(container, data, opts = {}) {
     const imgEl = buildImage(panel, slot, bb, safeC); cam.appendChild(imgEl);
     imgEl.onlow = () => { cam.getAnimations().forEach(a => a.cancel()); cam.style.transform = 'scale(1)'; };
     const svg = sv('svg', { viewBox: `0 0 ${W} ${H}` }, wrap);
-    const ol = sv('polygon', { points: poly.map(p => p.join(',')).join(' '), fill: 'none', stroke: PAPER, 'stroke-width': 6, 'stroke-linejoin': 'miter', 'stroke-miterlimit': 8, pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 }, svg);
+    const ol = sv('polygon', { points: poly.map(p => p.join(',')).join(' '), fill: 'none', stroke: PAPER, 'stroke-width': cleanStory ? 0 : 6, 'stroke-linejoin': 'miter', 'stroke-miterlimit': 8, pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 }, svg);
     const dir = (panel.slot + pg.data.n) % 4, wd = 560 / sp;
     wipe.animate([{ clipPath: wedge(dir, 0) }, { clipPath: wedge(dir, 140) }], { duration: wd, easing: 'cubic-bezier(.65,0,.2,1)', fill: 'forwards' }).finished.then(() => { wipe.style.clipPath = 'none'; }).catch(() => { });
     ol.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: wd + 120 / sp, easing: 'ease-out', fill: 'forwards' });
@@ -574,22 +595,26 @@ export function playComic(container, data, opts = {}) {
   }
   function showLine(pg, rev, line) {
     if (S.portrait) { dock.innerHTML = ''; const nar = isNarr(line.who); if (!nar) { const w = el('div', 'who', dock); w.textContent = line.who; w.style.background = whoColor(line.who); dock.appendChild(document.createElement('br')); } const t = el('span', 'tx' + (nar ? ' nar' : ''), dock); t.textContent = line.text; dock.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240 / S.speed }); return; }
+    if (cleanStory) pg.caps.innerHTML = '';
+    if (cleanComic) { pg.caps.querySelectorAll('.wc-cap').forEach(c=>{if(c.dataset.panel===rev.panel.id)c.remove();});pg.avoid=pg.avoid.filter(a=>a.capOwner!==rev.panel.id); }
     const nar = isNarr(line.who), c = el('div', 'wc-cap ' + (nar ? 'nar' : 'say'), pg.caps);
+    if(cleanComic)c.dataset.panel=rev.panel.id;
     c.style.visibility = 'hidden';
     const maxW = clamp(rev.bb.w * .62, 300, 540); c.style.maxWidth = maxW + 'px'; c.style.width = 'max-content';
     if (!nar) { const w = el('span', 'who', c); w.textContent = line.who; w.style.background = whoColor(line.who); }
     const tx = el('span', '', c); tx.textContent = line.text;
     const tl = nar ? null : el('i', 'tl', c);
     const w = c.offsetWidth, h = c.offsetHeight;
-    const pos = place(w, h, { poly: rev.poly, bb: rev.bb, safe: rev.safe, avoid: pg.avoid, noTopBias: true }); // 偏下放:仰拍/特写时脸多在上半
-    c.style.left = pos.x + 'px'; c.style.top = pos.y + 'px';
+    const pos = cleanStory ? {x:64,y:H-h-32} : place(w, h, { poly: rev.poly, bb: rev.bb, safe: rev.safe, avoid: pg.avoid, noTopBias: true });
+    if (cleanStory) { c.style.width = (W-128)+'px'; c.style.maxWidth = 'none'; }
+    c.style.left = pos.x + 'px'; c.style.top = (cleanStory ? H-c.offsetHeight-32 : pos.y) + 'px';
     if (tl) { // 气泡尖角指向主体
       const dx = rev.safe.x + rev.safe.w / 2 - (pos.x + w / 2), dy = rev.safe.y + rev.safe.h / 2 - (pos.y + h / 2);
       const side = Math.abs(dy) * 1.2 > Math.abs(dx) ? (dy > 0 ? 'b' : 't') : (dx > 0 ? 'r' : 'l');
       tl.classList.add(side);
       if (side === 'b' || side === 't') tl.style.left = clamp(w / 2 + dx * .25 - 9, 22, w - 40) + 'px'; else tl.style.top = clamp(h / 2 + dy * .25 - 9, 18, h - 36) + 'px';
     }
-    pg.avoid.push({ x: pos.x, y: pos.y, w, h });
+    pg.avoid.push({ x: pos.x, y: pos.y, w, h, ...(cleanComic?{capOwner:rev.panel.id}:{}) });
     c.style.visibility = 'visible';
     c.animate([{ transform: 'scale(.82) translateY(8px)', opacity: 0 }, { transform: 'scale(1.03)', opacity: 1, offset: .65 }, { transform: 'none', opacity: 1 }], { duration: 260 / S.speed, easing: 'ease-out' });
   }
@@ -608,7 +633,7 @@ export function playComic(container, data, opts = {}) {
     const pg = S.pg, panels = pg.data.panels;
     const cur = panels[S.ci];
     if (cur && S.li < (cur.lines || []).length) { showLine(pg, pg.revealed[S.ci], cur.lines[S.li]); S.li++; }
-    else if (S.ci + 1 < panels.length) { S.ci++; const p = panels[S.ci]; revealPanel(pg, p, S.ci); S.li = 0; if (S.portrait) dock.innerHTML = ''; if (p.lines && p.lines.length) { const rv = pg.revealed[S.ci]; setTimeout(() => { if (S.pg === pg && rv) showLine(pg, rv, p.lines[0]); }, 520 / S.speed); S.li = 1; } }
+    else if (S.ci + 1 < panels.length) { S.ci++; const p = panels[S.ci]; revealPanel(pg, p, S.ci); S.li = 0; if (S.portrait) dock.innerHTML = ''; if (p.lines && p.lines.length) { const rv = pg.revealed[S.ci],ci=S.ci; setTimeout(() => { if (!S.done && S.pg === pg && S.ci===ci && S.li===1 && rv) showLine(pg, rv, p.lines[0]); }, 520 / S.speed); S.li = 1; } }
     else if (S.pi + 1 < pages.length) { showPage(S.pi + 1, true); if (S.portrait) dock.innerHTML = ''; S.lock = true; setTimeout(() => { S.lock = false; advance(true); }, 700 / S.speed); return; }
     else { finish(); return; }
     updateStat(); schedule();
@@ -618,7 +643,7 @@ export function playComic(container, data, opts = {}) {
     S.timer = setTimeout(() => advance(true), (1700 + textLen() * 110) / S.speed);
   }
   function finish() { if (S.done) return; S.done = true; destroy(); opts.onDone && opts.onDone(); }
-  function destroy() { clearTimeout(S.timer); ro.disconnect(); document.removeEventListener('keydown', onKey); }
+  function destroy() { S.done=true; clearTimeout(S.timer); ro.disconnect(); document.removeEventListener('keydown', onKey); }
 
   function onKey(e) {
     if (!root.isConnected) return destroy();

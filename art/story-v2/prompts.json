@@ -1,0 +1,155 @@
+[
+  {
+    "name": "city",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-e83a4aa7-c014-462c-af74-bcab35049243.png",
+    "prompt": "Referenced clean cinematic anime narrative art; exact character continuity, no printed texture; see story-v2-content.mjs for scene and dialogue."
+  },
+  {
+    "name": "workers",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-bdb9e04b-4b60-444d-8967-a01201f158c2.png",
+    "prompt": "Referenced clean cinematic anime narrative art; exact character continuity, no printed texture; see story-v2-content.mjs for scene and dialogue."
+  },
+  {
+    "name": "tech",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-82271d33-126d-422a-855a-47249a653fc0.png",
+    "prompt": "Referenced clean cinematic anime narrative art; exact character continuity, no printed texture; see story-v2-content.mjs for scene and dialogue."
+  },
+  {
+    "name": "home",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-a40b6406-aac5-4b7f-99d1-1a043e404c8d.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/art/story-v2/source/home.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/v2-老蔡_neutral.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/v2-童乔_neutral.png"
+      ],
+      "prompt": "Edit image1 ONLY two character faces, preserving every other person, exact room, table, composition, outfits, heater, lighting, style and size. The bald bearded man at center MUST have the exact UNMASKED human face from image2; remove white faceplate and face straps entirely. The burgundy twin-bun woman at upper right MUST have the exact UNMASKED human face from image3; remove white faceplate and face straps entirely. This is early story normal life, NOBODY wears a mask. Ye Qi left, A Dou orange, Ye Qing red braid stay exactly unchanged. Do not introduce additional people. Clean crisp anime cel-shaded illustration, no coarse halftone/grain/brush marks/stains. No text. Wide16:9.",
+      "transparent_background": false
+    }
+  },
+  {
+    "name": "raid",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-2339214a-ac61-4ecf-b812-7025ca3be235.png",
+    "prompt": "Referenced clean cinematic anime narrative art; exact character continuity, no printed texture; see story-v2-content.mjs for scene and dialogue."
+  },
+  {
+    "name": "pump",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-92dbf2f5-eb3f-4e68-8663-789f11fa4db9.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/art/story-v2/source/pump.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/v2-老蔡_neutral.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/v2-童乔_neutral.png"
+      ],
+      "prompt": "Edit image1 ONLY two character faces. Preserve exact Ye Qi in center, bodies, outfits, actions, pump station background, robot, worker, camera composition, lighting and clean polished anime style. Old Cai at left MUST have EXACT UNMASKED human face of image2, bald beard brown eyes, NO white faceplate or face straps. Tong Qiao at right MUST have EXACT UNMASKED human face of image3, burgundy twin buns brown eyes, NO white faceplate or face straps. All rebel comrades have real visible human faces in these first two missions. No text, no grain/halftone/brush marks/grunge overlay. Wide16:9.",
+      "transparent_background": false
+    }
+  },
+  {
+    "name": "hiring",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-ce37fdd3-9b45-463b-9822-d4948eca95f2.png",
+    "prompt": "Referenced clean cinematic anime narrative art; exact character continuity, no printed texture; see story-v2-content.mjs for scene and dialogue."
+  },
+  {
+    "name": "control",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-664ff54c-5990-44d2-a477-d8822bebe825.png",
+    "prompt": "Referenced clean cinematic anime narrative art; exact character continuity, no printed texture; see story-v2-content.mjs for scene and dialogue."
+  },
+  {
+    "name": "message",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-125ecc99-ea77-436e-8153-8f605e881a7f.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/web3d/public/duanju/story/portraits/叶栖_neutral.png"
+      ],
+      "prompt": "Use case illustration-story. One wide16:9 polished anime graphic-novel game illustration. Exact reference identity Ye Qi young adult short black hair cyan fringe amber eyes black high collar jacket strap belts white mechanical LEFT forearm cyan stripes. He sits at a public communications terminal in company trainee dormitory at evening, writing a simple maintenance-order message to friends on a small screen. Screen has only geometric boxes and small non-legible lines, NO readable words. A plain notebook, spare connector, and simple meal tray next to him. Quiet hopeful smile, ordinary student life, functional room with bed lockers and clean window showing blue industrial city, restrained warm bedside lamp. Reference outfit unchanged, normal proportions; subject inside center80%, quiet bottom22% for subtitles. Precise clean ink contours and smooth cel shading. No speech balloons, logos, borders, grain, halftone, brush scratches, stains, grunge or misregistration.",
+      "transparent_background": false
+    }
+  },
+  {
+    "name": "thought",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-5d3e1acb-b94e-4fb9-bbc4-ca8fa39af887.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/web3d/public/duanju/story/portraits/叶栖_neutral.png"
+      ],
+      "prompt": "One wide16:9 cinematic narrative illustration. Exact reference Ye Qi short black/cyan hair amber eyes black jacket white mechanical LEFT forearm with cyan stripe. He sits at desk in trainee dormitory late at night, thoughtfully sketching mechanical command combinations in notebook, several tidy pages and a rugged controller beside him. In window the corporate factory and rail lights, simple bed and locker in background. He is hopeful and intensely studying, not suspicious or terrified. No holographic dead people, no foreshadowing reveal. Face and notebook central80%, bottom22% quieter for separate captions. Use case illustration-story. Polished clean anime graphic-novel art, crisp ink contours smooth cel shading, same blue/cyan industrial cyberpunk world. NO coarse halftone, brush marks, paper grain, stains, grunge, scratches, misregistration, written text, logos, speech balloons or comic borders. Exact reference identities and outfits, no arbitrary redesign.",
+      "transparent_background": false
+    }
+  },
+  {
+    "name": "report",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-9895aa7f-c412-4184-8ebd-2f41443344ea.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/web3d/public/duanju/story/portraits/叶栖_neutral.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/顾衡_neutral.webp"
+      ],
+      "prompt": "One wide16:9 cinematic final revelation scene in clinical company briefing room. Exact ref1 Ye Qi black/cyan hair amber eyes black jacket white mechanical LEFT forearm, stands frozen shocked with open notebook in left hand, palm braced on table. Exact ref2 Gu Heng grey hair glasses white coat teal turtleneck mechanical right hand stands calm beside a big wall screen. Screen displays an abstract remote robot video feed and paired execution timeline bars, no identifiable human victim faces in this image; information implied, not written. Cold pale lights, restrained cyan, expressive human body language, believable clean corporate room. Both complete heads and key hands central80%, lower22% clear for captions. Use case illustration-story. Polished clean anime graphic-novel art, crisp ink contours smooth cel shading, same blue/cyan industrial cyberpunk world. NO coarse halftone, brush marks, paper grain, stains, grunge, scratches, misregistration, written text, logos, speech balloons or comic borders. Exact reference identities and outfits, no arbitrary redesign.",
+      "transparent_background": false
+    }
+  },
+  {
+    "name": "squad-sprites",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-c96b3356-370b-46bb-a415-069713248c06.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/web3d/public/duanju/story/portraits/叶晴_neutral.webp",
+        "D:/wc/game/web3d/public/duanju/story/portraits/阿豆_neutral.webp",
+        "D:/wc/game/web3d/public/duanju/story/portraits/v2-老蔡_neutral.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/v2-童乔_neutral.png"
+      ],
+      "prompt": "One square transparent-background sprite sheet with EXACTLY FOUR full-body isolated chibi tactical characters, evenly spaced2x2, generous empty space separating rows and columns, all feet visible and each character within its own quadrant. Top left exactref1 Ye Qing black long braid cyan fringe amber eyes red coat. Top right exactref2 A Dou sandy white short hair orange goggles orange hoodie little shoulder drone. Bottom left exactref3 Old Cai bald thick beard brown eyes brown tactical vest, REAL VISIBLE HUMAN FACE. Bottom right exactref4 Tong Qiao burgundy twin buns brown eyes black/red sailor-collar tactical outfit, REAL VISIBLE HUMAN FACE. NOBODY wears faceplates, masks or helmets. Retain all identities/clothes and face features. Compact game chibi style3heads tall, ready stance with wrist controller, complete trousers and boots. Precise clean cel-shaded inks. No background, shadows, labels, text, halftone, grain, brush marks, stains.",
+      "transparent_background": true
+    }
+  },
+  {
+    "name": "cai-final",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-74bfc0ed-b19e-497e-bea3-2c521f8645f0.png",
+    "prompt": "Edit this narrative illustration, preserve the same character, pose, costume, environment, framing and clean sharp cinematic anime style. REMOVE the white face mask FROM THE FACE. It has fallen beside the character on the ground with its straps visible. Reveal the character's actual recognizable human face matching the second reference exactly: bald middleaged man with thick black beard and brown eyes, eyes closed, deceased peacefully with no gore. No tattoos or barcode on scalp. Keep subtle battle damage as physical scenery, no paper grain, halftone, brush texture or dirty graphic overlay. No text."
+  },
+  {
+    "name": "qing-dou-final",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-48c9c327-4df3-4be9-8aef-367572d31bc9.png",
+    "prompt": "Edit this image, preserve composition, characters, faces, clothes, lighting and clean anime style exactly. Add two fallen white combat face masks with broken straps beside the two characters on the floor, proving they wore masks during combat but masks have now fallen off. No mask obscuring either face. No text, no graphic gore, no gritty overlay."
+  },
+  {
+    "name": "tong-final",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-b27ee54a-b9b6-4945-af2b-df54293a0c17.png",
+    "prompt": "Edit this narrative illustration, preserve the same character, pose, costume, environment, framing and clean sharp cinematic anime style. REMOVE the white face mask FROM THE FACE. It has fallen beside the character on the ground with its straps visible. Reveal the character's actual recognizable human face matching the second reference exactly: young woman with burgundy twin buns and warm brown eyes, exhausted dying but still faintly hopeful, mouth slightly open speaking. No tattoos or barcode on scalp. Keep subtle battle damage as physical scenery, no paper grain, halftone, brush texture or dirty graphic overlay. No text."
+  },
+  {
+    "name": "empty",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-9adf29aa-99be-4b07-8e3f-2d17e9b8d88e.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/art/story-v2/source/home.png",
+        "D:/wc/game/web3d/public/duanju/story/portraits/叶栖_neutral.png"
+      ],
+      "prompt": "Generate the final epilogue image using image1 as exact ENVIRONMENT AND PROP CONTINUITY reference and image2 as protagonist identity. Same workshop, same table/heater, shelf arrangement and overhead lamp as image1. All four companions are absent, their four chairs empty. Only Ye Qi (image2 short black/cyan hair amber eyes black jacket WHITE mechanical LEFT forearm) has returned and sits quietly alone at the left end of the table, notebook open beside silent terminal and spare connectors. Untouched repair box and disassembled heater on table. No ghosts, no transparent remembered figures, no extra people. Evening muted warm lamp light and blue window. Wide composition emphasizes vacant seats, normal adult proportions, emotionally restrained. Preserve recognizable room layout. Use case illustration-story. One wide16:9 cinematic polished anime graphic-novel illustration. Crisp clean ink contours smooth cel shading, carefully designed industrial background, central80% main subject and quiet bottom22% for separate captions. No text, speech balloons, frames, coarse halftone, brush marks, paper grain, stains, grunge, misregistration. Non-graphic tragedy, no gore.",
+      "transparent_background": false
+    }
+  },
+  {
+    "name": "lao-cai-face",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-eb75fb5e-fb0d-45df-a47b-f4b048ae045c.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/web3d/public/duanju/story/portraits/老蔡_neutral.webp"
+      ],
+      "prompt": "Edit this character reference into his REAL UNMASKED human identity. The white faceplate in the input is ONLY a game hidden-identity placeholder; it is NOT something this man actually wears. REMOVE the faceplate, ALL face straps and ALL cyan light on face completely. Reveal a believable human face of an adult man about45 with bald head, thick dark beard continuous with visible beard in reference, warm brown eyes, strong ordinary facial features and a calm kind experienced mechanic expression. Preserve his brown tactical vest, charcoal work shirt, rolled sleeves, stocky muscular build, black gloves, wrist controller and red cord at belt exactly. Head-and-torso portrait, clean crisp anime cel-shaded ink style, NO mask, NO helmet, NO face armor, NO facial cybernetic stripe, NO coarse halftone, brush marks, grain, stains, text or background. Transparent background. This is the canonical actual face to use consistently in all narrative art.",
+      "transparent_background": true
+    }
+  },
+  {
+    "name": "tong-qiao-face",
+    "source": "C:\\Users\\27654\\.codex\\generated_images\\01a10d0f-3fd6-72d3-85df-9205fd8a3782\\exec-ac63a61d-8e1b-47d4-957e-2a223a1dac42.png",
+    "prompt": {
+      "referenced_image_paths": [
+        "D:/wc/game/web3d/public/duanju/story/portraits/童乔_neutral.webp"
+      ],
+      "prompt": "Edit this character reference into her REAL UNMASKED human identity. The white faceplate in input is ONLY a game hidden-identity placeholder, NOT an object the woman wears. REMOVE the faceplate, ALL face straps and ALL cyan light on face completely. Reveal a believable young adult human woman about23, warm brown eyes, natural nose and mouth, gentle focused medic expression. Preserve burgundy twin-bun hair, loose fringe, red ribbon details, black/red tactical sailor-collar outfit, black gloves and wrist controller exactly. Head-and-torso portrait matching clean crisp anime cel-shaded ink style. NO mask, NO helmet, NO face armor, NO facial cybernetic stripe, NO coarse halftone, brush marks, paper grain, stains, text or background. Transparent background. This is the canonical actual face to use consistently in all narrative artwork.",
+      "transparent_background": true
+    }
+  }
+]

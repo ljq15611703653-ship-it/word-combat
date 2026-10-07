@@ -25,7 +25,7 @@ let prog = loadP();
 let T: Training;
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 const all = q.get("unlock") === "all";
-const tutorialDone = () => { if (all) return true; try { return (JSON.parse(localStorage.getItem("duanju.story.v1") ?? "null")?.done ?? []).includes(14); } catch { return false; } };
+const tutorialDone = () => { if (all) return true; return ["duanju.story.v2","duanju.story.v1"].some(key => { try { return (JSON.parse(localStorage.getItem(key) ?? "null")?.done ?? []).includes(14); } catch { return false; } }); };
 const clsLevels = (c: string) => T.levels.filter((l) => l.cls === c).sort((a, b) => a.n - b.n);
 const unlocked = (l: TrainLevel) => all || l.n === 1 || prog.done.includes(`${l.cls}-${l.n - 1}`);
 const accent = (style: string) => STYLES.find((s) => s.id === style)?.accent ?? "#27d9f5";

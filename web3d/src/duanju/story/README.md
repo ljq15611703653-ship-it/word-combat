@@ -1,6 +1,6 @@
 # 断·句 故事模式（duanju-story.html）
 
-入口 `web3d/duanju-story.html` → `src/duanju/story/main.ts`。流程：序章漫画 → 选关页（14 个节拍卡，进度存 localStorage `duanju.story.v1`）→ 每关：标题卡 → 关前漫画(2页) → 关前对话 → **教学战斗** → 关后对话 → 关后漫画 → 解锁下一关。失败可重来（不重播剧情）。全程有「跳过」：漫画 Esc / 对话「跳过本段」「跳过剧情」。
+入口 `web3d/duanju-story.html` → `src/duanju/story/main.ts`。流程：4 页背景漫画 → 选关页（14 个节拍卡，进度存 localStorage `duanju.story.v2`）→ 每关：标题卡 → 关前漫画 → **教学战斗** → 关后漫画 → 解锁下一关。第一、二关还有同伴的关内对白。失败可重来（不重播剧情）。漫画 Esc 跳过；`?skip=1` 直接练教学。
 URL 调试：`?beat=N` 直接进某关，`?unlock=all` 全解锁，`?skip=1` 跳剧情，`?fast=1` 快速（无打字机、短标题卡）。
 
 ## 结构
@@ -45,3 +45,8 @@ URL 调试：`?beat=N` 直接进某关，`?unlock=all` 全解锁，`?skip=1` 跳
 - 撤回是整句回退（只在电脑出手前）；composer 接入后撤回体验要重做。
 - 占位图简陋，漫画对白字号随舞台缩放，竖屏下读起来偏小；对话半身像竖屏会压到文字框。
 - 我方三人用 Q 版立绘（`StyleDef.unitArt` → `public/duanju/art/<ye_qi|lu_xiaoman|ke_qian>/`）；敌方仍是占位剪影；教程里不出现任何职业名，也不提位置（POS 关）。
+# 主线重写（2026-10-07）
+
+当前制作源为 `web3d/scripts/story-v2-content.mjs`。4 页背景介绍、14 关、6 页终章，总计 66 页（143 格）。前两关是反抗军任务，3–14 关是公司课程；真实身份只在终章揭示。叶栖和前两关同伴露脸，后期目标同伴戴面具，终章露出真脸。旧版失忆、断联与选门剧情不再使用；下文旧说明仅供历史参考。
+
+四名同伴通过 `story_<name>/rig/rig.json` 与 `atlas.png` 接入已有骨骼，16 个独立部件，支持待机、施法、受击、左右镜像和手部特效锚点。面具版本只替换头部，复用身体与骨骼。`scripts/rig/story-pack.py` 从独立部件图打包；`story-rig-qa.mjs` 核验真实动作帧，`story-v2-integration-qa.mjs` 核验桌面/手机实际接入和全部漫画字幕。

@@ -1,7 +1,7 @@
 // 漫画页播放器对外封装：按 (level, when) 播一段；没有 panels 就直接 resolve。
 import { playComic, validate } from "./player";
 
-export interface ComicData { layouts: Record<string, unknown>; panels: any[]; assets?: Record<string, { src: string; crop: number[]; chroma?: string }> }
+export interface ComicData { layouts: Record<string, unknown>; panels: any[]; presentation?: string; assets?: Record<string, { src: string; crop: number[]; chroma?: string }> }
 export interface ComicHandle { destroy(): void; skip(): void; next(): void; setAuto(v: boolean): void; setSpeed(v: number): void }
 const BASE: string = (import.meta as any).env?.BASE_URL ?? "/";
 export const STORY_BASE = `${BASE}duanju/story/`;

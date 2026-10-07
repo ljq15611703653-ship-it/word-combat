@@ -42,6 +42,7 @@ export interface BattleHooks {
   guide?: (m: Match, u: number) => Guide | null;
   /** 脚本化电脑：返回 null 则走默认 AI */
   foeMove?(m: Match): { unit: number; passed: boolean; text: string; start: number } | null;
+  allyMove?(m: Match): { unit: number; passed: boolean; text: string; start: number } | null;
   onMount?(b: Battle): void;
   /** 每轮宣告开始前 / 结算演出之后（可 await 对话） */
   onRoundStart?(b: Battle): Promise<void> | void;
@@ -141,7 +142,8 @@ export class Battle {
         <div class="fig"><img alt="" draggable="false" /><i class="base"></i><span class="floats"></span></div>`;
       (side === "me" ? st.querySelector(".col.me") : st.querySelector(".col.foe"))!.appendChild(d);
       this.unitEls[u] = d;
-      const artDir = ((this.hooks && side === "me") || rigAll()) ? PROTAG[u % 3] : (s.unitArt?.[u % 3] ?? s.artDir);
+      const artDir = rigAll() ? PROTAG[u % 3] : (s.unitArt?.[u % 3] ?? s.artDir);
+      if (artDir.startsWith("story_")) d.classList.add("story-actor");
       loadArt(artDir, s.accent, s.accent2, u % 3, POS_GLYPH[u % 3]).then((a) => { this.arts[u] = a; d.querySelector("img")!.src = a.idle; });
       this.rigs[u]?.destroy();
       this.rigs[u] = createRig(artDir, d.querySelector<HTMLElement>(".fig")!, { onReady: () => { const im = d.querySelector("img"); if (im) im.style.display = "none"; }, onFail: () => { this.rigs[u] = undefined; } });
@@ -366,6 +368,8 @@ export class Battle {
           else { await this.typeInto(mv.unit, mv.text); await sleep(this.speedIdx === 2 ? 0 : 220 / this.view.speed()); }
           this.busy = false;
         } else {
+          const ally = this.hooks?.allyMove?.(m);
+          if (ally) { this.dock.cancel(); this.busy = true; if (!ally.passed) await this.typeInto(ally.unit, ally.text); this.busy = false; this.render(); continue; }
           if (this.auto) { this.autoHuman(); this.render(); await sleep(this.speedIdx === 2 ? 0 : 200); continue; }
           const a = await this.humanTurn();
           if (this.aborted) return;
