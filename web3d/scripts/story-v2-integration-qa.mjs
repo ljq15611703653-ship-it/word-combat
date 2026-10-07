@@ -18,7 +18,7 @@ try{
    const lines=await page.evaluate(i=>__groupsQA[i].reduce((n,p)=>n+p.lines.length+1,0)-1,i);
    for(let l=0;l<lines;l++){await page.evaluate(()=>__hQA.next());await page.waitForTimeout(180);const b=await page.evaluate(()=>{const e=document.querySelector('.wc-root.portrait .wc-dock')??document.querySelector('.wc-cap');const r=e?.getBoundingClientRect();return r?{right:r.right,bottom:r.bottom,left:r.left,sw:e.scrollWidth,cw:e.clientWidth}:null;});if(b){assert(b.left>=-1&&b.right<=viewport.width+1&&b.bottom<=viewport.height+1);assert(b.sw<=b.cw+24,JSON.stringify({i,l,b}));}}
    const group=await page.evaluate(i=>__groupsQA[i][0],i);
-   if(group.level===15||group.level<=2)await page.screenshot({path:`${out}/分格-${viewport.width}-L${group.level}-${group.when}-${group.page}.png`});
+   await page.screenshot({path:`${out}/分格-${viewport.width}-L${group.level}-${group.when}-${group.page}.png`});
   }
   assert.deepEqual(errors,[]);console.log(viewport.width,'all',count,'comic pages and captions checked');await page.close();
  }

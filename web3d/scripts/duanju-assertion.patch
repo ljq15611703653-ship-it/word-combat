@@ -123,7 +123,7 @@ index 3161929..747c9c9 100644
 -const amText = (a: Amt) => (typeof a === "number" ? String(a) : `${whoText(a.q.who)}${objText(a.q.obj)}${aggText(a.q.agg)}×${a.mult}`);
 -const effText = (e: Eff) => `${tgText(e.tg)}${{ dmg: "受伤", heal: "恢复", shield: "减伤" }[e.verb]}${amText(e.n)}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `重复${e.rep}次` : ""}`;
 +const amText = (a: Amt) => (typeof a === "number" ? String(a) : `（${winText(a.q.win)}，${whoText(a.q.who)}${objText(a.q.obj)}的${aggText(a.q.agg)}）${a.mult > 1 ? `×${a.mult}倍` : ""}`);
-+const effText = (e: Eff) => `${tgText(e.tg)}${e.tg.t === "units" || e.tg.t === "some" ? "各" : ""}${{ dmg: "受伤", heal: "恢复", shield: "获得减伤" }[e.verb]}${amText(e.n)}点${e.verb === "heal" ? "生命" : e.verb === "dmg" ? "伤害" : ""}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `（共执行${e.rep}次）` : ""}`;
++const effText = (e: Eff) => `${tgText(e.tg)}${e.tg.t === "units" || e.tg.t === "some" ? "各" : ""}${{ dmg: "受到", heal: "恢复", shield: "获得减伤" }[e.verb]}${amText(e.n)}点${e.verb === "heal" ? "生命" : e.verb === "dmg" ? "伤害" : ""}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `（共执行${e.rep}次）` : ""}`;
 +const thresholdText = (q: Query) => {
 +  const base = q.agg === "count" ? (q.win.dir === "before" ? 0 : P.THR0) : q.agg === "sum" ? P2.THR_SUM : q.agg === "len" ? P2.THR_LEN : P2.THR_SEGS;
 +  return `${aggText(q.agg)}至少${Math.max(0, base - ((q.tight ?? 1) - 1)) + 1}`;

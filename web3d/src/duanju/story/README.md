@@ -50,3 +50,5 @@ URL 调试：`?beat=N` 直接进某关，`?unlock=all` 全解锁，`?skip=1` 跳
 当前制作源为 `web3d/scripts/story-v2-content.mjs`。4 页背景介绍、14 关、6 页终章，总计 66 页（143 格）。前两关是反抗军任务，3–14 关是公司课程；真实身份只在终章揭示。叶栖和前两关同伴露脸，后期目标同伴戴面具，终章露出真脸。旧版失忆、断联与选门剧情不再使用；下文旧说明仅供历史参考。
 
 四名同伴通过 `story_<name>/rig/rig.json` 与 `atlas.png` 接入已有骨骼，16 个独立部件，支持待机、施法、受击、左右镜像和手部特效锚点。面具版本只替换头部，复用身体与骨骼。`scripts/rig/story-pack.py` 从独立部件图打包；`story-rig-qa.mjs` 核验真实动作帧，`story-v2-integration-qa.mjs` 核验桌面/手机实际接入和全部漫画字幕。
+
+漫画每格是独立画面，制作素材表中的每个镜头只使用一次。`python scripts/install-independent-shots.py` 分离143个镜头，然后运行 `node scripts/install-story-v2.mjs` 写入剧情数据。关卡的112格沿用旧版几何和镜头运动；宽格取景优先保住人物脸部。`story-v2-audit.mjs` 检查分镜未改变及独立画面未复用。

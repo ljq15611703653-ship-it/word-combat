@@ -249,7 +249,7 @@ const aggText = (a: Query["agg"]) => ({ count: "次数", sum: "累计", len: "�
 export const unitName = (u: number) => `${u < 3 ? "甲" : "乙"}方${u % 3 + 1}号${["词位", "数位", "速位"][u % 3]}随从`;
 const tgText = (t: Tg) => t.t === "some" ? `选择${t.n}个${t.side === "foe" ? "敌方" : "我方"}随从` : t.t === "unit" ? unitName(t.u) : t.t === "units" ? t.us.map(unitName).join("、") : { src: "来源", lowFoe: "敌方最低血", lowMe: "我方最低血", allMe: "我方全体", allFoe: "敌方全体" }[t.t];
 const amText = (a: Amt) => (typeof a === "number" ? String(a) : `（${winText(a.q.win)}，${whoText(a.q.who)}${objText(a.q.obj)}的${aggText(a.q.agg)}）${a.mult > 1 ? `×${a.mult}倍` : ""}`);
-const effText = (e: Eff) => `${tgText(e.tg)}${e.tg.t === "units" || e.tg.t === "some" ? "各" : ""}${{ dmg: "受伤", heal: "恢复", shield: "获得减伤" }[e.verb]}${amText(e.n)}点${e.verb === "heal" ? "生命" : e.verb === "dmg" ? "伤害" : ""}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `（共执行${e.rep}次）` : ""}`;
+const effText = (e: Eff) => `${tgText(e.tg)}${e.tg.t === "units" || e.tg.t === "some" ? "各" : ""}${{ dmg: "受到", heal: "恢复", shield: "获得减伤" }[e.verb]}${amText(e.n)}点${e.verb === "heal" ? "生命" : e.verb === "dmg" ? "伤害" : ""}${e.ignore ? "（无视减伤）" : ""}${(e.rep ?? 1) > 1 ? `（共执行${e.rep}次）` : ""}`;
 const thresholdText = (q: Query) => {
   const base = q.agg === "count" ? (q.win.dir === "before" ? 0 : P.THR0) : q.agg === "sum" ? P2.THR_SUM : q.agg === "len" ? P2.THR_LEN : P2.THR_SEGS;
   return `${aggText(q.agg)}至少${Math.max(0, base - ((q.tight ?? 1) - 1)) + 1}`;

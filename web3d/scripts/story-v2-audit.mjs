@@ -18,6 +18,12 @@ for(const original of reference.frames){
  assert(actual.image.startsWith(`v2-L${actual.level}-`),'Missing individually cropped shot');
 }
 console.log('All 112 main-story frames retain original geometry, order and camera');
+const crops=JSON.parse(fs.readFileSync('../art/story-v2/shot-crops.json','utf8'));
+assert.equal(crops.length,p.panels.length);
+assert.equal(new Set(crops.map(x=>`${x.source}:${x.cell}`)).size,crops.length,'An illustrated scene was reused');
+assert.equal(new Set(crops.map(x=>x.output)).size,crops.length);
+assert(p.panels.every(x=>crops.some(c=>c.output===x.image)));
+console.log('143 independently illustrated shots, each source cell used exactly once');
 assert.deepEqual(c.beats[0].meNames,['叶栖','叶晴','侦察机']);assert.deepEqual(c.beats[1].meNames,['叶栖','老蔡','童乔']);
 const beforeReveal=JSON.stringify(p.panels.filter(x=>x.level<15));
 for(const leak of ['亲手杀','真实战场','死亡时间','你们早就知道','公司伪造'])assert(!beforeReveal.includes(leak),'Early reveal: '+leak);
