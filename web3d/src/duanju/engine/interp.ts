@@ -267,7 +267,7 @@ function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
   if (amt > 0 && enemy && P2.KW && s.kw[u] === "首挡" && !s.kwUsed[u]) { s.kwUsed[u] = true; stat(s, `s${sideOf(u)}:firstblock`); return 0; }
   if (amt > 0 && enemy && P2.REDIR && s.redir[u]) {
     // 转移：全部转给出手的人（不再经过它的减伤、首挡；不屈照常）
-    stat(s, `s${sideOf(u)}:redirect`, amt);
+    TR({t:"vfx",effect:"reflect",u:r.actor,src:u,amt,sec:s.sec}); stat(s, `s${sideOf(u)}:redirect`, amt);
     const a = r.actor;
     if ((P2.KOCHECK ? !s.dead[a] : alive(s, a)) && s.hp[a] > 0) {
       const back = damage(s, a, amt, { ...r, actor: u });
@@ -280,7 +280,7 @@ function hit(s: St, u: number, n: number, pierce: boolean, r: Run): number {
 /** 执行一个效果，返回「成功」（真的发生了） */
 function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
   const r: Run = typeof e.n === "number" ? r0 : { ...r0, derived: true };
-  let base = amount(s, e.n, r.ctx);
+  let base = amount(s, e.n, r.ctx); if(typeof e.n !== "number") TR({t:"vfx",effect:"quote",u:r.actor,src:r.actor,amt:base,sec:s.sec}); if(e.ignore) TR({t:"vfx",effect:"pierce",u:r.actor,src:r.actor,amt:base,sec:s.sec});
   if (emitUse && e.verb === "dmg" && clsOf(s, owner) === "限制" && base > P2.CAP_LIM) { base = P2.CAP_LIM; stat(s, `s${owner}:t:限制封顶`); }   // 限制流：攻击句单次伤害封顶（引用量算出来的也一样）
   const tg = targets(s, owner, e.verb, e.tg, r);
   if (!tg.length) return false;
@@ -289,7 +289,7 @@ function exec(s: St, owner: Side, e: Eff, r0: Run, emitUse = false): boolean {
   const reps = e.verb === "shield" ? 1 : Math.max(1, e.rep ?? 1);   // 重复：打 M 次，每次都重新结算易伤/衰弱/减伤
   for (let rp = 0; rp < reps; rp++) for (const u of tg) {
     if (e.verb === "dmg") {
-      if (r.noTrig && sideOf(u) !== owner && shielded(s, u)) { stat(s, `s${sideOf(u)}:ignored`); continue; }
+      if (r.noTrig && sideOf(u) !== owner && shielded(s, u)) { TR({t:"vfx",effect:"nullify",u,src:u,amt:1,sec:s.sec}); stat(s, `s${sideOf(u)}:ignored`); continue; }
       let n = base;
       if (n > 0) n = Math.max(0, n + stLvl(s, u, "vuln") - (r.actor >= 0 ? stLvl(s, r.actor, "weak") : 0));
       if (n <= 0) continue;
@@ -466,7 +466,7 @@ const PH = { remove: 0, shield: 1, heal: 2, dmg: 3, cash: 4 };
 const phaseOf = (c: Clause): number => c.k === "remove" || c.k === "strip" ? PH.remove : c.k === "redirect" ? PH.shield : c.k === "postpone" ? PH.dmg : c.k === "cash" ? PH.cash : c.k === "act" ? PH[c.eff.verb] : c.k === "when" ? PH[c.effs[0]?.verb ?? "dmg"] : PH.dmg;
 function standingMatches(x: Standing, o: Obj) { return o.t === "word" ? x.words.includes(o.w) : o.t === "cat" ? (o.c === "any" || x.cats.includes(o.c)) : false; }
 function cashStanding(s: St, st: Standing) {
-  const c = st.c; if (c.k !== "delay") return;
+  const c = st.c; if (c.k !== "delay") return; TR({t:"vfx",effect:"cash",u:st.unit,src:st.unit,amt:1,sec:s.sec});
   for (const e of c.effs) if (exec(s, st.owner, e, { src: -1, actor: st.unit, sord: st.sord, noTrig: true, ctx: sctx(st) })) stat(s, `s${st.owner}:burst`);
   st.left = -1;
 }
@@ -486,13 +486,13 @@ function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }, inherited?:
   } else if (c.k === "redirect") {
     const tg = targets(s, me, "redir", c.tg, r);
     emit(s, { sord: d.sord, side: me, kind: "use", words: ["转移"], cats: ["def", "guard"], amt: 1, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
-    for (const u of tg) s.redir[u] = true;
+    for (const u of tg) { s.redir[u] = true; TR({t:"vfx",effect:"redirect",u,src:d.unit,amt:1,sec:s.sec}); }
     stat(s, `s${me}:redir`); prev.ok = tg.length > 0;
   } else if (c.k === "postpone") {
     emit(s, { sord: d.sord, side: me, kind: "use", words: ["延后"], cats: ["struct"], amt: c.n, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
     const b = CUR.find((x) => x.ord === c.ord && x.side !== me && !x.fired && !x.gone);
     if (b) {
-      b.start += c.n; stat(s, `s${me}:postpone`); prev.ok = true;
+      b.start += c.n; TR({t:"vfx",effect:"postpone",u:b.unit,src:d.unit,amt:c.n,end:b.start,sec:s.sec}); stat(s, `s${me}:postpone`); prev.ok = true;
       if (b.start > P.TL) { b.gone = true; stat(s, `s${b.side}:fizzle`); stat(s, `s${me}:pushout`); }   // 推出时间轴：整句落空
     } else { stat(s, `s${me}:postponeMiss`); prev.ok = false; }
   } else if (c.k === "strip") {
@@ -500,7 +500,7 @@ function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }, inherited?:
     emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
     if (u === undefined) { prev.ok = false; return; }
     const had = s.sh[u] > 0 || s.redir[u] || s.stand.some((x) => x.owner === sideOf(u) && x.unit === u);
-    s.sh[u] = 0; s.redir[u] = false;
+    TR({t:"vfx",effect:"strip",u,src:d.unit,amt:had?1:0,sec:s.sec}); s.sh[u] = 0; s.redir[u] = false;
     s.stand = s.stand.filter((x) => !(x.owner === sideOf(u) && x.unit === u));
     stat(s, had ? `s${me}:removed` : `s${me}:removeMiss`); prev.ok = had;
   } else if (c.k === "assert") {
@@ -508,13 +508,13 @@ function runClause(s: St, d: Decl, c: Clause, prev: { ok: boolean }, inherited?:
     if (st) fireAssertion(s, st);
   } else if (c.k === "when") {
     const cnt = evalQ(s, c.q, r.ctx);   // before 窗口：宣告生效那一刻判断一次
-    const yes = c.judge === "exist" ? cnt > thr(c.q) : cnt === 0;
+    const yes = c.judge === "exist" ? cnt > thr(c.q) : cnt === 0; TR({t:"vfx",effect:"condition",u:d.unit,src:d.unit,amt:yes?1:0,sec:s.sec});
     if (yes) { stat(s, `s${me}:fire`); for (const e of c.effs) exec(s, me, e, r, false); }
   } else if (c.k === "remove") {
     emit(s, { sord: d.sord, side: me, kind: "use", words: ["移除"], cats: ["struct"], amt: 1, len: 0, segs: 0, src: d.unit, trig: r.noTrig });
-    if (c.obj.t === "cat" && c.obj.c === "status") { const n = s.sts.filter((x) => sideOf(x.unit) === me).length; s.sts = s.sts.filter((x) => sideOf(x.unit) !== me); stat(s, n ? `s${me}:removed` : `s${me}:removeMiss`); return; }
+    if (c.obj.t === "cat" && c.obj.c === "status") { for(const x of s.sts.filter(x=>sideOf(x.unit)===me)) TR({t:"vfx",effect:"cleanse",u:x.unit,src:d.unit,amt:1,sec:s.sec}); const n = s.sts.filter((x) => sideOf(x.unit) === me).length; s.sts = s.sts.filter((x) => sideOf(x.unit) !== me); stat(s, n ? `s${me}:removed` : `s${me}:removeMiss`); return; }
     const cand = s.stand.filter((x) => x.owner === foe && standingMatches(x, c.obj)).sort((a, b) => b.left - a.left)[0];
-    if (cand) { s.stand = s.stand.filter((x) => x !== cand); stat(s, `s${me}:removed`); } else stat(s, `s${me}:removeMiss`);
+    if (cand) { TR({t:"vfx",effect:"remove",u:cand.unit,src:d.unit,amt:1,sec:s.sec}); s.stand = s.stand.filter((x) => x !== cand); stat(s, `s${me}:removed`); } else stat(s, `s${me}:removeMiss`);
   } else if (c.k === "cash") {
     for (const st of s.stand.filter((x) => x.owner === me && x.c.k === "delay" && x.active)) cashStanding(s, st);
   }

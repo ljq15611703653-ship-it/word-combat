@@ -56,3 +56,7 @@ engine/api.ts 的 Match.resolve() 用 setTrace 收集，再按 sec 稳定排序�
 
 ## 2026-10-07 逐词入口修复
 composer/grammar.ts的补全不再只取第一个动词或目标。枚举必需位置的合法后续，用已有进阶词资源作下界剪枝；搜索达到预算时保留未完成前缀，最终完整句仍严格diagnose。prefix-continuation-test.ts验证并流动作替代、结果链、状态换目标以及非法完整句拒绝；真实指针拖拽五局53条宣告与整句输入一致。
+
+## VFX 精确结算trace
+
+scripts/engine-vfx-trace-patch.mjs 在已有游戏与冷却补丁之后施加，只新增 TR 事件，不改变战斗规则。新增转移/反弹、精确移除与净化目标、全局编号延后和新起手时间、引用量、条件判定、无视防御/长期阻断、兑现。api.ts 转为 cue，standing 带真实长期句种类。动画按事件逐项变形，不预演未发生的分支。

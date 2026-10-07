@@ -45,6 +45,8 @@ export interface BattleView {
   clock(sec: number | null): void;
   /** 动画速度倍率（>1 更快） */
   speed(): number;
+  /** Real selectable tokens only; automatic gray words never enter the machine. */
+  sentenceWords?(u: number): { token: string; label: string }[];
   /** 可选：骨骼小人锚点（视口 client 坐标）。atRelease=true 取 cast 出手瞬间的姿态；没有骨骼小人返回 null（调用方回退到旧位置） */
   anchor?(u: number, which: "hand" | "torso" | "head", atRelease?: boolean): { x: number; y: number } | null;
   /** 可选：cast 动作的关键时刻（秒）；没有骨骼小人返回 null */

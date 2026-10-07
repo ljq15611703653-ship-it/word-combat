@@ -4,11 +4,12 @@
 // 只通过 BattleView 改显示，不碰引擎状态。详见 README.md。
 import { playDice } from "../dice";
 import "./vfx.css";
-import { unitLabel } from "../engine/api";
+import { unitLabel, P2, P } from "../engine/api";
+import { isAdvWord } from "../composer/grammar";
 import type { BattleView, CastPlayer, ReplayEvent } from "../types";
-import { buildShell } from "./shell";
 
-const TL = 20;
+
+
 interface Pt { x: number; y: number }
 interface Rc { x: number; y: number; w: number; h: number }
 interface Cam { s: number; tx: number; ty: number }
@@ -39,6 +40,8 @@ export class VfxCastPlayer implements CastPlayer {
   private temps: HTMLElement[] = [];
   private lifted: HTMLElement[] = [];
   private hinted = new Set<string>();
+  private machine: Tok[] = [];
+  private machineSrc = -1;
   /** 给测试用：最近一次播放的统计 */
   stats = { groups: 0, sentences: 0, ms: 0 };
 
@@ -66,13 +69,13 @@ export class VfxCastPlayer implements CastPlayer {
     addEventListener("keydown", onKey); this.stage.addEventListener("pointerdown", onDown);
     try {
       const groups = this.group(this.segment(events));
-      const nominal = groups.length * 3000 + events.length * 70;
-      this.tf = mode === "fast" ? Math.min(0.4, 3000 / nominal) : Math.min(1, 8000 / nominal);
+
+      this.tf = mode === "fast" ? 0.55 : 1.35;
       this.tf = Math.max(0.2, this.tf);
       this.stats = { groups: groups.length, sentences: 0, ms: 0 };
       for (const g of groups) {
         if (this.skipA) { for (const s of g.segs) { if (s.fire) this.apply(s.fire); s.evs.forEach((e) => this.apply(e)); } continue; }
-        view.clock(g.sec <= TL ? g.sec : null);
+        view.clock(g.sec <= P.TL ? g.sec : null);
         for (let i = 0; i < g.segs.length; i++) {
           const seg = g.segs[i];
           this.skipS = this.skipA;
@@ -98,7 +101,7 @@ export class VfxCastPlayer implements CastPlayer {
     const out: Seg[] = []; let cur: Seg | null = null;
     for (const e of evs) {
       if (e.type === "fire") { cur = { fire: e, evs: [], sec: e.sec }; out.push(cur); continue; }
-      const endish = e.sec > TL || e.type === "heat";
+      const endish = e.sec > P.TL || e.type === "heat";
       if (!cur || (endish && cur.fire)) { cur = { evs: [], sec: e.sec }; out.push(cur); }
       cur.evs.push(e);
     }
@@ -134,6 +137,7 @@ export class VfxCastPlayer implements CastPlayer {
     (parent ?? this.layer).appendChild(d); this.temps.push(d); return d;
   }
   private cleanup() {
+    this.stage.querySelectorAll(".vx-casting").forEach(el=>el.classList.remove("vx-casting"));
     this.anims.forEach((a) => { try { a.cancel(); } catch { /* */ } }); this.anims.clear();
     this.temps.forEach((t) => t.remove()); this.temps = [];
     this.lifted.forEach((t) => t.classList.remove("vx-lift")); this.lifted = [];
@@ -207,38 +211,76 @@ export class VfxCastPlayer implements CastPlayer {
   private async sentence(seg: Seg, grp: Group, idx: number) {
     const f = seg.fire;
     if (!f) { await this.roundEnd(seg); return; }
-    const src = f.src, sty = this.styleId(src), [c, c2] = this.col(src), kinds = f.kinds ?? [];
+    const src = f.src, sty = this.styleId(src), [c, c2] = this.col(src);
     // 1 镜头拉近（同秒合并：只在第一句动镜头，框住本秒所有出手者）
     if (idx === 0) await this.camTo(this.frame(grp.segs.map((s) => s.fire!.src)), 330);
     if (!this.view.castMoments?.(src)) this.view.flash(src, "cast");   // 有骨骼小人：cast 动作推迟到出手前（deliver），与弹道同步
-    // 2 词牌被拿起，盔甲壳亮起
-    const toks = this.pickup(src, f.text, sty);
-    const g = this.geo(src);
+    // Keep the sentence intact: only the effect currently executing leaves it.
+    const targets = [...new Set([src, ...this.effTargets(seg)])];
+    await this.camTo(this.frame(targets, 1.2), 300);
     const grpEl = this.mk("vx-grp");
-    const shell = this.mk("vx-shell", "", { x: g.cx - g.w / 2, y: g.cy - g.h / 2 }, grpEl);
-    shell.style.width = `${g.w}px`; shell.style.height = `${g.h}px`;
-    shell.appendChild(buildShell({ w: g.w, h: g.h, style: sty, c, c2 }));
-    shell.style.opacity = "0";
-    this.pulseShell(shell, g);
-    const shellIn = this.A(shell, [{ opacity: 0, transform: px({ x: g.cx - g.w / 2, y: g.cy - g.h / 2 + g.h * 0.12 }, " scale(.85)") }, { opacity: 1, transform: px({ x: g.cx - g.w / 2, y: g.cy - g.h / 2 }, " scale(1)") }], 300);
-    // 3 飞到盔甲壳旁
-    const slots = this.slots(toks, g, src);
-    await Promise.all(toks.map((t, i) => this.flyTo(t, slots[i], 340, i * 45, sty, c, grpEl)));
-    await shellIn;
-    // 4 按职业拼装
-    await this.assemble(sty, toks, g, grpEl, c, c2, kinds);
-    // 5 动作相关的前置演出
-    await this.cues(seg, f, toks, g, sty, c, c2);
-    // 6 镜头拉开框住目标
-    if (idx === 0) { const all = new Set<number>([src]); grp.segs.forEach((s) => this.effTargets(s).forEach((u) => all.add(u))); await this.camTo(this.frame([...all], 1.25), 260); }
-    // 7 打出去：结算在命中的那一刻才应用
-    await this.deliver(seg, f, toks, sty, c, c2, grpEl);
-    // 8 归位
-    await this.returnHome(toks, shell, g, grpEl);
+    this.view.unitEl(src).classList.add("vx-casting");
+    this.castRings(src, c);
+    this.machine = await this.buildMachine(src, f.text, c);
+    await this.deliver(seg, f, [], sty, c, c2, grpEl);
+    await Promise.all(this.machine.map(t => this.A(t.el, [{transform:px(t.pos),opacity:1},{transform:px(t.home),opacity:0}],420)));
+    this.machine = [];
+    this.view.unitEl(src).classList.remove("vx-casting");
+  }
+
+  private castRings(src:number,c:string) {
+    const g=this.geo(src), width=g.fig.w*1.45;
+    const start={x:g.cx-width/2,y:g.fig.y+g.fig.h-14};
+    for(let i=0;i<4;i++){
+      const ring=this.mk("vx-rise-ring","",start);ring.style.width=`${width}px`;ring.style.height=`${Math.max(14,width*.22)}px`;ring.style.setProperty("--mc",c);
+      void this.A(ring,[{transform:px(start)+" scale(.65)",opacity:0},{transform:px({x:start.x,y:start.y-18})+" scale(1)",opacity:.85,offset:.2},{transform:px({x:start.x,y:start.y-g.fig.h*.9})+" scale(.82)",opacity:0}],1400,{delay:i*220,easing:"linear"}).then(()=>ring.remove());
+    }
+  }
+  private async buildMachine(src:number, text:string, c:string):Promise<Tok[]> {
+    this.machineSrc=src;
+    const real=this.view.sentenceWords?.(src) ?? [];
+    // Fallback is limited to actual library words, never arbitrary text slices.
+    const words=real.length?real:Array.from(this.stage.querySelectorAll<HTMLElement>(".lib .cw[data-t]")).filter(el=>el.dataset.t!=="奖励"&&text.includes(el.textContent?.replace(/×.*$/,"").trim()??"\0")).map(el=>({token:el.dataset.t!,label:el.childNodes[0]?.textContent??el.dataset.t!}));
+    const panel=this.R(this.view.unitEl(src).querySelector(".decl")??this.view.unitEl(src));
+    const g=this.geo(src);
+    const cards:Tok[]=words.map((w,i)=>{
+      const kind=/^\d+$/.test(w.token)?"num":/^@|选择|来源/.test(w.token)?"tgt":isAdvWord(w.token)?"adv":"base";
+      const home={x:panel.x+Math.min(panel.w-35,(i%5)*30),y:panel.y};
+      const el=this.mk(`cw vx-machine-word k-${kind}`,"",home);el.textContent=w.label;el.dataset.token=w.token;el.style.setProperty("--word-color",c);el.style.opacity="0";
+      return {el,home,pos:{x:0,y:0},w:el.offsetWidth,h:el.offsetHeight,text:w.label};
+    });
+    const maxWidth=Math.min(300,this.stage.clientWidth-24), gap=5;
+    const lines:Tok[][]=[[]];let used=0;
+    for(const card of cards){if(used+card.w>maxWidth&&lines.at(-1)!.length){lines.push([]);used=0;}lines.at(-1)!.push(card);used+=card.w+gap;}
+    const top=Math.max(32,g.fig.y-lines.length*32-18);
+    lines.forEach((line,row)=>{const width=line.reduce((n,t)=>n+t.w,0)+gap*(line.length-1);let x=Math.max(12,Math.min(this.stage.clientWidth-width-12,g.cx-width/2));for(const card of line){card.pos={x,y:top+row*32};x+=card.w+gap;}});
+    const attack=words.some(w=>w.token==="造成");
+    if(attack){
+      // Action card is the receiver, number is the chamber; targeting cards dock
+      // below as a stabilizer. Every card moves, rather than a frame assembling.
+      const center={x:Math.max(110,Math.min(this.stage.clientWidth-110,g.cx)),y:Math.max(100,g.fig.y-72)};
+      const action=cards.find(t=>t.el.dataset.token==="造成");
+      const number=cards.find(t=>/^\d+$/.test(t.el.dataset.token??""));
+      if(action)action.pos={x:center.x-action.w*.5,y:center.y-32};
+      if(number)number.pos={x:center.x-number.w*.5,y:center.y-7};
+      const rest=cards.filter(t=>t!==action&&t!==number);
+      rest.forEach((t,i)=>{
+        const left=i%2===0, tier=Math.floor(i/2);
+        t.pos={x:center.x+(left?-t.w+8: -8),y:center.y+12+tier*22};
+        t.el.style.transformOrigin=left?"right center":"left center";
+        t.el.dataset.wing=left?"left":"right";
+        t.el.style.zIndex=String(4-tier);
+      });
+
+    }
+    await Promise.all(cards.map((t,i)=>{const scatter={x:t.pos.x+(i%2?-42:42),y:t.pos.y-42-i*4};return this.A(t.el,[{transform:px(t.home)+" scale(.6)",opacity:0},{transform:px(scatter)+` rotate(${i%2?20:-20}deg)`,opacity:1,offset:.6},{transform:px(scatter)+" rotate(0deg)",opacity:1}],480,{delay:i*45});}));
+    await Promise.all(cards.map((t,i)=>this.A(t.el,[{transform:t.el.style.transform,opacity:1},{transform:px(t.pos)+` rotate(${t.el.dataset.wing==="left"?-12:t.el.dataset.wing==="right"?12:0}deg) scale(1.12)`,opacity:1,offset:.85},{transform:px(t.pos)+` rotate(${t.el.dataset.wing==="left"?-12:t.el.dataset.wing==="right"?12:0}deg)`,opacity:1}],220,{delay:i*90,easing:"cubic-bezier(.6,0,.8,1)"}).then(()=>{this.sparks({x:t.pos.x+t.w,y:t.pos.y+t.h/2},c,4,"sq");})));
+    await this.wait(350);
+    return cards;
   }
 
   /** 演出期间壳的脉动：花纹绕中心缓慢转动，整体一呼一吸 + 描边明暗（只在演出时存在，随演出清理；关闭档/跳过时不加） */
-  private pulseShell(shell: HTMLElement, g: ReturnType<VfxCastPlayer["geo"]>) {
+  pulseShell(shell: HTMLElement, g: ReturnType<VfxCastPlayer["geo"]>) {
     if (this.T(1000) <= 0) return;
     const svg = shell.querySelector<SVGElement>(".vx-shell-svg"), pat = shell.querySelector<SVGElement>(".vx-pat");
     if (pat) {
@@ -252,7 +294,7 @@ export class VfxCastPlayer implements CastPlayer {
   }
 
   /** 词牌飞回句子条，壳收起 */
-  private async returnHome(toks: Tok[], shell: HTMLElement, g: ReturnType<VfxCastPlayer["geo"]>, grpEl: HTMLElement) {
+  async returnHome(toks: Tok[], shell: HTMLElement, g: ReturnType<VfxCastPlayer["geo"]>, grpEl: HTMLElement) {
     void g;
     for (const t of toks) t.el.classList.remove("fired");
     const sty = toks.length ? toks[0].el.className.match(/s-(\w+)/)?.[1] ?? "bing" : "bing";
@@ -281,7 +323,7 @@ export class VfxCastPlayer implements CastPlayer {
     if (out.length > 9) { const keep = out.slice(0, 8); keep.push(out.slice(8).join("")); return keep; }
     return out;
   }
-  private pickup(u: number, text: string, sty: string): Tok[] {
+  pickup(u: number, text: string, sty: string): Tok[] {
     const unit = this.view.unitEl(u);
     const tx = unit.querySelector<HTMLElement>(".decl .tx");
     const panel = this.R(unit.querySelector(".panel") ?? unit);
@@ -305,7 +347,7 @@ export class VfxCastPlayer implements CastPlayer {
       return { el, home: homes[i], pos: { ...homes[i] }, w: el.offsetWidth, h: el.offsetHeight, text: w };
     });
   }
-  private slots(toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, u: number): Pt[] {
+  slots(toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, u: number): Pt[] {
     const W = this.stage.clientWidth, c = this.cam, vx0 = -c.tx / c.s + 8, vx1 = (W - c.tx) / c.s - 8;   // 镜头里看得见的横向范围
     const maxRow = Math.min(Math.max(g.w * 1.25, 150), vx1 - vx0), gap = 12;
     const rows: Tok[][] = [[]]; let rw = 0;
@@ -320,7 +362,7 @@ export class VfxCastPlayer implements CastPlayer {
     });
     return toks.map((t) => out.get(t)!);
   }
-  private flyTo(t: Tok, to: Pt, ms: number, delay: number, sty: string, c: string, parent?: HTMLElement): Promise<void> {
+  flyTo(t: Tok, to: Pt, ms: number, delay: number, sty: string, c: string, parent?: HTMLElement): Promise<void> {
     const from = t.pos; t.pos = { ...to };
     if (parent && t.el.parentElement !== parent) parent.appendChild(t.el);
     const mid: Pt = { x: (from.x + to.x) / 2 + (sty === "zhuang" ? 0 : rnd(-18, 18)), y: Math.min(from.y, to.y) - (sty === "bing" ? 8 : 34) };
@@ -335,7 +377,7 @@ export class VfxCastPlayer implements CastPlayer {
   }
 
   // ---- 四种职业的拼装
-  private async assemble(sty: string, toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, grp: HTMLElement, c: string, c2: string, kinds: string[]) {
+  async assemble(sty: string, toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, grp: HTMLElement, c: string, c2: string, kinds: string[]) {
     if (!toks.length) return;
     const rowY = toks.map((t) => t.pos.y);
     if (sty === "bing") {
@@ -381,7 +423,7 @@ export class VfxCastPlayer implements CastPlayer {
   }
 
   // ---- 前置演出（按动作种类）
-  private async cues(seg: Seg, f: ReplayEvent, toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, sty: string, c: string, c2: string) {
+  async cues(seg: Seg, f: ReplayEvent, toks: Tok[], g: ReturnType<VfxCastPlayer["geo"]>, sty: string, c: string, c2: string) {
     const kinds = f.kinds ?? [];
     const hasEffect = seg.evs.some((e) => EFFECT.has(e.type));
     const ps: Promise<void>[] = [];
@@ -414,7 +456,7 @@ export class VfxCastPlayer implements CastPlayer {
     const text = tx?.textContent || "…";
     const el = this.mk("vx-tok victim", "", { x: r.x, y: r.y }); el.textContent = text.length > 14 ? text.slice(0, 13) + "…" : text;
     if (tx) { tx.classList.add("vx-lift"); this.lifted.push(tx); }
-    const shatter = start + n > TL;
+    const shatter = start + n > P.TL;
     const arrow = this.mk("vx-pushtag", `+${n}秒 ›››`, { x: r.x, y: r.y - 20 }); arrow.style.color = c;
     const dx = 46 + n * 14;
     await this.A(el, [{ transform: px({ x: r.x, y: r.y }) }, { transform: px({ x: r.x + dx, y: r.y }), offset: 0.7 }, { transform: px({ x: r.x + dx * (shatter ? 1.4 : 1), y: r.y }) }], 420, { easing: "cubic-bezier(.5,0,.2,1)" });
@@ -452,8 +494,14 @@ export class VfxCastPlayer implements CastPlayer {
 
   // ------------------------------------------------------------ 打出去
   private async deliver(seg: Seg, f: ReplayEvent, toks: Tok[], sty: string, c: string, c2: string, grpEl: HTMLElement) {
-    const evs = seg.evs; const src = f.src;
-    if (!evs.length) return;
+    const evs = [...seg.evs]; const src = f.src;
+    // Engine logs the remaining damage before its absorb record. Present the
+    // incoming attack and interception first, without changing final values.
+    for (let i = 0; i + 1 < evs.length; i++) {
+      const a = evs[i], b = evs[i + 1];
+      if (a.type === "hit" && b.type === "absorb" && a.src === b.src && a.tgt === b.tgt) { evs[i] = b; evs[i + 1] = a; i++; }
+    }
+    if (!evs.length) { this.view.float(src,"没有生效","info"); await this.wait(300); return; }
     const lungeDir = evs.find((e) => e.type === "hit" && e.tgt >= 0 && e.tgt !== src);
     if (lungeDir) this.lunge(src, lungeDir.tgt, grpEl);
     // 触发提示：别的随从的长期句亮起
@@ -463,20 +511,110 @@ export class VfxCastPlayer implements CastPlayer {
     if (trig.size) await this.wait(280);
     toks.forEach((t) => t.el.classList.add("fired"));
     await this.handCast(src, sty, c, c2);
-    const n = evs.length, step = Math.min(85, 520 / Math.max(1, n));
-    const applied: Promise<void>[] = [];
-    evs.forEach((e, i) => {
-      applied.push((async () => {
-        await this.wait(i * step);
-        const trigger = e.src >= 0 && e.src !== src && e.type !== "standing";
-        await this.launch(e, trigger ? this.styleId(e.src) : sty, trigger ? this.col(e.src) : [c, c2], toks, f);
-        if (i > 0) await applied[i - 1];
-        this.apply(e);
-        this.after(e, trigger ? this.styleId(e.src) : sty, trigger ? this.col(e.src)[0] : c);
-      })());
-    });
-    await Promise.all(applied);
-    await this.wait(110);
+    // Follow trace order. No cascade of overlapping animations hiding results.
+    let blocked = "";
+    for (const e of evs) {
+      const key = `${e.src}:${e.tgt}`;
+      if (e.type === "cue") { await this.effectCard(e,f,e.text,c); } else if (e.type === "absorb" && e.src >= 0) {
+        const next = evs[evs.indexOf(e) + 1];
+        const remaining = next?.type === "hit" && next.src === e.src && next.tgt === e.tgt ? next.amount : 0;
+        await this.effectCard({...e, amount:e.amount + remaining}, f, "造成", c);
+        blocked = key;
+        await this.domeFlash(e.tgt);
+      } else if (e.type === "hit" && blocked === key) {
+        blocked = ""; // The incoming attack was already shown at the shield.
+      } else if (["hit", "heal", "shield", "status", "standing"].includes(e.type)) {
+        if (e.src >= 0) await this.effectCard(e, f, e.type === "hit" ? "造成" : e.type === "heal" ? "恢复" : e.type === "shield" ? "减伤" : e.type === "status" ? e.text : "长期", c);
+        else await this.wait(220);
+      }
+      this.apply(e);
+      this.after(e, sty, c);
+      await this.wait(e.type === "down" ? 400 : 180);
+    }
+  }
+  private async morphMachine(kind:string,src:number,c:string){
+    const g=this.geo(src), center={x:Math.max(120,Math.min(this.stage.clientWidth-120,g.cx)),y:Math.max(95,g.fig.y-58)};
+    const count=Math.max(1,this.machine.length);
+    await Promise.all(this.machine.map((t,i)=>{
+      const from={...t.pos};let x=0,y=0,rotation=0;
+      if(["hit","absorb","reflect","pierce"].includes(kind)){const wing=i%2?-1:1;x=wing*Math.min(55,i*13)-t.w/2;y=-24+Math.floor(i/2)*21;rotation=i<2?0:wing*12;}
+      else if(kind==="shield"){const a=(i/(Math.max(1,count-1))-.5)*Math.PI*.85;x=Math.sin(a)*70-t.w/2;y=-Math.cos(a)*32;rotation=a*15;}
+      else if(kind==="heal"||kind==="cleanse"){const pts=[[0,-29],[-44,0],[0,0],[44,0],[0,29]];[x,y]=pts[i%5];x-=t.w/2;y+=Math.floor(i/5)*24;}
+      else if(["strip","remove"].includes(kind)){x=(i%2?36:-36)-t.w/2;y=Math.floor(i/2)*24-25;rotation=i%2?-15:15;}
+      else if(["postpone","quote"].includes(kind)){x=(i%3-1)*34-t.w/2;y=Math.floor(i/3)*24+(i%3)*9-28;}
+      else {const a=i/count*Math.PI*2-Math.PI/2;x=Math.cos(a)*48-t.w/2;y=Math.sin(a)*31;rotation=Math.cos(a)*10;}
+      t.pos={x:center.x+x,y:center.y+y};t.el.style.setProperty("--word-color",c);
+      return this.A(t.el,[{transform:px(from)},{transform:px({x:t.pos.x,y:t.pos.y-8})+` rotate(${rotation}deg) scale(1.08)`,offset:.8},{transform:px(t.pos)+` rotate(${rotation}deg)`}],360,{delay:i*25});
+    }));
+    this.sparks(center,c,5,"sq");await this.wait(150);
+  }
+  private async logicEffect(e:ReplayEvent,src:number,origin:Pt,target:Pt,c:string){
+    const kind=e.effect??"watch";
+    const labels:Record<string,string>={redirect:"转移",reflect:"反弹",postpone:"延后",strip:"移除",remove:"移除",cleanse:"净化",cash:"兑现",quote:"引用",condition:e.amount?"成立":"不成立",assertion:e.amount?"成立":"否则",pierce:"无视",nullify:"阻断",forbid:"不得",watch:"每当",delay:"定时",assert:"断言",ignore:"无视"};
+    const visual=this.mk(`vx-logic-effect fx-${kind}`,"",{x:target.x-40,y:target.y-30});visual.textContent=labels[kind]??kind;visual.style.setProperty("--mc",c);
+    if(kind==="postpone"){
+      const tx=this.view.unitEl(e.tgt).querySelector<HTMLElement>(".decl");if(tx)await this.A(tx,[{transform:"translateX(0)"},{transform:"translateX(20px)",opacity:.45},{transform:"translateX(0)",opacity:1}],650);
+      visual.textContent=e.end!==undefined&&e.end>P.TL?"移出时间轴":`延后 +${e.amount}秒`;
+    }
+    if(["strip","remove","cleanse"].includes(kind))this.sparks(target,c,12,"sq");
+    if(kind==="reflect"||kind==="redirect")await this.reflectCue(this.geo(e.tgt>=0?e.tgt:src),c);
+    if(kind==="quote"){visual.textContent=`引用 → ${e.amount}`;for(let i=0;i<3;i++){const bit=this.mk("vx-ghostnum",String(Math.max(0,e.amount-i)),{x:origin.x-55-i*22,y:origin.y-25});await this.A(bit,[{transform:px({x:origin.x-55-i*22,y:origin.y-25}),opacity:0},{transform:px(origin),opacity:1}],180);bit.remove();}}
+    await this.A(visual,[{transform:px({x:target.x-40,y:target.y-30})+" scale(.6)",opacity:0},{transform:px({x:target.x-40,y:target.y-30}),opacity:1,offset:.3},{transform:px({x:target.x-40,y:target.y-45}),opacity:0}],750);
+    visual.remove();
+  }
+  private async effectCard(e: ReplayEvent, f: ReplayEvent, word: string, c: string) {
+    const src=e.src>=0?e.src:f.src;
+    const kind=e.effect??(e.type==="status"?e.text:e.type);
+    c=this.col(src)[0];
+    if(this.machineSrc!==src||!this.machine.length){await Promise.all(this.machine.map(t=>this.A(t.el,[{opacity:1},{opacity:0}],180)));this.machine=await this.buildMachine(src,f.text,c);this.castRings(src,c);}
+
+    await this.morphMachine(kind,src,c);
+
+    const module=this.machine.filter(t=>t.text.includes(word));
+    const number=this.machine.find(t=>/^\d+$/.test(t.text));
+    const core=module[0]??this.machine[0];
+    const origin=core?{x:core.pos.x+core.w/2,y:core.pos.y+core.h/2}:this.anchorPt(src,e.tgt>=0?e.tgt:src);
+    const target=e.tgt>=0?this.tgtPt(e.tgt):this.tgtPt(src);
+    module.forEach(t=>t.el.classList.add("vx-module-active"));
+    const col=c;
+    const charge=this.mk("vx-machine-charge","",{x:origin.x-32,y:origin.y-32});charge.style.setProperty("--mc",col);
+    await this.A(charge,[{transform:px({x:origin.x-32,y:origin.y-32})+" scale(.4) rotate(-45deg)",opacity:0},{transform:px({x:origin.x-32,y:origin.y-32})+" scale(1) rotate(0deg)",opacity:1}],450);
+    if(["hit","absorb"].includes(e.type)){
+      const rail=this.mk("vx-machine-rail","",{x:origin.x,y:origin.y});const dx=target.x-origin.x,dy=target.y-origin.y;rail.style.width=`${Math.hypot(dx,dy)}px`;rail.style.transform=px(origin)+` rotate(${Math.atan2(dy,dx)}rad)`;rail.style.setProperty("--mc",col);
+      const shot=number?.el??this.mk("cw k-num vx-machine-shot","",origin);
+      shot.classList.add("vx-launched");
+      const launchFrom=number?{...number.pos}:origin;
+      shot.style.setProperty("--word-color",col);
+      if(!number)shot.textContent=String(e.amount);
+      const to={x:target.x-shot.offsetWidth/2,y:target.y-shot.offsetHeight/2};
+      // Mask only the corresponding numeric substring, leaving the rest readable.
+      const tx=this.view.unitEl(src).querySelector<HTMLElement>(".decl .tx");
+      const original=tx?.textContent??"";
+      if(tx&&number){const node=document.createTextNode(original),at=original.indexOf(number.text);if(at>=0){tx.replaceChildren(document.createTextNode(original.slice(0,at)));const mask=document.createElement("span");mask.className="vx-number-away";mask.textContent=number.text;tx.append(mask,document.createTextNode(original.slice(at+number.text.length)));}else tx.replaceChildren(node);}
+
+      if(number)number.el.classList.add("vx-module-active");
+      const angle=Math.atan2(dy,dx);
+      const flash=this.mk("vx-muzzle","",{x:origin.x-25,y:origin.y-25});flash.style.setProperty("--mc",col);
+      void this.A(flash,[{transform:px({x:origin.x-25,y:origin.y-25})+" scale(.3)",opacity:1},{transform:px({x:origin.x-25,y:origin.y-25})+" scale(1.7)",opacity:0}],320);
+      for(const t of this.machine.filter(t=>t!==number))void this.A(t.el,[{transform:px(t.pos)},{transform:px({x:t.pos.x-Math.cos(angle)*10,y:t.pos.y-Math.sin(angle)*10}),offset:.3},{transform:px(t.pos)}],350);
+      for(let k=0;k<4;k++){const trail=this.mk("vx-attack-trail","",origin);trail.style.setProperty("--mc",col);void this.A(trail,[{transform:px(origin)+` rotate(${angle}rad)`,opacity:.8},{transform:px(target)+` rotate(${angle}rad)`,opacity:0}],700,{delay:k*45});}
+
+      await this.A(shot,[{transform:px(launchFrom)+" scale(1)",opacity:1},{transform:px(to)+" scale(1.25)",opacity:1}],700,{easing:"cubic-bezier(.5,0,.7,1)"});
+      this.sparks(target,col,18,"sq");const burst=this.mk("vx-muzzle vx-hit-burst","",{x:target.x-30,y:target.y-30});burst.style.setProperty("--mc",col);void this.A(burst,[{transform:px({x:target.x-30,y:target.y-30})+" scale(.3)",opacity:1},{transform:px({x:target.x-30,y:target.y-30})+" scale(2)",opacity:0}],400);await this.A(shot,[{transform:px(to)+" scale(1.25)",opacity:1},{transform:px(to)+" scale(1.8)",opacity:0}],240);if(number){await this.A(shot,[{transform:px(to),opacity:0},{transform:px(number.pos),opacity:1}],260);}else shot.remove();
+      shot.classList.remove("vx-launched");
+      if(tx)tx.textContent=original;
+      rail.remove();
+    }else if(e.type==="shield"){
+      // Plates fan out from the assembled shield module and dock around the ally.
+      await Promise.all([-1,0,1].map((i)=>{const plate=this.mk("vx-shield-plate","",origin);plate.style.setProperty("--mc",col);const to={x:target.x+i*27-12,y:target.y-38};return this.A(plate,[{transform:px(origin)+" scale(.3)",opacity:0},{transform:px(to),opacity:1}],700).then(()=>plate.remove());}));
+    }else if(e.type==="heal"){
+      const cross=this.mk("vx-repair-cross","+",origin);cross.style.setProperty("--mc",col);await this.A(cross,[{transform:px(origin),opacity:1},{transform:px({x:target.x-20,y:target.y-20})+" rotate(90deg)",opacity:1}],700);this.sparks(target,col,10,"plus");cross.remove();
+    }else if(e.type==="cue"||e.type==="standing"){
+      await this.logicEffect(e,src,origin,target,col);
+    }else if(e.type==="status"){
+      const stamp=this.mk("vx-state-stamp","",origin);stamp.textContent=e.text;stamp.style.setProperty("--mc",col);await this.A(stamp,[{transform:px(origin)+" scale(.5)",opacity:0},{transform:px({x:target.x-30,y:target.y-18}),opacity:1}],700);stamp.remove();
+    }else await this.wait(350);
+    charge.remove();module.forEach(t=>t.el.classList.remove("vx-module-active"));number?.el.classList.remove("vx-module-active");
   }
   /** 骨骼小人 cast：动作与光效一起开始，蓄力 → 在「出手帧」才继续（弹道从手腕发出）。没有骨骼小人时立即返回 */
   private async handCast(src: number, sty: string, c: string, c2: string) {
@@ -518,7 +656,7 @@ export class VfxCastPlayer implements CastPlayer {
   }
 
   /** 事件的「飞行」部分：返回时刻 = 命中时刻 */
-  private async launch(e: ReplayEvent, sty: string, [c, c2]: string[], toks: Tok[], f: ReplayEvent): Promise<void> {
+  async launch(e: ReplayEvent, sty: string, [c, c2]: string[], toks: Tok[], f: ReplayEvent): Promise<void> {
     const src = e.src;
     switch (e.type) {
       case "hit": {
@@ -540,11 +678,12 @@ export class VfxCastPlayer implements CastPlayer {
   private apply(e: ReplayEvent) {
     const v = this.view;
     switch (e.type) {
+      case "cue": v.float(e.tgt>=0?e.tgt:e.src, e.text, "info"); if(["strip","remove","cleanse"].includes(e.effect??"")) this.view.unitEl(e.tgt).querySelectorAll(".vx-resident").forEach(x=>{const k=(x as HTMLElement).dataset.kind??"";if(e.effect==="cleanse"?["灼烧","易伤","衰弱"].includes(k):e.effect==="strip"?["shield","redirect","standing"].includes(k):k==="standing")x.remove();}); if(e.effect==="strip") {const d=v.getDisplay(e.tgt);v.setDisplay(e.tgt,d.hp,0);} if(e.effect==="redirect")this.marker(e.tgt,"redirect","转移"); break;
       case "fire": break;
-      case "standing": v.float(e.src, "长期句生效", "info"); break;
-      case "shield": { const d = v.getDisplay(e.tgt); v.setDisplay(e.tgt, d.hp, d.sh + e.amount); v.float(e.tgt, e.text, "shield"); v.flash(e.tgt, "shield"); break; }
+      case "standing": v.float(e.src, e.text, "info"); this.marker(e.src, "standing", ({delay:"定时",assert:"断言",forbid:"不得",watch:"每当",ignore:"无视"} as Record<string,string>)[e.effect??""]??"长期"); break;
+      case "shield": { const d = v.getDisplay(e.tgt); v.setDisplay(e.tgt, d.hp, d.sh + e.amount); v.float(e.tgt, e.text, "shield"); v.flash(e.tgt, "shield"); this.marker(e.tgt, "shield", "减伤"); break; }
       case "absorb": {
-        const d = v.getDisplay(e.tgt); v.setDisplay(e.tgt, d.hp, Math.max(0, d.sh - e.amount)); v.float(e.tgt, e.text, "shield");
+        const d = v.getDisplay(e.tgt); v.setDisplay(e.tgt, d.hp, P2.MITHIT ? d.sh : Math.max(0, d.sh - e.amount)); v.float(e.tgt, e.text, "shield");
         this.hint(e.tgt, "首挡"); break;
       }
       case "hit": {
@@ -553,11 +692,17 @@ export class VfxCastPlayer implements CastPlayer {
         if (hp === 1) this.hint(e.tgt, "不屈"); break;
       }
       case "heal": { const d = v.getDisplay(e.tgt); v.setDisplay(e.tgt, d.hp + e.amount, d.sh); v.float(e.tgt, e.text, "heal"); v.flash(e.tgt, "heal"); break; }
-      case "status": v.float(e.tgt, e.text, "status"); break;
+      case "status": v.float(e.tgt, e.text, "status"); this.marker(e.tgt, e.text, e.text); break;
       case "heat": v.banner("过热", `每个随从 −${e.amount}`); break;
-      case "down": v.markDown(e.tgt); v.float(e.tgt, "倒下", "info"); break;
+      case "down": this.view.unitEl(e.tgt).querySelectorAll(".vx-resident").forEach(x=>x.remove()); v.markDown(e.tgt); v.float(e.tgt, "倒下", "info"); break;
       case "dice": void playDice(v, e, (ms) => this.wait(ms)); break;
     }
+  }
+  private marker(u:number, kind:string, text:string) {
+    const host=this.view.unitEl(u);
+    let el=Array.from(host.querySelectorAll<HTMLElement>(".vx-resident")).find(x=>x.dataset.kind===kind);
+    if(!el){el=document.createElement("div");el.className="vx-resident";el.dataset.kind=kind;host.appendChild(el);}
+    el.textContent=text;el.style.setProperty("--resident-color",this.col(u)[0]);
   }
   /** 首挡 / 不屈 触发提示（根据面板上关键词标签是否已用判断，每个随从每轮只提示一次） */
   private hint(u: number, kw: string) {
@@ -570,7 +715,7 @@ export class VfxCastPlayer implements CastPlayer {
     if (this.skipS) return;
     if (e.type === "hit" && e.tgt >= 0) this.impact(this.tgtPt(e.tgt), sty, c);
     if (e.type === "status") this.aura(e.tgt, e.text);
-    if (e.type === "shield") this.dome(e.tgt, "#00e5ff");
+
     if (e.type === "heal") this.sparks(this.tgtPt(e.tgt), "#5eead4", 6, "plus");
     if (e.type === "down") this.sparks(this.tgtPt(e.tgt), "#fff", 10, "sq");
   }
@@ -697,10 +842,10 @@ export class VfxCastPlayer implements CastPlayer {
     const burns = [...new Set(seg.evs.filter((e) => e.type === "hit" && e.src < 0 && !heat).map((e) => e.tgt))];
     await this.camTo({ s: 1, tx: 0, ty: 0 }, 200);
     if (burns.length && !heat) { burns.forEach((u) => this.aura(u, "灼烧")); await this.wait(240); }
-    const n = seg.evs.length, step = Math.min(70, 400 / Math.max(1, n));
-    for (const e of seg.evs) {
-      if (e.src >= 0 && e.type !== "down" && e.type !== "standing") { const [c, c2] = this.col(e.src); await this.launch(e, this.styleId(e.src), [c, c2], [], e); } else await this.wait(step);
-      this.apply(e); this.after(e, "bing", "#ff5c7a");
+    for(const e of seg.evs){
+      if(e.src>=0&&["hit","heal","shield","status","standing","cue"].includes(e.type))await this.effectCard(e,e,e.type==="hit"?"造成":e.type==="heal"?"恢复":e.type==="shield"?"减伤":e.text,this.col(e.src)[0]);
+      else await this.wait(200);
+      this.apply(e);this.after(e,e.src>=0?this.styleId(e.src):"bing",e.src>=0?this.col(e.src)[0]:"#ff5c7a");
     }
     await this.wait(150);
   }

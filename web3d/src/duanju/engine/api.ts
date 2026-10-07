@@ -34,9 +34,11 @@ export function configureRules(kind: RulesKind, custom = ""): string | null {
   } catch (e) { return String((e as Error).message ?? e); }
 }
 
-export type ReplayType = "hit" | "heal" | "shield" | "absorb" | "status" | "down" | "standing" | "fire" | "heat" | "dice";
+export type ReplayType = "hit" | "heal" | "shield" | "absorb" | "status" | "down" | "standing" | "fire" | "heat" | "dice" | "cue";
 export interface ReplayEvent {
   sec: number; type: ReplayType; src: number; tgt: number; amount: number; text: string;
+  effect?: string;
+  end?: number;
   /** 仅 fire：这句话含哪些动作（dmg/heal/shield/burn/vuln/weak/redirect/postpone/strip/nullify/delay/cash/forbid/standing/cond/quote） */
   kinds?: string[];
   /** 仅 fire：宣告的起手秒 */
@@ -173,6 +175,7 @@ export class Match {
     const hp = pre.hp.slice(); const downed = new Set<number>(); const diceOf = new Map<number, ReplayEvent>();
     for (const e of raw) {
       switch (e.t) {
+        case "vfx": ev.push({sec:e.sec,type:"cue",src:e.src,tgt:e.u,amount:e.amt,text:({redirect:"转移",reflect:"反弹",postpone:"延后",strip:"移除",remove:"移除",cleanse:"净化",cash:"兑现",quote:"引用",pierce:"无视",nullify:"阻断",condition:e.amt?"条件成立":"条件不成立"} as Record<string,string>)[e.effect]??e.effect,effect:e.effect,end:e.end}); break;
         case "fire": {
           const d = this.history.slice().reverse().find((h) => h.unit === e.u && h.rnd === s.rnd);
           const dc = decls.find((x) => x.unit === e.u);
@@ -193,8 +196,8 @@ export class Match {
         case "shield": ev.push({ sec: e.sec, type: "shield", src: e.src, tgt: e.u, amount: e.amt, text: `盾+${e.amt}` }); break;
         case "absorb": ev.push({ sec: e.sec, type: "absorb", src: e.src, tgt: e.u, amount: e.amt, text: `挡${e.amt}` }); break;
         case "status": ev.push({ sec: e.sec, type: "status", src: e.src, tgt: e.u, amount: 1, text: STATUS_ZH[e.kind as keyof typeof STATUS_ZH] ?? e.kind }); break;
-        case "standing": ev.push({ sec: e.sec, type: "standing", src: e.u, tgt: -1, amount: 0, text: zh(clauseText(e.c)) }); break;
-        case "assertion": ev.push({ sec: e.sec, type: "standing", src: e.u, tgt: -1, amount: 0, text: e.yes ? "断言成立：执行奖励分支" : "断言不成立：执行否则分支" }); break;
+        case "standing": ev.push({ sec: e.sec, type: "standing", src: e.u, tgt: -1, amount: 0, text: zh(clauseText(e.c)), effect:e.c.k === "when" ? e.c.forbid ? "forbid" : "watch" : e.c.k }); break;
+        case "assertion": ev.push({ sec: e.sec, type: "cue", src: e.u, tgt: e.u, amount: e.yes ? 1 : 0, text: e.yes ? "断言成立：执行奖励分支" : "断言不成立：执行否则分支",effect:"assertion" }); break;
         case "down": downed.add(e.u); hp[e.u] = 0; ev.push({ sec: e.sec, type: "down", src: e.src, tgt: e.u, amount: 0, text: "倒下" }); if (diceOf.has(e.u)) { ev.push(diceOf.get(e.u)!); diceOf.delete(e.u); } break;
         case "dice": diceOf.set(e.u, { sec: e.sec, type: "dice", src: -1, tgt: e.u, amount: e.roll, text: `投骰 ${e.roll} → 获得数字牌 ${e.roll}` }); break;   // 等该随从的「倒下」事件之后再放
         case "heat":

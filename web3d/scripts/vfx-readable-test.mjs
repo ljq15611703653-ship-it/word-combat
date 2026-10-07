@@ -1,0 +1,8 @@
+import assert from 'node:assert/strict';
+const {chromium}=await import('file:///C:/Users/27654/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs');
+const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+try {const page=await browser.newPage({viewport:{width:1280,height:800}});const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:5210/duanju.html?start=1');await page.waitForFunction(()=>window.__dj?.battle);
+const result=await page.evaluate(async()=>{const b=window.__dj.battle;const {VfxCastPlayer}=await import('/src/duanju/vfx/player.ts');const player=new VfxCastPlayer();b.view._s=b.stage;b.busy=true;b.view.speed=()=>2;b.m.s.sh[0]=2;b.render();const initial=b.view.getDisplay(0);const ev=(type,src,tgt,amount,text)=>({sec:1,type,src,tgt,amount,text});await player.play([ev('fire',0,-1,0,'减伤2'),ev('shield',0,0,2,'减伤2'),ev('fire',3,-1,0,'造成3'),ev('absorb',3,0,2,'挡2'),ev('hit',3,0,1,'-1')],b.view);const after=b.view.getDisplay(0);const resident=!!b.unitEls[0].querySelector('.vx-resident[data-kind="shield"]');const clean=!document.querySelector('.vx-layer,.vx-lift');b.busy=false;b.m.s.sh[0]=0;b.disp.sh[0]=0;b.render();const expired=!b.unitEls[0].querySelector('.vx-resident[data-kind="shield"]');return {initial,after,resident,clean,expired};});assert.equal(result.after.sh,result.initial.sh+2);assert.equal(result.after.hp,result.initial.hp-1);assert(result.resident&&result.clean&&result.expired);assert.deepEqual(errors,[]);console.log(JSON.stringify({result,errors}));await page.screenshot({path:'D:/wc/guide/词牌演出新版.png'});
+}finally{await browser.close()}
+
+

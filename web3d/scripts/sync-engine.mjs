@@ -5,6 +5,7 @@ import { pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { applyCooldownPatch } from './engine-cooldown-patch.mjs';
+import { applyVfxTracePatch } from './engine-vfx-trace-patch.mjs';
 import { applyGamePatch } from "./engine-game-patch.mjs";
 
 const LAB = process.env.LAB_DIR ?? "D:/wc/nc_lab/web3d/src";
@@ -84,7 +85,7 @@ function koNow(`);
     t = must(f, t, "if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; s.stand", "if (s.hp[u] <= 0) { s.dead[u] = true; s.redir[u] = false; rollDown(s, u); s.stand");
   }
   if (f === "deck") {}
-  writeFileSync(`${OUT}/${f}.ts`, applyCooldownPatch(f, applyGamePatch(f, header(`lab2/${f}.ts`) + t)));
+  writeFileSync(`${OUT}/${f}.ts`, applyVfxTracePatch(f, applyCooldownPatch(f, applyGamePatch(f, header(`lab2/${f}.ts`) + t))));
 }
 let r = fix(readFileSync(`${LAB}/lab/rules.ts`, "utf8"));
 r = must("lab-rules", r, "export interface Card { v: number; cd: number }", "export interface Card { v: number; cd: number; once?: boolean }   // once = 一次性牌（骰牌）：用掉就消失，不冷却");

@@ -1,5 +1,5 @@
 // 战斗界面：简化版。所有信息放在随从旁边的面板里；右上角回合/行动点/数字牌；右下角操作按钮。只显示双方公开信息。
-import { Match, P2, configureRules, setUnitNames, type ReplayEvent, type Cls } from "./engine/api";
+import { Match, P2, configureRules, setUnitNames, unitLabel, type ReplayEvent, type Cls } from "./engine/api";
 import { KW_TIP } from "./setup";
 import { randDeck } from "./engine/deck";
 import { deckOk } from "./engine/api";
@@ -11,6 +11,7 @@ import { createRig, type RigFigure } from "./rig/rig";
 const PROTAG = ["ye_qi", "lu_xiaoman", "ke_qian"];
 const rigAll = () => typeof location !== "undefined" && new URLSearchParams(location.search).has("rig");
 import { Dock } from "./dock";
+import { astToTokens, tokenLabel } from "./composer/grammar";
 import { VfxCastPlayer } from "./vfx/player";
 import "./layout.css";
 import "./skin.css";
@@ -71,6 +72,7 @@ export class Battle {
   private foeStyle: StyleDef;
   private myStyle: StyleDef;
   private speedIdx = 0;
+  private roundResolved = false;
   private arts: ArtSet[] = [];
   /** 有骨骼资源的角色用 Canvas 骨骼小人替换整图（没有则保持整图/剪影） */
   private rigs: (RigFigure | undefined)[] = [];
@@ -184,6 +186,22 @@ export class Battle {
       else dec.innerHTML = "";
       el.classList.toggle("ready", side === 0 && this.canPick(u) && (this.dock?.unit ?? -1) < 0);
       el.classList.toggle("folded", this.collapsed.has(u));
+      if (!this.busy) {
+        const marks = new Map<string, string>();
+        if (v.alive) {
+          if (sh > 0 && !this.roundResolved) marks.set("shield", `减伤 ${sh}`);
+          if (v.redir) marks.set("redirect", "转移");
+          for (const s of v.sts) marks.set(s.kind, `${s.kind} ${s.left}轮`);
+          if (v.standing.length) marks.set("standing", v.standing.map(s => `${s.text}${s.left < 99 ? ` · ${s.left}轮` : ""}`).join(" / "));
+        }
+        el.querySelectorAll<HTMLElement>(".vx-resident").forEach(x => { if (!marks.has(x.dataset.kind!)) x.remove(); });
+        for (const [kind, text] of marks) {
+          let mark = Array.from(el.querySelectorAll<HTMLElement>(".vx-resident")).find(x => x.dataset.kind === kind);
+          if (!mark) { mark = document.createElement("div"); mark.className = "vx-resident"; mark.dataset.kind = kind; el.appendChild(mark); }
+          mark.textContent = kind === "standing" ? v.standing.map(s=>`${s.text.match(/断言|每当|不得|定时|无视/)?.[0]??"长期"}${s.left<99?` ${s.left}轮`:""}`).join(" · ") : text;
+          mark.title = text;
+        }
+      }
     }
     // 右上角：轮数 / 行动点 / 数字牌
     const h = m.hud();
@@ -219,6 +237,10 @@ export class Battle {
     banner: (text, sub) => { const b = this.stage.querySelector<HTMLElement>(".banner")!; b.hidden = false; b.querySelector("b")!.textContent = text; b.querySelector("span")!.textContent = sub ?? ""; b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop"); },
     clock: (sec) => { const c = this.stage.querySelector<HTMLElement>(".clock")!; if (sec === null) { c.hidden = true; this.stage.querySelector<HTMLElement>(".banner")!.hidden = true; } else { c.hidden = false; c.textContent = `第 ${sec} 秒`; } },
     speed: () => [1, 2, 12][this.speedIdx],
+    sentenceWords: (u) => {
+      const d = this.m.s.decl.find(x => x.unit === u);
+      return d ? astToTokens(d.cl).filter(t => t !== "奖励").map(token => ({ token, label: tokenLabel(token, unitLabel) })) : [];
+    },
     anchor: (u, which, atRelease) => {
       const rg = this.rigs[u]; if (!rg || !rg.canvas.width) return null;
       const cv = rg.canvas, mm = rg.castMoments(); if (!mm) return null;
@@ -366,6 +388,7 @@ export class Battle {
       this.stage.querySelectorAll<HTMLElement>('[data-a^="skip"]').forEach((b) => (b.hidden = true));
       for (let u = 0; u < 6; u++) { this.disp.hp[u] = Math.max(0, m.s.hp[u]); this.disp.sh[u] = m.s.sh[u]; }
       this.unitEls.forEach((el, u) => el.classList.toggle("fall", !m.unitAlive(u)));
+      this.roundResolved = true;
       this.busy = false; this.render();
       if (this.hooks?.onRoundEnd) { await this.hooks.onRoundEnd(this); if (this.aborted) return; }
       if (m.over()) {
@@ -377,8 +400,10 @@ export class Battle {
       if (this.auto) await sleep(this.speedIdx === 2 ? 0 : 300); else await this.button("next", "本轮结算完了，点「下一轮」");
       if (this.aborted) return;
       m.nextRound();
+      this.roundResolved = false;
       for (let u = 0; u < 6; u++) { this.disp.hp[u] = m.s.hp[u]; this.disp.sh[u] = m.s.sh[u]; }
       this.render();
     }
   }
 }
+
